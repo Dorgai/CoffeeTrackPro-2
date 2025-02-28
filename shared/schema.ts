@@ -64,13 +64,15 @@ export const orders = pgTable("orders", {
   createdById: integer("created_by_id").references(() => users.id),
 });
 
-export const insertUserSchema = createInsertSchema(users).omit({ id: true });
-export const insertShopSchema = createInsertSchema(shops).omit({ id: true });
-export const insertGreenCoffeeSchema = createInsertSchema(greenCoffee).omit({ id: true, createdAt: true });
-export const insertRoastingBatchSchema = createInsertSchema(roastingBatches).omit({ id: true, roastedAt: true });
-export const insertRetailInventorySchema = createInsertSchema(retailInventory).omit({ id: true, updatedAt: true });
-export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, createdAt: true });
+// Create insert schemas for each table
+export const insertUserSchema = createInsertSchema(users);
+export const insertShopSchema = createInsertSchema(shops);
+export const insertGreenCoffeeSchema = createInsertSchema(greenCoffee);
+export const insertRoastingBatchSchema = createInsertSchema(roastingBatches);
+export const insertRetailInventorySchema = createInsertSchema(retailInventory);
+export const insertOrderSchema = createInsertSchema(orders);
 
+// Export types for use in application code
 export type User = typeof users.$inferSelect;
 export type Shop = typeof shops.$inferSelect;
 export type GreenCoffee = typeof greenCoffee.$inferSelect;

@@ -13,3 +13,20 @@ if (!process.env.DATABASE_URL) {
 
 export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 export const db = drizzle({ client: pool, schema });
+
+// Seed initial data if needed
+export async function seedInitialData() {
+  try {
+    // Check if we already have shops
+    const existingShops = await db.select().from(schema.shops);
+    if (existingShops.length === 0) {
+      // Create initial shop
+      await db.insert(schema.shops).values({
+        name: "Main Roastery",
+        location: "123 Coffee Street",
+      });
+    }
+  } catch (error) {
+    console.error("Error seeding initial data:", error);
+  }
+}

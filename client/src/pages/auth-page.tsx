@@ -47,7 +47,6 @@ export default function AuthPage() {
       username: "",
       password: "",
       role: "barista",
-      shopId: 1,
     },
   });
 
