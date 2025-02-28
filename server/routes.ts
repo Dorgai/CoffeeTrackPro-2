@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { insertGreenCoffeeSchema, insertRoastingBatchSchema, insertOrderSchema } from "@shared/schema";
+import { insertGreenCoffeeSchema, insertRoastingBatchSchema, insertOrderSchema, insertShopSchema } from "@shared/schema";
 
 function requireRole(roles: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -15,6 +15,22 @@ function requireRole(roles: string[]) {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
+
+  // Shops Routes - accessible by roastery owner
+  app.get("/api/shops", async (req, res) => {
+    const shops = await storage.getShops();
+    res.json(shops);
+  });
+
+  app.post(
+    "/api/shops",
+    requireRole(["roasteryOwner"]),
+    async (req, res) => {
+      const data = insertShopSchema.parse(req.body);
+      const shop = await storage.createShop(data);
+      res.status(201).json(shop);
+    },
+  );
 
   // Green Coffee Routes - accessible by roastery owner
   app.get("/api/green-coffee", async (req, res) => {

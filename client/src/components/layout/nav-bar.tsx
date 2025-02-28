@@ -22,8 +22,14 @@ export function NavBar() {
     },
     {
       href: "/inventory",
-      label: "Inventory",
+      label: "Green Coffee",
       icon: Coffee,
+      roles: ["roasteryOwner"],
+    },
+    {
+      href: "/shops",
+      label: "Shops",
+      icon: Store,
       roles: ["roasteryOwner"],
     },
     {

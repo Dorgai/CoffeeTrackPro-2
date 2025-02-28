@@ -11,6 +11,7 @@ import Dashboard from "@/pages/dashboard";
 import Inventory from "@/pages/inventory";
 import Roasting from "@/pages/roasting";
 import Retail from "@/pages/retail";
+import Shops from "@/pages/shops";
 
 function Router() {
   return (
@@ -50,6 +51,15 @@ function Router() {
           </PageLayout>
         )}
         roles={["shopManager", "barista"]}
+      />
+      <ProtectedRoute 
+        path="/shops" 
+        component={() => (
+          <PageLayout>
+            <Shops />
+          </PageLayout>
+        )}
+        roles={["roasteryOwner"]}
       />
       <Route component={NotFound} />
     </Switch>
