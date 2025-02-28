@@ -217,3 +217,245 @@ export default function Inventory() {
     </div>
   );
 }
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Loader2, Plus, Edit, Coffee } from "lucide-react";
+import { Link } from "react-router-dom";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { GreenCoffee } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
+import { formatDate } from "@/lib/utils";
+
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { GreenCoffeeForm } from "@/components/coffee/green-coffee-form";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+
+export default function Inventory() {
+  const { toast } = useToast();
+  const [selectedCoffee, setSelectedCoffee] = useState<GreenCoffee | null>(null);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+  const { data: coffees, isLoading } = useQuery<GreenCoffee[]>({
+    queryKey: ["/api/green-coffee"],
+  });
+
+  // Group coffees by date (today vs older)
+  const today = new Date().toDateString();
+  const todayCoffees = coffees?.filter(
+    coffee => new Date(coffee.createdAt!).toDateString() === today
+  ) || [];
+  const olderCoffees = coffees?.filter(
+    coffee => new Date(coffee.createdAt!).toDateString() !== today
+  ) || [];
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto py-8 space-y-8">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Green Coffee Inventory</h1>
+          <p className="text-muted-foreground">
+            Manage your green coffee inventory and track stock levels.
+          </p>
+        </div>
+
+        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Add New Coffee
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[600px]">
+            <GreenCoffeeForm
+              onSuccess={() => {
+                toast({
+                  title: "Coffee Added",
+                  description: "New green coffee has been added to inventory",
+                });
+                setIsAddDialogOpen(false);
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {todayCoffees.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Today's Updates</CardTitle>
+            <CardDescription>
+              Green coffee added or updated today
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Producer</TableHead>
+                  <TableHead>Country</TableHead>
+                  <TableHead>Current Stock (kg)</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {todayCoffees.map((coffee) => (
+                  <TableRow key={coffee.id}>
+                    <TableCell>
+                      <Link
+                        to={`/coffee/${coffee.id}`}
+                        className="text-blue-500 hover:underline font-medium"
+                      >
+                        {coffee.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell>{coffee.producer}</TableCell>
+                    <TableCell>{coffee.country}</TableCell>
+                    <TableCell>{coffee.currentStock}</TableCell>
+                    <TableCell>
+                      <Dialog open={isEditDialogOpen && selectedCoffee?.id === coffee.id} 
+                        onOpenChange={(open) => {
+                          setIsEditDialogOpen(open);
+                          if (!open) setSelectedCoffee(null);
+                        }}>
+                        <DialogTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => {
+                              setSelectedCoffee(coffee);
+                              setIsEditDialogOpen(true);
+                            }}
+                          >
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[600px]">
+                          {selectedCoffee && (
+                            <GreenCoffeeForm
+                              coffee={selectedCoffee}
+                              onSuccess={() => {
+                                toast({
+                                  title: "Coffee Updated",
+                                  description: "Green coffee has been updated",
+                                });
+                                setIsEditDialogOpen(false);
+                                setSelectedCoffee(null);
+                              }}
+                            />
+                          )}
+                        </DialogContent>
+                      </Dialog>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Green Coffee Inventory</CardTitle>
+          <CardDescription>
+            All available green coffee beans in stock
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Producer</TableHead>
+                <TableHead>Country</TableHead>
+                <TableHead>Current Stock (kg)</TableHead>
+                <TableHead>Arrival Date</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {olderCoffees.map((coffee) => (
+                <TableRow key={coffee.id}>
+                  <TableCell>
+                    <Link
+                      to={`/coffee/${coffee.id}`}
+                      className="text-blue-500 hover:underline font-medium"
+                    >
+                      {coffee.name}
+                    </Link>
+                  </TableCell>
+                  <TableCell>{coffee.producer}</TableCell>
+                  <TableCell>{coffee.country}</TableCell>
+                  <TableCell>{coffee.currentStock}</TableCell>
+                  <TableCell>{formatDate(coffee.createdAt || "")}</TableCell>
+                  <TableCell>
+                    <Dialog open={isEditDialogOpen && selectedCoffee?.id === coffee.id} 
+                      onOpenChange={(open) => {
+                        setIsEditDialogOpen(open);
+                        if (!open) setSelectedCoffee(null);
+                      }}>
+                      <DialogTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            setSelectedCoffee(coffee);
+                            setIsEditDialogOpen(true);
+                          }}
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[600px]">
+                        {selectedCoffee && (
+                          <GreenCoffeeForm
+                            coffee={selectedCoffee}
+                            onSuccess={() => {
+                              toast({
+                                title: "Coffee Updated",
+                                description: "Green coffee has been updated",
+                              });
+                              setIsEditDialogOpen(false);
+                              setSelectedCoffee(null);
+                            }}
+                          />
+                        )}
+                      </DialogContent>
+                    </Dialog>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

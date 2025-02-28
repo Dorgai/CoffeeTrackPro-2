@@ -1,14 +1,21 @@
+
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
-import { useAuth } from "@/hooks/use-auth";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { insertRetailInventorySchema } from "@shared/schema";
+import { GreenCoffee } from "@shared/schema";
+import { Loader2, Coffee, History, Package2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { GreenCoffee, RetailInventory, Order } from "@shared/schema";
-import { Loader2, Plus } from "lucide-react";
+import { useUser } from "@/hooks/use-user";
+import { formatDate } from "@/lib/utils";
 
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -17,99 +24,49 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { RetailInventoryForm } from "@/components/coffee/retail-inventory-form";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
 
 export default function Retail() {
-  const { user } = useAuth();
   const { toast } = useToast();
+  const { user } = useUser();
   const [selectedCoffee, setSelectedCoffee] = useState<GreenCoffee | null>(null);
+  const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
 
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
   });
 
-  const { data: inventory, isLoading: loadingInventory } = useQuery<
-    RetailInventory[]
-  >({
-    queryKey: ["/api/retail-inventory", user?.shopId],
-    enabled: user?.shopId !== undefined,
+  const { data: retailInventory, isLoading: loadingInventory } = useQuery({
+    queryKey: ["/api/retail-inventory"],
   });
 
-  const { data: orders, isLoading: loadingOrders } = useQuery<Order[]>({
-    queryKey: ["/api/orders", user?.shopId],
-    enabled: user?.shopId !== undefined,
+  const { data: orders, isLoading: loadingOrders } = useQuery({
+    queryKey: ["/api/orders"],
   });
 
   const updateInventoryMutation = useMutation({
-    mutationFn: async (data: {
-      greenCoffeeId: number;
-      smallBags: number;
-      largeBags: number;
-    }) => {
-      const res = await apiRequest("POST", "/api/retail-inventory", {
-        ...data,
-        shopId: user?.shopId,
-        updatedById: user?.id,
+    mutationFn: async ({ greenCoffeeId, smallBags, largeBags }: { greenCoffeeId: number, smallBags: number, largeBags: number }) => {
+      return apiRequest("/api/retail-inventory", {
+        method: "POST",
+        data: {
+          greenCoffeeId,
+          smallBags,
+          largeBags,
+        },
       });
-      return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["/api/retail-inventory", user?.shopId],
-      });
+      queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory"] });
       toast({
-        title: "Success",
-        description: "Inventory updated successfully",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
+        title: "Inventory Updated",
+        description: "The inventory has been updated successfully",
       });
     },
   });
-
-  if (loadingCoffees || loadingInventory || loadingOrders) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
-
-  const getOrderStatusColor = (status: Order["status"]) => {
-    switch (status) {
-      case "pending":
-        return "warning";
-      case "approved":
-        return "success";
-      case "completed":
-        return "secondary";
-      case "rejected":
-        return "destructive";
-      default:
-        return "default";
-    }
-  };
 
   const handleUpdateInventory = (coffeeId: number, smallBags: number, largeBags: number) => {
     updateInventoryMutation.mutate({
@@ -119,146 +76,97 @@ export default function Retail() {
     });
   };
 
+  if (loadingCoffees || loadingInventory || loadingOrders) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  // Get current inventory for a coffee
+  const getCurrentInventory = (coffeeId: number) => {
+    const inventory = retailInventory?.find(item => item.greenCoffeeId === coffeeId);
+    return {
+      smallBags: inventory?.smallBags || 0,
+      largeBags: inventory?.largeBags || 0,
+      id: inventory?.id,
+      updatedAt: inventory?.updatedAt,
+      updatedBy: inventory?.updatedBy,
+    };
+  };
+
+  // Get orders for a specific coffee
+  const getCoffeeOrders = (coffeeId: number) => {
+    return orders?.filter(order => order.greenCoffeeId === coffeeId) || [];
+  };
+
   return (
     <div className="container mx-auto py-8 space-y-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Retail Management</h1>
         <p className="text-muted-foreground">
-          Manage your shop's inventory and place orders.
+          Manage your shop's inventory and view orders.
         </p>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>Current Inventory</CardTitle>
-            <CardDescription>Stock levels for your shop</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Coffee</TableHead>
-                  <TableHead>Small Bags (200g)</TableHead>
-                  <TableHead>Large Bags (1kg)</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {coffees?.map((coffee) => {
-                  const inv = inventory?.find(
-                    (i) => i.greenCoffeeId === coffee.id
-                  ) || { smallBags: 0, largeBags: 0 };
-                  return (
-                    <TableRow key={coffee.id}>
-                      <TableCell>{coffee.name}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="number"
-                            className="w-20"
-                            defaultValue={inv.smallBags}
-                            onChange={(e) =>
-                              handleUpdateInventory(
-                                coffee.id,
-                                parseInt(e.target.value) || 0,
-                                inv.largeBags
-                              )
-                            }
-                          />
-                          <span>bags</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="number"
-                            className="w-20"
-                            defaultValue={inv.largeBags}
-                            onChange={(e) =>
-                              handleUpdateInventory(
-                                coffee.id,
-                                inv.smallBags,
-                                parseInt(e.target.value) || 0
-                              )
-                            }
-                          />
-                          <span>bags</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSelectedCoffee(coffee)}
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Order More
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+      <Tabs defaultValue="inventory" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="inventory" className="flex items-center gap-2">
+            <Package2 className="h-4 w-4" />
+            Inventory
+          </TabsTrigger>
+          <TabsTrigger value="orders" className="flex items-center gap-2">
+            <History className="h-4 w-4" />
+            Order History
+          </TabsTrigger>
+        </TabsList>
 
-        <div className="space-y-8">
-          {selectedCoffee && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Place Order</CardTitle>
-                <CardDescription>
-                  Order more {selectedCoffee.name} for your shop
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {/* Your existing OrderForm component */}
-                <OrderForm
-                  greenCoffeeId={selectedCoffee.id}
-                  maxSmallBags={100}
-                  maxLargeBags={50}
-                  onSuccess={() => setSelectedCoffee(null)}
-                />
-              </CardContent>
-            </Card>
-          )}
-
+        <TabsContent value="inventory" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Recent Orders</CardTitle>
+              <CardTitle>Retail Inventory</CardTitle>
+              <CardDescription>
+                Current stock of roasted coffee available for order
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date</TableHead>
                     <TableHead>Coffee</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>Producer</TableHead>
+                    <TableHead>Small Bags (200g)</TableHead>
+                    <TableHead>Large Bags (1kg)</TableHead>
+                    <TableHead>Last Updated</TableHead>
+                    <TableHead>Updated By</TableHead>
+                    <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {orders?.map((order) => {
-                    const coffee = coffees?.find(
-                      (c) => c.id === order.greenCoffeeId
-                    );
+                  {coffees?.map((coffee) => {
+                    const inventory = getCurrentInventory(coffee.id);
                     return (
-                      <TableRow key={order.id}>
+                      <TableRow key={coffee.id}>
+                        <TableCell className="font-medium">{coffee.name}</TableCell>
+                        <TableCell>{coffee.producer}</TableCell>
+                        <TableCell>{inventory.smallBags}</TableCell>
+                        <TableCell>{inventory.largeBags}</TableCell>
                         <TableCell>
-                          {new Date(order.createdAt).toLocaleDateString()}
+                          {inventory.updatedAt ? formatDate(inventory.updatedAt) : 'Never'}
                         </TableCell>
-                        <TableCell>{coffee?.name}</TableCell>
+                        <TableCell>{inventory.updatedBy?.username || '-'}</TableCell>
                         <TableCell>
-                          {order.smallBags} × 200g
-                          <br />
-                          {order.largeBags} × 1kg
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={getOrderStatusColor(order.status)}>
-                            {order.status}
-                          </Badge>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedCoffee(coffee);
+                              setIsUpdateDialogOpen(true);
+                            }}
+                          >
+                            Update
+                          </Button>
                         </TableCell>
                       </TableRow>
                     );
@@ -267,8 +175,77 @@ export default function Retail() {
               </Table>
             </CardContent>
           </Card>
-        </div>
-      </div>
+        </TabsContent>
+
+        <TabsContent value="orders" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Order History</CardTitle>
+              <CardDescription>
+                Recent orders placed by retailers
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {orders && orders.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Order Date</TableHead>
+                      <TableHead>Coffee</TableHead>
+                      <TableHead>Small Bags (200g)</TableHead>
+                      <TableHead>Large Bags (1kg)</TableHead>
+                      <TableHead>Total Weight</TableHead>
+                      <TableHead>Ordered By</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {orders.map((order) => {
+                      const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
+                      const totalWeight = (order.smallBags * 0.2) + (order.largeBags * 1);
+                      
+                      return (
+                        <TableRow key={order.id}>
+                          <TableCell>{formatDate(order.createdAt || "")}</TableCell>
+                          <TableCell className="font-medium">{coffee?.name || 'Unknown'}</TableCell>
+                          <TableCell>{order.smallBags}</TableCell>
+                          <TableCell>{order.largeBags}</TableCell>
+                          <TableCell>{totalWeight.toFixed(2)} kg</TableCell>
+                          <TableCell>{order.user?.username || '-'}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  No orders have been placed yet
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      <Dialog 
+        open={isUpdateDialogOpen && !!selectedCoffee} 
+        onOpenChange={(open) => {
+          setIsUpdateDialogOpen(open);
+          if (!open) setSelectedCoffee(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-[500px]">
+          {selectedCoffee && (
+            <RetailInventoryForm
+              coffee={selectedCoffee}
+              currentInventory={getCurrentInventory(selectedCoffee.id)}
+              onSuccess={() => {
+                setIsUpdateDialogOpen(false);
+                setSelectedCoffee(null);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
