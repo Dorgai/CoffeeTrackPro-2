@@ -8,7 +8,8 @@ import {
   Store, 
   BarChart3,
   Loader2,
-  AlertTriangle 
+  AlertTriangle,
+  LogOut 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -42,7 +43,7 @@ function StatsCard({
 }
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, logoutMutation } = useAuth();
 
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
@@ -76,12 +77,22 @@ export default function Dashboard() {
           <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user?.username}</h1>
           <p className="text-muted-foreground">Here's what's happening with your coffee roasting operations.</p>
         </div>
-        
-        {user?.role === "roasteryOwner" && (
-          <Button asChild>
-            <Link href="/inventory">Manage Inventory</Link>
+
+        <div className="flex gap-2">
+          {user?.role === "roasteryOwner" && (
+            <Button asChild>
+              <Link href="/inventory">Manage Inventory</Link>
+            </Button>
+          )}
+          <Button 
+            variant="outline" 
+            onClick={() => logoutMutation.mutate()} 
+            disabled={logoutMutation.isPending}
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Logout
           </Button>
-        )}
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
