@@ -131,8 +131,8 @@ import { Coffee, Package, Home, ShoppingCart, Flame } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 
-export function NavBar() {
-  const { user, logout } = useAuth();
+// This is part of the original NavBar function
+// const { user, logout } = useAuth();
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background">
