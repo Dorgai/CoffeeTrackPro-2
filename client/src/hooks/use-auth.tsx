@@ -105,3 +105,69 @@ export function useAuth() {
   }
   return context;
 }
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useUser } from "./use-user";
+
+interface AuthContextType {
+  user: any;
+  isLoading: boolean;
+  loginMutation: any;
+  registerMutation: any;
+  logout: () => void;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
+  const { user, isLoading, refetch } = useUser();
+
+  const loginMutation = useMutation({
+    mutationFn: async (data: { username: string; password: string }) => {
+      const res = await apiRequest("POST", "/api/auth/login", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      refetch();
+    },
+  });
+
+  const registerMutation = useMutation({
+    mutationFn: async (data: { username: string; password: string; role: string }) => {
+      const res = await apiRequest("POST", "/api/auth/register", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      refetch();
+    },
+  });
+
+  const logout = async () => {
+    await apiRequest("POST", "/api/auth/logout", {});
+    queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+  };
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        isLoading,
+        loginMutation,
+        registerMutation,
+        logout,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+}

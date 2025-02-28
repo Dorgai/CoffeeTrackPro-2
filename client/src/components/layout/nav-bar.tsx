@@ -126,3 +126,66 @@ export function NavBar() {
     </nav>
   );
 }
+import { Link } from "wouter";
+import { Coffee, Package, Home, ShoppingCart, Flame } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
+import { Button } from "@/components/ui/button";
+
+export function NavBar() {
+  const { user, logout } = useAuth();
+
+  return (
+    <header className="sticky top-0 z-40 w-full border-b bg-background">
+      <div className="container flex h-16 items-center">
+        <Link href="/" className="flex items-center space-x-2">
+          <Coffee className="h-6 w-6" />
+          <span className="font-bold">Coffee Roastery</span>
+        </Link>
+        
+        <nav className="flex items-center space-x-4 lg:space-x-6 mx-6">
+          <Link href="/" className="text-sm font-medium transition-colors hover:text-primary">
+            <div className="flex items-center space-x-1">
+              <Home className="h-4 w-4" />
+              <span>Dashboard</span>
+            </div>
+          </Link>
+          <Link href="/inventory" className="text-sm font-medium transition-colors hover:text-primary">
+            <div className="flex items-center space-x-1">
+              <Package className="h-4 w-4" />
+              <span>Inventory</span>
+            </div>
+          </Link>
+          <Link href="/roasting" className="text-sm font-medium transition-colors hover:text-primary">
+            <div className="flex items-center space-x-1">
+              <Flame className="h-4 w-4" />
+              <span>Roasting</span>
+            </div>
+          </Link>
+          <Link href="/retail" className="text-sm font-medium transition-colors hover:text-primary">
+            <div className="flex items-center space-x-1">
+              <ShoppingCart className="h-4 w-4" />
+              <span>Retail</span>
+            </div>
+          </Link>
+        </nav>
+        
+        <div className="ml-auto flex items-center space-x-4">
+          {user ? (
+            <>
+              <span className="text-sm text-muted-foreground">
+                {user.username} ({user.role})
+              </span>
+              <Button variant="ghost" onClick={() => logout()}>
+                Logout
+              </Button>
+            </>
+          ) : (
+            <Link href="/auth">
+              <Button variant="ghost">Login</Button>
+            </Link>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+}
