@@ -1,133 +1,5 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertOrderSchema } from "@shared/schema";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/use-auth";
-
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
-// Removing duplicate function
-// export function OrderForm({ 
-//   greenCoffeeId,
-//   maxSmallBags,
-//   maxLargeBags,
-//   onSuccess 
-// }: { 
-//   greenCoffeeId: number;
-//   maxSmallBags: number;
-//   maxLargeBags: number;
-//   onSuccess?: () => void;
-// }) {
-//   const { toast } = useToast();
-//   const { user } = useAuth();
-
-//   const form = useForm({
-//     resolver: zodResolver(insertOrderSchema),
-//     defaultValues: {
-//       greenCoffeeId,
-//       shopId: user?.shopId!,
-//       smallBags: 0,
-//       largeBags: 0,
-//       status: "pending",
-//     },
-//   });
-
-//   const orderMutation = useMutation({
-//     mutationFn: async (data: typeof form.getValues) => {
-//       const res = await apiRequest("POST", "/api/orders", data);
-//       return res.json();
-//     },
-//     onSuccess: () => {
-//       queryClient.invalidateQueries({ queryKey: ["/api/orders", user?.shopId] });
-//       toast({
-//         title: "Success",
-//         description: "Order placed successfully",
-//       });
-//       onSuccess?.();
-//       form.reset();
-//     },
-//     onError: (error) => {
-//       toast({
-//         title: "Error",
-//         description: error.message,
-//         variant: "destructive",
-//       });
-//     },
-//   });
-
-//   return (
-//     <Card>
-//       <CardHeader>
-//         <CardTitle>Place Order</CardTitle>
-//       </CardHeader>
-//       <CardContent>
-//         <Form {...form}>
-//           <form onSubmit={form.handleSubmit((data) => orderMutation.mutate(data))} className="space-y-4">
-//             <FormField
-//               control={form.control}
-//               name="smallBags"
-//               render={({ field }) => (
-//                 <FormItem>
-//                   <FormLabel>Small Bags (200g)</FormLabel>
-//                   <FormControl>
-//                     <Input 
-//                       type="number" 
-//                       min="0"
-//                       max={maxSmallBags}
-//                       {...field} 
-//                     />
-//                   </FormControl>
-//                   <FormMessage />
-//                 </FormItem>
-//               )}
-//             />
-
-//             <FormField
-//               control={form.control}
-//               name="largeBags"
-//               render={({ field }) => (
-//                 <FormItem>
-//                   <FormLabel>Large Bags (1kg)</FormLabel>
-//                   <FormControl>
-//                     <Input 
-//                       type="number"
-//                       min="0" 
-//                       max={maxLargeBags}
-//                       {...field} 
-//                     />
-//                   </FormControl>
-//                   <FormMessage />
-//                 </FormItem>
-//               )}
-//             />
-
-//             <Button 
-//               type="submit" 
-//               disabled={orderMutation.isPending}
-//               className="w-full"
-//             >
-//               Place Order
-//             </Button>
-//           </form>
-//         </Form>
-//       </CardContent>
-//     </Card>
-//   );
-// }
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -210,147 +82,70 @@ export function OrderForm({
     },
   });
 
-  const onSubmit = form.handleSubmit((data) => {
-    // Validation checks
-    if (data.smallBags === 0 && data.largeBags === 0) {
-      toast({
-        title: "Order Validation",
-        description: "Please select at least one bag to order",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Check if ordered quantities exceed available stock
-    if (data.smallBags > availableBags.smallBags || data.largeBags > availableBags.largeBags) {
-      toast({
-        title: "Insufficient Stock",
-        description: "The ordered quantity exceeds available stock",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Calculate if ordered weight exceeds max allowed percentage of green coffee
-    const orderedWeight = (data.smallBags * 0.2) + (data.largeBags * 1);
-    const maxAllowedWeight = Number(coffee.currentStock) * (maxStockPercentage / 100);
-
-    if (orderedWeight > maxAllowedWeight) {
-      toast({
-        title: "Order Exceeds Limit",
-        description: `Orders cannot exceed ${maxStockPercentage}% of available green coffee stock`,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Store form data and open confirmation dialog
+  const onSubmit = (data: OrderFormValues) => {
     setFormData(data);
     setIsConfirmOpen(true);
-  });
-
-  const confirmOrder = async () => {
-    if (formData) {
-      try {
-        await createOrderMutation.mutateAsync(formData);
-        toast({
-          title: "Order Placed",
-          description: "Your order has been placed successfully",
-        });
-        form.reset({
-          greenCoffeeId: coffee.id,
-          smallBags: 0,
-          largeBags: 0,
-        });
-      } catch (error) {
-        toast({
-          title: "Error",
-          description: "Failed to place order",
-          variant: "destructive",
-        });
-      }
-    }
   };
 
-  // Calculate total weight and price
-  const smallBags = form.watch("smallBags");
-  const largeBags = form.watch("largeBags");
-  const totalWeight = (smallBags * 0.2) + (largeBags * 1);
-  const maxAllowedWeight = Number(coffee.currentStock) * (maxStockPercentage / 100);
+  const confirmOrder = () => {
+    if (formData) {
+      createOrderMutation.mutate(formData);
+    }
+  };
 
   return (
     <>
       <Card>
         <CardHeader>
-          <CardTitle>{coffee.name}</CardTitle>
+          <CardTitle>Place Order</CardTitle>
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={onSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="smallBags"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Small Bags (200g)</FormLabel>
-                      <FormControl>
-                        <Input type="number" min="0" max={availableBags.smallBags} {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        Available: {availableBags.smallBags}
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="smallBags"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Small Bags (200g)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="0"
+                        max={availableBags.smallBags}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-                <FormField
-                  control={form.control}
-                  name="largeBags"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Large Bags (1kg)</FormLabel>
-                      <FormControl>
-                        <Input type="number" min="0" max={availableBags.largeBags} {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        Available: {availableBags.largeBags}
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <Separator />
-
-              <div className="space-y-1">
-                <div className="flex justify-between text-sm">
-                  <span>Total Weight:</span>
-                  <span>{totalWeight.toFixed(2)} kg</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Max Allowed:</span>
-                  <span>{maxAllowedWeight.toFixed(2)} kg ({maxStockPercentage}% of stock)</span>
-                </div>
-              </div>
-
-              {totalWeight > maxAllowedWeight && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    Order exceeds {maxStockPercentage}% of available green coffee stock
-                  </AlertDescription>
-                </Alert>
-              )}
+              <FormField
+                control={form.control}
+                name="largeBags"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Large Bags (1kg)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number"
+                        min="0" 
+                        max={availableBags.largeBags}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <Button 
                 type="submit" 
-                className="w-full" 
                 disabled={createOrderMutation.isPending}
+                className="w-full"
               >
-                Submit Order
+                Place Order
               </Button>
             </form>
           </Form>
@@ -360,26 +155,12 @@ export function OrderForm({
       <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirm Your Order</DialogTitle>
+            <DialogTitle>Confirm Order</DialogTitle>
             <DialogDescription>
               Please review your order details before confirming.
             </DialogDescription>
           </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="font-medium">Coffee:</p>
-                <p className="text-muted-foreground">{coffee.name}</p>
-              </div>
-              <div>
-                <p className="font-medium">Producer:</p>
-                <p className="text-muted-foreground">{coffee.producer}</p>
-              </div>
-            </div>
-
-            <Separator />
-
+          <div className="space-y-4">
             <div className="space-y-2">
               <p className="font-medium">Order Details:</p>
               <div className="grid grid-cols-2 gap-2">
