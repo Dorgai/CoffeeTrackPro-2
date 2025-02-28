@@ -1,0 +1,56 @@
+Key User Interfaces and use cases: 
+
+Green coffee management
+
+Use cases
+
+Roastery owner user can 
+
+i) register new green coffee (producer, name, altitude, cupping notes, country, other details) 
+ii) input initial quantity or update inventory quantity and 
+iii) see available inventory based on roasted quantities and packaged coffees (see further below) 
+
+UI
+
+Every new green coffee is displayed in a grid in reverse chronological order, per day (latest change appearing on top of the list). 
+The previously ordered green coffees are displayed in another grid, with quantity, date of arrival and the name of the coffee. 
+Within the grid, the name of the coffee is a web link to that specific coffee’s information page. That page can be edited by Roastery owner by clicking on the “Edit” button on the page of each green coffee. 
+
+Retailer order screen
+
+Coffee ordering use case
+
+In a grid, with list of available coffees where actors can select the type of coffee they want to order: they can choose the 
+i) bag size and 
+ii) the number of bags desired of each bag size. 
+	
+The number entered can’t exceed the number of bags in stock. 
+
+UI controls
+
+After all data input, the user has to “submit” the data by clicking on the submit button. User has to confirm the submission by clicking on the confirm button appearing after pressing the submit button. 
+
+UI validations 
+
+Only positive numbers can be input for the quantity of bags desired. 
+The total quantity of all coffees can’t exceed 80% of the available stock of green coffee of the given coffee. 80% is a parameter that can be changed in the UI by the Roastery owner user. 
+
+Roaster screen
+
+Use cases: 
+Roaster user can update the inventory of roasted coffee (by coffee name, date, quantity of small and large size bags) and the coffee packed. 
+
+Select amount: The user must enter the amount of i) green coffee roasted and i) the amount of coffee packed. User can’t submit the value of amount of green coffee roasted without filling in the amount of coffee packed. 
+
+Input options and validations: Small bags contain 200 g of coffee, large bags contain 1000 g of coffee. For each coffee (by name) the total weight of coffee packed should not be less than 80% of coffee roasted from the same coffee (name). 
+
+Roasting loss calculation: for each roasting, for each coffee (by name) a roasting loss is calculated, by subtracting the total weight packaged from the total weight of green beans roasted. 
+
+Retail information and retail inventory management screen 
+
+Inventory: for Roastery owner to have an overview of actual inventory of every retail shop, by coffee and by packaging size 
+
+Retail inventory: 
+Barista, shop manager or retail manager manually updates the inventory (per coffee type, per  roasting profile (filter or espresso), and per date) 
+Each change is logged, with last change displayed including the change quantity and the user name (actor) 
+Provides an overview of stock available at each retail unit, by retail unit
