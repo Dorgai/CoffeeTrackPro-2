@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "./hooks/use-auth";
 import { ProtectedRoute } from "./lib/protected-route";
+import { PageLayout } from "@/components/layout/page-layout";
 import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
 import Dashboard from "@/pages/dashboard";
@@ -14,21 +15,40 @@ import Retail from "@/pages/retail";
 function Router() {
   return (
     <Switch>
-      <ProtectedRoute path="/" component={Dashboard} />
       <Route path="/auth" component={AuthPage} />
       <ProtectedRoute 
+        path="/" 
+        component={() => (
+          <PageLayout>
+            <Dashboard />
+          </PageLayout>
+        )}
+      />
+      <ProtectedRoute 
         path="/inventory" 
-        component={Inventory}
+        component={() => (
+          <PageLayout>
+            <Inventory />
+          </PageLayout>
+        )}
         roles={["roasteryOwner"]}
       />
       <ProtectedRoute 
         path="/roasting" 
-        component={Roasting}
+        component={() => (
+          <PageLayout>
+            <Roasting />
+          </PageLayout>
+        )}
         roles={["roaster"]}
       />
       <ProtectedRoute 
         path="/retail" 
-        component={Retail} 
+        component={() => (
+          <PageLayout>
+            <Retail />
+          </PageLayout>
+        )}
         roles={["shopManager", "barista"]}
       />
       <Route component={NotFound} />
