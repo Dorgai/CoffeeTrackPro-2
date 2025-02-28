@@ -18,113 +18,114 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export function OrderForm({ 
-  greenCoffeeId,
-  maxSmallBags,
-  maxLargeBags,
-  onSuccess 
-}: { 
-  greenCoffeeId: number;
-  maxSmallBags: number;
-  maxLargeBags: number;
-  onSuccess?: () => void;
-}) {
-  const { toast } = useToast();
-  const { user } = useAuth();
-  
-  const form = useForm({
-    resolver: zodResolver(insertOrderSchema),
-    defaultValues: {
-      greenCoffeeId,
-      shopId: user?.shopId!,
-      smallBags: 0,
-      largeBags: 0,
-      status: "pending",
-    },
-  });
+// Removing duplicate function
+// export function OrderForm({ 
+//   greenCoffeeId,
+//   maxSmallBags,
+//   maxLargeBags,
+//   onSuccess 
+// }: { 
+//   greenCoffeeId: number;
+//   maxSmallBags: number;
+//   maxLargeBags: number;
+//   onSuccess?: () => void;
+// }) {
+//   const { toast } = useToast();
+//   const { user } = useAuth();
 
-  const orderMutation = useMutation({
-    mutationFn: async (data: typeof form.getValues) => {
-      const res = await apiRequest("POST", "/api/orders", data);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/orders", user?.shopId] });
-      toast({
-        title: "Success",
-        description: "Order placed successfully",
-      });
-      onSuccess?.();
-      form.reset();
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
+//   const form = useForm({
+//     resolver: zodResolver(insertOrderSchema),
+//     defaultValues: {
+//       greenCoffeeId,
+//       shopId: user?.shopId!,
+//       smallBags: 0,
+//       largeBags: 0,
+//       status: "pending",
+//     },
+//   });
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Place Order</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit((data) => orderMutation.mutate(data))} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="smallBags"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Small Bags (200g)</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="number" 
-                      min="0"
-                      max={maxSmallBags}
-                      {...field} 
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+//   const orderMutation = useMutation({
+//     mutationFn: async (data: typeof form.getValues) => {
+//       const res = await apiRequest("POST", "/api/orders", data);
+//       return res.json();
+//     },
+//     onSuccess: () => {
+//       queryClient.invalidateQueries({ queryKey: ["/api/orders", user?.shopId] });
+//       toast({
+//         title: "Success",
+//         description: "Order placed successfully",
+//       });
+//       onSuccess?.();
+//       form.reset();
+//     },
+//     onError: (error) => {
+//       toast({
+//         title: "Error",
+//         description: error.message,
+//         variant: "destructive",
+//       });
+//     },
+//   });
 
-            <FormField
-              control={form.control}
-              name="largeBags"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Large Bags (1kg)</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="number"
-                      min="0" 
-                      max={maxLargeBags}
-                      {...field} 
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+//   return (
+//     <Card>
+//       <CardHeader>
+//         <CardTitle>Place Order</CardTitle>
+//       </CardHeader>
+//       <CardContent>
+//         <Form {...form}>
+//           <form onSubmit={form.handleSubmit((data) => orderMutation.mutate(data))} className="space-y-4">
+//             <FormField
+//               control={form.control}
+//               name="smallBags"
+//               render={({ field }) => (
+//                 <FormItem>
+//                   <FormLabel>Small Bags (200g)</FormLabel>
+//                   <FormControl>
+//                     <Input 
+//                       type="number" 
+//                       min="0"
+//                       max={maxSmallBags}
+//                       {...field} 
+//                     />
+//                   </FormControl>
+//                   <FormMessage />
+//                 </FormItem>
+//               )}
+//             />
 
-            <Button 
-              type="submit" 
-              disabled={orderMutation.isPending}
-              className="w-full"
-            >
-              Place Order
-            </Button>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
-  );
-}
+//             <FormField
+//               control={form.control}
+//               name="largeBags"
+//               render={({ field }) => (
+//                 <FormItem>
+//                   <FormLabel>Large Bags (1kg)</FormLabel>
+//                   <FormControl>
+//                     <Input 
+//                       type="number"
+//                       min="0" 
+//                       max={maxLargeBags}
+//                       {...field} 
+//                     />
+//                   </FormControl>
+//                   <FormMessage />
+//                 </FormItem>
+//               )}
+//             />
+
+//             <Button 
+//               type="submit" 
+//               disabled={orderMutation.isPending}
+//               className="w-full"
+//             >
+//               Place Order
+//             </Button>
+//           </form>
+//         </Form>
+//       </CardContent>
+//     </Card>
+//   );
+// }
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";

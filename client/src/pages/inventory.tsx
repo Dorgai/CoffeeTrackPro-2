@@ -217,35 +217,8 @@ export default function Inventory() {
     </div>
   );
 }
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { Loader2, Plus, Edit, Coffee } from "lucide-react";
-import { Link } from "react-router-dom";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { GreenCoffee } from "@shared/schema";
-import { useToast } from "@/hooks/use-toast";
-import { formatDate } from "@/lib/utils";
-
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { GreenCoffeeForm } from "@/components/coffee/green-coffee-form";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-
-export default function Inventory() {
+// Removing duplicate export
+function InventorySecondImplementation() {
   const { toast } = useToast();
   const [selectedCoffee, setSelectedCoffee] = useState<GreenCoffee | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
