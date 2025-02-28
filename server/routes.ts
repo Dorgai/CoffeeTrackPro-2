@@ -3,6 +3,8 @@ import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { insertGreenCoffeeSchema, insertRoastingBatchSchema, insertOrderSchema, insertShopSchema } from "@shared/schema";
+import {insertRetailInventorySchema} from "@shared/schema"; //import the missing schema
+
 
 function requireRole(roles: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -83,6 +85,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       parseInt(req.params.shopId),
     );
     res.json(inventory);
+  });
+
+  app.post("/api/retail-inventory", requireRole(["shopManager", "barista"]), async (req, res) => {
+    const data = insertRetailInventorySchema.parse(req.body);
+    const inventory = await storage.updateRetailInventory(data);
+    res.status(201).json(inventory);
   });
 
   // Orders Routes - accessible by shop manager and barista
