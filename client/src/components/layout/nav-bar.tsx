@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { ShopSelector } from "./shop-selector";
 import { RestockDialog } from "../coffee/restock-dialog";
 import { StockLevelIndicator } from "./stock-level-indicator";
+import { GreenBeansStockIndicator } from "./green-beans-stock-indicator";
 
 export function NavBar() {
   const { user, logoutMutation } = useAuth();
@@ -121,8 +122,13 @@ export function NavBar() {
               {(user.role === "shopManager" || user.role === "barista") && (
                 <ShopSelector />
               )}
-              {/* Only show RestockDialog and StockLevelIndicator for non-roaster roles */}
-              {user.role !== "roaster" && (
+              {user.role === "roasteryOwner" ? (
+                <>
+                  <GreenBeansStockIndicator />
+                  <StockLevelIndicator />
+                  <RestockDialog />
+                </>
+              ) : user.role !== "roaster" && (
                 <>
                   <StockLevelIndicator />
                   <RestockDialog />
