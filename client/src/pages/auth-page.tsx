@@ -60,7 +60,7 @@ export default function AuthPage() {
           <div className="space-y-6">
             <div className="flex flex-col items-center space-y-4">
               <img 
-                src="/attached_assets/Untitled design_1740827014275.jpg" 
+                src="/assets/logo.jpg" 
                 alt="Sonic Beans Logo" 
                 className="h-24 w-auto"
               />

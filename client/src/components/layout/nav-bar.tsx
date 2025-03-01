@@ -22,7 +22,7 @@ export function NavBar() {
         <div className="mr-4 flex">
           <Link href="/" className="flex items-center">
             <img 
-              src="/attached_assets/Untitled design_1740827014275.jpg" 
+              src="/assets/logo.jpg" 
               alt="Sonic Beans Logo" 
               className="h-8 w-auto"
             />
