@@ -217,7 +217,7 @@ export class DatabaseStorage implements IStorage {
 
   async getOrdersByShop(shopId: number): Promise<Order[]> {
     try {
-      const orders = await db
+      const results = await db
         .select({
           id: orders.id,
           shopId: orders.shopId,
@@ -238,8 +238,8 @@ export class DatabaseStorage implements IStorage {
         .leftJoin(users, eq(orders.createdById, users.id))
         .orderBy(desc(orders.createdAt));
 
-      console.log("Found orders for shop:", orders);
-      return orders;
+      console.log("Found orders for shop:", results);
+      return results;
     } catch (error) {
       console.error("Error getting orders:", error);
       throw error;

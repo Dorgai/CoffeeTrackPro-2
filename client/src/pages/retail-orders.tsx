@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { GreenCoffee, Order } from "@shared/schema";
+import { GreenCoffee } from "@shared/schema";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -19,6 +19,22 @@ import {
 } from "@/components/ui/table";
 import { formatDate } from "@/lib/utils";
 
+type OrderWithUser = {
+  id: number;
+  shopId: number;
+  greenCoffeeId: number;
+  smallBags: number;
+  largeBags: number;
+  status: string;
+  createdAt: string;
+  createdById: number;
+  user: {
+    id: number;
+    username: string;
+    role: string;
+  };
+};
+
 export default function RetailOrders() {
   const { user } = useAuth();
 
@@ -26,7 +42,7 @@ export default function RetailOrders() {
     queryKey: ["/api/green-coffee"],
   });
 
-  const { data: orders, isLoading: loadingOrders } = useQuery<Order[]>({
+  const { data: orders, isLoading: loadingOrders } = useQuery<OrderWithUser[]>({
     queryKey: ["/api/orders", user?.shopId],
     enabled: !!user?.shopId,
   });
