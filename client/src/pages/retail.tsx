@@ -64,13 +64,14 @@ export default function Retail() {
       });
 
       const res = await apiRequest("POST", "/api/retail-inventory", {
-        ...data,
-        shopId: user.shopId,
-        updatedById: user.id
+        greenCoffeeId: data.greenCoffeeId,
+        smallBags: Number(data.smallBags),
+        largeBags: Number(data.largeBags)
       });
 
       if (!res.ok) {
         const errorData = await res.json();
+        console.error("Server error response:", errorData);
         throw new Error(errorData.message || "Failed to update inventory");
       }
 

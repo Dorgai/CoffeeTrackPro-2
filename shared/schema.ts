@@ -69,7 +69,13 @@ export const insertUserSchema = createInsertSchema(users);
 export const insertShopSchema = createInsertSchema(shops);
 export const insertGreenCoffeeSchema = createInsertSchema(greenCoffee);
 export const insertRoastingBatchSchema = createInsertSchema(roastingBatches);
-export const insertRetailInventorySchema = createInsertSchema(retailInventory);
+export const insertRetailInventorySchema = createInsertSchema(retailInventory).extend({
+  shopId: z.number(),
+  greenCoffeeId: z.number(),
+  smallBags: z.number().int().min(0),
+  largeBags: z.number().int().min(0),
+  updatedById: z.number()
+});
 export const insertOrderSchema = createInsertSchema(orders);
 
 // Export types for use in application code

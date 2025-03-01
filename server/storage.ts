@@ -160,15 +160,18 @@ export class DatabaseStorage implements IStorage {
 
     try {
       // First try to find existing inventory
-      const [existingInventory] = await db
+      const existingInventory = await db
         .select()
         .from(retailInventory)
-        .where(eq(retailInventory.shopId, inventory.shopId))
-        .where(eq(retailInventory.greenCoffeeId, inventory.greenCoffeeId));
+        .where(
+          eq(retailInventory.shopId, inventory.shopId),
+          eq(retailInventory.greenCoffeeId, inventory.greenCoffeeId)
+        )
+        .limit(1);
 
       console.log("Found existing inventory:", existingInventory);
 
-      if (existingInventory) {
+      if (existingInventory.length > 0) {
         // Update existing inventory
         const [updatedInventory] = await db
           .update(retailInventory)
@@ -178,7 +181,7 @@ export class DatabaseStorage implements IStorage {
             updatedById: inventory.updatedById,
             updatedAt: new Date(),
           })
-          .where(eq(retailInventory.id, existingInventory.id))
+          .where(eq(retailInventory.id, existingInventory[0].id))
           .returning();
 
         console.log("Updated existing inventory:", updatedInventory);
@@ -188,7 +191,11 @@ export class DatabaseStorage implements IStorage {
         const [newInventory] = await db
           .insert(retailInventory)
           .values({
-            ...inventory,
+            shopId: inventory.shopId,
+            greenCoffeeId: inventory.greenCoffeeId,
+            smallBags: inventory.smallBags,
+            largeBags: inventory.largeBags,
+            updatedById: inventory.updatedById,
             updatedAt: new Date(),
           })
           .returning();
