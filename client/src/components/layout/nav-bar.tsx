@@ -120,16 +120,15 @@ export function NavBar() {
           {user ? (
             <div className="flex items-center space-x-4">
               {(user.role === "shopManager" || user.role === "barista") && (
-                <ShopSelector />
-              )}
-              {user.role === "roasteryOwner" ? (
                 <>
-                  <GreenBeansStockIndicator />
+                  <ShopSelector />
                   <StockLevelIndicator />
                   <RestockDialog />
                 </>
-              ) : user.role !== "roaster" && (
+              )}
+              {user.role === "roasteryOwner" && (
                 <>
+                  <GreenBeansStockIndicator />
                   <StockLevelIndicator />
                   <RestockDialog />
                 </>
