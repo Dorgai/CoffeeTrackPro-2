@@ -1,49 +1,38 @@
 import { Route, Switch } from "wouter";
-import { Layout } from "@/components/layout";
-import Dashboard from "@/pages/dashboard";
-import AuthPage from "@/pages/auth-page";
-import Inventory from "@/pages/inventory";
-import CoffeeDetail from "@/pages/coffee-detail";
-import Roasting from "@/pages/roasting";
-import Retail from "@/pages/retail";
-import Order from "@/pages/order";
-import NotFound from "@/pages/not-found";
-import { ProtectedRoute } from "@/lib/protected-route";
-import { useUser } from "@/hooks/use-user";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { AuthProvider } from "./hooks/use-auth";
 import { Toaster } from "@/components/ui/toaster";
+import { PageLayout } from "@/components/layout/page-layout";
+import Dashboard from "@/pages/dashboard";
+import AuthPage from "@/pages/auth-page";
+import Inventory from "@/pages/inventory";
+import Roasting from "@/pages/roasting";
+import Retail from "@/pages/retail";
+import Shops from "@/pages/shops";
+import NotFound from "@/pages/not-found";
+import { ProtectedRoute } from "@/lib/protected-route";
 
 
-function App() {
-  const { isLoading } = useUser();
-
-  if (isLoading) {
-    return <div>Loading...</div>;
-  }
-
+export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <Switch>
-          <Route path="/login">{() => <AuthPage />}</Route>
-          <Route path="/auth">{() => <AuthPage />}</Route>
-          
-          <Layout>
+          <Route path="/auth" component={AuthPage} />
+          <Route path="/login" component={AuthPage} />
+
+          <PageLayout>
             <ProtectedRoute path="/" component={Dashboard} />
-            <ProtectedRoute path="/inventory" component={Inventory} />
-            <ProtectedRoute path="/coffee/:id" component={CoffeeDetail} />
-            <ProtectedRoute path="/roasting" component={Roasting} />
-            <ProtectedRoute path="/retail" component={Retail} />
-            <ProtectedRoute path="/order" component={Order} />
-            <Route path="/:rest*">{() => <NotFound />}</Route>
-          </Layout>
+            <ProtectedRoute path="/inventory" component={Inventory} roles={["roasteryOwner"]} />
+            <ProtectedRoute path="/roasting" component={Roasting} roles={["roaster"]} />
+            <ProtectedRoute path="/retail" component={Retail} roles={["shopManager", "barista"]} />
+            <ProtectedRoute path="/shops" component={Shops} roles={["roasteryOwner"]} />
+            <Route path="/:rest*" component={NotFound} />
+          </PageLayout>
         </Switch>
         <Toaster />
       </AuthProvider>
     </QueryClientProvider>
   );
 }
-
-export default App;

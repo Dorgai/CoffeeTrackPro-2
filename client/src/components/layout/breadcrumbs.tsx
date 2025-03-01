@@ -1,58 +1,49 @@
-import * as React from "react";
 import { useLocation } from "wouter";
-import { ChevronRight, Home } from "lucide-react";
-import { Link } from "wouter";
-
 import {
   Breadcrumb,
   BreadcrumbItem,
   BreadcrumbLink,
   BreadcrumbList,
-  BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 
+const routes: Record<string, string> = {
+  "/": "Dashboard",
+  "/inventory": "Green Coffee Inventory",
+  "/roasting": "Roasting",
+  "/retail": "Retail Management",
+  "/shops": "Shop Management",
+  "/orders": "Orders",
+};
+
 export function Breadcrumbs() {
   const [location] = useLocation();
-
-  if (location === "/") return null;
-
   const pathSegments = location.split("/").filter(Boolean);
-
+  
   return (
     <Breadcrumb className="py-4">
       <BreadcrumbList>
         <BreadcrumbItem>
-          <BreadcrumbLink asChild>
-            <Link href="/">
-              <Home className="h-4 w-4" />
-            </Link>
-          </BreadcrumbLink>
+          <BreadcrumbLink href="/">Home</BreadcrumbLink>
         </BreadcrumbItem>
-
+        <BreadcrumbSeparator />
         {pathSegments.map((segment, index) => {
+          const path = `/${pathSegments.slice(0, index + 1).join("/")}`;
           const isLast = index === pathSegments.length - 1;
-          const href = `/${pathSegments.slice(0, index + 1).join("/")}`;
-
+          
           return (
-            <React.Fragment key={segment}>
-              <BreadcrumbSeparator>
-                <ChevronRight className="h-4 w-4" />
-              </BreadcrumbSeparator>
-              <BreadcrumbItem>
-                {isLast ? (
-                  <BreadcrumbPage>
-                    {segment.charAt(0).toUpperCase() + segment.slice(1)}
-                  </BreadcrumbPage>
-                ) : (
-                  <BreadcrumbLink asChild>
-                    <Link href={href}>
-                      {segment.charAt(0).toUpperCase() + segment.slice(1)}
-                    </Link>
+            <BreadcrumbItem key={path}>
+              {isLast ? (
+                <span className="font-medium">{routes[path] || segment}</span>
+              ) : (
+                <>
+                  <BreadcrumbLink href={path}>
+                    {routes[path] || segment}
                   </BreadcrumbLink>
-                )}
-              </BreadcrumbItem>
-            </React.Fragment>
+                  <BreadcrumbSeparator />
+                </>
+              )}
+            </BreadcrumbItem>
           );
         })}
       </BreadcrumbList>
