@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useState } from 'react';
 import type { Shop } from "@shared/schema";
-import { Loader2, Store, Plus, Edit2 } from "lucide-react";
+import { Store, Plus, Edit2, Trash2 } from "lucide-react";
 
 import {
   Form,
@@ -32,12 +32,25 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function Shops() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [editingShop, setEditingShop] = useState<Shop | null>(null);
+  const [shopToDelete, setShopToDelete] = useState<Shop | null>(null);
 
   const form = useForm({
     resolver: zodResolver(insertShopSchema),
@@ -101,6 +114,32 @@ export default function Shops() {
         description: "Shop updated successfully",
       });
       setEditingShop(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteShopMutation = useMutation({
+    mutationFn: async (shopId: number) => {
+      const res = await apiRequest("DELETE", `/api/shops/${shopId}`);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to delete shop");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/shops"] });
+      toast({
+        title: "Success",
+        description: "Shop deleted successfully",
+      });
+      setShopToDelete(null);
     },
     onError: (error: Error) => {
       toast({
@@ -205,20 +244,30 @@ export default function Shops() {
                     </div>
                   </div>
                   {user?.role === "roasteryOwner" && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setEditingShop(shop);
-                        editForm.reset({
-                          name: shop.name,
-                          location: shop.location,
-                        });
-                      }}
-                    >
-                      <Edit2 className="h-4 w-4 mr-2" />
-                      Edit
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setEditingShop(shop);
+                          editForm.reset({
+                            name: shop.name,
+                            location: shop.location,
+                          });
+                        }}
+                      >
+                        <Edit2 className="h-4 w-4 mr-2" />
+                        Edit
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => setShopToDelete(shop)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </Button>
+                    </div>
                   )}
                 </div>
               ))}
@@ -289,6 +338,29 @@ export default function Shops() {
           </Form>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog 
+        open={!!shopToDelete}
+        onOpenChange={(open) => !open && setShopToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete {shopToDelete?.name}. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => shopToDelete && deleteShopMutation.mutate(shopToDelete.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete Shop
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
