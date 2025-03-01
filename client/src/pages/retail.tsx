@@ -5,7 +5,7 @@ import { Loader2, Coffee, PackagePlus } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { useActiveShop } from "@/hooks/use-active-shop";
+import { useActiveShop, useUserShops } from "@/hooks/use-active-shop";
 import { ShopSelector } from "@/components/layout/shop-selector";
 import {
   Card,
@@ -32,7 +32,8 @@ import { formatDate } from "@/lib/utils";
 export default function Retail() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { activeShop, userShops } = useActiveShop();
+  const { activeShop } = useActiveShop();
+  const { isLoading: loadingShops } = useUserShops();
   const [selectedCoffee, setSelectedCoffee] = useState<GreenCoffee | null>(null);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
@@ -108,7 +109,7 @@ export default function Retail() {
     }
   };
 
-  if (loadingCoffees || loadingInventory) {
+  if (loadingCoffees || loadingInventory || loadingShops) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin" />

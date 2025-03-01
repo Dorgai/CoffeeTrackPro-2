@@ -43,6 +43,21 @@ type Order = {
   };
 };
 
+// Helper function to group orders by shop
+function groupOrdersByShop(orders: Order[]) {
+  const groups: Record<string, Order[]> = {};
+
+  orders.forEach(order => {
+    const shopName = order.shop?.name || `Shop #${order.shopId}`;
+    if (!groups[shopName]) {
+      groups[shopName] = [];
+    }
+    groups[shopName].push(order);
+  });
+
+  return groups;
+}
+
 function StatsCard({
   title,
   value,
@@ -94,9 +109,10 @@ export default function Dashboard() {
     enabled: !!user && (user.role === "shopManager" || user.role === "barista"),
   });
 
+  // Query for orders (for both roaster and manager)
   const { data: orders, isLoading: loadingOrders } = useQuery<Order[]>({
     queryKey: ["/api/orders"],
-    enabled: !!user && user.role === "roaster",
+    enabled: !!user && (user.role === "roaster" || user.role === "shopManager"),
   });
 
   if (loadingCoffees || loadingBatches || loadingInventory || loadingOrders) {
@@ -125,8 +141,13 @@ export default function Dashboard() {
     };
   });
 
+  // Get pending orders grouped by shop (for managers)
+  const pendingOrdersByShop = orders ? 
+    groupOrdersByShop(orders.filter(order => order.status === "pending")) : {};
+
   return (
     <div className="container mx-auto py-8 space-y-8">
+      {/* Header section remains the same */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user?.username}</h1>
@@ -150,6 +171,7 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Stats cards section */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatsCard
           title="Green Coffee Types"
@@ -174,6 +196,7 @@ export default function Dashboard() {
         />
       </div>
 
+      {/* Low stock alerts section */}
       {lowStockCoffees.length > 0 && (
         <Card>
           <CardHeader>
@@ -198,6 +221,7 @@ export default function Dashboard() {
       )}
 
       <div className="grid gap-4 md:grid-cols-2">
+        {/* Roasting Batches section */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle>Recent Roasting Batches</CardTitle>
@@ -295,35 +319,68 @@ export default function Dashboard() {
           </Card>
         )}
 
-        {/* Pending Orders Section - Only for roasters */}
-        {user?.role === "roaster" && (
+        {/* Pending Orders Section - For both roasters and managers */}
+        {(user?.role === "roaster" || user?.role === "shopManager") && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle>Pending Orders</CardTitle>
               <Button variant="outline" asChild>
-                <Link href="/roasting/orders">View All Orders</Link>
+                <Link href={user?.role === "roaster" ? "/roasting/orders" : "/retail/orders"}>
+                  View All Orders
+                </Link>
               </Button>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {orders?.filter(order => order.status === "pending").map(order => (
-                  <div key={order.id} className="space-y-2 p-3 bg-muted rounded-lg">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-medium">{order.shop?.name}</p>
-                        <p className="text-sm">{order.greenCoffee?.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Ordered: {new Date(order.createdAt).toLocaleDateString()}
-                        </p>
+              <div className="space-y-6">
+                {user?.role === "shopManager" ? (
+                  // For managers: Show orders grouped by shop
+                  Object.entries(pendingOrdersByShop).map(([shopName, shopOrders]) => (
+                    <div key={shopName} className="space-y-3">
+                      <h3 className="font-medium text-sm text-muted-foreground">{shopName}</h3>
+                      <div className="space-y-2">
+                        {shopOrders.map(order => (
+                          <div key={order.id} className="p-3 bg-muted rounded-lg">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="text-sm font-medium">{order.greenCoffee?.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  Ordered: {new Date(order.createdAt).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <Badge variant="destructive">Pending</Badge>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 mt-2 text-sm">
+                              <div>Small Bags: {order.smallBags}</div>
+                              <div>Large Bags: {order.largeBags}</div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      <Badge variant="destructive">Pending</Badge>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>Small Bags: {order.smallBags}</div>
-                      <div>Large Bags: {order.largeBags}</div>
-                    </div>
+                  ))
+                ) : (
+                  // For roasters: Show all pending orders
+                  <div className="space-y-4">
+                    {orders?.filter(order => order.status === "pending").map(order => (
+                      <div key={order.id} className="space-y-2 p-3 bg-muted rounded-lg">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium">{order.shop?.name}</p>
+                            <p className="text-sm">{order.greenCoffee?.name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              Ordered: {new Date(order.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <Badge variant="destructive">Pending</Badge>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>Small Bags: {order.smallBags}</div>
+                          <div>Large Bags: {order.largeBags}</div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
                 {(!orders || orders.filter(order => order.status === "pending").length === 0) && (
                   <p className="text-muted-foreground text-center py-4">No pending orders</p>
                 )}
