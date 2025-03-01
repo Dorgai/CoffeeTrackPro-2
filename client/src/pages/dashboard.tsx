@@ -6,7 +6,6 @@ import {
   Coffee,
   Package,
   Store,
-  BarChart3,
   Loader2,
   AlertTriangle,
   LogOut,
@@ -34,11 +33,11 @@ type Order = {
   largeBags: number;
   status: string;
   createdAt: string;
-  shop?: {
+  shop: {
     name: string;
     location: string;
   };
-  greenCoffee?: {
+  greenCoffee: {
     name: string;
     producer: string;
   };
@@ -59,47 +58,44 @@ function groupOrdersByShop(orders: Order[]) {
   return groups;
 }
 
-function StatsCard({
-  title,
-  value,
-  icon: Icon,
-  description
-}: {
-  title: string;
-  value: string | number;
-  icon: React.ElementType;
-  description?: string;
-}) {
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        {description && (
-          <p className="text-xs text-muted-foreground">{description}</p>
-        )}
-      </CardContent>
-    </Card>
-  );
+// Function to calculate days since a date
+function getDaysSince(date: string) {
+  const orderDate = new Date(date);
+  const today = new Date();
+  const diffTime = Math.abs(today.getTime() - orderDate.getTime());
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 }
 
 export default function Dashboard() {
   const { user, logoutMutation } = useAuth();
 
+  // Get all available coffees
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
-    enabled: !!user && (user.role === "roasteryOwner" || user.role === "roaster"),
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/green-coffee");
+      if (!res.ok) {
+        throw new Error("Failed to fetch coffees");
+      }
+      return res.json();
+    },
+    enabled: !!user,
   });
 
+  // Get roasting batches for roasters and owners
   const { data: batches, isLoading: loadingBatches } = useQuery<RoastingBatch[]>({
     queryKey: ["/api/roasting-batches"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/roasting-batches");
+      if (!res.ok) {
+        throw new Error("Failed to fetch batches");
+      }
+      return res.json();
+    },
     enabled: !!user && (user.role === "roaster" || user.role === "roasteryOwner"),
   });
 
-  // Get current and previous day inventory
+  // Get current inventory for all shops
   const { data: currentInventory, isLoading: loadingInventory } = useQuery<RetailInventory[]>({
     queryKey: ["/api/retail-inventory"],
     queryFn: async () => {
@@ -112,6 +108,7 @@ export default function Dashboard() {
     enabled: !!user,
   });
 
+  // Get previous inventory history
   const { data: previousInventory } = useQuery<RetailInventory[]>({
     queryKey: ["/api/retail-inventory/history"],
     queryFn: async () => {
@@ -124,7 +121,7 @@ export default function Dashboard() {
     enabled: !!user,
   });
 
-  // Query for orders
+  // Get all orders
   const { data: orders, isLoading: loadingOrders } = useQuery<Order[]>({
     queryKey: ["/api/orders"],
     queryFn: async () => {
@@ -135,6 +132,15 @@ export default function Dashboard() {
       return res.json();
     },
     enabled: !!user,
+  });
+
+  console.log("Dashboard Data:", {
+    user,
+    coffees,
+    batches,
+    currentInventory,
+    previousInventory,
+    orders
   });
 
   if (loadingCoffees || loadingBatches || loadingInventory || loadingOrders) {
@@ -166,6 +172,14 @@ export default function Dashboard() {
       largeBagChange: previous ? current.largeBags - previous.largeBags : 0
     };
   });
+
+  // Calculate pending orders with age information
+  const pendingOrders = orders?.filter(o => o.status === "pending") || [];
+  const oldestPendingOrder = pendingOrders.reduce((oldest, order) => {
+    const orderDays = getDaysSince(order.createdAt);
+    return orderDays > oldest ? orderDays : oldest;
+  }, 0);
+
 
   return (
     <div className="container mx-auto py-8 space-y-8">
@@ -201,7 +215,8 @@ export default function Dashboard() {
         />
         <StatsCard
           title="Pending Orders"
-          value={orders?.filter(o => o.status === "pending").length || 0}
+          value={pendingOrders.length}
+          description={oldestPendingOrder > 0 ? `Oldest: ${oldestPendingOrder} days ago` : undefined}
           icon={AlertTriangle}
         />
         <StatsCard
@@ -331,10 +346,10 @@ export default function Dashboard() {
                               <div>
                                 <p className="font-medium">{coffee?.name}</p>
                                 <p className="text-sm text-muted-foreground">
-                                  Ordered: {new Date(order.createdAt).toLocaleDateString()}
+                                  Ordered: {new Date(order.createdAt).toLocaleDateString()} ({getDaysSince(order.createdAt)} days ago)
                                 </p>
                               </div>
-                              <Badge variant="destructive">Pending</Badge>
+                              <Badge variant="destructive">Pending {getDaysSince(order.createdAt)}d</Badge>
                             </div>
                             <div className="grid grid-cols-2 gap-4 mt-2">
                               <div className="text-sm">Small Bags: {order.smallBags}</div>
@@ -508,10 +523,10 @@ export default function Dashboard() {
                             <div>
                               <p className="text-sm font-medium">{order.greenCoffee?.name}</p>
                               <p className="text-xs text-muted-foreground">
-                                Ordered: {new Date(order.createdAt).toLocaleDateString()}
+                                Ordered: {new Date(order.createdAt).toLocaleDateString()} ({getDaysSince(order.createdAt)} days ago)
                               </p>
                             </div>
-                            <Badge variant="destructive">Pending</Badge>
+                            <Badge variant="destructive">Pending {getDaysSince(order.createdAt)}d</Badge>
                           </div>
                           <div className="grid grid-cols-2 gap-4 mt-2 text-sm">
                             <div>Small Bags: {order.smallBags}</div>
@@ -532,10 +547,10 @@ export default function Dashboard() {
                           <p className="font-medium">{order.shop?.name}</p>
                           <p className="text-sm">{order.greenCoffee?.name}</p>
                           <p className="text-sm text-muted-foreground">
-                            Ordered: {new Date(order.createdAt).toLocaleDateString()}
+                            Ordered: {new Date(order.createdAt).toLocaleDateString()} ({getDaysSince(order.createdAt)} days ago)
                           </p>
                         </div>
-                        <Badge variant="destructive">Pending</Badge>
+                        <Badge variant="destructive">Pending {getDaysSince(order.createdAt)}d</Badge>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div>Small Bags: {order.smallBags}</div>
@@ -693,20 +708,13 @@ export default function Dashboard() {
                   <TableHead>Current Stock</TableHead>
                   <TableHead>Min. Threshold</TableHead>
                   <TableHead>Status</TableHead>
+                  {user?.role === "roasteryOwner" && <TableHead>Details</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {coffees?.map((coffee) => (
                   <TableRow key={coffee.id}>
-                    <TableCell className="font-medium">
-                      {user?.role === "roasteryOwner" ? (
-                        <Link href={`/coffee/${coffee.id}`} className="hover:underline">
-                          {coffee.name}
-                        </Link>
-                      ) : (
-                        coffee.name
-                      )}
-                    </TableCell>
+                    <TableCell className="font-medium">{coffee.name}</TableCell>
                     <TableCell>{coffee.producer || '-'}</TableCell>
                     <TableCell>{coffee.country || '-'}</TableCell>
                     <TableCell>{coffee.currentStock} kg</TableCell>
@@ -718,11 +726,18 @@ export default function Dashboard() {
                         <Badge variant="outline">In Stock</Badge>
                       )}
                     </TableCell>
+                    {user?.role === "roasteryOwner" && (
+                      <TableCell>
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/coffee/${coffee.id}`}>View Details</Link>
+                        </Button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
                 {(!coffees || coffees.length === 0) && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-4">
+                    <TableCell colSpan={7} className="text-center text-muted-foreground py-4">
                       No green coffee inventory available
                     </TableCell>
                   </TableRow>
@@ -733,5 +748,32 @@ export default function Dashboard() {
         </Card>
       )}
     </div>
+  );
+}
+
+function StatsCard({
+  title,
+  value,
+  icon: Icon,
+  description
+}: {
+  title: string;
+  value: string | number;
+  icon: React.ElementType;
+  description?: string;
+}) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        <Icon className="h-4 w-4 text-muted-foreground" />
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold">{value}</div>
+        {description && (
+          <p className="text-xs text-muted-foreground">{description}</p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
