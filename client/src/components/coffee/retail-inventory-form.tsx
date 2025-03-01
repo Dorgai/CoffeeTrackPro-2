@@ -1,9 +1,6 @@
-
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { GreenCoffee } from "@shared/schema";
 
@@ -34,6 +31,7 @@ export function RetailInventoryForm({
   coffee,
   currentInventory,
   onSuccess,
+  onUpdate,
 }: {
   coffee: GreenCoffee;
   currentInventory?: {
@@ -42,6 +40,7 @@ export function RetailInventoryForm({
     id?: number;
   };
   onSuccess?: () => void;
+  onUpdate: (coffeeId: number, smallBags: number, largeBags: number) => void;
 }) {
   const { toast } = useToast();
 
@@ -54,30 +53,14 @@ export function RetailInventoryForm({
     },
   });
 
-  const updateMutation = useMutation({
-    mutationFn: async (data: InventoryFormValues) => {
-      return apiRequest("/api/retail-inventory", {
-        method: "POST",
-        data,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory"] });
-      if (onSuccess) onSuccess();
-    },
-  });
-
   const onSubmit = form.handleSubmit(async (data) => {
     try {
-      await updateMutation.mutateAsync(data);
-      toast({
-        title: "Inventory Updated",
-        description: "Retail inventory has been updated successfully",
-      });
+      await onUpdate(coffee.id, data.smallBags, data.largeBags);
+      if (onSuccess) onSuccess();
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to update inventory",
+        description: error instanceof Error ? error.message : "Failed to update inventory",
         variant: "destructive",
       });
     }
@@ -95,7 +78,7 @@ export function RetailInventoryForm({
         <Form {...form}>
           <form onSubmit={onSubmit} className="space-y-4">
             <input type="hidden" name="greenCoffeeId" value={coffee.id} />
-            
+
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -130,8 +113,7 @@ export function RetailInventoryForm({
 
             <Button 
               type="submit" 
-              className="w-full" 
-              disabled={updateMutation.isPending}
+              className="w-full"
             >
               Update Inventory
             </Button>
