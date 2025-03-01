@@ -70,9 +70,23 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
     );
   }
 
-  // Return nothing if there are no pending confirmations
+  // Return a message when there are no pending confirmations
   if (!confirmations || confirmations.length === 0) {
-    return null;
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>No New Arrivals</CardTitle>
+          <CardDescription>
+            There are currently no pending coffee shipments to confirm.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center p-8 text-muted-foreground">
+            <p>Once coffee is dispatched to your shop, you'll be able to confirm the received quantities here.</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   // Confirm received quantities

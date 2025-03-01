@@ -402,6 +402,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           updatedById: req.user!.id,
         });
 
+        // Create dispatch confirmation when status changes to "dispatched"
+        if (status === "dispatched") {
+          await storage.createDispatchedCoffeeConfirmation({
+            orderId: order.id,
+            shopId: order.shopId,
+            greenCoffeeId: order.greenCoffeeId,
+            dispatchedSmallBags: smallBags,
+            dispatchedLargeBags: largeBags,
+            status: "pending"
+          });
+        }
+
         console.log("Order updated successfully:", updatedOrder);
 
         // If there are remaining bags, create a new pending order
