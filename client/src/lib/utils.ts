@@ -1,4 +1,3 @@
-
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -14,13 +13,21 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Formats a date object into a localized date string.
+ * Formats a date object or date string into a localized date string.
  * 
- * @param date The date to format
+ * @param date The date to format (Date object or date string)
  * @returns Formatted date string
  */
-export function formatDate(date: Date) {
-  return date.toLocaleDateString("en-US", {
+export function formatDate(date: Date | string | null | undefined) {
+  if (!date) return '-';
+
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+
+  if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) {
+    return '-';
+  }
+
+  return dateObj.toLocaleDateString("en-US", {
     month: "long",
     day: "numeric",
     year: "numeric",
