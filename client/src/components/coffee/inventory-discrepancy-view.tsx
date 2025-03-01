@@ -47,7 +47,16 @@ export function InventoryDiscrepancyView() {
   }
 
   if (!discrepancies || discrepancies.length === 0) {
-    return null;
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>No Discrepancies</CardTitle>
+          <CardDescription>
+            All received coffee quantities match the dispatched amounts.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
   }
 
   return (
@@ -105,8 +114,8 @@ export function InventoryDiscrepancyView() {
                     discrepancy.status === "open" 
                       ? "destructive" 
                       : discrepancy.status === "investigating" 
-                        ? "warning" 
-                        : "success"
+                        ? "default"
+                        : "default"
                   }>
                     {discrepancy.status}
                   </Badge>

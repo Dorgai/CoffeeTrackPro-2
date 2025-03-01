@@ -1,6 +1,7 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import { DispatchedCoffeeConfirmation } from "@/components/coffee/dispatched-coffee-confirmation";
+import { InventoryDiscrepancyView } from "@/components/coffee/inventory-discrepancy-view";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ShopSelector } from "@/components/layout/shop-selector";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -41,17 +42,21 @@ export default function RetailNewArrivals() {
         <ShopSelector />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>New Inventory Arrivals</CardTitle>
-          <CardDescription>
-            Confirm and update inventory quantities for newly received coffee shipments
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <DispatchedCoffeeConfirmation shopId={activeShop.id} />
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>New Inventory Arrivals</CardTitle>
+            <CardDescription>
+              Confirm and update inventory quantities for newly received coffee shipments
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DispatchedCoffeeConfirmation shopId={activeShop.id} />
+          </CardContent>
+        </Card>
+
+        <InventoryDiscrepancyView />
+      </div>
     </div>
   );
 }
