@@ -8,7 +8,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useActiveShop } from "@/hooks/use-active-shop";
-import { Store } from "lucide-react";
+import { Store, Loader2 } from "lucide-react";
 
 interface ShopSelectorProps {
   value?: number | null;
@@ -19,17 +19,13 @@ interface ShopSelectorProps {
 export function ShopSelector({ value, onChange, className }: ShopSelectorProps) {
   const { activeShop, setActiveShop } = useActiveShop();
 
-  const { data: shops } = useQuery<Shop[]>({
+  const { data: shops, isLoading } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
   });
 
-  if (!shops || shops.length === 0) {
-    return null;
-  }
-
   const handleChange = (value: string) => {
     const shopId = value ? parseInt(value, 10) : null;
-    const shop = shops.find((s) => s.id === shopId);
+    const shop = shops?.find((s) => s.id === shopId);
 
     // Call both the controlled and context handlers
     if (onChange) {
@@ -47,16 +43,29 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
       <Select
         value={currentValue?.toString()}
         onValueChange={handleChange}
+        disabled={isLoading}
       >
         <SelectTrigger className="w-[200px]">
-          <SelectValue placeholder="Select a shop" />
+          {isLoading ? (
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Loading shops...</span>
+            </div>
+          ) : (
+            <SelectValue placeholder="Select a shop" />
+          )}
         </SelectTrigger>
         <SelectContent>
-          {shops.map((shop) => (
+          {shops?.map((shop) => (
             <SelectItem key={shop.id} value={shop.id.toString()}>
               {shop.name}
             </SelectItem>
           ))}
+          {!isLoading && (!shops || shops.length === 0) && (
+            <div className="relative flex items-center justify-center py-2 text-sm text-muted-foreground">
+              No shops available
+            </div>
+          )}
         </SelectContent>
       </Select>
     </div>
