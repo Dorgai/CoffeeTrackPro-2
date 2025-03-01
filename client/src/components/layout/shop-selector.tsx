@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/select";
 import { useActiveShop } from "@/hooks/use-active-shop";
 import { Store, Loader2 } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 
 interface ShopSelectorProps {
   value?: number | null;
@@ -18,9 +19,13 @@ interface ShopSelectorProps {
 
 export function ShopSelector({ value, onChange, className }: ShopSelectorProps) {
   const { activeShop, setActiveShop } = useActiveShop();
+  const { user } = useAuth();
+
+  // For roasteryOwner, fetch all shops. For others, fetch only assigned shops
+  const endpoint = user?.role === "roasteryOwner" ? "/api/shops" : "/api/user/shops";
 
   const { data: shops, isLoading } = useQuery<Shop[]>({
-    queryKey: ["/api/user/shops"],
+    queryKey: [endpoint],
   });
 
   const handleChange = (value: string) => {
