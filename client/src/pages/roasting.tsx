@@ -13,16 +13,31 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function Roasting() {
   const [selectedCoffee, setSelectedCoffee] = useState<GreenCoffee | null>(null);
 
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/green-coffee");
+      if (!res.ok) {
+        throw new Error("Failed to fetch green coffee");
+      }
+      return res.json();
+    },
   });
 
   const { data: batches, isLoading: loadingBatches } = useQuery<RoastingBatch[]>({
     queryKey: ["/api/roasting-batches"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/roasting-batches");
+      if (!res.ok) {
+        throw new Error("Failed to fetch roasting batches");
+      }
+      return res.json();
+    },
   });
 
   if (loadingCoffees || loadingBatches) {
@@ -88,11 +103,11 @@ export default function Roasting() {
                     return (
                       <TableRow key={batch.id}>
                         <TableCell>
-                          {new Date(batch.roastedAt).toLocaleDateString()}
+                          {batch.roastedAt ? new Date(batch.roastedAt).toLocaleDateString() : '-'}
                         </TableCell>
-                        <TableCell>{coffee?.name}</TableCell>
-                        <TableCell>{batch.roastedAmount.toString()}kg</TableCell>
-                        <TableCell>{batch.roastingLoss.toString()}kg</TableCell>
+                        <TableCell>{coffee?.name || '-'}</TableCell>
+                        <TableCell>{batch.roastedAmount}kg</TableCell>
+                        <TableCell>{batch.roastingLoss}kg</TableCell>
                         <TableCell>
                           {batch.smallBagsProduced} × 200g
                           <br />
@@ -101,6 +116,13 @@ export default function Roasting() {
                       </TableRow>
                     );
                   })}
+                  {(!batches || batches.length === 0) && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-4">
+                        No roasting batches recorded yet
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>

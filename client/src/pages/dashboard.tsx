@@ -101,16 +101,30 @@ export default function Dashboard() {
 
   // Get current and previous day inventory
   const { data: currentInventory, isLoading: loadingInventory } = useQuery<RetailInventory[]>({
-    queryKey: ["/api/retail-inventory"], // Removed user?.defaultShopId
-    enabled: !!user, // Removed role check, fetching for all shops
+    queryKey: ["/api/retail-inventory"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/retail-inventory");
+      if (!res.ok) {
+        throw new Error("Failed to fetch inventory");
+      }
+      return res.json();
+    },
+    enabled: !!user,
   });
 
   const { data: previousInventory } = useQuery<RetailInventory[]>({
-    queryKey: ["/api/retail-inventory/history"], // Removed user?.defaultShopId
-    enabled: !!user, // Removed role check, fetching for all shops
+    queryKey: ["/api/retail-inventory/history"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/retail-inventory/history");
+      if (!res.ok) {
+        throw new Error("Failed to fetch inventory history");
+      }
+      return res.json();
+    },
+    enabled: !!user,
   });
 
-  // Query for orders (for both roaster and manager)
+  // Query for orders
   const { data: orders, isLoading: loadingOrders } = useQuery<Order[]>({
     queryKey: ["/api/orders"],
     queryFn: async () => {
@@ -120,7 +134,7 @@ export default function Dashboard() {
       }
       return res.json();
     },
-    enabled: !!user && (user.role === "roaster" || user.role === "shopManager" || user.role === "roasteryOwner"),
+    enabled: !!user,
   });
 
   if (loadingCoffees || loadingBatches || loadingInventory || loadingOrders) {
@@ -130,6 +144,10 @@ export default function Dashboard() {
       </div>
     );
   }
+
+  // Get pending orders grouped by shop (for managers)
+  const pendingOrdersByShop = orders ? 
+    groupOrdersByShop(orders.filter(order => order.status === "pending")) : {};
 
   const lowStockCoffees = coffees?.filter(
     coffee => Number(coffee.currentStock) <= Number(coffee.minThreshold)
@@ -149,10 +167,6 @@ export default function Dashboard() {
     };
   });
 
-  // Get pending orders grouped by shop (for managers)
-  const pendingOrdersByShop = orders ? 
-    groupOrdersByShop(orders.filter(order => order.status === "pending")) : {};
-
   return (
     <div className="container mx-auto py-8 space-y-8">
       {/* Header section */}
@@ -161,7 +175,6 @@ export default function Dashboard() {
           <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user?.username}</h1>
           <p className="text-muted-foreground">Here's what's happening with your coffee roasting operations.</p>
         </div>
-
         <div className="flex gap-2">
           {user?.role === "roasteryOwner" && (
             <Button asChild>
@@ -182,73 +195,117 @@ export default function Dashboard() {
       {/* Stats cards section */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatsCard
-          title="Green Coffee Types"
-          value={coffees?.length || 0}
-          icon={Coffee}
-        />
-        <StatsCard
-          title="Roasting Batches"
-          value={batches?.length || 0}
+          title="Total Orders"
+          value={orders?.length || 0}
           icon={Package}
-          description="Total batches"
         />
         <StatsCard
-          title="Low Stock Items"
-          value={lowStockCoffees.length}
+          title="Pending Orders"
+          value={orders?.filter(o => o.status === "pending").length || 0}
           icon={AlertTriangle}
         />
         <StatsCard
           title="Active Shops"
-          value={currentInventory?.length || 0}
+          value={new Set(orders?.map(o => o.shopId)).size || 0}
           icon={Store}
+        />
+        <StatsCard
+          title="Coffee Types"
+          value={coffees?.length || 0}
+          icon={Coffee}
         />
       </div>
 
-      {/* Low stock alerts section for Shop Managers */}
+      {/* Manager's View - Stock Overview and Pending Orders */}
       {user?.role === "shopManager" && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-red-500">Low Stock Alerts</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {currentInventory?.map((shopInventory) => {
-                const coffee = coffees?.find(c => c.id === shopInventory.greenCoffeeId);
-                const isLowStock = shopInventory.smallBags < 3 || shopInventory.largeBags < 3;
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* Stock Overview */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Stock Overview</CardTitle>
+              <CardDescription>Current inventory levels across shops</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {Object.entries(groupOrdersByShop(orders || [])).map(([shopName, shopOrders]) => (
+                  <div key={shopName} className="space-y-2">
+                    <h3 className="font-medium text-lg">{shopName}</h3>
+                    <div className="space-y-2">
+                      {currentInventory
+                        ?.filter(inv => inv.shopId === shopOrders[0]?.shopId)
+                        .map(inv => {
+                          const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
+                          const isLowStock = inv.smallBags < 3 || inv.largeBags < 3;
 
-                if (!isLowStock) return null;
-
-                return (
-                  <div key={`${shopInventory.shopId}-${shopInventory.greenCoffeeId}`}
-                       className="p-4 bg-muted rounded-lg">
-                    <div className="mb-2">
-                      <h3 className="font-medium">{shopInventory.shop?.name || `Shop #${shopInventory.shopId}`}</h3>
-                    </div>
-                    <div className="flex items-center justify-between p-2 bg-background rounded">
-                      <div>
-                        <p className="font-medium">{coffee?.name}</p>
-                        <div className="text-sm text-muted-foreground space-y-1">
-                          {shopInventory.smallBags < 3 && (
-                            <p>Small Bags: {shopInventory.smallBags} (Below 3)</p>
-                          )}
-                          {shopInventory.largeBags < 3 && (
-                            <p>Large Bags: {shopInventory.largeBags} (Below 3)</p>
-                          )}
-                        </div>
-                      </div>
-                      <Badge variant="destructive">Low Stock</Badge>
+                          return (
+                            <div 
+                              key={`${inv.shopId}-${inv.greenCoffeeId}`}
+                              className={`p-3 rounded-lg ${isLowStock ? 'bg-destructive/10' : 'bg-muted'}`}
+                            >
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <p className="font-medium">{coffee?.name}</p>
+                                  <div className="text-sm text-muted-foreground">
+                                    <p>Small Bags: {inv.smallBags}</p>
+                                    <p>Large Bags: {inv.largeBags}</p>
+                                  </div>
+                                </div>
+                                {isLowStock && (
+                                  <Badge variant="destructive">Low Stock</Badge>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
                     </div>
                   </div>
-                );
-              })}
-              {(!currentInventory || currentInventory.length === 0) && (
-                <p className="text-center text-muted-foreground py-4">
-                  No low stock items to display
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Pending Orders */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Pending Orders</CardTitle>
+              <CardDescription>Orders awaiting processing</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {Object.entries(pendingOrdersByShop).map(([shopName, shopOrders]) => (
+                  <div key={shopName} className="space-y-3">
+                    <h3 className="font-medium text-lg">{shopName}</h3>
+                    <div className="space-y-2">
+                      {shopOrders.map(order => {
+                        const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
+                        return (
+                          <div key={order.id} className="p-3 bg-muted rounded-lg">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="font-medium">{coffee?.name}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  Ordered: {new Date(order.createdAt).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <Badge variant="destructive">Pending</Badge>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 mt-2">
+                              <div className="text-sm">Small Bags: {order.smallBags}</div>
+                              <div className="text-sm">Large Bags: {order.largeBags}</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+                {Object.keys(pendingOrdersByShop).length === 0 && (
+                  <p className="text-center text-muted-foreground">No pending orders</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Low stock alerts section for Roastery Owners and Roasters */}
@@ -274,7 +331,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       )}
-
       <div className="grid gap-4 md:grid-cols-2">
         {/* Roasting Batches section */}
         <Card>
