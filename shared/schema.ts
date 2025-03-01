@@ -74,7 +74,14 @@ export const orders = pgTable("orders", {
 export const insertUserSchema = createInsertSchema(users);
 export const insertShopSchema = createInsertSchema(shops);
 export const insertGreenCoffeeSchema = createInsertSchema(greenCoffee);
-export const insertRoastingBatchSchema = createInsertSchema(roastingBatches);
+export const insertRoastingBatchSchema = createInsertSchema(roastingBatches).extend({
+  greenCoffeeId: z.coerce.number(),
+  greenCoffeeAmount: z.coerce.number().min(0, "Amount must be positive"),
+  roastedAmount: z.coerce.number().min(0, "Amount must be positive"),
+  roastingLoss: z.coerce.number().min(0, "Loss must be positive"),
+  smallBagsProduced: z.coerce.number().int().min(0, "Number of bags must be positive"),
+  largeBagsProduced: z.coerce.number().int().min(0, "Number of bags must be positive"),
+});
 export const insertRetailInventorySchema = createInsertSchema(retailInventory).extend({
   shopId: z.number(),
   greenCoffeeId: z.number(),

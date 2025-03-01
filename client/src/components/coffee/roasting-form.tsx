@@ -30,7 +30,6 @@ interface FormValues {
   largeBagsProduced: number;
 }
 
-
 export function RoastingForm({ 
   greenCoffeeId,
   onSuccess 
@@ -39,7 +38,7 @@ export function RoastingForm({
   onSuccess?: () => void;
 }) {
   const { toast } = useToast();
-  const form = useForm({
+  const form = useForm<FormValues>({
     resolver: zodResolver(insertRoastingBatchSchema),
     defaultValues: {
       greenCoffeeId,
@@ -53,15 +52,12 @@ export function RoastingForm({
 
   const { data: coffee } = useQuery({
     queryKey: [`/api/green-coffee/${greenCoffeeId}`],
-    queryFn: () => apiRequest(`/api/green-coffee/${greenCoffeeId}`).then(res => res.json()),
-  })
+    queryFn: () => apiRequest("GET", `/api/green-coffee/${greenCoffeeId}`).then(res => res.json()),
+  });
 
   const createMutation = useMutation({
     mutationFn: async (data: FormValues) => {
-      return apiRequest("/api/roasting-batches", {
-        method: "POST",
-        data,
-      });
+      return apiRequest("POST", "/api/roasting-batches", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/roasting-batches"] });
@@ -72,11 +68,10 @@ export function RoastingForm({
   });
 
   const onSubmit = form.handleSubmit(async (data: FormValues) => {
-    const smallBagsProduced = data.smallBagsProduced || 0;
-    const largeBagsProduced = data.largeBagsProduced || 0;
+    const smallBagsProduced = Number(data.smallBagsProduced) || 0;
+    const largeBagsProduced = Number(data.largeBagsProduced) || 0;
     const totalPackagedWeight = (smallBagsProduced * 0.2) + largeBagsProduced;
     const packagingEfficiency = (totalPackagedWeight / data.roastedAmount) * 100;
-
 
     // Check if green coffee amount exceeds current stock
     if (coffee && data.greenCoffeeAmount > coffee.currentStock) {
@@ -101,7 +96,12 @@ export function RoastingForm({
     try {
       await createMutation.mutateAsync({
         ...data,
-        roastingLoss: data.greenCoffeeAmount - totalPackagedWeight,
+        greenCoffeeId: Number(greenCoffeeId),
+        greenCoffeeAmount: Number(data.greenCoffeeAmount),
+        roastedAmount: Number(data.roastedAmount),
+        roastingLoss: Number(data.greenCoffeeAmount) - totalPackagedWeight,
+        smallBagsProduced: Number(data.smallBagsProduced),
+        largeBagsProduced: Number(data.largeBagsProduced),
       });
       toast({
         title: "Roasting Batch Recorded",
@@ -131,7 +131,12 @@ export function RoastingForm({
                 <FormItem>
                   <FormLabel>Green Coffee Amount (kg)</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.01" {...field} />
+                    <Input 
+                      type="number" 
+                      step="0.01" 
+                      {...field} 
+                      onChange={(e) => field.onChange(Number(e.target.value))}
+                    />
                   </FormControl>
                   <FormDescription>
                     Available stock: {coffee ? `${coffee.currentStock} kg` : 'Loading...'}
@@ -148,7 +153,12 @@ export function RoastingForm({
                 <FormItem>
                   <FormLabel>Roasted Amount (kg)</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.01" {...field} />
+                    <Input 
+                      type="number" 
+                      step="0.01" 
+                      {...field} 
+                      onChange={(e) => field.onChange(Number(e.target.value))}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -163,9 +173,13 @@ export function RoastingForm({
                   <FormItem>
                     <FormLabel>Small Bags (200g) Produced</FormLabel>
                     <FormControl>
-                      <Input type="number" {...field} />
+                      <Input 
+                        type="number" 
+                        {...field} 
+                        onChange={(e) => field.onChange(Number(e.target.value))}
+                      />
                     </FormControl>
-                    <FormDescription>Total: {(field.value as number * 0.2).toFixed(2)} kg</FormDescription>
+                    <FormDescription>Total: {((field.value as number || 0) * 0.2).toFixed(2)} kg</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -178,9 +192,13 @@ export function RoastingForm({
                   <FormItem>
                     <FormLabel>Large Bags (1kg) Produced</FormLabel>
                     <FormControl>
-                      <Input type="number" {...field} />
+                      <Input 
+                        type="number" 
+                        {...field} 
+                        onChange={(e) => field.onChange(Number(e.target.value))}
+                      />
                     </FormControl>
-                    <FormDescription>Total: {(field.value as number)} kg</FormDescription>
+                    <FormDescription>Total: {(field.value as number || 0)} kg</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -194,7 +212,12 @@ export function RoastingForm({
                 <FormItem>
                   <FormLabel>Roasting Loss (kg)</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.01" readOnly {...field} />
+                    <Input 
+                      type="number" 
+                      step="0.01" 
+                      readOnly 
+                      {...field} 
+                    />
                   </FormControl>
                   <FormDescription>
                     Automatically calculated as green coffee amount minus packaged coffee
@@ -205,8 +228,8 @@ export function RoastingForm({
             />
 
             {coffee && (
-              <Alert className={( ( (coffee.currentStock || 0) - (form.getValues("greenCoffeeAmount") || 0) )< 0 ? "bg-red-100" : "bg-green-100" )}>
-                <InfoIcon className="h-4 w-4 mt-0.5" />
+              <Alert>
+                <InfoIcon />
                 <AlertDescription>
                   <div className="flex justify-between items-center">
                     <span>Remaining Stock: {(coffee.currentStock - (form.getValues("greenCoffeeAmount") || 0)).toFixed(2)} kg</span>
