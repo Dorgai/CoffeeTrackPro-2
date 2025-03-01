@@ -15,6 +15,7 @@ import RetailOrders from "@/pages/retail-orders";
 import RetailOverview from "@/pages/retail-overview";
 import Analytics from "@/pages/analytics";
 import Reports from "@/pages/reports";
+import UserManagement from "@/pages/user-management";
 import Shops from "@/pages/shops";
 import Profile from "@/pages/profile";
 import NotFound from "@/pages/not-found";
@@ -41,6 +42,7 @@ export default function App() {
             <ProtectedRoute path="/retail-overview" component={RetailOverview} roles={["roasteryOwner"]} />
             <ProtectedRoute path="/analytics" component={Analytics} roles={["roasteryOwner", "shopManager"]} />
             <ProtectedRoute path="/reports" component={Reports} roles={["roasteryOwner", "shopManager"]} />
+            <ProtectedRoute path="/users" component={UserManagement} roles={["roasteryOwner"]} />
             <ProtectedRoute path="/shops" component={Shops} roles={["roasteryOwner"]} />
             <ProtectedRoute path="/profile" component={Profile} />
 

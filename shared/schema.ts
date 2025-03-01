@@ -10,6 +10,9 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   role: text("role", { enum: userRoles }).notNull(),
   defaultShopId: integer("default_shop_id").references(() => shops.id),
+  isActive: boolean("is_active").notNull().default(false),
+  isPendingApproval: boolean("is_pending_approval").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const shops = pgTable("shops", {
