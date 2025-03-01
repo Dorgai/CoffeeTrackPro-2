@@ -1,12 +1,10 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { GreenCoffee } from "@shared/schema";
-import { Loader2, Coffee, History, Package2 } from "lucide-react";
+import { Loader2, Coffee } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useUser } from "@/hooks/use-user";
-import { formatDate } from "@/lib/utils";
-
+import { useAuth } from "@/hooks/use-auth";
 import {
   Card,
   CardContent,
@@ -28,10 +26,14 @@ import { RetailInventoryForm } from "@/components/coffee/retail-inventory-form";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { History, Package2 } from "lucide-react";
+import { formatDate } from "@/lib/utils";
+import { useUser } from "@/hooks/use-user";
+
 
 export default function Retail() {
   const { toast } = useToast();
-  const { user } = useUser();
+  const { user } = useAuth();
   const [selectedCoffee, setSelectedCoffee] = useState<GreenCoffee | null>(null);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
 
@@ -41,19 +43,25 @@ export default function Retail() {
 
   const { data: retailInventory, isLoading: loadingInventory } = useQuery({
     queryKey: ["/api/retail-inventory"],
+    enabled: !!user?.shopId, // Only fetch if user has a shopId
   });
 
   const { data: orders, isLoading: loadingOrders } = useQuery({
-    queryKey: ["/api/orders"],
+    queryKey: ["/api/orders", user?.shopId],
+    enabled: !!user?.shopId,
   });
 
   const updateInventoryMutation = useMutation({
-    mutationFn: async ({ greenCoffeeId, smallBags, largeBags }: { greenCoffeeId: number, smallBags: number, largeBags: number }) => {
-      const res = await apiRequest("POST", "/api/retail-inventory", {
-        greenCoffeeId,
-        smallBags,
-        largeBags,
-      });
+    mutationFn: async (data: { greenCoffeeId: number; smallBags: number; largeBags: number }) => {
+      if (!user?.shopId) {
+        throw new Error("No shop assigned to user");
+      }
+
+      const res = await apiRequest("POST", "/api/retail-inventory", data);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to update inventory");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -64,17 +72,27 @@ export default function Retail() {
       });
     },
     onError: (error: Error) => {
+      console.error("Inventory update error:", error);
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to update inventory",
         variant: "destructive",
       });
     },
   });
 
-  // Modified handleUpdateInventory function to properly handle inventory updates
+  // Handle inventory updates with proper error handling
   const handleUpdateInventory = async (coffeeId: number, smallBags: number, largeBags: number) => {
     try {
+      if (!user?.shopId) {
+        toast({
+          title: "Error",
+          description: "You must be assigned to a shop to update inventory",
+          variant: "destructive",
+        });
+        return;
+      }
+
       await updateInventoryMutation.mutateAsync({
         greenCoffeeId: coffeeId,
         smallBags,
@@ -84,6 +102,16 @@ export default function Retail() {
       console.error("Failed to update inventory:", error);
     }
   };
+
+  if (!user?.shopId) {
+    return (
+      <div className="container mx-auto py-8">
+        <div className="bg-destructive/10 text-destructive px-4 py-2 rounded">
+          You are not assigned to any shop. Please contact an administrator.
+        </div>
+      </div>
+    );
+  }
 
   if (loadingCoffees || loadingInventory || loadingOrders) {
     return (
@@ -211,7 +239,7 @@ export default function Retail() {
                     {orders.map((order) => {
                       const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
                       const totalWeight = (order.smallBags * 0.2) + (order.largeBags * 1);
-                      
+
                       return (
                         <TableRow key={order.id}>
                           <TableCell>{formatDate(order.createdAt || "")}</TableCell>
@@ -251,6 +279,7 @@ export default function Retail() {
                 setIsUpdateDialogOpen(false);
                 setSelectedCoffee(null);
               }}
+              onUpdate={handleUpdateInventory}
             />
           )}
         </DialogContent>

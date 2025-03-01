@@ -5,7 +5,6 @@ import { storage } from "./storage";
 import { insertGreenCoffeeSchema, insertRoastingBatchSchema, insertOrderSchema, insertShopSchema } from "@shared/schema";
 import {insertRetailInventorySchema} from "@shared/schema"; //import the missing schema
 
-
 function requireRole(roles: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user || !roles.includes(req.user.role)) {
@@ -81,24 +80,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Retail Inventory Routes - accessible by shop manager and barista
   app.get("/api/retail-inventory", requireRole(["shopManager", "barista"]), async (req, res) => {
-    if (!req.user?.shopId) {
-      return res.status(400).json({ message: "User is not assigned to a shop" });
+    try {
+      if (!req.user?.shopId) {
+        return res.status(400).json({ message: "User is not assigned to a shop" });
+      }
+      const inventory = await storage.getRetailInventoriesByShop(req.user.shopId);
+      res.json(inventory);
+    } catch (error) {
+      console.error("Error fetching retail inventory:", error);
+      res.status(500).json({ message: "Failed to fetch retail inventory" });
     }
-    const inventory = await storage.getRetailInventoriesByShop(req.user.shopId);
-    res.json(inventory);
   });
 
   app.post("/api/retail-inventory", requireRole(["shopManager", "barista"]), async (req, res) => {
-    if (!req.user?.shopId) {
-      return res.status(400).json({ message: "User is not assigned to a shop" });
+    try {
+      if (!req.user?.shopId) {
+        return res.status(400).json({ message: "User is not assigned to a shop" });
+      }
+
+      const data = insertRetailInventorySchema.parse({
+        ...req.body,
+        shopId: req.user.shopId,
+        updatedById: req.user.id
+      });
+
+      const inventory = await storage.updateRetailInventory(data);
+      res.status(201).json(inventory);
+    } catch (error) {
+      console.error("Error updating retail inventory:", error);
+      res.status(400).json({ 
+        message: error instanceof Error ? error.message : "Failed to update inventory" 
+      });
     }
-    const data = insertRetailInventorySchema.parse({
-      ...req.body,
-      shopId: req.user.shopId,
-      updatedById: req.user.id
-    });
-    const inventory = await storage.updateRetailInventory(data);
-    res.status(201).json(inventory);
   });
 
   // Orders Routes - accessible by shop manager and barista
