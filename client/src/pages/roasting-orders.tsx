@@ -43,6 +43,34 @@ import { z } from "zod";
 import { formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
+// Helper function to group orders by date
+function groupOrdersByDate(orders: OrderWithDetails[]) {
+  const groups: Record<string, OrderWithDetails[]> = {};
+
+  orders.forEach(order => {
+    const date = new Date(order.createdAt).toLocaleDateString();
+    if (!groups[date]) {
+      groups[date] = [];
+    }
+    groups[date].push(order);
+  });
+
+  // Sort orders within each date group by status
+  Object.values(groups).forEach(dateOrders => {
+    dateOrders.sort((a, b) => {
+      const statusOrder = {
+        pending: 0,
+        roasted: 1,
+        dispatched: 2,
+        delivered: 3
+      };
+      return statusOrder[a.status as keyof typeof statusOrder] - statusOrder[b.status as keyof typeof statusOrder];
+    });
+  });
+
+  return groups;
+}
+
 type OrderWithDetails = {
   id: number;
   shopId: number;
@@ -134,18 +162,6 @@ export default function RoastingOrders() {
     );
   }
 
-  // Group orders by shop
-  const ordersByShop = orders?.reduce((acc, order) => {
-    const shopId = order.shopId;
-    if (!acc[shopId]) {
-      acc[shopId] = {
-        shop: order.shop,
-        orders: []
-      };
-    }
-    acc[shopId].orders.push(order);
-    return acc;
-  }, {} as Record<number, { shop: OrderWithDetails['shop'], orders: OrderWithDetails[] }>);
 
   const getAvailableStatuses = () => {
     if (user?.role === "roaster") {
@@ -170,75 +186,93 @@ export default function RoastingOrders() {
         </p>
       </div>
 
-      {Object.values(ordersByShop || {}).map(({ shop, orders: shopOrders }) => (
-        <Card key={shop.name}>
+      {Object.entries(groupOrdersByDate(orders || [])).map(([date, dateOrders]) => (
+        <Card key={date} className="mb-6">
           <CardHeader>
-            <div className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              <CardTitle>{shop.name}</CardTitle>
-            </div>
-            <CardDescription>{shop.location}</CardDescription>
+            <CardTitle>Orders for {date}</CardTitle>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Coffee</TableHead>
-                  <TableHead>Producer</TableHead>
-                  <TableHead>Ordered</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Last Updated</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {shopOrders.map((order) => (
-                  <TableRow key={order.id}>
-                    <TableCell>{order.greenCoffee.name}</TableCell>
-                    <TableCell>{order.greenCoffee.producer}</TableCell>
-                    <TableCell>
-                      <div>
-                        <div>Small Bags: {order.smallBags}</div>
-                        <div>Large Bags: {order.largeBags}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <Badge
-                          variant={order.status === "pending" ? "destructive" : "outline"}
-                          className="capitalize"
-                        >
-                          {order.status}
-                        </Badge>
-                        {order.updatedBy && (
-                          <div className="text-xs text-muted-foreground">
-                            by {order.updatedBy.username}
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>{formatDate(order.updatedAt || order.createdAt)}</TableCell>
-                    <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedOrder(order);
-                          form.reset({
-                            smallBags: order.smallBags,
-                            largeBags: order.largeBags,
-                            status: "roasted",
-                          });
-                          setIsUpdateDialogOpen(true);
-                        }}
-                      >
-                        Update Status
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <div className="space-y-6">
+              {["pending", "roasted", "dispatched", "delivered"].map(status => {
+                const statusOrders = dateOrders.filter(order => order.status === status);
+                if (statusOrders.length === 0) return null;
+
+                return (
+                  <div key={status} className="space-y-4">
+                    <h3 className="text-lg font-semibold capitalize">{status}</h3>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Shop</TableHead>
+                          <TableHead>Coffee</TableHead>
+                          <TableHead>Quantity</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Last Updated</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {statusOrders.map(order => (
+                          <TableRow key={order.id}>
+                            <TableCell>
+                              <div>
+                                <p className="font-medium">{order.shop.name}</p>
+                                <p className="text-sm text-muted-foreground">{order.shop.location}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <p>{order.greenCoffee.name}</p>
+                                <p className="text-sm text-muted-foreground">{order.greenCoffee.producer}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <div>Small Bags: {order.smallBags}</div>
+                                <div>Large Bags: {order.largeBags}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="space-y-1">
+                                <Badge
+                                  variant={order.status === "pending" ? "destructive" : "outline"}
+                                  className="capitalize"
+                                >
+                                  {order.status}
+                                </Badge>
+                                {order.updatedBy && (
+                                  <div className="text-xs text-muted-foreground">
+                                    by {order.updatedBy.username}
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>{formatDate(order.updatedAt || order.createdAt)}</TableCell>
+                            <TableCell>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedOrder(order);
+                                  form.reset({
+                                    smallBags: order.smallBags,
+                                    largeBags: order.largeBags,
+                                    status: "roasted",
+                                  });
+                                  setIsUpdateDialogOpen(true);
+                                }}
+                              >
+                                Update Status
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                );
+              })}
+            </div>
           </CardContent>
         </Card>
       ))}

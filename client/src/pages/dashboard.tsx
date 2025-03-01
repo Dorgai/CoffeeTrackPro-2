@@ -2,22 +2,24 @@ import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  Coffee, 
-  Package, 
-  Store, 
+import {
+  Coffee,
+  Package,
+  Store,
   BarChart3,
   Loader2,
   AlertTriangle,
-  LogOut 
+  LogOut,
+  TrendingUp,
+  TrendingDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { GreenCoffee, RoastingBatch, RetailInventory } from "@shared/schema";
 
-function StatsCard({ 
-  title, 
-  value, 
+function StatsCard({
+  title,
+  value,
   icon: Icon,
   description
 }: {
@@ -42,6 +44,13 @@ function StatsCard({
   );
 }
 
+// Helper function to calculate day difference
+function isSameDay(date1: Date, date2: Date) {
+  return date1.getFullYear() === date2.getFullYear() &&
+    date1.getMonth() === date2.getMonth() &&
+    date1.getDate() === date2.getDate();
+}
+
 export default function Dashboard() {
   const { user, logoutMutation } = useAuth();
 
@@ -55,9 +64,14 @@ export default function Dashboard() {
     enabled: !!user && (user.role === "roaster" || user.role === "roasteryOwner"),
   });
 
-  // For retail inventory, if roasteryOwner get all, otherwise get by shop
-  const { data: inventory, isLoading: loadingInventory } = useQuery<RetailInventory[]>({
+  // Get current and previous day inventory
+  const { data: currentInventory, isLoading: loadingInventory } = useQuery<RetailInventory[]>({
     queryKey: ["/api/retail-inventory", user?.defaultShopId],
+    enabled: !!user,
+  });
+
+  const { data: previousInventory } = useQuery<RetailInventory[]>({
+    queryKey: ["/api/retail-inventory/history", user?.defaultShopId],
     enabled: !!user,
   });
 
@@ -73,6 +87,20 @@ export default function Dashboard() {
     coffee => Number(coffee.currentStock) <= Number(coffee.minThreshold)
   ) || [];
 
+  // Calculate inventory changes
+  const inventoryWithChanges = currentInventory?.map(current => {
+    const previous = previousInventory?.find(prev =>
+      prev.shopId === current.shopId &&
+      prev.greenCoffeeId === current.greenCoffeeId
+    );
+
+    return {
+      ...current,
+      smallBagChange: previous ? current.smallBags - previous.smallBags : 0,
+      largeBagChange: previous ? current.largeBags - previous.largeBags : 0
+    };
+  });
+
   return (
     <div className="container mx-auto py-8 space-y-8">
       <div className="flex justify-between items-center">
@@ -87,9 +115,9 @@ export default function Dashboard() {
               <Link href="/inventory">Manage Inventory</Link>
             </Button>
           )}
-          <Button 
-            variant="outline" 
-            onClick={() => logoutMutation.mutate()} 
+          <Button
+            variant="outline"
+            onClick={() => logoutMutation.mutate()}
             disabled={logoutMutation.isPending}
           >
             <LogOut className="h-4 w-4 mr-2" />
@@ -117,7 +145,7 @@ export default function Dashboard() {
         />
         <StatsCard
           title="Active Shops"
-          value={inventory?.length || 0}
+          value={currentInventory?.length || 0}
           icon={Store}
         />
       </div>
@@ -189,21 +217,53 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {inventory?.slice(0, 5).map(inv => (
-                <div key={inv.id} className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Shop #{inv.shopId}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Last updated: {new Date(inv.updatedAt || "").toLocaleDateString()}
-                    </p>
+              {inventoryWithChanges?.slice(0, 5).map(inv => (
+                <div key={inv.id} className="space-y-2 p-3 bg-muted rounded-lg">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-medium">{inv.shop?.name || `Shop #${inv.shopId}`}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Last updated: {new Date(inv.updatedAt || "").toLocaleDateString()}
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p>{inv.smallBags} small bags</p>
-                    <p>{inv.largeBags} large bags</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center justify-between">
+                      <span>Small Bags:</span>
+                      <div className="flex items-center gap-2">
+                        <span>{inv.smallBags}</span>
+                        {inv.smallBagChange !== 0 && (
+                          <span className={`text-sm ${inv.smallBagChange > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                            {inv.smallBagChange > 0 ? (
+                              <TrendingUp className="h-4 w-4" />
+                            ) : (
+                              <TrendingDown className="h-4 w-4" />
+                            )}
+                            {Math.abs(inv.smallBagChange)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Large Bags:</span>
+                      <div className="flex items-center gap-2">
+                        <span>{inv.largeBags}</span>
+                        {inv.largeBagChange !== 0 && (
+                          <span className={`text-sm ${inv.largeBagChange > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                            {inv.largeBagChange > 0 ? (
+                              <TrendingUp className="h-4 w-4" />
+                            ) : (
+                              <TrendingDown className="h-4 w-4" />
+                            )}
+                            {Math.abs(inv.largeBagChange)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               ))}
-              {(!inventory || inventory.length === 0) && (
+              {(!inventoryWithChanges || inventoryWithChanges.length === 0) && (
                 <p className="text-muted-foreground text-center py-4">No inventory data available</p>
               )}
             </div>
