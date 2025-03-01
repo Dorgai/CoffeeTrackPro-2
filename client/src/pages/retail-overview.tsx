@@ -123,7 +123,9 @@ export default function RetailOverview() {
           <p className="text-muted-foreground">{shop.location}</p>
 
           {/* New Inventory Arrivals Section */}
-          <DispatchedCoffeeConfirmation shopId={shop.id} />
+          {(user?.role === "roasteryOwner" || user?.role === "shopManager" || user?.role === "barista") && (
+            <DispatchedCoffeeConfirmation shopId={shop.id} />
+          )}
 
           <Card>
             <CardHeader>
