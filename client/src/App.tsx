@@ -14,6 +14,7 @@ import Retail from "@/pages/retail";
 import RetailOrders from "@/pages/retail-orders";
 import RetailOverview from "@/pages/retail-overview";
 import Shops from "@/pages/shops";
+import Profile from "@/pages/profile";
 import NotFound from "@/pages/not-found";
 import { ProtectedRoute } from "@/lib/protected-route";
 
@@ -37,6 +38,7 @@ export default function App() {
             <ProtectedRoute path="/retail/orders" component={RetailOrders} roles={["shopManager", "barista"]} />
             <ProtectedRoute path="/retail-overview" component={RetailOverview} roles={["roasteryOwner"]} />
             <ProtectedRoute path="/shops" component={Shops} roles={["roasteryOwner"]} />
+            <ProtectedRoute path="/profile" component={Profile} /> {/* Added profile route */}
 
             {/* NotFound route must be last */}
             <Route component={NotFound} />
