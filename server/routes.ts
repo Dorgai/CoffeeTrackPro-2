@@ -179,20 +179,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Fetching orders for user:", req.user?.username, "with role:", req.user?.role);
       const shopId = Number(req.query.shopId);
 
-      // For roaster and roastery owner, if no shopId is provided, return all orders
-      if ((req.user?.role === "roaster" || req.user?.role === "roasteryOwner")) {
+      // For roaster and roastery owner, always return all orders
+      if (req.user?.role === "roaster" || req.user?.role === "roasteryOwner") {
         console.log("Fetching all orders for roaster/owner");
         const allOrders = await storage.getAllOrders();
         console.log("Found orders:", allOrders.length);
         return res.json(allOrders);
       }
 
+      // For shop managers and baristas, require shopId and check access
       if (!shopId) {
         return res.status(400).json({ message: "Shop ID is required" });
       }
 
-      // Allow roaster and roastery owner to access any shop's orders
-      if (req.user?.role !== "roasteryOwner" && req.user?.role !== "roaster" && !await checkShopAccess(req.user!.id, shopId)) {
+      if (!await checkShopAccess(req.user!.id, shopId)) {
         return res.status(403).json({ message: "User does not have access to this shop" });
       }
 

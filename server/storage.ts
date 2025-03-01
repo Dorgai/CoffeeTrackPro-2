@@ -445,10 +445,10 @@ export class DatabaseStorage implements IStorage {
         .innerJoin(shops, eq(orders.shopId, shops.id))
         .innerJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
         .innerJoin(users, eq(orders.createdById, users.id))
-        .leftJoin(users, eq(orders.updatedById, users.id), "users2")
+        .leftJoin(users.as('users2'), eq(orders.updatedById, users.as('users2').id))
         .orderBy(desc(orders.createdAt));
 
-      console.log("getAllOrders query successful, found orders:", result);
+      console.log("getAllOrders query result:", result);
       return result;
     } catch (error) {
       console.error("Error in getAllOrders:", error);
