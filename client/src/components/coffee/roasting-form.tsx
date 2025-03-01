@@ -30,10 +30,10 @@ interface FormValues {
   largeBagsProduced: number;
 }
 
-export function RoastingForm({ 
+export function RoastingForm({
   greenCoffeeId,
-  onSuccess 
-}: { 
+  onSuccess
+}: {
   greenCoffeeId: number;
   onSuccess?: () => void;
 }) {
@@ -70,11 +70,13 @@ export function RoastingForm({
   const onSubmit = form.handleSubmit(async (data: FormValues) => {
     const smallBagsProduced = Number(data.smallBagsProduced) || 0;
     const largeBagsProduced = Number(data.largeBagsProduced) || 0;
+    const greenCoffeeAmount = Number(data.greenCoffeeAmount) || 0;
+    const roastedAmount = Number(data.roastedAmount) || 0;
     const totalPackagedWeight = (smallBagsProduced * 0.2) + largeBagsProduced;
-    const packagingEfficiency = (totalPackagedWeight / data.roastedAmount) * 100;
+    const roastingLoss = Math.max(0, greenCoffeeAmount - roastedAmount);
 
     // Check if green coffee amount exceeds current stock
-    if (coffee && data.greenCoffeeAmount > coffee.currentStock) {
+    if (coffee && greenCoffeeAmount > coffee.currentStock) {
       toast({
         title: "Insufficient Stock",
         description: "The amount of green coffee exceeds the available stock.",
@@ -84,6 +86,7 @@ export function RoastingForm({
     }
 
     // Check if packaging efficiency is at least 80%
+    const packagingEfficiency = (totalPackagedWeight / roastedAmount) * 100;
     if (packagingEfficiency < 80) {
       toast({
         title: "Validation Error",
@@ -97,16 +100,17 @@ export function RoastingForm({
       await createMutation.mutateAsync({
         ...data,
         greenCoffeeId: Number(greenCoffeeId),
-        greenCoffeeAmount: Number(data.greenCoffeeAmount),
-        roastedAmount: Number(data.roastedAmount),
-        roastingLoss: Number(data.greenCoffeeAmount) - totalPackagedWeight,
-        smallBagsProduced: Number(data.smallBagsProduced),
-        largeBagsProduced: Number(data.largeBagsProduced),
+        greenCoffeeAmount,
+        roastedAmount,
+        roastingLoss,
+        smallBagsProduced,
+        largeBagsProduced,
       });
       toast({
         title: "Roasting Batch Recorded",
         description: "The roasting batch has been recorded successfully.",
       });
+      if (onSuccess) onSuccess();
     } catch (error) {
       toast({
         title: "Error",
@@ -131,10 +135,10 @@ export function RoastingForm({
                 <FormItem>
                   <FormLabel>Green Coffee Amount (kg)</FormLabel>
                   <FormControl>
-                    <Input 
-                      type="number" 
-                      step="0.01" 
-                      {...field} 
+                    <Input
+                      type="number"
+                      step="0.01"
+                      {...field}
                       onChange={(e) => field.onChange(Number(e.target.value))}
                     />
                   </FormControl>
@@ -153,10 +157,10 @@ export function RoastingForm({
                 <FormItem>
                   <FormLabel>Roasted Amount (kg)</FormLabel>
                   <FormControl>
-                    <Input 
-                      type="number" 
-                      step="0.01" 
-                      {...field} 
+                    <Input
+                      type="number"
+                      step="0.01"
+                      {...field}
                       onChange={(e) => field.onChange(Number(e.target.value))}
                     />
                   </FormControl>
@@ -173,9 +177,9 @@ export function RoastingForm({
                   <FormItem>
                     <FormLabel>Small Bags (200g) Produced</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        {...field} 
+                      <Input
+                        type="number"
+                        {...field}
                         onChange={(e) => field.onChange(Number(e.target.value))}
                       />
                     </FormControl>
@@ -192,9 +196,9 @@ export function RoastingForm({
                   <FormItem>
                     <FormLabel>Large Bags (1kg) Produced</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        {...field} 
+                      <Input
+                        type="number"
+                        {...field}
                         onChange={(e) => field.onChange(Number(e.target.value))}
                       />
                     </FormControl>
@@ -212,11 +216,11 @@ export function RoastingForm({
                 <FormItem>
                   <FormLabel>Roasting Loss (kg)</FormLabel>
                   <FormControl>
-                    <Input 
-                      type="number" 
-                      step="0.01" 
-                      readOnly 
-                      {...field} 
+                    <Input
+                      type="number"
+                      step="0.01"
+                      readOnly
+                      {...field}
                     />
                   </FormControl>
                   <FormDescription>

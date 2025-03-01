@@ -182,8 +182,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createRoastingBatch(batch: InsertRoastingBatch): Promise<RoastingBatch> {
-    const [newBatch] = await db.insert(roastingBatches).values(batch).returning();
-    return newBatch;
+    try {
+      const [newBatch] = await db
+        .insert(roastingBatches)
+        .values({
+          ...batch,
+          greenCoffeeAmount: batch.greenCoffeeAmount.toString(),
+          roastedAmount: batch.roastedAmount.toString(),
+          roastingLoss: batch.roastingLoss.toString(),
+        })
+        .returning();
+      return newBatch;
+    } catch (error) {
+      console.error("Error creating roasting batch:", error);
+      throw error;
+    }
   }
 
   // Retail Inventory
