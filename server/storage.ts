@@ -463,6 +463,7 @@ export class DatabaseStorage implements IStorage {
         .innerJoin(users, eq(retailInventory.updatedById, users.id))
         .orderBy(desc(retailInventory.updatedAt));
 
+      console.log("Found retail inventories:", result);
       return result;
     } catch (error) {
       console.error("Error fetching all retail inventories:", error);

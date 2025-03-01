@@ -158,12 +158,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json(inventory);
       }
 
-      // If we get here, return all inventories the user has access to
+      // If no shopId provided, get all inventories for user's shops
       const userShops = await storage.getUserShops(req.user!.id);
       console.log("User shops:", userShops);
+
       const allInventories = await Promise.all(
         userShops.map(shop => storage.getRetailInventoriesByShop(shop.id))
       );
+
       const flattenedInventories = allInventories.flat();
       console.log("Found total inventories:", flattenedInventories.length);
       return res.json(flattenedInventories);
