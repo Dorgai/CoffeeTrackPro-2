@@ -25,9 +25,9 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Switch>
-          <PageLayout>
-            {/* Auth routes outside of layout */}
+        <PageLayout>
+          <Switch>
+            {/* Auth routes */}
             <Route path="/auth" component={AuthPage} />
             <Route path="/login" component={AuthPage} />
 
@@ -42,14 +42,14 @@ export default function App() {
             <ProtectedRoute path="/retail-overview" component={RetailOverview} roles={["roasteryOwner"]} />
             <ProtectedRoute path="/analytics" component={Analytics} roles={["roasteryOwner", "shopManager"]} />
             <ProtectedRoute path="/reports" component={Reports} roles={["roasteryOwner", "shopManager"]} />
-            <ProtectedRoute path="/users" component={UserManagement} roles={["roasteryOwner"]} />
+            <ProtectedRoute path="/user-management" component={UserManagement} roles={["roasteryOwner"]} />
             <ProtectedRoute path="/shops" component={Shops} roles={["roasteryOwner"]} />
             <ProtectedRoute path="/profile" component={Profile} />
 
             {/* NotFound route must be last */}
             <Route component={NotFound} />
-          </PageLayout>
-        </Switch>
+          </Switch>
+        </PageLayout>
         <Toaster />
       </AuthProvider>
     </QueryClientProvider>

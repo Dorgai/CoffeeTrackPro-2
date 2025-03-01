@@ -27,7 +27,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, Key } from "lucide-react";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Loader2, Key, AlertCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -37,22 +47,26 @@ export default function UserManagement() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [userToDeactivate, setUserToDeactivate] = useState<User | null>(null);
 
   // Fetch all users
   const { data: users, isLoading } = useQuery<User[]>({
     queryKey: ["/api/users"],
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/users");
-      if (!res.ok) throw new Error("Failed to fetch users");
-      return res.json();
-    },
   });
 
   // Approve user mutation
   const approveUserMutation = useMutation({
     mutationFn: async (userId: number) => {
       const res = await apiRequest("POST", `/api/users/${userId}/approve`);
-      if (!res.ok) throw new Error("Failed to approve user");
+      if (!res.ok) {
+        const error = await res.text();
+        try {
+          const errorData = JSON.parse(error);
+          throw new Error(errorData.message || "Failed to approve user");
+        } catch {
+          throw new Error(error || "Failed to approve user");
+        }
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -60,6 +74,13 @@ export default function UserManagement() {
       toast({
         title: "Success",
         description: "User has been approved",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
       });
     },
   });
@@ -70,7 +91,15 @@ export default function UserManagement() {
       const res = await apiRequest("POST", `/api/users/${userId}/toggle-activation`, {
         isActive,
       });
-      if (!res.ok) throw new Error("Failed to update user activation status");
+      if (!res.ok) {
+        const error = await res.text();
+        try {
+          const errorData = JSON.parse(error);
+          throw new Error(errorData.message || "Failed to update user activation status");
+        } catch {
+          throw new Error(error || "Failed to update user activation status");
+        }
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -78,6 +107,14 @@ export default function UserManagement() {
       toast({
         title: "Success",
         description: "User activation status has been updated",
+      });
+      setUserToDeactivate(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
       });
     },
   });
@@ -88,7 +125,15 @@ export default function UserManagement() {
       const res = await apiRequest("POST", `/api/users/${userId}/update-password`, {
         password,
       });
-      if (!res.ok) throw new Error("Failed to update password");
+      if (!res.ok) {
+        const error = await res.text();
+        try {
+          const errorData = JSON.parse(error);
+          throw new Error(errorData.message || "Failed to update password");
+        } catch {
+          throw new Error(error || "Failed to update password");
+        }
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -99,12 +144,20 @@ export default function UserManagement() {
         description: "Password has been updated",
       });
     },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   if (currentUser?.role !== "roasteryOwner") {
     return (
       <div className="container mx-auto py-8">
         <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
           <AlertDescription>
             You do not have permission to access this page.
           </AlertDescription>
@@ -154,12 +207,20 @@ export default function UserManagement() {
                   <TableCell className="font-medium">{user.username}</TableCell>
                   <TableCell>{user.role}</TableCell>
                   <TableCell>
-                    <Badge variant={user.isPendingApproval ? "warning" : user.isActive ? "success" : "destructive"}>
+                    <Badge 
+                      variant={
+                        user.isPendingApproval 
+                          ? "outline"
+                          : user.isActive 
+                            ? "default" 
+                            : "destructive"
+                      }
+                    >
                       {user.isPendingApproval ? "Pending Approval" : user.isActive ? "Active" : "Inactive"}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {new Date(user.createdAt!).toLocaleDateString()}
+                    {user.createdAt && new Date(user.createdAt).toLocaleDateString()}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -177,12 +238,7 @@ export default function UserManagement() {
                         <Button
                           variant={user.isActive ? "destructive" : "outline"}
                           size="sm"
-                          onClick={() =>
-                            toggleActivationMutation.mutate({
-                              userId: user.id,
-                              isActive: !user.isActive,
-                            })
-                          }
+                          onClick={() => setUserToDeactivate(user)}
                         >
                           {user.isActive ? "Deactivate" : "Activate"}
                         </Button>
@@ -246,6 +302,39 @@ export default function UserManagement() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={!!userToDeactivate}
+        onOpenChange={(open) => !open && setUserToDeactivate(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {userToDeactivate?.isActive ? "Deactivate" : "Activate"} User
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to {userToDeactivate?.isActive ? "deactivate" : "activate"} {userToDeactivate?.username}?
+              {userToDeactivate?.isActive && " This will prevent them from accessing the system."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (userToDeactivate) {
+                  toggleActivationMutation.mutate({
+                    userId: userToDeactivate.id,
+                    isActive: !userToDeactivate.isActive,
+                  });
+                }
+              }}
+              className={userToDeactivate?.isActive ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
+            >
+              {userToDeactivate?.isActive ? "Deactivate" : "Activate"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
