@@ -20,10 +20,13 @@ import {
   userShops,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, gt } from "drizzle-orm";
+import { eq, desc, gt, and } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
+import { type DispatchedCoffeeConfirmation, type InsertDispatchedCoffeeConfirmation, dispatchedCoffeeConfirmations } from "./dispatchedCoffeeConfirmations";
+import { type InventoryDiscrepancy, type InsertInventoryDiscrepancy, inventoryDiscrepancies } from "./inventoryDiscrepancies";
+
 
 const PostgresSessionStore = connectPg(session);
 
@@ -86,6 +89,33 @@ export interface IStorage {
     greenCoffee: GreenCoffee;
     user: User;
     updatedBy: User | null;
+  })[]>;
+
+  // Dispatched Coffee Confirmations
+  getDispatchedCoffeeConfirmations(shopId: number): Promise<(DispatchedCoffeeConfirmation & {
+    greenCoffee: GreenCoffee;
+    shop: Shop;
+  })[]>;
+
+  createDispatchedCoffeeConfirmation(data: InsertDispatchedCoffeeConfirmation): Promise<DispatchedCoffeeConfirmation>;
+
+  confirmDispatchedCoffee(
+    confirmationId: number,
+    data: {
+      receivedSmallBags: number;
+      receivedLargeBags: number;
+      confirmedById: number;
+    }
+  ): Promise<DispatchedCoffeeConfirmation>;
+
+  // Inventory Discrepancies
+  createInventoryDiscrepancy(data: InsertInventoryDiscrepancy): Promise<InventoryDiscrepancy>;
+
+  getInventoryDiscrepancies(): Promise<(InventoryDiscrepancy & {
+    confirmation: DispatchedCoffeeConfirmation & {
+      greenCoffee: GreenCoffee;
+      shop: Shop;
+    };
   })[]>;
 }
 
@@ -464,6 +494,189 @@ export class DatabaseStorage implements IStorage {
       return ordersWithUpdatedBy;
     } catch (error) {
       console.error("Error in getAllOrders:", error);
+      throw error;
+    }
+  }
+
+  async getDispatchedCoffeeConfirmations(shopId: number): Promise<(DispatchedCoffeeConfirmation & {
+    greenCoffee: GreenCoffee;
+    shop: Shop;
+  })[]> {
+    try {
+      const confirmations = await db
+        .select({
+          id: dispatchedCoffeeConfirmations.id,
+          orderId: dispatchedCoffeeConfirmations.orderId,
+          shopId: dispatchedCoffeeConfirmations.shopId,
+          greenCoffeeId: dispatchedCoffeeConfirmations.greenCoffeeId,
+          dispatchedSmallBags: dispatchedCoffeeConfirmations.dispatchedSmallBags,
+          dispatchedLargeBags: dispatchedCoffeeConfirmations.dispatchedLargeBags,
+          status: dispatchedCoffeeConfirmations.status,
+          greenCoffee: {
+            id: greenCoffee.id,
+            name: greenCoffee.name,
+            producer: greenCoffee.producer,
+          },
+          shop: {
+            id: shops.id,
+            name: shops.name,
+            location: shops.location,
+          },
+        })
+        .from(dispatchedCoffeeConfirmations)
+        .innerJoin(greenCoffee, eq(dispatchedCoffeeConfirmations.greenCoffeeId, greenCoffee.id))
+        .innerJoin(shops, eq(dispatchedCoffeeConfirmations.shopId, shops.id))
+        .where(
+          and(
+            eq(dispatchedCoffeeConfirmations.shopId, shopId),
+            eq(dispatchedCoffeeConfirmations.status, "pending")
+          )
+        );
+
+      return confirmations;
+    } catch (error) {
+      console.error("Error fetching dispatched coffee confirmations:", error);
+      throw error;
+    }
+  }
+
+  async createDispatchedCoffeeConfirmation(data: InsertDispatchedCoffeeConfirmation): Promise<DispatchedCoffeeConfirmation> {
+    try {
+      const [confirmation] = await db
+        .insert(dispatchedCoffeeConfirmations)
+        .values(data)
+        .returning();
+
+      return confirmation;
+    } catch (error) {
+      console.error("Error creating dispatched coffee confirmation:", error);
+      throw error;
+    }
+  }
+
+  async confirmDispatchedCoffee(
+    confirmationId: number,
+    data: {
+      receivedSmallBags: number;
+      receivedLargeBags: number;
+      confirmedById: number;
+    }
+  ): Promise<DispatchedCoffeeConfirmation> {
+    try {
+      const [confirmation] = await db
+        .update(dispatchedCoffeeConfirmations)
+        .set({
+          receivedSmallBags: data.receivedSmallBags,
+          receivedLargeBags: data.receivedLargeBags,
+          confirmedById: data.confirmedById,
+          confirmedAt: new Date(),
+          status: "confirmed",
+        })
+        .where(eq(dispatchedCoffeeConfirmations.id, confirmationId))
+        .returning();
+
+      // Get the original confirmation to check for discrepancies
+      const [original] = await db
+        .select()
+        .from(dispatchedCoffeeConfirmations)
+        .where(eq(dispatchedCoffeeConfirmations.id, confirmationId));
+
+      // Create discrepancy report if quantities don't match
+      if (
+        original.dispatchedSmallBags !== data.receivedSmallBags ||
+        original.dispatchedLargeBags !== data.receivedLargeBags
+      ) {
+        await db.insert(inventoryDiscrepancies).values({
+          confirmationId,
+          smallBagsDifference: data.receivedSmallBags - original.dispatchedSmallBags,
+          largeBagsDifference: data.receivedLargeBags - original.dispatchedLargeBags,
+        });
+
+        // Update confirmation status to indicate discrepancy
+        await db
+          .update(dispatchedCoffeeConfirmations)
+          .set({ status: "discrepancy_reported" })
+          .where(eq(dispatchedCoffeeConfirmations.id, confirmationId));
+      }
+
+      return confirmation;
+    } catch (error) {
+      console.error("Error confirming dispatched coffee:", error);
+      throw error;
+    }
+  }
+
+  async createInventoryDiscrepancy(data: InsertInventoryDiscrepancy): Promise<InventoryDiscrepancy> {
+    try {
+      const [discrepancy] = await db
+        .insert(inventoryDiscrepancies)
+        .values(data)
+        .returning();
+
+      return discrepancy;
+    } catch (error) {
+      console.error("Error creating inventory discrepancy:", error);
+      throw error;
+    }
+  }
+
+  async getInventoryDiscrepancies(): Promise<(InventoryDiscrepancy & {
+    confirmation: DispatchedCoffeeConfirmation & {
+      greenCoffee: GreenCoffee;
+      shop: Shop;
+    };
+  })[]> {
+    try {
+      const discrepancies = await db
+        .select({
+          id: inventoryDiscrepancies.id,
+          confirmationId: inventoryDiscrepancies.confirmationId,
+          smallBagsDifference: inventoryDiscrepancies.smallBagsDifference,
+          largeBagsDifference: inventoryDiscrepancies.largeBagsDifference,
+          notes: inventoryDiscrepancies.notes,
+          status: inventoryDiscrepancies.status,
+          createdAt: inventoryDiscrepancies.createdAt,
+          confirmation: {
+            id: dispatchedCoffeeConfirmations.id,
+            orderId: dispatchedCoffeeConfirmations.orderId,
+            shopId: dispatchedCoffeeConfirmations.shopId,
+            greenCoffeeId: dispatchedCoffeeConfirmations.greenCoffeeId,
+            dispatchedSmallBags: dispatchedCoffeeConfirmations.dispatchedSmallBags,
+            dispatchedLargeBags: dispatchedCoffeeConfirmations.dispatchedLargeBags,
+            receivedSmallBags: dispatchedCoffeeConfirmations.receivedSmallBags,
+            receivedLargeBags: dispatchedCoffeeConfirmations.receivedLargeBags,
+            status: dispatchedCoffeeConfirmations.status,
+            confirmedAt: dispatchedCoffeeConfirmations.confirmedAt,
+            greenCoffee: {
+              id: greenCoffee.id,
+              name: greenCoffee.name,
+              producer: greenCoffee.producer,
+            },
+            shop: {
+              id: shops.id,
+              name: shops.name,
+              location: shops.location,
+            },
+          },
+        })
+        .from(inventoryDiscrepancies)
+        .innerJoin(
+          dispatchedCoffeeConfirmations,
+          eq(inventoryDiscrepancies.confirmationId, dispatchedCoffeeConfirmations.id)
+        )
+        .innerJoin(
+          greenCoffee,
+          eq(dispatchedCoffeeConfirmations.greenCoffeeId, greenCoffee.id)
+        )
+        .innerJoin(
+          shops,
+          eq(dispatchedCoffeeConfirmations.shopId, shops.id)
+        )
+        .orderBy(desc(inventoryDiscrepancies.createdAt));
+
+      return discrepancies;
+    } catch (error) {
+      console.error("Error fetching inventory discrepancies:", error);
       throw error;
     }
   }

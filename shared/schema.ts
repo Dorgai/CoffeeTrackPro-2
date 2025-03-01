@@ -79,6 +79,39 @@ export const orders = pgTable("orders", {
   updatedById: integer("updated_by_id").references(() => users.id),
 });
 
+// New table for tracking dispatched coffee confirmations
+export const dispatchedCoffeeConfirmations = pgTable("dispatched_coffee_confirmations", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id").references(() => orders.id).notNull(),
+  shopId: integer("shop_id").references(() => shops.id).notNull(),
+  greenCoffeeId: integer("green_coffee_id").references(() => greenCoffee.id).notNull(),
+  dispatchedSmallBags: integer("dispatched_small_bags").notNull(),
+  dispatchedLargeBags: integer("dispatched_large_bags").notNull(),
+  receivedSmallBags: integer("received_small_bags"),
+  receivedLargeBags: integer("received_large_bags"),
+  status: text("status", {
+    enum: ["pending", "confirmed", "discrepancy_reported"]
+  }).notNull().default("pending"),
+  confirmedById: integer("confirmed_by_id").references(() => users.id),
+  confirmedAt: timestamp("confirmed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// New table for inventory discrepancy alerts
+export const inventoryDiscrepancies = pgTable("inventory_discrepancies", {
+  id: serial("id").primaryKey(),
+  confirmationId: integer("confirmation_id").references(() => dispatchedCoffeeConfirmations.id).notNull(),
+  smallBagsDifference: integer("small_bags_difference").notNull(),
+  largeBagsDifference: integer("large_bags_difference").notNull(),
+  notes: text("notes"),
+  status: text("status", {
+    enum: ["open", "investigating", "resolved"]
+  }).notNull().default("open"),
+  createdAt: timestamp("created_at").defaultNow(),
+  resolvedAt: timestamp("resolved_at"),
+  resolvedById: integer("resolved_by_id").references(() => users.id),
+});
+
 // Create insert schemas for each table
 export const insertUserSchema = createInsertSchema(users);
 export const insertShopSchema = createInsertSchema(shops);
@@ -101,6 +134,23 @@ export const insertRetailInventorySchema = createInsertSchema(retailInventory).e
 export const insertOrderSchema = createInsertSchema(orders);
 export const insertUserShopSchema = createInsertSchema(userShops);
 
+// Create insert schemas for new tables
+export const insertDispatchedCoffeeConfirmationSchema = createInsertSchema(dispatchedCoffeeConfirmations).extend({
+  orderId: z.number(),
+  shopId: z.number(),
+  greenCoffeeId: z.number(),
+  dispatchedSmallBags: z.number().int().min(0),
+  dispatchedLargeBags: z.number().int().min(0),
+  receivedSmallBags: z.number().int().min(0).optional(),
+  receivedLargeBags: z.number().int().min(0).optional(),
+});
+
+export const insertInventoryDiscrepancySchema = createInsertSchema(inventoryDiscrepancies).extend({
+  confirmationId: z.number(),
+  smallBagsDifference: z.number().int(),
+  largeBagsDifference: z.number().int(),
+});
+
 // Export types for use in application code
 export type User = typeof users.$inferSelect;
 export type Shop = typeof shops.$inferSelect;
@@ -110,6 +160,11 @@ export type RetailInventory = typeof retailInventory.$inferSelect;
 export type Order = typeof orders.$inferSelect;
 export type UserShop = typeof userShops.$inferSelect;
 
+// Export types for new tables
+export type DispatchedCoffeeConfirmation = typeof dispatchedCoffeeConfirmations.$inferSelect;
+export type InventoryDiscrepancy = typeof inventoryDiscrepancies.$inferSelect;
+export type InsertDispatchedCoffeeConfirmation = z.infer<typeof insertDispatchedCoffeeConfirmationSchema>;
+export type InsertInventoryDiscrepancy = z.infer<typeof insertInventoryDiscrepancySchema>;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertShop = z.infer<typeof insertShopSchema>;
 export type InsertGreenCoffee = z.infer<typeof insertGreenCoffeeSchema>;

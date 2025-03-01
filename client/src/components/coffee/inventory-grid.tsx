@@ -1,3 +1,4 @@
+import { useLocation } from "wouter";
 import {
   Table,
   TableBody,
@@ -14,11 +15,11 @@ import type { GreenCoffee } from "@shared/schema";
 
 export function InventoryGrid({
   coffees,
-  onSelect,
 }: {
   coffees: GreenCoffee[];
-  onSelect?: (coffee: GreenCoffee) => void;
 }) {
+  const [, navigate] = useLocation();
+
   return (
     <Card>
       <CardHeader>
@@ -57,7 +58,7 @@ export function InventoryGrid({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => onSelect?.(coffee)}
+                    onClick={() => navigate(`/coffee/${coffee.id}`)}
                   >
                     View Details
                   </Button>
