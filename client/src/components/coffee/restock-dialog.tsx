@@ -15,9 +15,9 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { RefreshCw } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 type CoffeeWithQuantity = {
   id: number;
@@ -133,11 +133,19 @@ export function RestockDialog() {
       </DialogTrigger>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>Restock Order</DialogTitle>
+          <DialogTitle>Restock Order for {activeShop?.name}</DialogTitle>
           <DialogDescription>
-            Create a restock order for {activeShop?.name}. Adjust quantities as needed.
+            Create a restock order for {activeShop?.name || "your shop"}. Adjust quantities as needed.
           </DialogDescription>
         </DialogHeader>
+
+        {!activeShop && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertDescription>
+              Please select a shop from the dropdown in the navigation bar before creating a restock order.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <div className="py-4">
           <Table>
@@ -184,7 +192,7 @@ export function RestockDialog() {
           </Button>
           <Button 
             onClick={handleSubmit}
-            disabled={createOrderMutation.isPending}
+            disabled={createOrderMutation.isPending || !activeShop}
           >
             Submit Order
           </Button>

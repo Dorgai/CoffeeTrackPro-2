@@ -3,7 +3,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { User } from "@shared/schema";
-
 import {
   Card,
   CardContent,
@@ -27,11 +26,13 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Loader2, Key } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function UserManagement() {
+  const { user: currentUser } = useAuth();
   const { toast } = useToast();
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [newPassword, setNewPassword] = useState("");
@@ -100,6 +101,18 @@ export default function UserManagement() {
     },
   });
 
+  if (currentUser?.role !== "roasteryOwner") {
+    return (
+      <div className="container mx-auto py-8">
+        <Alert variant="destructive">
+          <AlertDescription>
+            You do not have permission to access this page.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -141,13 +154,9 @@ export default function UserManagement() {
                   <TableCell className="font-medium">{user.username}</TableCell>
                   <TableCell>{user.role}</TableCell>
                   <TableCell>
-                    {user.isPendingApproval ? (
-                      <Badge variant="warning">Pending Approval</Badge>
-                    ) : user.isActive ? (
-                      <Badge variant="success">Active</Badge>
-                    ) : (
-                      <Badge variant="destructive">Inactive</Badge>
-                    )}
+                    <Badge variant={user.isPendingApproval ? "warning" : user.isActive ? "success" : "destructive"}>
+                      {user.isPendingApproval ? "Pending Approval" : user.isActive ? "Active" : "Inactive"}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     {new Date(user.createdAt!).toLocaleDateString()}
@@ -163,7 +172,7 @@ export default function UserManagement() {
                           Approve
                         </Button>
                       )}
-                      
+
                       {!user.isPendingApproval && (
                         <Button
                           variant={user.isActive ? "destructive" : "outline"}
@@ -179,52 +188,17 @@ export default function UserManagement() {
                         </Button>
                       )}
 
-                      <Dialog
-                        open={isPasswordDialogOpen && selectedUser?.id === user.id}
-                        onOpenChange={(open) => {
-                          setIsPasswordDialogOpen(open);
-                          if (!open) {
-                            setSelectedUser(null);
-                            setNewPassword("");
-                          }
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedUser(user);
+                          setIsPasswordDialogOpen(true);
                         }}
                       >
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setSelectedUser(user)}
-                          >
-                            <Key className="h-4 w-4 mr-2" />
-                            Reset Password
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Reset Password</DialogTitle>
-                          </DialogHeader>
-                          <div className="space-y-4 pt-4">
-                            <Input
-                              type="password"
-                              placeholder="Enter new password"
-                              value={newPassword}
-                              onChange={(e) => setNewPassword(e.target.value)}
-                            />
-                            <Button
-                              className="w-full"
-                              onClick={() =>
-                                updatePasswordMutation.mutate({
-                                  userId: user.id,
-                                  password: newPassword,
-                                })
-                              }
-                              disabled={!newPassword}
-                            >
-                              Update Password
-                            </Button>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
+                        <Key className="h-4 w-4 mr-2" />
+                        Reset Password
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -233,6 +207,45 @@ export default function UserManagement() {
           </Table>
         </CardContent>
       </Card>
+
+      <Dialog
+        open={isPasswordDialogOpen}
+        onOpenChange={(open) => {
+          setIsPasswordDialogOpen(open);
+          if (!open) {
+            setSelectedUser(null);
+            setNewPassword("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset Password for {selectedUser?.username}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <Input
+              type="password"
+              placeholder="Enter new password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+            />
+            <Button
+              className="w-full"
+              onClick={() => {
+                if (selectedUser) {
+                  updatePasswordMutation.mutate({
+                    userId: selectedUser.id,
+                    password: newPassword,
+                  });
+                }
+              }}
+              disabled={!newPassword || !selectedUser}
+            >
+              Update Password
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

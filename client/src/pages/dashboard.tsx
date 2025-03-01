@@ -243,15 +243,17 @@ export default function Dashboard() {
         />
         <StatsCard
           title="Pending Orders"
-          value={filteredOrders.filter(o => o.status === "pending").length}
+          value={pendingOrders.length}
           description={oldestPendingOrder > 0 ? `Oldest: ${oldestPendingOrder} days ago` : undefined}
           icon={AlertTriangle}
         />
-        <StatsCard
-          title="Active Shops"
-          value={new Set(filteredOrders.map(o => o.shopId)).size}
-          icon={Store}
-        />
+        {user?.role !== "roaster" && (
+          <StatsCard
+            title="Active Shops"
+            value={new Set(filteredOrders.map(o => o.shopId)).size}
+            icon={Store}
+          />
+        )}
         <StatsCard
           title="Coffee Types"
           value={coffees ? `${coffees.filter(c => Number(c.currentStock) > 0).length} / ${coffees.length}` : '0 / 0'}
@@ -260,71 +262,73 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Missing Coffee Types Widget - Visible to all roles */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Missing Coffee Types</CardTitle>
-          <CardDescription>Coffee types available in other shops but not in stock here</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-6">
-            {(user?.role === "barista" && selectedShopId ?
-              [{ id: selectedShopId, name: currentInventory?.find(inv => inv.shopId === selectedShopId)?.shop?.name || "Selected Shop" }]
-              : orders?.filter(order => order.shop).reduce((shops, order) => {
-                if (order.shop && !shops.some(s => s.id === order.shopId)) {
-                  shops.push({ id: order.shopId, name: order.shop.name });
-                }
-                return shops;
-              }, [] as Array<{ id: number; name: string }>)
-            ).map(shop => {
-              const shopInventory = currentInventory?.filter(inv => inv.shopId === shop.id) || [];
-              const shopCoffeeIds = new Set(shopInventory.map(inv => inv.greenCoffeeId));
+      {/* Missing Coffee Types Widget - Not visible for roasters */}
+      {user?.role !== "roaster" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Missing Coffee Types</CardTitle>
+            <CardDescription>Coffee types available in other shops but not in stock here</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {(user?.role === "barista" && selectedShopId ?
+                [{ id: selectedShopId, name: currentInventory?.find(inv => inv.shopId === selectedShopId)?.shop?.name || "Selected Shop" }]
+                : orders?.filter(order => order.shop).reduce((shops, order) => {
+                  if (order.shop && !shops.some(s => s.id === order.shopId)) {
+                    shops.push({ id: order.shopId, name: order.shop.name });
+                  }
+                  return shops;
+                }, [] as Array<{ id: number; name: string }>)
+              ).map(shop => {
+                const shopInventory = currentInventory?.filter(inv => inv.shopId === shop.id) || [];
+                const shopCoffeeIds = new Set(shopInventory.map(inv => inv.greenCoffeeId));
 
-              // Find coffees that exist in other shops but not in this one
-              const missingCoffees = coffees?.filter(coffee => {
-                const isInOtherShops = currentInventory?.some(inv =>
-                  inv.shopId !== shop.id &&
-                  inv.greenCoffeeId === coffee.id &&
-                  (inv.smallBags > 0 || inv.largeBags > 0)
-                );
-                return !shopCoffeeIds.has(coffee.id) && isInOtherShops;
-              });
+                // Find coffees that exist in other shops but not in this one
+                const missingCoffees = coffees?.filter(coffee => {
+                  const isInOtherShops = currentInventory?.some(inv =>
+                    inv.shopId !== shop.id &&
+                    inv.greenCoffeeId === coffee.id &&
+                    (inv.smallBags > 0 || inv.largeBags > 0)
+                  );
+                  return !shopCoffeeIds.has(coffee.id) && isInOtherShops;
+                });
 
-              if (!missingCoffees?.length) return null;
+                if (!missingCoffees?.length) return null;
 
-              return (
-                <div key={shop.id} className="space-y-2">
-                  <h3 className="font-medium">{shop.name}</h3>
-                  <div className="grid gap-2">
-                    {missingCoffees.map(coffee => (
-                      <div key={coffee.id} className="p-3 bg-muted rounded-lg">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <p className="font-medium">{coffee.name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {coffee.producer} - {coffee.country}
-                            </p>
+                return (
+                  <div key={shop.id} className="space-y-2">
+                    <h3 className="font-medium">{shop.name}</h3>
+                    <div className="grid gap-2">
+                      {missingCoffees.map(coffee => (
+                        <div key={coffee.id} className="p-3 bg-muted rounded-lg">
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <p className="font-medium">{coffee.name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {coffee.producer} - {coffee.country}
+                              </p>
+                            </div>
+                            {(user?.role === "shopManager" || user?.role === "barista") && (
+                              <Button variant="outline" size="sm" asChild>
+                                <Link href={`/retail/orders?coffeeId=${coffee.id}&shopId=${shop.id}`}>
+                                  Order Now
+                                </Link>
+                              </Button>
+                            )}
                           </div>
-                          {(user?.role === "shopManager" || user?.role === "barista") && (
-                            <Button variant="outline" size="sm" asChild>
-                              <Link href={`/retail/orders?coffeeId=${coffee.id}&shopId=${shop.id}`}>
-                                Order Now
-                              </Link>
-                            </Button>
-                          )}
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              );
-            }).filter(Boolean)}
-            {!currentInventory?.length && (
-              <p className="text-center text-muted-foreground py-4">No inventory data available</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+                );
+              }).filter(Boolean)}
+              {!currentInventory?.length && (
+                <p className="text-center text-muted-foreground py-4">No inventory data available</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Manager's View - Total Stock Overview and Shop Breakdown */}
       {user?.role === "shopManager" && (

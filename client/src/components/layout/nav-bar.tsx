@@ -65,13 +65,8 @@ export function NavBar() {
                 </MenubarContent>
               </MenubarMenu>
               <MenubarMenu>
-                <MenubarTrigger>Retail</MenubarTrigger>
+                <MenubarTrigger>Management</MenubarTrigger>
                 <MenubarContent>
-                  <MenubarItem>
-                    <Link href="/retail-overview" className="flex w-full">
-                      Overview
-                    </Link>
-                  </MenubarItem>
                   <MenubarItem>
                     <Link href="/shops" className="flex w-full">
                       Shop Management
@@ -124,16 +119,22 @@ export function NavBar() {
         <div className="ml-auto flex items-center space-x-4">
           {user ? (
             <div className="flex items-center space-x-4">
+              {/* Show shop selector for all roles except roaster */}
               {user.role !== "roaster" && <ShopSelector />}
-              {user.role !== "roaster" && (
+
+              {/* Show GreenBeansStockIndicator for roasteryOwner and roaster */}
+              {(user.role === "roasteryOwner" || user.role === "roaster") && (
+                <GreenBeansStockIndicator />
+              )}
+
+              {/* Show StockLevelIndicator and RestockDialog for roasteryOwner, shopManager, and barista */}
+              {(user.role === "roasteryOwner" || user.role === "shopManager" || user.role === "barista") && (
                 <>
-                  {user.role === "roasteryOwner" && (
-                    <GreenBeansStockIndicator />
-                  )}
                   <StockLevelIndicator />
                   <RestockDialog />
                 </>
               )}
+
               <Avatar>
                 <AvatarFallback>
                   {user.username.charAt(0).toUpperCase()}
