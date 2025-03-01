@@ -42,6 +42,11 @@ export default function Retail() {
 
   const { data: retailInventory, isLoading: loadingInventory } = useQuery({
     queryKey: ["/api/retail-inventory", activeShop?.id],
+    queryFn: async () => {
+      if (!activeShop?.id) return {};
+      const res = await apiRequest("GET", `/api/retail-inventory?shopId=${activeShop.id}`);
+      return res.json();
+    },
     enabled: !!activeShop?.id,
   });
 

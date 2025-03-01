@@ -19,6 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate } from "@/lib/utils";
+import { apiRequest } from "@/lib/queryClient";
 
 type OrderWithUser = {
   id: number;
@@ -46,6 +47,11 @@ export default function RetailOrders() {
 
   const { data: orders, isLoading: loadingOrders } = useQuery<OrderWithUser[]>({
     queryKey: ["/api/orders", activeShop?.id],
+    queryFn: async () => {
+      if (!activeShop?.id) return [];
+      const res = await apiRequest("GET", `/api/orders?shopId=${activeShop.id}`);
+      return res.json();
+    },
     enabled: !!activeShop?.id,
   });
 

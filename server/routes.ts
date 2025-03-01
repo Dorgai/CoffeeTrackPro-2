@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { insertGreenCoffeeSchema, insertRoastingBatchSchema, insertOrderSchema, insertShopSchema } from "@shared/schema";
-import {insertRetailInventorySchema} from "@shared/schema"; //import the missing schema
+import {insertRetailInventorySchema} from "@shared/schema";
 
 function requireRole(roles: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -12,6 +12,11 @@ function requireRole(roles: string[]) {
     }
     next();
   };
+}
+
+async function checkShopAccess(userId: number, shopId: number) {
+  const userShops = await storage.getUserShops(userId);
+  return userShops.some(shop => shop.id === shopId);
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -96,10 +101,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Retail Inventory Routes - accessible by shop manager and barista
   app.get("/api/retail-inventory", requireRole(["shopManager", "barista"]), async (req, res) => {
     try {
-      if (!req.user?.shopId) {
-        return res.status(400).json({ message: "User is not assigned to a shop" });
+      const shopId = Number(req.query.shopId);
+      if (!shopId) {
+        return res.status(400).json({ message: "Shop ID is required" });
       }
-      const inventory = await storage.getRetailInventoriesByShop(req.user.shopId);
+
+      if (!await checkShopAccess(req.user!.id, shopId)) {
+        return res.status(403).json({ message: "User does not have access to this shop" });
+      }
+
+      const inventory = await storage.getRetailInventoriesByShop(shopId);
       res.json(inventory);
     } catch (error) {
       console.error("Error fetching retail inventory:", error);
@@ -109,22 +120,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/retail-inventory", requireRole(["shopManager", "barista"]), async (req, res) => {
     try {
-      if (!req.user?.shopId) {
-        return res.status(400).json({ message: "User is not assigned to a shop" });
+      const { shopId } = req.body;
+      if (!shopId) {
+        return res.status(400).json({ message: "Shop ID is required" });
       }
 
-      console.log("Received inventory update request:", {
-        body: req.body,
-        user: { id: req.user.id, shopId: req.user.shopId }
-      });
+      if (!await checkShopAccess(req.user!.id, shopId)) {
+        return res.status(403).json({ message: "User does not have access to this shop" });
+      }
 
       const data = insertRetailInventorySchema.parse({
         ...req.body,
-        shopId: req.user.shopId,
-        updatedById: req.user.id
+        updatedById: req.user!.id
       });
-
-      console.log("Parsed inventory data:", data);
 
       const inventory = await storage.updateRetailInventory(data);
       res.status(201).json(inventory);
@@ -140,12 +148,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Orders Routes - accessible by shop manager and barista
   app.get("/api/orders", requireRole(["shopManager", "barista"]), async (req, res) => {
     try {
-      if (!req.user?.shopId) {
-        return res.status(400).json({ message: "User is not assigned to a shop" });
+      const shopId = Number(req.query.shopId);
+      if (!shopId) {
+        return res.status(400).json({ message: "Shop ID is required" });
       }
 
-      console.log("Fetching orders for shop:", req.user.shopId);
-      const orders = await storage.getOrdersByShop(req.user.shopId);
+      if (!await checkShopAccess(req.user!.id, shopId)) {
+        return res.status(403).json({ message: "User does not have access to this shop" });
+      }
+
+      const orders = await storage.getOrdersByShop(shopId);
       res.json(orders);
     } catch (error) {
       console.error("Error fetching orders:", error);
@@ -155,14 +167,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/orders", requireRole(["shopManager", "barista"]), async (req, res) => {
     try {
-      if (!req.user?.shopId) {
-        return res.status(400).json({ message: "User is not assigned to a shop" });
+      const { shopId } = req.body;
+      if (!shopId) {
+        return res.status(400).json({ message: "Shop ID is required" });
+      }
+
+      if (!await checkShopAccess(req.user!.id, shopId)) {
+        return res.status(403).json({ message: "User does not have access to this shop" });
       }
 
       const data = insertOrderSchema.parse({
         ...req.body,
-        shopId: req.user.shopId,
-        createdById: req.user.id,
+        createdById: req.user!.id,
         status: "pending"
       });
 
