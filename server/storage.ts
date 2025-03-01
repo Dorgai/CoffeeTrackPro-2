@@ -246,34 +246,18 @@ export class DatabaseStorage implements IStorage {
 
       console.log("Looking up shops for user:", user?.username, "with role:", user?.role);
 
-      // If roasteryOwner, return all active shops
-      if (user?.role === "roasteryOwner") {
-        return await db
-          .select()
-          .from(shops)
-          .where(eq(shops.isActive, true));
+      // If roaster, return empty array as they don't need shop access
+      if (user?.role === "roaster") {
+        return [];
       }
 
-      // For other roles, get associated active shops through userShops table
-      const result = await db
-        .select({
-          id: shops.id,
-          name: shops.name,
-          location: shops.location,
-          isActive: shops.isActive,
-          defaultOrderQuantity: shops.defaultOrderQuantity
-        })
-        .from(userShops)
-        .innerJoin(shops, eq(userShops.shopId, shops.id))
-        .where(
-          and(
-            eq(userShops.userId, userId),
-            eq(shops.isActive, true)
-          )
-        );
+      // For all other roles, return all active shops
+      return await db
+        .select()
+        .from(shops)
+        .where(eq(shops.isActive, true))
+        .orderBy(shops.name);
 
-      console.log("Found shops for user:", userId, result);
-      return result;
     } catch (error) {
       console.error("Error fetching user shops:", error);
       throw error;
@@ -391,7 +375,7 @@ export class DatabaseStorage implements IStorage {
             role: users.role,
           },
         })
-        .from(greenCoffee) 
+        .from(greenCoffee)
         .leftJoin(
           retailInventory,
           and(
@@ -849,6 +833,7 @@ export class DatabaseStorage implements IStorage {
               confirmationId,
               smallBagsDifference: data.receivedSmallBags - confirmation.dispatchedSmallBags,
               largeBagsDifference: data.receivedLargeBags - confirmation.dispatchedLargeBags,
+              status: "open",
             })
             .returning();
 
@@ -880,11 +865,21 @@ export class DatabaseStorage implements IStorage {
 
   async createInventoryDiscrepancy(data: InsertInventoryDiscrepancy): Promise<InventoryDiscrepancy> {
     try {
+      console.log("Creating inventory discrepancy with data:", data);
       const [discrepancy] = await db
         .insert(inventoryDiscrepancies)
-        .values(data)
+        .values({
+          ...data,
+          status: data.status || "open", // Ensure status is set
+          createdAt: new Date(),
+        })
         .returning();
 
+      if (!discrepancy) {
+        throw new Error("Failed to create inventory discrepancy");
+      }
+
+      console.log("Created discrepancy:", discrepancy);
       return discrepancy;
     } catch (error) {
       console.error("Error creating inventory discrepancy:", error);

@@ -95,6 +95,11 @@ export function NavBar() {
                     Batches
                   </Link>
                 </MenubarItem>
+                <MenubarItem>
+                  <Link href="/roasting/discrepancies" className="flex w-full">
+                    Discrepancy Reports
+                  </Link>
+                </MenubarItem>
               </MenubarContent>
             </MenubarMenu>
           )}

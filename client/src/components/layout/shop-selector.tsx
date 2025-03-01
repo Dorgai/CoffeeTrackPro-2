@@ -21,11 +21,15 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   const { activeShop, setActiveShop } = useActiveShop();
   const { user } = useAuth();
 
-  // For roasteryOwner, fetch all shops. For others, fetch only assigned shops
-  const endpoint = user?.role === "roasteryOwner" ? "/api/shops" : "/api/user/shops";
+  // Hide shop selector for roaster role
+  if (user?.role === "roaster") {
+    return null;
+  }
 
+  // For all other roles, fetch all shops
   const { data: shops, isLoading } = useQuery<Shop[]>({
-    queryKey: [endpoint],
+    queryKey: ["/api/user/shops"],
+    enabled: !!user
   });
 
   const handleChange = (value: string) => {
