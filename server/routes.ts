@@ -173,13 +173,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Orders Routes - accessible by shop manager and barista
-  app.get("/api/orders", requireRole(["shopManager", "barista", "roasteryOwner"]), async (req, res) => {
+  // Orders Routes - accessible by shop manager, barista, and roaster
+  app.get("/api/orders", requireRole(["shopManager", "barista", "roaster", "roasteryOwner"]), async (req, res) => {
     try {
       const shopId = Number(req.query.shopId);
 
-      // For roastery owner, if no shopId is provided, return all orders
-      if (req.user?.role === "roasteryOwner" && !shopId) {
+      // For roaster and roastery owner, if no shopId is provided, return all orders
+      if ((req.user?.role === "roaster" || req.user?.role === "roasteryOwner") && !shopId) {
         const allOrders = await storage.getAllOrders();
         return res.json(allOrders);
       }
