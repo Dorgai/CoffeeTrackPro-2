@@ -282,8 +282,30 @@ export class DatabaseStorage implements IStorage {
 
   // Green Coffee
   async getGreenCoffee(id: number): Promise<GreenCoffee | undefined> {
-    const [coffee] = await db.select().from(greenCoffee).where(eq(greenCoffee.id, id));
-    return coffee;
+    try {
+      console.log("Fetching green coffee details for ID:", id);
+      const [coffee] = await db
+        .select({
+          id: greenCoffee.id,
+          name: greenCoffee.name,
+          producer: greenCoffee.producer,
+          country: greenCoffee.country,
+          altitude: greenCoffee.altitude,
+          cuppingNotes: greenCoffee.cuppingNotes,
+          details: greenCoffee.details,
+          currentStock: greenCoffee.currentStock,
+          minThreshold: greenCoffee.minThreshold,
+          createdAt: greenCoffee.createdAt,
+        })
+        .from(greenCoffee)
+        .where(eq(greenCoffee.id, id));
+
+      console.log("Found coffee details:", coffee);
+      return coffee;
+    } catch (error) {
+      console.error("Error fetching green coffee:", error);
+      throw error;
+    }
   }
 
   async getGreenCoffees(): Promise<GreenCoffee[]> {

@@ -29,6 +29,7 @@ interface DispatchedCoffeeProps {
 }
 
 export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) {
+  // Always declare hooks at the top level
   const { toast } = useToast();
   const [selectedConfirmation, setSelectedConfirmation] = useState<DispatchConfirmationType | null>(null);
   const [receivedQuantities, setReceivedQuantities] = useState({
@@ -36,60 +37,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
     largeBags: 0
   });
 
-  // Fetch both pending dispatched coffee confirmations and coffee details
-  const { data: confirmations, isLoading } = useQuery<(DispatchConfirmationType & { coffee?: { name: string } })[]>({
-    queryKey: ["/api/dispatched-coffee/confirmations", shopId],
-    queryFn: async () => {
-      console.log("Fetching confirmations for shop:", shopId);
-      const res = await apiRequest("GET", `/api/dispatched-coffee/confirmations?shopId=${shopId}`);
-      if (!res.ok) {
-        const error = await res.text();
-        throw new Error(error);
-      }
-      const confirmations = await res.json();
-      console.log("Received confirmations:", confirmations);
-
-      // Fetch coffee details for each confirmation
-      const confirmationsWithCoffee = await Promise.all(
-        confirmations.map(async (confirmation) => {
-          const coffeeRes = await apiRequest("GET", `/api/green-coffee/${confirmation.greenCoffeeId}`);
-          const coffee = await coffeeRes.json();
-          return { ...confirmation, coffee };
-        })
-      );
-
-      return confirmationsWithCoffee;
-    },
-  });
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
-
-  // Return a message when there are no pending confirmations
-  if (!confirmations || confirmations.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>No New Arrivals</CardTitle>
-          <CardDescription>
-            There are currently no pending coffee shipments to confirm.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center p-8 text-muted-foreground">
-            <p>Once coffee is dispatched to your shop, you'll be able to confirm the received quantities here.</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // Confirm received quantities
+  // Define mutation outside of any conditional logic
   const confirmMutation = useMutation({
     mutationFn: async (data: {
       confirmationId: number;
@@ -121,6 +69,37 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
     },
   });
 
+  // Query for confirmations
+  const { data: confirmations, isLoading } = useQuery<(DispatchConfirmationType & { coffee?: { name: string } })[]>({
+    queryKey: ["/api/dispatched-coffee/confirmations", shopId],
+    queryFn: async () => {
+      console.log("Fetching confirmations for shop:", shopId);
+      const res = await apiRequest("GET", `/api/dispatched-coffee/confirmations?shopId=${shopId}`);
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error);
+      }
+      const confirmations = await res.json();
+      console.log("Received confirmations:", confirmations);
+
+      // Fetch coffee details for each confirmation
+      const confirmationsWithCoffee = await Promise.all(
+        confirmations.map(async (confirmation) => {
+          try {
+            const coffeeRes = await apiRequest("GET", `/api/green-coffee/${confirmation.greenCoffeeId}`);
+            const coffee = await coffeeRes.json();
+            return { ...confirmation, coffee };
+          } catch (error) {
+            console.error("Error fetching coffee details:", error);
+            return { ...confirmation, coffee: { name: "Unknown Coffee" } };
+          }
+        })
+      );
+
+      return confirmationsWithCoffee;
+    },
+  });
+
   const handleConfirm = () => {
     if (!selectedConfirmation) return;
 
@@ -130,6 +109,32 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
       receivedLargeBags: receivedQuantities.largeBags,
     });
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!confirmations || confirmations.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>No New Arrivals</CardTitle>
+          <CardDescription>
+            There are currently no pending coffee shipments to confirm.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center p-8 text-muted-foreground">
+            <p>Once coffee is dispatched to your shop, you'll be able to confirm the received quantities here.</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
