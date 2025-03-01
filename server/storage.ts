@@ -171,6 +171,8 @@ export class DatabaseStorage implements IStorage {
         .from(users)
         .where(eq(users.id, userId));
 
+      console.log("Looking up shops for user:", user?.username, "with role:", user?.role);
+
       // If roasteryOwner, return all shops
       if (user?.role === "roasteryOwner") {
         return await db.select().from(shops);

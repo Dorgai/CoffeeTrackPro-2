@@ -24,6 +24,7 @@ async function checkShopAccess(userId: number, shopId: number) {
 
     // For other roles, check userShops table
     const userShops = await storage.getUserShops(userId);
+    console.log("User shops for", userId, ":", userShops);
     return userShops.some(shop => shop.id === shopId);
   } catch (error) {
     console.error("Error checking shop access:", error);
