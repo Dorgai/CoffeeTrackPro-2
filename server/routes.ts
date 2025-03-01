@@ -98,18 +98,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "User is not assigned to a shop" });
       }
 
+      console.log("Received inventory update request:", {
+        body: req.body,
+        user: { id: req.user.id, shopId: req.user.shopId }
+      });
+
       const data = insertRetailInventorySchema.parse({
         ...req.body,
         shopId: req.user.shopId,
         updatedById: req.user.id
       });
 
+      console.log("Parsed inventory data:", data);
+
       const inventory = await storage.updateRetailInventory(data);
       res.status(201).json(inventory);
     } catch (error) {
       console.error("Error updating retail inventory:", error);
       res.status(400).json({ 
-        message: error instanceof Error ? error.message : "Failed to update inventory" 
+        message: error instanceof Error ? error.message : "Failed to update inventory",
+        details: error instanceof Error ? error.stack : undefined
       });
     }
   });

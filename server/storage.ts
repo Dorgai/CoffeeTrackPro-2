@@ -156,30 +156,49 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateRetailInventory(inventory: InsertRetailInventory): Promise<RetailInventory> {
-    const [existingInventory] = await db
-      .select()
-      .from(retailInventory)
-      .where(eq(retailInventory.shopId, inventory.shopId))
-      .where(eq(retailInventory.greenCoffeeId, inventory.greenCoffeeId));
+    console.log("Updating retail inventory with data:", inventory);
 
-    if (existingInventory) {
-      const [updatedInventory] = await db
-        .update(retailInventory)
-        .set({
-          smallBags: inventory.smallBags,
-          largeBags: inventory.largeBags,
-          updatedById: inventory.updatedById,
-          updatedAt: new Date(),
-        })
-        .where(eq(retailInventory.id, existingInventory.id))
-        .returning();
-      return updatedInventory;
-    } else {
-      const [newInventory] = await db
-        .insert(retailInventory)
-        .values(inventory)
-        .returning();
-      return newInventory;
+    try {
+      // First try to find existing inventory
+      const [existingInventory] = await db
+        .select()
+        .from(retailInventory)
+        .where(eq(retailInventory.shopId, inventory.shopId))
+        .where(eq(retailInventory.greenCoffeeId, inventory.greenCoffeeId));
+
+      console.log("Found existing inventory:", existingInventory);
+
+      if (existingInventory) {
+        // Update existing inventory
+        const [updatedInventory] = await db
+          .update(retailInventory)
+          .set({
+            smallBags: inventory.smallBags,
+            largeBags: inventory.largeBags,
+            updatedById: inventory.updatedById,
+            updatedAt: new Date(),
+          })
+          .where(eq(retailInventory.id, existingInventory.id))
+          .returning();
+
+        console.log("Updated existing inventory:", updatedInventory);
+        return updatedInventory;
+      } else {
+        // Create new inventory entry
+        const [newInventory] = await db
+          .insert(retailInventory)
+          .values({
+            ...inventory,
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        console.log("Created new inventory:", newInventory);
+        return newInventory;
+      }
+    } catch (error) {
+      console.error("Error in updateRetailInventory:", error);
+      throw error;
     }
   }
 

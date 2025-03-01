@@ -57,18 +57,23 @@ export default function Retail() {
         throw new Error("No shop assigned to user");
       }
 
+      console.log("Sending inventory update:", {
+        ...data,
+        shopId: user.shopId,
+        updatedById: user.id
+      });
+
       const res = await apiRequest("POST", "/api/retail-inventory", {
-        greenCoffeeId: data.greenCoffeeId,
-        smallBags: data.smallBags,
-        largeBags: data.largeBags,
+        ...data,
         shopId: user.shopId,
         updatedById: user.id
       });
 
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Failed to update inventory");
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to update inventory");
       }
+
       return res.json();
     },
     onSuccess: () => {
@@ -98,6 +103,12 @@ export default function Retail() {
         });
         return;
       }
+
+      console.log("Updating inventory for coffee:", {
+        coffeeId,
+        smallBags,
+        largeBags
+      });
 
       await updateInventoryMutation.mutateAsync({
         greenCoffeeId: coffeeId,
