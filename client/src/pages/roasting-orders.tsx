@@ -1,7 +1,8 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
 import { GreenCoffee } from "@shared/schema";
-import { Loader2, Package, ArrowRight } from "lucide-react";
+import { Loader2, Package } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -50,6 +51,7 @@ type OrderWithDetails = {
   largeBags: number;
   status: string;
   createdAt: string;
+  updatedAt: string;
   shop: {
     name: string;
     location: string;
@@ -59,6 +61,9 @@ type OrderWithDetails = {
     producer: string;
   };
   user: {
+    username: string;
+  };
+  updatedBy?: {
     username: string;
   };
 };
@@ -73,6 +78,7 @@ type UpdateOrderValues = z.infer<typeof updateOrderSchema>;
 
 export default function RoastingOrders() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [selectedOrder, setSelectedOrder] = useState<OrderWithDetails | null>(null);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
 
@@ -128,19 +134,6 @@ export default function RoastingOrders() {
     );
   }
 
-  const onSubmit = form.handleSubmit(async (data) => {
-    if (!selectedOrder) return;
-
-    try {
-      await updateOrderMutation.mutateAsync({
-        ...data,
-        orderId: selectedOrder.id,
-      });
-    } catch (error) {
-      console.error("Failed to update order:", error);
-    }
-  });
-
   // Group orders by shop
   const ordersByShop = orders?.reduce((acc, order) => {
     const shopId = order.shopId;
@@ -154,12 +147,26 @@ export default function RoastingOrders() {
     return acc;
   }, {} as Record<number, { shop: OrderWithDetails['shop'], orders: OrderWithDetails[] }>);
 
+  const getAvailableStatuses = () => {
+    if (user?.role === "roaster") {
+      return [
+        { value: "roasted", label: "Roasted" },
+        { value: "dispatched", label: "Dispatched" },
+      ];
+    }
+    return [
+      { value: "roasted", label: "Roasted" },
+      { value: "dispatched", label: "Dispatched" },
+      { value: "delivered", label: "Delivered" },
+    ];
+  };
+
   return (
     <div className="container mx-auto py-8 space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Roasting Orders</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Manage Orders</h1>
         <p className="text-muted-foreground">
-          Manage and track orders from all retail shops
+          Update order status and track fulfillment
         </p>
       </div>
 
@@ -180,7 +187,7 @@ export default function RoastingOrders() {
                   <TableHead>Producer</TableHead>
                   <TableHead>Ordered</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Order Date</TableHead>
+                  <TableHead>Last Updated</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -196,14 +203,21 @@ export default function RoastingOrders() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        variant={order.status === "pending" ? "destructive" : "outline"}
-                        className="capitalize"
-                      >
-                        {order.status}
-                      </Badge>
+                      <div className="space-y-1">
+                        <Badge
+                          variant={order.status === "pending" ? "destructive" : "outline"}
+                          className="capitalize"
+                        >
+                          {order.status}
+                        </Badge>
+                        {order.updatedBy && (
+                          <div className="text-xs text-muted-foreground">
+                            by {order.updatedBy.username}
+                          </div>
+                        )}
+                      </div>
                     </TableCell>
-                    <TableCell>{formatDate(order.createdAt)}</TableCell>
+                    <TableCell>{formatDate(order.updatedAt || order.createdAt)}</TableCell>
                     <TableCell>
                       <Button
                         variant="outline"
@@ -252,7 +266,17 @@ export default function RoastingOrders() {
                 </p>
               </div>
               <Form {...form}>
-                <form onSubmit={onSubmit} className="space-y-4">
+                <form onSubmit={form.handleSubmit(async (data) => {
+                  if (!selectedOrder) return;
+                  try {
+                    await updateOrderMutation.mutateAsync({
+                      ...data,
+                      orderId: selectedOrder.id,
+                    });
+                  } catch (error) {
+                    console.error("Failed to update order:", error);
+                  }
+                })} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
@@ -303,9 +327,11 @@ export default function RoastingOrders() {
                             className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                             {...field}
                           >
-                            <option value="roasted">Roasted</option>
-                            <option value="dispatched">Dispatched</option>
-                            <option value="delivered">Delivered</option>
+                            {getAvailableStatuses().map(status => (
+                              <option key={status.value} value={status.value}>
+                                {status.label}
+                              </option>
+                            ))}
                           </select>
                         </FormControl>
                         <FormMessage />
@@ -321,9 +347,8 @@ export default function RoastingOrders() {
                     {updateOrderMutation.isPending ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <ArrowRight className="h-4 w-4 mr-2" />
+                      "Update Order"
                     )}
-                    Update Order
                   </Button>
                 </form>
               </Form>

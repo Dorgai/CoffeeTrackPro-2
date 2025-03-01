@@ -230,7 +230,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch(
     "/api/orders/:id/status",
-    requireRole(["roaster"]),
+    requireRole(["roaster", "shopManager", "barista"]),
     async (req, res) => {
       try {
         const orderId = parseInt(req.params.id);
@@ -248,11 +248,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
+        // Validate status changes based on role
+        if (req.user?.role === "roaster" && status === "delivered") {
+          return res.status(403).json({
+            message: "Roasters can only change status to 'roasted' or 'dispatched'"
+          });
+        }
+
         // Update the order with new status and quantities
         const updatedOrder = await storage.updateOrderStatus(orderId, {
           status,
           smallBags,
           largeBags,
+          updatedById: req.user!.id,
         });
 
         // If there are remaining bags, create a new pending order

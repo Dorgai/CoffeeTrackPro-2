@@ -67,6 +67,7 @@ export interface IStorage {
       status: Order["status"];
       smallBags: number;
       largeBags: number;
+      updatedById: number;
     }
   ): Promise<Order>;
   // Add new method to interface
@@ -84,6 +85,7 @@ export interface IStorage {
     shop: Shop;
     greenCoffee: GreenCoffee;
     user: User;
+    updatedBy: User;
   })[]>;
 }
 
@@ -314,6 +316,7 @@ export class DatabaseStorage implements IStorage {
       status: Order["status"];
       smallBags: number;
       largeBags: number;
+      updatedById: number;
     }
   ): Promise<Order> {
     const [updatedOrder] = await db
@@ -322,6 +325,8 @@ export class DatabaseStorage implements IStorage {
         status: update.status,
         smallBags: update.smallBags,
         largeBags: update.largeBags,
+        updatedById: update.updatedById,
+        updatedAt: new Date(),
       })
       .where(eq(orders.id, id))
       .returning();
@@ -399,6 +404,7 @@ export class DatabaseStorage implements IStorage {
     shop: Shop;
     greenCoffee: GreenCoffee;
     user: User;
+    updatedBy: User;
   })[]> {
     try {
       const result = await db
@@ -410,15 +416,19 @@ export class DatabaseStorage implements IStorage {
           largeBags: orders.largeBags,
           status: orders.status,
           createdAt: orders.createdAt,
+          updatedAt: orders.updatedAt,
           createdById: orders.createdById,
+          updatedById: orders.updatedById,
           shop: shops,
           greenCoffee: greenCoffee,
           user: users,
+          updatedBy: users2,
         })
         .from(orders)
         .innerJoin(shops, eq(orders.shopId, shops.id))
         .innerJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
         .innerJoin(users, eq(orders.createdById, users.id))
+        .leftJoin(users as unknown as typeof users2, eq(orders.updatedById, users2.id))
         .orderBy(desc(orders.createdAt));
 
       return result;
