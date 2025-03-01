@@ -55,9 +55,19 @@ export function NavBar() {
                       Inventory
                     </Link>
                   </MenubarItem>
+                </MenubarContent>
+              </MenubarMenu>
+              <MenubarMenu>
+                <MenubarTrigger>Retail</MenubarTrigger>
+                <MenubarContent>
+                  <MenubarItem>
+                    <Link href="/retail-overview" className="flex w-full">
+                      Overview
+                    </Link>
+                  </MenubarItem>
                   <MenubarItem>
                     <Link href="/shops" className="flex w-full">
-                      Shops
+                      Shop Management
                     </Link>
                   </MenubarItem>
                 </MenubarContent>

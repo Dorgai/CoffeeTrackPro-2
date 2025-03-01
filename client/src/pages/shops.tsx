@@ -6,7 +6,7 @@ import { insertShopSchema } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Shop } from "@shared/schema";
-import { Loader2, Store, Plus, Package, ShoppingCart } from "lucide-react";
+import { Loader2, Store, Plus } from "lucide-react";
 
 import {
   Form,
@@ -25,49 +25,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { formatDate } from "@/lib/utils";
-
-type AllInventoryItem = {
-  id: number;
-  shopId: number;
-  greenCoffeeId: number;
-  smallBags: number;
-  largeBags: number;
-  updatedAt: string;
-  shop: Shop;
-  greenCoffee: {
-    name: string;
-    producer: string;
-  };
-  updatedBy: {
-    username: string;
-  };
-};
-
-type AllOrderItem = {
-  id: number;
-  shopId: number;
-  greenCoffeeId: number;
-  smallBags: number;
-  largeBags: number;
-  status: string;
-  createdAt: string;
-  shop: Shop;
-  greenCoffee: {
-    name: string;
-  };
-  user: {
-    username: string;
-  };
-};
 
 export default function Shops() {
   const { toast } = useToast();
@@ -81,14 +38,6 @@ export default function Shops() {
 
   const { data: shops, isLoading } = useQuery<Shop[]>({
     queryKey: ["/api/shops"],
-  });
-
-  const { data: allInventory } = useQuery<AllInventoryItem[]>({
-    queryKey: ["/api/retail-inventory"],
-  });
-
-  const { data: allOrders } = useQuery<AllOrderItem[]>({
-    queryKey: ["/api/orders"],
   });
 
   const createShopMutation = useMutation({
@@ -212,80 +161,6 @@ export default function Shops() {
           </CardContent>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Package className="h-5 w-5" />
-            <CardTitle>All Shops Inventory</CardTitle>
-          </div>
-          <CardDescription>Current inventory across all shops</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Shop</TableHead>
-                <TableHead>Coffee</TableHead>
-                <TableHead>Small Bags (200g)</TableHead>
-                <TableHead>Large Bags (1kg)</TableHead>
-                <TableHead>Last Updated</TableHead>
-                <TableHead>Updated By</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {allInventory?.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell>{item.shop.name}</TableCell>
-                  <TableCell className="font-medium">{item.greenCoffee.name}</TableCell>
-                  <TableCell>{item.smallBags}</TableCell>
-                  <TableCell>{item.largeBags}</TableCell>
-                  <TableCell>{formatDate(item.updatedAt)}</TableCell>
-                  <TableCell>{item.updatedBy.username}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <ShoppingCart className="h-5 w-5" />
-            <CardTitle>All Shops Orders</CardTitle>
-          </div>
-          <CardDescription>Orders from all retail locations</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Shop</TableHead>
-                <TableHead>Coffee</TableHead>
-                <TableHead>Small Bags</TableHead>
-                <TableHead>Large Bags</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Ordered By</TableHead>
-                <TableHead>Order Date</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {allOrders?.map((order) => (
-                <TableRow key={order.id}>
-                  <TableCell>{order.shop.name}</TableCell>
-                  <TableCell className="font-medium">{order.greenCoffee.name}</TableCell>
-                  <TableCell>{order.smallBags}</TableCell>
-                  <TableCell>{order.largeBags}</TableCell>
-                  <TableCell className="capitalize">{order.status}</TableCell>
-                  <TableCell>{order.user.username}</TableCell>
-                  <TableCell>{formatDate(order.createdAt)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
     </div>
   );
 }
