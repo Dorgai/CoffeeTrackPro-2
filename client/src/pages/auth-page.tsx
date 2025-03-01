@@ -3,7 +3,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertUserSchema } from "@shared/schema";
 import { Redirect } from "wouter";
-import { Coffee } from "lucide-react";
 
 import {
   Form,
@@ -59,11 +58,15 @@ export default function AuthPage() {
       <div className="max-w-5xl w-full grid md:grid-cols-2 gap-8">
         <div className="flex flex-col justify-center">
           <div className="space-y-6">
-            <div className="flex items-center space-x-2">
-              <Coffee className="h-12 w-12 text-primary" />
+            <div className="flex flex-col items-center space-y-4">
+              <img 
+                src="/attached_assets/Untitled design_1740827014275.jpg" 
+                alt="Sonic Beans Logo" 
+                className="h-24 w-auto"
+              />
               <h1 className="text-3xl font-bold">Coffee Roasting Manager</h1>
             </div>
-            <p className="text-muted-foreground text-lg">
+            <p className="text-muted-foreground text-lg text-center">
               Manage your coffee roasting operations, track inventory, and handle orders all in one place.
             </p>
           </div>

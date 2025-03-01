@@ -9,7 +9,7 @@ import {
   MenubarShortcut,
   MenubarTrigger,
 } from "@/components/ui/menubar";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/use-auth";
 import { ShopSelector } from "./shop-selector";
 
@@ -21,7 +21,11 @@ export function NavBar() {
       <div className="flex h-16 items-center px-4">
         <div className="mr-4 flex">
           <Link href="/" className="flex items-center">
-            <span className="ml-2 text-xl font-bold">CoffeeHub</span>
+            <img 
+              src="/attached_assets/Untitled design_1740827014275.jpg" 
+              alt="Sonic Beans Logo" 
+              className="h-8 w-auto"
+            />
           </Link>
         </div>
         <Menubar className="border-none">
