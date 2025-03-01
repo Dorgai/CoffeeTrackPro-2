@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { GreenCoffee } from "@shared/schema";
@@ -50,30 +49,40 @@ export default function Retail() {
 
   const updateInventoryMutation = useMutation({
     mutationFn: async ({ greenCoffeeId, smallBags, largeBags }: { greenCoffeeId: number, smallBags: number, largeBags: number }) => {
-      return apiRequest("/api/retail-inventory", {
-        method: "POST",
-        data: {
-          greenCoffeeId,
-          smallBags,
-          largeBags,
-        },
+      const res = await apiRequest("POST", "/api/retail-inventory", {
+        greenCoffeeId,
+        smallBags,
+        largeBags,
       });
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory"] });
       toast({
-        title: "Inventory Updated",
-        description: "The inventory has been updated successfully",
+        title: "Success",
+        description: "Inventory updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
       });
     },
   });
 
-  const handleUpdateInventory = (coffeeId: number, smallBags: number, largeBags: number) => {
-    updateInventoryMutation.mutate({
-      greenCoffeeId: coffeeId,
-      smallBags,
-      largeBags,
-    });
+  // Modified handleUpdateInventory function to properly handle inventory updates
+  const handleUpdateInventory = async (coffeeId: number, smallBags: number, largeBags: number) => {
+    try {
+      await updateInventoryMutation.mutateAsync({
+        greenCoffeeId: coffeeId,
+        smallBags,
+        largeBags,
+      });
+    } catch (error) {
+      console.error("Failed to update inventory:", error);
+    }
   };
 
   if (loadingCoffees || loadingInventory || loadingOrders) {

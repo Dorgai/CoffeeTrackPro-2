@@ -80,15 +80,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // Retail Inventory Routes - accessible by shop manager and barista
-  app.get("/api/retail-inventory/:shopId", requireRole(["shopManager", "barista"]), async (req, res) => {
-    const inventory = await storage.getRetailInventoriesByShop(
-      parseInt(req.params.shopId),
-    );
+  app.get("/api/retail-inventory", requireRole(["shopManager", "barista"]), async (req, res) => {
+    if (!req.user?.shopId) {
+      return res.status(400).json({ message: "User is not assigned to a shop" });
+    }
+    const inventory = await storage.getRetailInventoriesByShop(req.user.shopId);
     res.json(inventory);
   });
 
   app.post("/api/retail-inventory", requireRole(["shopManager", "barista"]), async (req, res) => {
-    const data = insertRetailInventorySchema.parse(req.body);
+    if (!req.user?.shopId) {
+      return res.status(400).json({ message: "User is not assigned to a shop" });
+    }
+    const data = insertRetailInventorySchema.parse({
+      ...req.body,
+      shopId: req.user.shopId,
+      updatedById: req.user.id
+    });
     const inventory = await storage.updateRetailInventory(data);
     res.status(201).json(inventory);
   });
