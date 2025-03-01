@@ -5,7 +5,7 @@ import { Loader2, PackagePlus } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { useActiveShop, useUserShops } from "@/hooks/use-active-shop";
+import { useActiveShop } from "@/hooks/use-active-shop";
 import { ShopSelector } from "@/components/layout/shop-selector";
 import {
   Card,
@@ -33,7 +33,17 @@ export default function Retail() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { activeShop } = useActiveShop();
-  const { data: userShops, isLoading: loadingShops } = useUserShops();
+  const { data: userShops, isLoading: loadingShops } = useQuery({
+    queryKey: ["/api/user/shops"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/user/shops");
+      if (!res.ok) {
+        throw new Error("Failed to fetch user shops");
+      }
+      return res.json();
+    },
+  });
+
   const [selectedCoffee, setSelectedCoffee] = useState<GreenCoffee | null>(null);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
@@ -88,27 +98,6 @@ export default function Retail() {
     },
   });
 
-  const handleUpdateInventory = async (coffeeId: number, smallBags: number, largeBags: number) => {
-    try {
-      if (!activeShop?.id) {
-        toast({
-          title: "Error",
-          description: "Please select a shop to update inventory",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      await updateInventoryMutation.mutateAsync({
-        greenCoffeeId: coffeeId,
-        smallBags,
-        largeBags
-      });
-    } catch (error) {
-      console.error("Failed to update inventory:", error);
-    }
-  };
-
   if (loadingCoffees || loadingInventory || loadingShops) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -150,12 +139,12 @@ export default function Retail() {
           </div>
         </div>
 
-        {/* Always show ShopSelector when userShops data is available */}
-        {userShops && userShops.length > 0 ? (
-          <div className="w-[200px]">
+        {/* Add ShopSelector here if user has shops */}
+        {userShops && userShops.length > 0 && (
+          <div className="flex items-center gap-4">
             <ShopSelector />
           </div>
-        ) : null}
+        )}
       </div>
 
       {!activeShop?.id ? (
@@ -217,8 +206,8 @@ export default function Retail() {
         </Card>
       )}
 
-      <Dialog 
-        open={isUpdateDialogOpen && !!selectedCoffee} 
+      <Dialog
+        open={isUpdateDialogOpen && !!selectedCoffee}
         onOpenChange={(open) => {
           setIsUpdateDialogOpen(open);
           if (!open) setSelectedCoffee(null);
@@ -233,7 +222,13 @@ export default function Retail() {
                 setIsUpdateDialogOpen(false);
                 setSelectedCoffee(null);
               }}
-              onUpdate={handleUpdateInventory}
+              onUpdate={async (coffeeId, smallBags, largeBags) => {
+                await updateInventoryMutation.mutateAsync({
+                  greenCoffeeId: coffeeId,
+                  smallBags,
+                  largeBags
+                });
+              }}
             />
           )}
         </DialogContent>

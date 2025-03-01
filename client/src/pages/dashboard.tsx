@@ -380,37 +380,39 @@ export default function Dashboard() {
       )}
       <div className="grid gap-4 md:grid-cols-2">
         {/* Roasting Batches section */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <CardTitle>Recent Roasting Batches</CardTitle>
-            {user?.role === "roaster" && (
-              <Button variant="outline" asChild>
-                <Link href="/roasting">View All</Link>
-              </Button>
-            )}
-          </CardHeader>
-          <CardContent>
-            {batches?.slice(0, 5).map(batch => (
-              <div key={batch.id} className="flex items-center justify-between py-2">
-                <div>
-                  <p className="font-medium">Batch #{batch.id}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {new Date(batch.roastedAt || "").toLocaleDateString()}
-                  </p>
+        {(user?.role === "roaster" || user?.role === "roasteryOwner") && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <CardTitle>Recent Roasting Batches</CardTitle>
+              {user?.role === "roaster" && (
+                <Button variant="outline" asChild>
+                  <Link href="/roasting">View All</Link>
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent>
+              {batches?.slice(0, 5).map(batch => (
+                <div key={batch.id} className="flex items-center justify-between py-2">
+                  <div>
+                    <p className="font-medium">Batch #{batch.id}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {new Date(batch.roastedAt || "").toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p>{batch.roastedAmount}kg roasted</p>
+                    <p className="text-sm text-muted-foreground">
+                      Loss: {batch.roastingLoss}kg
+                    </p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p>{batch.roastedAmount}kg roasted</p>
-                  <p className="text-sm text-muted-foreground">
-                    Loss: {batch.roastingLoss}kg
-                  </p>
-                </div>
-              </div>
-            ))}
-            {(!batches || batches.length === 0) && (
-              <p className="text-muted-foreground text-center py-4">No roasting batches recorded yet</p>
-            )}
-          </CardContent>
-        </Card>
+              ))}
+              {(!batches || batches.length === 0) && (
+                <p className="text-muted-foreground text-center py-4">No roasting batches recorded yet</p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Stock Overview Section - Only for shop managers and baristas */}
         {(user?.role === "shopManager" || user?.role === "barista") && (
@@ -479,77 +481,77 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         )}
+      </div>
 
-        {/* Pending Orders Section - For both roasters and managers */}
-        {(user?.role === "roaster" || user?.role === "shopManager") && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <CardTitle>Pending Orders</CardTitle>
-              <Button variant="outline" asChild>
-                <Link href={user?.role === "roaster" ? "/roasting/orders" : "/retail/orders"}>
-                  View All Orders
-                </Link>
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {user?.role === "shopManager" ? (
-                  // For managers: Show orders grouped by shop
-                  Object.entries(pendingOrdersByShop).map(([shopName, shopOrders]) => (
-                    <div key={shopName} className="space-y-3">
-                      <h3 className="font-medium text-sm text-muted-foreground">{shopName}</h3>
-                      <div className="space-y-2">
-                        {shopOrders.map(order => (
-                          <div key={order.id} className="p-3 bg-muted rounded-lg">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <p className="text-sm font-medium">{order.greenCoffee?.name}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  Ordered: {new Date(order.createdAt).toLocaleDateString()}
-                                </p>
-                              </div>
-                              <Badge variant="destructive">Pending</Badge>
+      {/* Pending Orders Section - For both roasters and managers */}
+      {(user?.role === "roaster" || user?.role === "shopManager") && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle>Pending Orders</CardTitle>
+            <Button variant="outline" asChild>
+              <Link href={user?.role === "roaster" ? "/roasting/orders" : "/retail/orders"}>
+                View All Orders
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {user?.role === "shopManager" ? (
+                // For managers: Show orders grouped by shop
+                Object.entries(pendingOrdersByShop).map(([shopName, shopOrders]) => (
+                  <div key={shopName} className="space-y-3">
+                    <h3 className="font-medium text-sm text-muted-foreground">{shopName}</h3>
+                    <div className="space-y-2">
+                      {shopOrders.map(order => (
+                        <div key={order.id} className="p-3 bg-muted rounded-lg">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="text-sm font-medium">{order.greenCoffee?.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Ordered: {new Date(order.createdAt).toLocaleDateString()}
+                              </p>
                             </div>
-                            <div className="grid grid-cols-2 gap-4 mt-2 text-sm">
-                              <div>Small Bags: {order.smallBags}</div>
-                              <div>Large Bags: {order.largeBags}</div>
-                            </div>
+                            <Badge variant="destructive">Pending</Badge>
                           </div>
-                        ))}
+                          <div className="grid grid-cols-2 gap-4 mt-2 text-sm">
+                            <div>Small Bags: {order.smallBags}</div>
+                            <div>Large Bags: {order.largeBags}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                // For roasters: Show all pending orders
+                <div className="space-y-4">
+                  {orders?.filter(order => order.status === "pending").map(order => (
+                    <div key={order.id} className="space-y-2 p-3 bg-muted rounded-lg">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-medium">{order.shop?.name}</p>
+                          <p className="text-sm">{order.greenCoffee?.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Ordered: {new Date(order.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <Badge variant="destructive">Pending</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>Small Bags: {order.smallBags}</div>
+                        <div>Large Bags: {order.largeBags}</div>
                       </div>
                     </div>
-                  ))
-                ) : (
-                  // For roasters: Show all pending orders
-                  <div className="space-y-4">
-                    {orders?.filter(order => order.status === "pending").map(order => (
-                      <div key={order.id} className="space-y-2 p-3 bg-muted rounded-lg">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <p className="font-medium">{order.shop?.name}</p>
-                            <p className="text-sm">{order.greenCoffee?.name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              Ordered: {new Date(order.createdAt).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <Badge variant="destructive">Pending</Badge>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>Small Bags: {order.smallBags}</div>
-                          <div>Large Bags: {order.largeBags}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {(!orders || orders.filter(order => order.status === "pending").length === 0) && (
-                  <p className="text-muted-foreground text-center py-4">No pending orders</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+                  ))}
+                </div>
+              )}
+              {(!orders || orders.filter(order => order.status === "pending").length === 0) && (
+                <p className="text-muted-foreground text-center py-4">No pending orders</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Retail Inventory Overview - For roasteryOwner */}
       {user?.role === "roasteryOwner" && (
