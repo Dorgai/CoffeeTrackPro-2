@@ -720,12 +720,7 @@ export class DatabaseStorage implements IStorage {
         .from(dispatchedCoffeeConfirmations)
         .innerJoin(greenCoffee, eq(dispatchedCoffeeConfirmations.greenCoffeeId, greenCoffee.id))
         .innerJoin(shops, eq(dispatchedCoffeeConfirmations.shopId, shops.id))
-        .where(
-          and(
-            eq(dispatchedCoffeeConfirmations.shopId, shopId),
-            eq(dispatchedCoffeeConfirmations.status, "pending")
-          )
-        )
+        .where(eq(dispatchedCoffeeConfirmations.shopId, shopId))
         .orderBy(desc(dispatchedCoffeeConfirmations.createdAt));
 
       console.log("Found confirmations:", confirmations);

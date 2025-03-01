@@ -37,6 +37,38 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
     largeBags: 0
   });
 
+  // Query for confirmations
+  const { data: confirmations, isLoading } = useQuery<(DispatchConfirmationType & { coffee?: { name: string } })[]>({
+    queryKey: ["/api/dispatched-coffee/confirmations", shopId],
+    queryFn: async () => {
+      console.log("Fetching confirmations for shop:", shopId);
+      const res = await apiRequest("GET", `/api/dispatched-coffee/confirmations?shopId=${shopId}`);
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error);
+      }
+      const confirmations = await res.json();
+      console.log("Received confirmations:", confirmations);
+
+      // Fetch coffee details for each confirmation
+      const confirmationsWithCoffee = await Promise.all(
+        confirmations.map(async (confirmation) => {
+          try {
+            const coffeeRes = await apiRequest("GET", `/api/green-coffee/${confirmation.greenCoffeeId}`);
+            const coffee = await coffeeRes.json();
+            return { ...confirmation, coffee };
+          } catch (error) {
+            console.error("Error fetching coffee details:", error);
+            return { ...confirmation, coffee: { name: "Unknown Coffee" } };
+          }
+        })
+      );
+
+      // Filter only pending confirmations
+      return confirmationsWithCoffee.filter(conf => conf.status === "pending");
+    },
+  });
+
   // Define mutation outside of any conditional logic
   const confirmMutation = useMutation({
     mutationFn: async (data: {
@@ -66,37 +98,6 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
         description: error.message,
         variant: "destructive",
       });
-    },
-  });
-
-  // Query for confirmations
-  const { data: confirmations, isLoading } = useQuery<(DispatchConfirmationType & { coffee?: { name: string } })[]>({
-    queryKey: ["/api/dispatched-coffee/confirmations", shopId],
-    queryFn: async () => {
-      console.log("Fetching confirmations for shop:", shopId);
-      const res = await apiRequest("GET", `/api/dispatched-coffee/confirmations?shopId=${shopId}`);
-      if (!res.ok) {
-        const error = await res.text();
-        throw new Error(error);
-      }
-      const confirmations = await res.json();
-      console.log("Received confirmations:", confirmations);
-
-      // Fetch coffee details for each confirmation
-      const confirmationsWithCoffee = await Promise.all(
-        confirmations.map(async (confirmation) => {
-          try {
-            const coffeeRes = await apiRequest("GET", `/api/green-coffee/${confirmation.greenCoffeeId}`);
-            const coffee = await coffeeRes.json();
-            return { ...confirmation, coffee };
-          } catch (error) {
-            console.error("Error fetching coffee details:", error);
-            return { ...confirmation, coffee: { name: "Unknown Coffee" } };
-          }
-        })
-      );
-
-      return confirmationsWithCoffee;
     },
   });
 
