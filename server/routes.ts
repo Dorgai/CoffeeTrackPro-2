@@ -404,14 +404,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Create dispatch confirmation when status changes to "dispatched"
         if (status === "dispatched") {
-          await storage.createDispatchedCoffeeConfirmation({
-            orderId: order.id,
-            shopId: order.shopId,
-            greenCoffeeId: order.greenCoffeeId,
-            dispatchedSmallBags: smallBags,
-            dispatchedLargeBags: largeBags,
-            status: "pending"
-          });
+          console.log("Creating dispatch confirmation for order:", orderId);
+          try {
+            const confirmation = await storage.createDispatchedCoffeeConfirmation({
+              orderId: order.id,
+              shopId: order.shopId!,
+              greenCoffeeId: order.greenCoffeeId!,
+              dispatchedSmallBags: smallBags,
+              dispatchedLargeBags: largeBags,
+              status: "pending"
+            });
+            console.log("Created dispatch confirmation:", confirmation);
+          } catch (error) {
+            console.error("Error creating dispatch confirmation:", error);
+            // Don't fail the whole request if confirmation creation fails
+          }
         }
 
         console.log("Order updated successfully:", updatedOrder);
