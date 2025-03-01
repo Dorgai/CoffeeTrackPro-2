@@ -7,14 +7,32 @@ import {
 } from "@/components/ui/hover-card";
 import { Progress } from "@/components/ui/progress";
 import { Coffee } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export function GreenBeansStockIndicator() {
-  // Fetch green coffee data
+  const { toast } = useToast();
+
+  // Fetch green coffee data using our standard query client
   const { data: coffees } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/green-coffee");
+      if (!response.ok) {
+        throw new Error("Failed to fetch green coffee data");
+      }
+      return response.json();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
-  if (!coffees) {
+  if (!coffees?.length) {
     return null;
   }
 
@@ -24,10 +42,10 @@ export function GreenBeansStockIndicator() {
   // Calculate total desired stock based on min thresholds
   const totalDesiredStock = coffees.reduce((sum, coffee) => sum + Number(coffee.minThreshold), 0);
 
-  // Calculate stock level percentage
-  const stockPercentage = Math.min(Math.round((totalCurrentStock / totalDesiredStock) * 100), 100);
+  // Calculate stock level percentage with a minimum of 0 and maximum of 100
+  const stockPercentage = Math.min(Math.max(Math.round((totalCurrentStock / totalDesiredStock) * 100), 0), 100);
 
-  // Determine stock level status
+  // Determine stock level status and color
   const getStockClass = () => {
     if (stockPercentage < 50) return "bg-red-500";
     if (stockPercentage >= 75) return "bg-green-500";
@@ -56,15 +74,15 @@ export function GreenBeansStockIndicator() {
           <div className="grid grid-cols-2 gap-2 text-sm">
             <div>
               <p className="text-muted-foreground">Current Stock:</p>
-              <p className="font-medium">{totalCurrentStock}kg</p>
+              <p className="font-medium">{totalCurrentStock.toFixed(2)}kg</p>
             </div>
             <div>
               <p className="text-muted-foreground">Target Stock:</p>
-              <p className="font-medium">{totalDesiredStock}kg</p>
+              <p className="font-medium">{totalDesiredStock.toFixed(2)}kg</p>
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            Stock Ratio: {totalCurrentStock}kg / {totalDesiredStock}kg
+            Stock Ratio: {totalCurrentStock.toFixed(2)}kg / {totalDesiredStock.toFixed(2)}kg
           </p>
         </div>
       </HoverCardContent>

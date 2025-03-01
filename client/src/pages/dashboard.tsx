@@ -523,41 +523,6 @@ export default function Dashboard() {
         </Card>
       )}
       <div className="grid gap-4 md:grid-cols-2">
-        {/* Roasting Batches section */}
-        {(user?.role === "roaster" || user?.role === "roasteryOwner") && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <CardTitle>Recent Roasting Batches</CardTitle>
-              {user?.role === "roaster" && (
-                <Button variant="outline" asChild>
-                  <Link href="/roasting">View All</Link>
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent>
-              {batches?.slice(0, 5).map(batch => (
-                <div key={batch.id} className="flex items-center justify-between py-2">
-                  <div>
-                    <p className="font-medium">Batch #{batch.id}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {new Date(batch.roastedAt || "").toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p>{batch.roastedAmount}kg roasted</p>
-                    <p className="text-sm text-muted-foreground">
-                      Loss: {batch.roastingLoss}kg
-                    </p>
-                  </div>
-                </div>
-              ))}
-              {(!batches || batches.length === 0) && (
-                <p className="text-muted-foreground text-center py-4">No roasting batches recorded yet</p>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
         {/* Stock Overview Section - Only for shop managers and baristas */}
         {(user?.role === "shopManager" || user?.role === "barista") && (
           <Card>
@@ -847,19 +812,21 @@ export default function Dashboard() {
                     <TableCell>{coffee.producer || '-'}</TableCell>
                     <TableCell>{coffee.country || '-'}</TableCell>
                     <TableCell>{coffee.currentStock} kg</TableCell>
-                    <TableCell>{coffee.minThreshold} kg</TableCell>
+                    <TableCell>{coffee.minThreshold || 0} kg</TableCell>
                     <TableCell>
                       {Number(coffee.currentStock) <= Number(coffee.minThreshold) ? (
                         <Badge variant="destructive">Low Stock</Badge>
                       ) : (
-                        <Badge variant="outline">In Stock</Badge>
+                        <Badge variant="outline">In Stock</</Badge>
                       )}
                     </TableCell>
                     {user?.role === "roasteryOwner" && (
                       <TableCell>
-                        <Button variant="outline" size="sm" asChild>
-                          <Link href={`/coffee/${coffee.id}`}>View Details</Link>
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Link href={`/inventory/${coffee.id}`}>
+                            <Button variant="outline" size="sm">View Details</Button>
+                          </Link>
+                        </div>
                       </TableCell>
                     )}
                   </TableRow>
@@ -876,7 +843,41 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       )}
-    </div>
+      {/* Recent Roasting Batches section - For roaster and roasteryOwner */}
+      {(user?.role === "roaster" || user?.role === "roasteryOwner") && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle>Recent Roasting Batches</CardTitle>
+            {user?.role === "roaster" && (
+              <Button variant="outline" asChild>
+                <Link href="/roasting">View All</Link>
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent>
+            {batches?.slice(0, 5).map(batch => (
+              <div key={batch.id} className="flex items-center justify-between py-2">
+                <div>
+                  <p className="font-medium">Batch #{batch.id}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {new Date(batch.roastedAt || "").toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p>{batch.roastedAmount}kg roasted</p>
+                  <p className="text-sm text-muted-foreground">
+                    Loss: {batch.roastingLoss}kg
+                  </p>
+                </div>
+              </div>
+            ))}
+            {(!batches || batches.length === 0) && (
+              <p className="text-muted-foreground text-center py-4">No roasting batches recorded yet</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+    </div> {/* main container */}
   );
 }
 
