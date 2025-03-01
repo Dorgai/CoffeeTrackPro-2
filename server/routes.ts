@@ -188,8 +188,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Shop ID is required" });
       }
 
-      // Allow roastery owner to access any shop's orders
-      if (req.user?.role !== "roasteryOwner" && !await checkShopAccess(req.user!.id, shopId)) {
+      // Allow roaster and roastery owner to access any shop's orders
+      if (req.user?.role !== "roasteryOwner" && req.user?.role !== "roaster" && !await checkShopAccess(req.user!.id, shopId)) {
         return res.status(403).json({ message: "User does not have access to this shop" });
       }
 

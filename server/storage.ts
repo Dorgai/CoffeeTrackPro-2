@@ -85,7 +85,7 @@ export interface IStorage {
     shop: Shop;
     greenCoffee: GreenCoffee;
     user: User;
-    updatedBy: User;
+    updatedBy: User | null;
   })[]>;
 }
 
@@ -404,7 +404,7 @@ export class DatabaseStorage implements IStorage {
     shop: Shop;
     greenCoffee: GreenCoffee;
     user: User;
-    updatedBy: User;
+    updatedBy: User | null;
   })[]> {
     try {
       const result = await db
@@ -422,13 +422,17 @@ export class DatabaseStorage implements IStorage {
           shop: shops,
           greenCoffee: greenCoffee,
           user: users,
-          updatedBy: users2,
+          updatedBy: {
+            id: users.id,
+            username: users.username,
+            role: users.role,
+          },
         })
         .from(orders)
         .innerJoin(shops, eq(orders.shopId, shops.id))
         .innerJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
         .innerJoin(users, eq(orders.createdById, users.id))
-        .leftJoin(users as unknown as typeof users2, eq(orders.updatedById, users2.id))
+        .leftJoin(users as typeof users, eq(orders.updatedById, users.id), 'updatedByUser')
         .orderBy(desc(orders.createdAt));
 
       return result;
