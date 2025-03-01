@@ -331,6 +331,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Dispatched Coffee Confirmation Routes
+  app.get("/api/dispatched-coffee/confirmations", requireRole(["shopManager", "barista"]), async (req, res) => {
+    try {
+      const { shopId } = req.query;
+      if (!shopId) {
+        return res.status(400).json({ message: "Shop ID is required" });
+      }
+
+      const confirmations = await storage.getDispatchedCoffeeConfirmations(Number(shopId));
+      res.json(confirmations);
+    } catch (error) {
+      console.error("Error fetching dispatched coffee confirmations:", error);
+      res.status(500).json({ message: "Failed to fetch confirmations" });
+    }
+  });
+
+  app.post("/api/dispatched-coffee/confirm", requireRole(["shopManager", "barista"]), async (req, res) => {
+    try {
+      const { confirmationId, receivedSmallBags, receivedLargeBags } = req.body;
+
+      if (!confirmationId) {
+        return res.status(400).json({ message: "Confirmation ID is required" });
+      }
+
+      const confirmation = await storage.confirmDispatchedCoffee(confirmationId, {
+        receivedSmallBags: Number(receivedSmallBags),
+        receivedLargeBags: Number(receivedLargeBags),
+        confirmedById: req.user!.id,
+      });
+
+      res.json(confirmation);
+    } catch (error) {
+      console.error("Error confirming dispatched coffee:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to confirm dispatch" 
+      });
+    }
+  });
+
+  // Inventory Discrepancies Routes
+  app.get("/api/inventory-discrepancies", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
+    try {
+      const discrepancies = await storage.getInventoryDiscrepancies();
+      res.json(discrepancies);
+    } catch (error) {
+      console.error("Error fetching inventory discrepancies:", error);
+      res.status(500).json({ message: "Failed to fetch discrepancies" });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;
