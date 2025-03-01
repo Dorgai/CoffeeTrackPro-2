@@ -702,9 +702,12 @@ export class DatabaseStorage implements IStorage {
             name: greenCoffee.name,
             producer: greenCoffee.producer,
             country: greenCoffee.country,
+            altitude: greenCoffee.altitude,
+            cuppingNotes: greenCoffee.cuppingNotes,
             details: greenCoffee.details,
             currentStock: greenCoffee.currentStock,
             minThreshold: greenCoffee.minThreshold,
+            createdAt: greenCoffee.createdAt,
           },
           shop: {
             id: shops.id,
@@ -720,6 +723,7 @@ export class DatabaseStorage implements IStorage {
         .where(
           and(
             eq(dispatchedCoffeeConfirmations.shopId, shopId),
+            eq(dispatchedCoffeeConfirmations.status, "pending")
           )
         )
         .orderBy(desc(dispatchedCoffeeConfirmations.createdAt));
@@ -755,40 +759,124 @@ export class DatabaseStorage implements IStorage {
     }
   ): Promise<DispatchedCoffeeConfirmation> {
     try {
-      const [confirmation] = await db
-        .update(dispatchedCoffeeConfirmations)
-        .set({
-          receivedSmallBags: data.receivedSmallBags,
-          receivedLargeBags: data.receivedLargeBags,
-          confirmedById: data.confirmedById,
-          confirmedAt: new Date(),
-          status: "confirmed",
-        })
-        .where(eq(dispatchedCoffeeConfirmations.id, confirmationId))
-        .returning();
+      console.log("Confirming dispatched coffee for confirmation:", confirmationId, "with data:", data);
 
-      const [original] = await db
+      // Get the original confirmation with shop and coffee details
+      const [confirmation] = await db
         .select()
         .from(dispatchedCoffeeConfirmations)
         .where(eq(dispatchedCoffeeConfirmations.id, confirmationId));
 
-      if (
-        original.dispatchedSmallBags !== data.receivedSmallBags ||
-        original.dispatchedLargeBags !== data.receivedLargeBags
-      ) {
-        await db.insert(inventoryDiscrepancies).values({
-          confirmationId,
-          smallBagsDifference: data.receivedSmallBags - original.dispatchedSmallBags,
-          largeBagsDifference: data.receivedLargeBags - original.dispatchedLargeBags,
-        });
-
-        await db
-          .update(dispatchedCoffeeConfirmations)
-          .set({ status: "discrepancy_reported" })
-          .where(eq(dispatchedCoffeeConfirmations.id, confirmationId));
+      if (!confirmation) {
+        throw new Error("Confirmation not found");
       }
 
-      return confirmation;
+      // Start a transaction to ensure data consistency
+      const result = await db.transaction(async (tx) => {
+        // Update the confirmation status
+        const [updatedConfirmation] = await tx
+          .update(dispatchedCoffeeConfirmations)
+          .set({
+            receivedSmallBags: data.receivedSmallBags,
+            receivedLargeBags: data.receivedLargeBags,
+            confirmedById: data.confirmedById,
+            confirmedAt: new Date(),
+            status: "confirmed",
+          })
+          .where(eq(dispatchedCoffeeConfirmations.id, confirmationId))
+          .returning();
+
+        if (!updatedConfirmation) {
+          throw new Error("Failed to update confirmation record");
+        }
+
+        console.log("Updated confirmation:", updatedConfirmation);
+
+        // Update or create retail inventory
+        const [existingInventory] = await tx
+          .select()
+          .from(retailInventory)
+          .where(
+            and(
+              eq(retailInventory.shopId, confirmation.shopId),
+              eq(retailInventory.greenCoffeeId, confirmation.greenCoffeeId)
+            )
+          );
+
+        if (existingInventory) {
+          console.log("Updating existing inventory:", existingInventory);
+          // Update existing inventory
+          const [updatedInventory] = await tx
+            .update(retailInventory)
+            .set({
+              smallBags: existingInventory.smallBags + data.receivedSmallBags,
+              largeBags: existingInventory.largeBags + data.receivedLargeBags,
+              updatedById: data.confirmedById,
+              updatedAt: new Date(),
+            })
+            .where(eq(retailInventory.id, existingInventory.id))
+            .returning();
+
+          if (!updatedInventory) {
+            throw new Error("Failed to update retail inventory");
+          }
+          console.log("Updated inventory:", updatedInventory);
+        } else {
+          console.log("Creating new inventory entry");
+          // Create new inventory entry
+          const [newInventory] = await tx
+            .insert(retailInventory)
+            .values({
+              shopId: confirmation.shopId,
+              greenCoffeeId: confirmation.greenCoffeeId,
+              smallBags: data.receivedSmallBags,
+              largeBags: data.receivedLargeBags,
+              updatedById: data.confirmedById,
+              updatedAt: new Date(),
+            })
+            .returning();
+
+          if (!newInventory) {
+            throw new Error("Failed to create retail inventory");
+          }
+          console.log("Created new inventory:", newInventory);
+        }
+
+        // Create discrepancy report if quantities don't match
+        if (
+          confirmation.dispatchedSmallBags !== data.receivedSmallBags ||
+          confirmation.dispatchedLargeBags !== data.receivedLargeBags
+        ) {
+          console.log("Creating discrepancy report");
+          const [discrepancy] = await tx
+            .insert(inventoryDiscrepancies)
+            .values({
+              confirmationId,
+              smallBagsDifference: data.receivedSmallBags - confirmation.dispatchedSmallBags,
+              largeBagsDifference: data.receivedLargeBags - confirmation.dispatchedLargeBags,
+            })
+            .returning();
+
+          if (!discrepancy) {
+            throw new Error("Failed to create discrepancy report");
+          }
+
+          const [updatedConfirmationStatus] = await tx
+            .update(dispatchedCoffeeConfirmations)
+            .set({ status: "discrepancy_reported" })
+            .where(eq(dispatchedCoffeeConfirmations.id, confirmationId))
+            .returning();
+
+          if (!updatedConfirmationStatus) {
+            throw new Error("Failed to update confirmation status for discrepancy");
+          }
+        }
+
+        return updatedConfirmation;
+      });
+
+      console.log("Successfully confirmed dispatched coffee:", result);
+      return result;
     } catch (error) {
       console.error("Error confirming dispatched coffee:", error);
       throw error;
