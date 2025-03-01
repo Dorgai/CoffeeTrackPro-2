@@ -1,12 +1,17 @@
 import express, { type Request, Response, NextFunction } from "express";
+import cors from "cors";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { seedInitialData } from "./db";
 
 const app = express();
+
+// Add CORS middleware
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Add request logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -44,11 +49,19 @@ app.use((req, res, next) => {
 
     const server = await registerRoutes(app);
 
+    // Global error handler
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      console.error("Error:", err);
       const status = err.status || err.statusCode || 500;
       const message = err.message || "Internal Server Error";
 
-      res.status(status).json({ message });
+      res.status(status).json({
+        error: {
+          message,
+          status,
+          timestamp: new Date().toISOString(),
+        }
+      });
     });
 
     if (app.get("env") === "development") {
@@ -58,7 +71,7 @@ app.use((req, res, next) => {
     }
 
     const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 5000;
-    
+
     server.on('error', (error: any) => {
       if (error.code === 'EADDRINUSE') {
         log(`Port ${port} is already in use. Trying port ${port + 1}...`);
@@ -70,12 +83,12 @@ app.use((req, res, next) => {
         log(`Server error: ${error.message}`);
       }
     });
-    
+
     server.listen(port, "0.0.0.0", () => {
       log(`Server is running on port ${port}`);
     });
   } catch (error) {
-    log("Failed to start server:", error);
+    log(`Failed to start server: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
   }
 })();
