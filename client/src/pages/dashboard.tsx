@@ -254,8 +254,9 @@ export default function Dashboard() {
         />
         <StatsCard
           title="Coffee Types"
-          value={coffees?.length || 0}
+          value={coffees ? `${coffees.filter(c => Number(c.currentStock) > 0).length} / ${coffees.length}` : '0 / 0'}
           icon={Coffee}
+          description="In Stock / Total Available"
         />
       </div>
 

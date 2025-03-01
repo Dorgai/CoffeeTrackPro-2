@@ -124,12 +124,7 @@ export function NavBar() {
         <div className="ml-auto flex items-center space-x-4">
           {user ? (
             <div className="flex items-center space-x-4">
-              {/* Show ShopSelector for all roles except roaster */}
-              {user.role !== "roaster" && (
-                <ShopSelector />
-              )}
-
-              {/* Show indicators and RestockDialog for all roles except roaster */}
+              {user.role !== "roaster" && <ShopSelector />}
               {user.role !== "roaster" && (
                 <>
                   {user.role === "roasteryOwner" && (
@@ -139,7 +134,6 @@ export function NavBar() {
                   <RestockDialog />
                 </>
               )}
-
               <Avatar>
                 <AvatarFallback>
                   {user.username.charAt(0).toUpperCase()}
