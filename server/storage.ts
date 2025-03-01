@@ -11,6 +11,10 @@ import {
   type InsertRoastingBatch,
   type InsertRetailInventory,
   type InsertOrder,
+  type DispatchedCoffeeConfirmation,
+  type InsertDispatchedCoffeeConfirmation,
+  type InventoryDiscrepancy,
+  type InsertInventoryDiscrepancy,
   users,
   shops,
   greenCoffee,
@@ -18,15 +22,14 @@ import {
   retailInventory,
   orders,
   userShops,
+  dispatchedCoffeeConfirmations,
+  inventoryDiscrepancies,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, gt, and } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
-import { type DispatchedCoffeeConfirmation, type InsertDispatchedCoffeeConfirmation, dispatchedCoffeeConfirmations } from "./dispatchedCoffeeConfirmations";
-import { type InventoryDiscrepancy, type InsertInventoryDiscrepancy, inventoryDiscrepancies } from "./inventoryDiscrepancies";
-
 
 const PostgresSessionStore = connectPg(session);
 

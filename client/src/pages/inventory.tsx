@@ -11,13 +11,10 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 export default function Inventory() {
   const { user } = useAuth();
 
-  // Use the appropriate endpoint based on user role
-  const endpoint = user?.role === "roaster" ? "/api/roaster/green-coffee" : "/api/green-coffee";
-
   const { data: coffees, isLoading, error } = useQuery<GreenCoffee[]>({
-    queryKey: [endpoint],
+    queryKey: ["/api/green-coffee"],
     queryFn: async () => {
-      const res = await apiRequest("GET", endpoint);
+      const res = await apiRequest("GET", "/api/green-coffee");
       if (!res.ok) {
         const errorData = await res.text();
         throw new Error(errorData);

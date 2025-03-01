@@ -53,8 +53,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  // Green Coffee Routes - accessible by roastery owner
-  app.get("/api/green-coffee", requireRole(["roasteryOwner"]), async (req, res) => {
+  // Green Coffee Routes - accessible by roastery owner and roaster
+  app.get("/api/green-coffee", requireRole(["roasteryOwner", "roaster"]), async (req, res) => {
     const coffees = await storage.getGreenCoffees();
     res.json(coffees);
   });
@@ -69,16 +69,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  // Green Coffee Routes - accessible by roaster
-  app.get("/api/roaster/green-coffee", requireRole(["roaster"]), async (req, res) => {
-    try {
-      const coffees = await storage.getGreenCoffees();
-      res.json(coffees);
-    } catch (error) {
-      console.error("Error fetching roaster green coffee:", error);
-      res.status(500).json({ message: "Failed to fetch green coffee" });
-    }
-  });
 
   // Roasting Routes - accessible by roaster
   app.get("/api/roasting-batches", requireRole(["roaster", "roasteryOwner"]), async (req, res) => {
