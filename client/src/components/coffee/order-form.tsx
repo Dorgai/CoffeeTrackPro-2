@@ -125,7 +125,12 @@ export function OrderForm({
                 name="smallBags"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Small Bags (200g)</FormLabel>
+                    <FormLabel className="flex justify-between">
+                      <span>Small Bags (200g)</span>
+                      <span className="text-muted-foreground">
+                        Current stock: {availableBags.smallBags}
+                      </span>
+                    </FormLabel>
                     <FormControl>
                       <Input type="number" min="0" {...field} />
                     </FormControl>
@@ -139,7 +144,12 @@ export function OrderForm({
                 name="largeBags"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Large Bags (1kg)</FormLabel>
+                    <FormLabel className="flex justify-between">
+                      <span>Large Bags (1kg)</span>
+                      <span className="text-muted-foreground">
+                        Current stock: {availableBags.largeBags}
+                      </span>
+                    </FormLabel>
                     <FormControl>
                       <Input type="number" min="0" {...field} />
                     </FormControl>

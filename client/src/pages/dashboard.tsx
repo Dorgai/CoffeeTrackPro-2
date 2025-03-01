@@ -216,44 +216,97 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Manager's View - Stock Overview and Pending Orders */}
+      {/* Manager's View - Total Stock Overview and Shop Breakdown */}
       {user?.role === "shopManager" && (
         <div className="grid gap-4 md:grid-cols-2">
           {/* Stock Overview */}
           <Card>
             <CardHeader>
               <CardTitle>Stock Overview</CardTitle>
-              <CardDescription>Current inventory levels across shops</CardDescription>
+              <CardDescription>Total inventory across all shops</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {currentInventory?.map(inv => {
-                  const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
-                  const isLowStock = inv.smallBags < 3 || inv.largeBags < 3;
+                {/* Total Stock Section */}
+                {currentInventory && coffees && (
+                  <div className="space-y-4 mb-6">
+                    <h3 className="font-medium text-lg">Total Stock</h3>
+                    {coffees.map(coffee => {
+                      const allShopsInventory = currentInventory.filter(inv => inv.greenCoffeeId === coffee.id);
+                      const totalSmallBags = allShopsInventory.reduce((sum, inv) => sum + inv.smallBags, 0);
+                      const totalLargeBags = allShopsInventory.reduce((sum, inv) => sum + inv.largeBags, 0);
+                      const isLowStock = totalSmallBags < 3 || totalLargeBags < 3;
 
-                  return (
-                    <div
-                      key={`${inv.shopId}-${inv.greenCoffeeId}`}
-                      className={`p-3 rounded-lg ${isLowStock ? 'bg-destructive/10' : 'bg-muted'}`}
-                    >
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <p className="font-medium">{coffee?.name}</p>
-                          <div className="text-sm text-muted-foreground">
-                            <p>Small Bags: {inv.smallBags}</p>
-                            <p>Large Bags: {inv.largeBags}</p>
+                      return (
+                        <div
+                          key={`total-${coffee.id}`}
+                          className={`p-3 rounded-lg ${isLowStock ? 'bg-destructive/10' : 'bg-muted'}`}
+                        >
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <p className="font-medium">{coffee.name}</p>
+                              <div className="text-sm text-muted-foreground">
+                                <p>Total Small Bags: {totalSmallBags}</p>
+                                <p>Total Large Bags: {totalLargeBags}</p>
+                              </div>
+                            </div>
+                            {isLowStock && (
+                              <Badge variant="destructive">Low Total Stock</Badge>
+                            )}
                           </div>
                         </div>
-                        {isLowStock && (
-                          <Badge variant="destructive">Low Stock</Badge>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-                {(!currentInventory || currentInventory.length === 0) && (
-                  <p className="text-center text-muted-foreground">No inventory data available</p>
+                      );
+                    })}
+                  </div>
                 )}
+
+                {/* Per Shop Breakdown */}
+                <div className="space-y-6 border-t pt-6">
+                  <h3 className="font-medium text-lg">Stock by Shop</h3>
+                  {orders?.filter(order => order.shop).reduce((shops, order) => {
+                    if (order.shop && !shops.some(s => s.id === order.shopId)) {
+                      shops.push({ id: order.shopId, name: order.shop.name });
+                    }
+                    return shops;
+                  }, [] as Array<{ id: number; name: string }>).map(shop => {
+                    const shopInventory = currentInventory?.filter(inv => inv.shopId === shop.id) || [];
+
+                    return (
+                      <div key={shop.id} className="space-y-2">
+                        <h4 className="font-medium">{shop.name}</h4>
+                        <div className="space-y-2">
+                          {shopInventory.map(inv => {
+                            const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
+                            const isLowStock = inv.smallBags < 3 || inv.largeBags < 3;
+
+                            return (
+                              <div
+                                key={`${inv.shopId}-${inv.greenCoffeeId}`}
+                                className={`p-3 rounded-lg ${isLowStock ? 'bg-destructive/10' : 'bg-background'}`}
+                              >
+                                <div className="flex justify-between items-center">
+                                  <div>
+                                    <p className="font-medium">{coffee?.name}</p>
+                                    <div className="text-sm text-muted-foreground">
+                                      <p>Small Bags: {inv.smallBags}</p>
+                                      <p>Large Bags: {inv.largeBags}</p>
+                                    </div>
+                                  </div>
+                                  {isLowStock && (
+                                    <Badge variant="destructive">Low Stock</Badge>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {shopInventory.length === 0 && (
+                            <p className="text-sm text-muted-foreground">No inventory data available</p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </CardContent>
           </Card>
