@@ -28,18 +28,42 @@ import { Separator } from "@/components/ui/separator";
 import { RoastingForm } from "@/components/coffee/roasting-form";
 
 export default function CoffeeDetail() {
-  const [params] = useParams();
+  const params = useParams();
   const { toast } = useToast();
-  const coffeeId = parseInt(params.id || "0");
 
-  const { data: coffee, isLoading: loadingCoffee } = useQuery<GreenCoffee>({
+  // Guard against invalid ID
+  const coffeeId = parseInt(params.id || "0");
+  if (isNaN(coffeeId) || coffeeId <= 0) {
+    return (
+      <div className="container mx-auto py-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Invalid Coffee ID</CardTitle>
+            <CardDescription>
+              The requested coffee could not be found.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/inventory">
+              <Button>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Inventory
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const { data: coffee, isLoading: loadingCoffee, error: coffeeError } = useQuery<GreenCoffee>({
     queryKey: [`/api/green-coffee/${coffeeId}`],
-    enabled: !!coffeeId,
+    enabled: coffeeId > 0,
   });
 
   const { data: batches, isLoading: loadingBatches } = useQuery<RoastingBatch[]>({
     queryKey: [`/api/roasting-batches/coffee/${coffeeId}`],
-    enabled: !!coffeeId,
+    enabled: coffeeId > 0,
   });
 
   const deleteMutation = useMutation({
@@ -57,11 +81,53 @@ export default function CoffeeDetail() {
   });
 
   if (loadingCoffee) {
-    return <div>Loading coffee details...</div>;
+    return <div className="container mx-auto py-8">Loading coffee details...</div>;
+  }
+
+  if (coffeeError) {
+    return (
+      <div className="container mx-auto py-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Error Loading Coffee Details</CardTitle>
+            <CardDescription>
+              An error occurred while loading the coffee details.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/inventory">
+              <Button>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Inventory
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   if (!coffee) {
-    return <div>Coffee not found</div>;
+    return (
+      <div className="container mx-auto py-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Coffee Not Found</CardTitle>
+            <CardDescription>
+              The requested coffee could not be found.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/inventory">
+              <Button>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Inventory
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   // Calculate total roasted and total packaged amounts

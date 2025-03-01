@@ -359,6 +359,8 @@ export class DatabaseStorage implements IStorage {
             producer: greenCoffee.producer,
             country: greenCoffee.country,
             altitude: greenCoffee.altitude,
+            cuppingNotes: greenCoffee.cuppingNotes,
+            details: greenCoffee.details,
             currentStock: greenCoffee.currentStock,
           },
           updatedBy: {
@@ -367,7 +369,7 @@ export class DatabaseStorage implements IStorage {
             role: users.role,
           },
         })
-        .from(greenCoffee) // Start from green coffee to get all entries
+        .from(greenCoffee) 
         .leftJoin(
           retailInventory,
           and(
@@ -378,16 +380,16 @@ export class DatabaseStorage implements IStorage {
         .leftJoin(users, eq(retailInventory.updatedById, users.id))
         .orderBy(desc(retailInventory.updatedAt));
 
-      // Transform results to ensure zero quantities for non-stocked items
       const transformedResult = result.map(item => ({
-        ...item,
-        shopId: item.shopId || shopId,
-        greenCoffeeId: item.greenCoffeeId || item.greenCoffee.id,
-        smallBags: item.smallBags || 0,
-        largeBags: item.largeBags || 0,
-        updatedAt: item.updatedAt || null,
-        updatedById: item.updatedById || null,
-        updatedBy: item.updatedBy || null,
+        id: item.id ?? -1, 
+        shopId: shopId,
+        greenCoffeeId: item.greenCoffee.id,
+        smallBags: item.smallBags ?? 0,
+        largeBags: item.largeBags ?? 0,
+        updatedAt: item.updatedAt ?? null,
+        updatedById: item.updatedById ?? null,
+        greenCoffee: item.greenCoffee,
+        updatedBy: item.updatedBy ?? null,
       }));
 
       console.log("Found retail inventory result:", transformedResult);
@@ -628,7 +630,6 @@ export class DatabaseStorage implements IStorage {
         .innerJoin(users, eq(orders.createdById, users.id))
         .orderBy(desc(orders.createdAt));
 
-      // Add updatedBy information in a separate loop to avoid join complexity
       const ordersWithUpdatedBy = await Promise.all(
         result.map(async (order) => {
           let updatedBy = null;
@@ -697,7 +698,6 @@ export class DatabaseStorage implements IStorage {
         .where(
           and(
             eq(dispatchedCoffeeConfirmations.shopId, shopId),
-            //Removed the where clause filtering by status.
           )
         )
         .orderBy(desc(dispatchedCoffeeConfirmations.createdAt));
@@ -745,13 +745,11 @@ export class DatabaseStorage implements IStorage {
         .where(eq(dispatchedCoffeeConfirmations.id, confirmationId))
         .returning();
 
-      // Get the original confirmation to check for discrepancies
       const [original] = await db
         .select()
         .from(dispatchedCoffeeConfirmations)
         .where(eq(dispatchedCoffeeConfirmations.id, confirmationId));
 
-      // Create discrepancy report if quantities don't match
       if (
         original.dispatchedSmallBags !== data.receivedSmallBags ||
         original.dispatchedLargeBags !== data.receivedLargeBags
@@ -762,7 +760,6 @@ export class DatabaseStorage implements IStorage {
           largeBagsDifference: data.receivedLargeBags - original.dispatchedLargeBags,
         });
 
-        // Update confirmation status to indicate discrepancy
         await db
           .update(dispatchedCoffeeConfirmations)
           .set({ status: "discrepancy_reported" })
@@ -905,7 +902,6 @@ export class DatabaseStorage implements IStorage {
         .from(dispatchedCoffeeConfirmations)
         .innerJoin(greenCoffee, eq(dispatchedCoffeeConfirmations.greenCoffeeId, greenCoffee.id))
         .innerJoin(shops, eq(dispatchedCoffeeConfirmations.shopId, shops.id))
-        //Removed the where clause filtering by status.
         .orderBy(desc(dispatchedCoffeeConfirmations.createdAt));
 
       console.log("Found all confirmations:", confirmations);
