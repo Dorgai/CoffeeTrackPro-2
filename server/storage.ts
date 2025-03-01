@@ -17,6 +17,7 @@ import {
   roastingBatches,
   retailInventory,
   orders,
+  userShops,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
