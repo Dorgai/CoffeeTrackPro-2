@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/use-auth";
 import { ShopSelector } from "./shop-selector";
 import { RestockDialog } from "../coffee/restock-dialog";
+import { StockLevelIndicator } from "./stock-level-indicator";
 
 export function NavBar() {
   const { user, logoutMutation } = useAuth();
@@ -120,8 +121,13 @@ export function NavBar() {
               {(user.role === "shopManager" || user.role === "barista") && (
                 <ShopSelector />
               )}
-              {/* Only show RestockDialog for non-roaster roles */}
-              {user.role !== "roaster" && <RestockDialog />}
+              {/* Only show RestockDialog and StockLevelIndicator for non-roaster roles */}
+              {user.role !== "roaster" && (
+                <>
+                  <StockLevelIndicator />
+                  <RestockDialog />
+                </>
+              )}
               <Avatar>
                 <AvatarFallback>
                   {user.username.charAt(0).toUpperCase()}
