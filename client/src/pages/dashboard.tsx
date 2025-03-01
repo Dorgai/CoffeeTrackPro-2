@@ -146,7 +146,7 @@ export default function Dashboard() {
   }
 
   // Get pending orders grouped by shop (for managers)
-  const pendingOrdersByShop = orders ? 
+  const pendingOrdersByShop = orders ?
     groupOrdersByShop(orders.filter(order => order.status === "pending")) : {};
 
   const lowStockCoffees = coffees?.filter(
@@ -227,39 +227,33 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {Object.entries(groupOrdersByShop(orders || [])).map(([shopName, shopOrders]) => (
-                  <div key={shopName} className="space-y-2">
-                    <h3 className="font-medium text-lg">{shopName}</h3>
-                    <div className="space-y-2">
-                      {currentInventory
-                        ?.filter(inv => inv.shopId === shopOrders[0]?.shopId)
-                        .map(inv => {
-                          const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
-                          const isLowStock = inv.smallBags < 3 || inv.largeBags < 3;
+                {currentInventory?.map(inv => {
+                  const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
+                  const isLowStock = inv.smallBags < 3 || inv.largeBags < 3;
 
-                          return (
-                            <div 
-                              key={`${inv.shopId}-${inv.greenCoffeeId}`}
-                              className={`p-3 rounded-lg ${isLowStock ? 'bg-destructive/10' : 'bg-muted'}`}
-                            >
-                              <div className="flex justify-between items-center">
-                                <div>
-                                  <p className="font-medium">{coffee?.name}</p>
-                                  <div className="text-sm text-muted-foreground">
-                                    <p>Small Bags: {inv.smallBags}</p>
-                                    <p>Large Bags: {inv.largeBags}</p>
-                                  </div>
-                                </div>
-                                {isLowStock && (
-                                  <Badge variant="destructive">Low Stock</Badge>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
+                  return (
+                    <div
+                      key={`${inv.shopId}-${inv.greenCoffeeId}`}
+                      className={`p-3 rounded-lg ${isLowStock ? 'bg-destructive/10' : 'bg-muted'}`}
+                    >
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="font-medium">{coffee?.name}</p>
+                          <div className="text-sm text-muted-foreground">
+                            <p>Small Bags: {inv.smallBags}</p>
+                            <p>Large Bags: {inv.largeBags}</p>
+                          </div>
+                        </div>
+                        {isLowStock && (
+                          <Badge variant="destructive">Low Stock</Badge>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
+                {(!currentInventory || currentInventory.length === 0) && (
+                  <p className="text-center text-muted-foreground">No inventory data available</p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -530,8 +524,8 @@ export default function Dashboard() {
                         const isLowStock = inv.smallBags < 3 || inv.largeBags < 3;
 
                         return (
-                          <div 
-                            key={`${inv.shopId}-${inv.greenCoffeeId}`} 
+                          <div
+                            key={`${inv.shopId}-${inv.greenCoffeeId}`}
                             className={`p-3 rounded-lg ${isLowStock ? 'bg-destructive/10' : 'bg-muted'}`}
                           >
                             <div className="flex justify-between items-start">
@@ -597,7 +591,7 @@ export default function Dashboard() {
                                   Ordered: {new Date(order.createdAt).toLocaleDateString()}
                                 </p>
                               </div>
-                              <Badge 
+                              <Badge
                                 variant={order.status === "pending" ? "destructive" : "outline"}
                                 className="capitalize"
                               >
