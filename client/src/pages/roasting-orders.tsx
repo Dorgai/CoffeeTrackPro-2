@@ -40,6 +40,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { formatDate } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 type OrderWithDetails = {
   id: number;
@@ -140,6 +141,19 @@ export default function RoastingOrders() {
     }
   });
 
+  // Group orders by shop
+  const ordersByShop = orders?.reduce((acc, order) => {
+    const shopId = order.shopId;
+    if (!acc[shopId]) {
+      acc[shopId] = {
+        shop: order.shop,
+        orders: []
+      };
+    }
+    acc[shopId].orders.push(order);
+    return acc;
+  }, {} as Record<number, { shop: OrderWithDetails['shop'], orders: OrderWithDetails[] }>);
+
   return (
     <div className="container mx-auto py-8 space-y-8">
       <div>
@@ -149,61 +163,71 @@ export default function RoastingOrders() {
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Package className="h-5 w-5" />
-            <CardTitle>Pending Orders</CardTitle>
-          </div>
-          <CardDescription>Orders waiting to be roasted and dispatched</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Shop</TableHead>
-                <TableHead>Coffee</TableHead>
-                <TableHead>Producer</TableHead>
-                <TableHead>Small Bags (200g)</TableHead>
-                <TableHead>Large Bags (1kg)</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Order Date</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {orders?.map((order) => (
-                <TableRow key={order.id}>
-                  <TableCell>{order.shop.name}</TableCell>
-                  <TableCell className="font-medium">{order.greenCoffee.name}</TableCell>
-                  <TableCell>{order.greenCoffee.producer}</TableCell>
-                  <TableCell>{order.smallBags}</TableCell>
-                  <TableCell>{order.largeBags}</TableCell>
-                  <TableCell className="capitalize">{order.status}</TableCell>
-                  <TableCell>{formatDate(order.createdAt)}</TableCell>
-                  <TableCell>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedOrder(order);
-                        form.reset({
-                          smallBags: order.smallBags,
-                          largeBags: order.largeBags,
-                          status: "roasted",
-                        });
-                        setIsUpdateDialogOpen(true);
-                      }}
-                    >
-                      Update Status
-                    </Button>
-                  </TableCell>
+      {Object.values(ordersByShop || {}).map(({ shop, orders: shopOrders }) => (
+        <Card key={shop.name}>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              <CardTitle>{shop.name}</CardTitle>
+            </div>
+            <CardDescription>{shop.location}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Coffee</TableHead>
+                  <TableHead>Producer</TableHead>
+                  <TableHead>Ordered</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Order Date</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              </TableHeader>
+              <TableBody>
+                {shopOrders.map((order) => (
+                  <TableRow key={order.id}>
+                    <TableCell>{order.greenCoffee.name}</TableCell>
+                    <TableCell>{order.greenCoffee.producer}</TableCell>
+                    <TableCell>
+                      <div>
+                        <div>Small Bags: {order.smallBags}</div>
+                        <div>Large Bags: {order.largeBags}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={order.status === "pending" ? "destructive" : "outline"}
+                        className="capitalize"
+                      >
+                        {order.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{formatDate(order.createdAt)}</TableCell>
+                    <TableCell>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedOrder(order);
+                          form.reset({
+                            smallBags: order.smallBags,
+                            largeBags: order.largeBags,
+                            status: "roasted",
+                          });
+                          setIsUpdateDialogOpen(true);
+                        }}
+                      >
+                        Update Status
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      ))}
 
       <Dialog
         open={isUpdateDialogOpen}

@@ -65,7 +65,9 @@ export const orders = pgTable("orders", {
   greenCoffeeId: integer("green_coffee_id").references(() => greenCoffee.id),
   smallBags: integer("small_bags").notNull(),
   largeBags: integer("large_bags").notNull(),
-  status: text("status", { enum: ["pending", "approved", "completed", "rejected"] }).notNull(),
+  status: text("status", { 
+    enum: ["pending", "roasted", "dispatched", "delivered"] 
+  }).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   createdById: integer("created_by_id").references(() => users.id),
 });
