@@ -5,6 +5,7 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { GreenCoffee } from "@shared/schema";
+import { useActiveShop } from "@/hooks/use-active-shop";
 
 import {
   Form,
@@ -38,6 +39,7 @@ export function OrderForm({
   onSuccess?: () => void;
 }) {
   const { toast } = useToast();
+  const { activeShop } = useActiveShop();
 
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderFormSchema),
@@ -50,7 +52,14 @@ export function OrderForm({
 
   const createOrderMutation = useMutation({
     mutationFn: async (data: OrderFormValues) => {
-      const res = await apiRequest("POST", "/api/orders", data);
+      if (!activeShop?.id) {
+        throw new Error("Please select a shop first");
+      }
+
+      const res = await apiRequest("POST", "/api/orders", {
+        ...data,
+        shopId: activeShop.id
+      });
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.message || "Failed to create order");
@@ -58,7 +67,7 @@ export function OrderForm({
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders", activeShop?.id] });
       if (onSuccess) onSuccess();
       toast({
         title: "Order Created",
@@ -125,7 +134,7 @@ export function OrderForm({
             <Button 
               type="submit" 
               className="w-full"
-              disabled={createOrderMutation.isPending}
+              disabled={createOrderMutation.isPending || !activeShop}
             >
               Place Order
             </Button>

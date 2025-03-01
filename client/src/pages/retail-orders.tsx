@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { GreenCoffee } from "@shared/schema";
-import { Loader2 } from "lucide-react";
+import { Loader2, PackagePlus } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useActiveShop } from "@/hooks/use-active-shop";
 import {
@@ -18,8 +19,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { OrderForm } from "@/components/coffee/order-form";
 
 type OrderWithUser = {
   id: number;
@@ -40,6 +44,7 @@ type OrderWithUser = {
 export default function RetailOrders() {
   const { user } = useAuth();
   const { activeShop } = useActiveShop();
+  const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
 
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
@@ -75,11 +80,17 @@ export default function RetailOrders() {
 
   return (
     <div className="container mx-auto py-8 space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Order History</h1>
-        <p className="text-muted-foreground">
-          View and manage your shop's coffee orders
-        </p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Order History</h1>
+          <p className="text-muted-foreground">
+            View and manage your shop's coffee orders
+          </p>
+        </div>
+        <Button onClick={() => setIsOrderDialogOpen(true)}>
+          <PackagePlus className="h-4 w-4 mr-2" />
+          Place Order
+        </Button>
       </div>
 
       <Card>
@@ -129,6 +140,29 @@ export default function RetailOrders() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog
+        open={isOrderDialogOpen}
+        onOpenChange={setIsOrderDialogOpen}
+      >
+        <DialogContent className="sm:max-w-[500px]">
+          <CardHeader>
+            <CardTitle>Place New Order</CardTitle>
+            <CardDescription>Order coffee from the roastery</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {coffees?.map((coffee) => (
+              <div key={coffee.id} className="mb-4">
+                <OrderForm
+                  coffee={coffee}
+                  availableBags={{ smallBags: 0, largeBags: 0 }}
+                  onSuccess={() => setIsOrderDialogOpen(false)}
+                />
+              </div>
+            ))}
+          </CardContent>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
