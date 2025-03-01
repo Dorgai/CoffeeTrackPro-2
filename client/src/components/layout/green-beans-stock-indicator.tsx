@@ -20,7 +20,7 @@ export function GreenBeansStockIndicator() {
 
   // Calculate total current stock
   const totalCurrentStock = coffees.reduce((sum, coffee) => sum + Number(coffee.currentStock), 0);
-  
+
   // Calculate total desired stock based on min thresholds
   const totalDesiredStock = coffees.reduce((sum, coffee) => sum + Number(coffee.minThreshold), 0);
 
@@ -29,9 +29,9 @@ export function GreenBeansStockIndicator() {
 
   // Determine stock level status
   const getStockStatus = () => {
+    if (stockPercentage < 50) return "bg-red-500";
     if (stockPercentage >= 75) return "bg-green-500";
-    if (stockPercentage >= 50) return "bg-yellow-500";
-    return "bg-red-500";
+    return "bg-yellow-500";
   };
 
   return (
@@ -40,7 +40,9 @@ export function GreenBeansStockIndicator() {
         <div className="flex items-center gap-2 cursor-pointer">
           <Coffee className="h-4 w-4" />
           <div className="flex items-center gap-1">
-            <span className="text-sm font-medium">{stockPercentage}%</span>
+            <span className={`text-sm font-medium ${stockPercentage < 50 ? 'text-red-500' : ''}`}>
+              {stockPercentage}%
+            </span>
             <Progress 
               value={stockPercentage} 
               className="w-24 h-2"
