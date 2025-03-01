@@ -67,12 +67,13 @@ export default function RetailOverview() {
   const { data: allInventory, isLoading: loadingInventory } = useQuery<AllInventoryItem[]>({
     queryKey: ["/api/retail-inventory"],
     queryFn: async () => {
-      const res = await fetch("/api/retail-inventory");
+      const res = await apiRequest("GET", "/api/retail-inventory");
       if (!res.ok) {
-        throw new Error("Failed to fetch inventory");
+        const error = await res.text();
+        throw new Error(error);
       }
       const data = await res.json();
-      console.log("Fetched inventory data:", data);
+      console.log("Fetched retail inventory data:", data);
       return data;
     },
   });
@@ -91,7 +92,7 @@ export default function RetailOverview() {
 
   // Group inventory and orders by shop
   const shopData = allInventory?.reduce((acc, item) => {
-    const shopId = item.shop.id;
+    const shopId = item.shopId;
     // Only include shops that the user has access to
     if (user?.role !== "roasteryOwner" && !userShops?.some(s => s.id === shopId)) {
       return acc;
@@ -109,7 +110,7 @@ export default function RetailOverview() {
 
   // Add orders to the grouped data
   allOrders?.forEach(order => {
-    const shopId = order.shop.id;
+    const shopId = order.shopId;
     if (shopData?.[shopId]) {
       shopData[shopId].orders.push(order);
     }
