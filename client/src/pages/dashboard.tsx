@@ -261,12 +261,15 @@ export default function Dashboard() {
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
-            {orders?.filter(order => order.shop).reduce((shops, order) => {
-              if (order.shop && !shops.some(s => s.id === order.shopId)) {
-                shops.push({ id: order.shopId, name: order.shop.name });
-              }
-              return shops;
-            }, [] as Array<{ id: number; name: string }>).map(shop => {
+            {(user?.role === "barista" && selectedShopId ?
+              [{ id: selectedShopId, name: currentInventory?.find(inv => inv.shopId === selectedShopId)?.shop?.name || "Selected Shop" }]
+              : orders?.filter(order => order.shop).reduce((shops, order) => {
+                if (order.shop && !shops.some(s => s.id === order.shopId)) {
+                  shops.push({ id: order.shopId, name: order.shop.name });
+                }
+                return shops;
+              }, [] as Array<{ id: number; name: string }>)
+            ).map(shop => {
               const shopInventory = currentInventory?.filter(inv => inv.shopId === shop.id) || [];
               const shopCoffeeIds = new Set(shopInventory.map(inv => inv.greenCoffeeId));
 
@@ -295,7 +298,7 @@ export default function Dashboard() {
                               {coffee.producer} - {coffee.country}
                             </p>
                           </div>
-                          {user?.role === "shopManager" && (
+                          {(user?.role === "shopManager" || user?.role === "barista") && (
                             <Button variant="outline" size="sm" asChild>
                               <Link href={`/retail/orders?coffeeId=${coffee.id}&shopId=${shop.id}`}>
                                 Order Now
