@@ -165,6 +165,18 @@ export class DatabaseStorage implements IStorage {
 
   async getUserShops(userId: number): Promise<Shop[]> {
     try {
+      // First get the user to check their role
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, userId));
+
+      // If roasteryOwner, return all shops
+      if (user?.role === "roasteryOwner") {
+        return await db.select().from(shops);
+      }
+
+      // For other roles, get associated shops through userShops table
       const result = await db
         .select({
           id: shops.id,
@@ -173,10 +185,11 @@ export class DatabaseStorage implements IStorage {
           isActive: shops.isActive,
           defaultOrderQuantity: shops.defaultOrderQuantity
         })
-        .from(shops)
-        .innerJoin(userShops, eq(shops.id, userShops.shopId))
+        .from(userShops)
+        .innerJoin(shops, eq(userShops.shopId, shops.id))
         .where(eq(userShops.userId, userId));
 
+      console.log("Found shops for user:", userId, result);
       return result;
     } catch (error) {
       console.error("Error fetching user shops:", error);
