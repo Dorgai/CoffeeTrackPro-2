@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { GreenCoffee } from "@shared/schema";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useActiveShop } from "@/hooks/use-active-shop";
 import {
   Card,
   CardContent,
@@ -37,21 +38,22 @@ type OrderWithUser = {
 
 export default function RetailOrders() {
   const { user } = useAuth();
+  const { activeShop } = useActiveShop();
 
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
   });
 
   const { data: orders, isLoading: loadingOrders } = useQuery<OrderWithUser[]>({
-    queryKey: ["/api/orders", user?.shopId],
-    enabled: !!user?.shopId,
+    queryKey: ["/api/orders", activeShop?.id],
+    enabled: !!activeShop?.id,
   });
 
-  if (!user?.shopId) {
+  if (!activeShop?.id) {
     return (
       <div className="container mx-auto py-8">
         <div className="bg-destructive/10 text-destructive px-4 py-2 rounded">
-          You are not assigned to any shop. Please contact an administrator.
+          Please select a shop from the dropdown in the navigation bar.
         </div>
       </div>
     );

@@ -5,6 +5,7 @@ import { Loader2, Coffee, PackagePlus } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { useActiveShop } from "@/hooks/use-active-shop";
 import {
   Card,
   CardContent,
@@ -30,6 +31,7 @@ import { formatDate } from "@/lib/utils";
 export default function Retail() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { activeShop } = useActiveShop();
   const [selectedCoffee, setSelectedCoffee] = useState<GreenCoffee | null>(null);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
@@ -39,20 +41,20 @@ export default function Retail() {
   });
 
   const { data: retailInventory, isLoading: loadingInventory } = useQuery({
-    queryKey: ["/api/retail-inventory"],
-    enabled: !!user?.shopId,
+    queryKey: ["/api/retail-inventory", activeShop?.id],
+    enabled: !!activeShop?.id,
   });
 
   const updateInventoryMutation = useMutation({
     mutationFn: async (data: { greenCoffeeId: number; smallBags: number; largeBags: number }) => {
-      if (!user?.shopId) {
-        throw new Error("No shop assigned to user");
+      if (!activeShop?.id) {
+        throw new Error("No shop selected");
       }
 
       const res = await apiRequest("POST", "/api/retail-inventory", {
         ...data,
-        shopId: user.shopId,
-        updatedById: user.id
+        shopId: activeShop.id,
+        updatedById: user!.id
       });
 
       if (!res.ok) {
@@ -63,7 +65,7 @@ export default function Retail() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", activeShop?.id] });
       toast({
         title: "Success",
         description: "Inventory updated successfully",
@@ -81,10 +83,10 @@ export default function Retail() {
 
   const handleUpdateInventory = async (coffeeId: number, smallBags: number, largeBags: number) => {
     try {
-      if (!user?.shopId) {
+      if (!activeShop?.id) {
         toast({
           title: "Error",
-          description: "You must be assigned to a shop to update inventory",
+          description: "Please select a shop to update inventory",
           variant: "destructive",
         });
         return;
@@ -100,11 +102,11 @@ export default function Retail() {
     }
   };
 
-  if (!user?.shopId) {
+  if (!activeShop?.id) {
     return (
       <div className="container mx-auto py-8">
         <div className="bg-destructive/10 text-destructive px-4 py-2 rounded">
-          You are not assigned to any shop. Please contact an administrator.
+          Please select a shop from the dropdown in the navigation bar.
         </div>
       </div>
     );

@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/menubar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/use-auth";
+import { ShopSelector } from "./shop-selector";
 
 export function NavBar() {
   const { user, logoutMutation } = useAuth();
@@ -105,7 +106,10 @@ export function NavBar() {
         </Menubar>
         <div className="ml-auto flex items-center space-x-4">
           {user ? (
-            <div className="flex items-center">
+            <div className="flex items-center space-x-4">
+              {(user.role === "shopManager" || user.role === "barista") && (
+                <ShopSelector />
+              )}
               <Avatar>
                 <AvatarFallback>
                   {user.username.charAt(0).toUpperCase()}
@@ -121,7 +125,7 @@ export function NavBar() {
                       </Link>
                     </MenubarItem>
                     <MenubarSeparator />
-                    <MenubarItem 
+                    <MenubarItem
                       onClick={() => logoutMutation.mutate()}
                       disabled={logoutMutation.isPending}
                     >

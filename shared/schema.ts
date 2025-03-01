@@ -9,13 +9,19 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   role: text("role", { enum: userRoles }).notNull(),
-  shopId: integer("shop_id").references(() => shops.id),
+  defaultShopId: integer("default_shop_id").references(() => shops.id),
 });
 
 export const shops = pgTable("shops", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   location: text("location").notNull(),
+});
+
+// New table for many-to-many relationship between users and shops
+export const userShops = pgTable("user_shops", {
+  userId: integer("user_id").references(() => users.id).notNull(),
+  shopId: integer("shop_id").references(() => shops.id).notNull(),
 });
 
 export const greenCoffee = pgTable("green_coffee", {
@@ -77,6 +83,7 @@ export const insertRetailInventorySchema = createInsertSchema(retailInventory).e
   updatedById: z.number()
 });
 export const insertOrderSchema = createInsertSchema(orders);
+export const insertUserShopSchema = createInsertSchema(userShops);
 
 // Export types for use in application code
 export type User = typeof users.$inferSelect;
@@ -85,6 +92,7 @@ export type GreenCoffee = typeof greenCoffee.$inferSelect;
 export type RoastingBatch = typeof roastingBatches.$inferSelect;
 export type RetailInventory = typeof retailInventory.$inferSelect;
 export type Order = typeof orders.$inferSelect;
+export type UserShop = typeof userShops.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertShop = z.infer<typeof insertShopSchema>;
@@ -92,3 +100,4 @@ export type InsertGreenCoffee = z.infer<typeof insertGreenCoffeeSchema>;
 export type InsertRoastingBatch = z.infer<typeof insertRoastingBatchSchema>;
 export type InsertRetailInventory = z.infer<typeof insertRetailInventorySchema>;
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
+export type InsertUserShop = z.infer<typeof insertUserShopSchema>;

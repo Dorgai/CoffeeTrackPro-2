@@ -17,6 +17,21 @@ function requireRole(roles: string[]) {
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
 
+  // User's Shops Route
+  app.get("/api/user/shops", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const shops = await storage.getUserShops(req.user.id);
+      res.json(shops);
+    } catch (error) {
+      console.error("Error fetching user shops:", error);
+      res.status(500).json({ message: "Failed to fetch shops" });
+    }
+  });
+
   // Shops Routes - accessible by roastery owner
   app.get("/api/shops", async (req, res) => {
     const shops = await storage.getShops();

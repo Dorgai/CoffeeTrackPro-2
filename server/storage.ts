@@ -38,6 +38,7 @@ export interface IStorage {
   getShop(id: number): Promise<Shop | undefined>;
   getShops(): Promise<Shop[]>;
   createShop(shop: InsertShop): Promise<Shop>;
+  getUserShops(userId: number): Promise<Shop[]>; // Added method
 
   // Green Coffee
   getGreenCoffee(id: number): Promise<GreenCoffee | undefined>;
@@ -101,6 +102,25 @@ export class DatabaseStorage implements IStorage {
   async createShop(shop: InsertShop): Promise<Shop> {
     const [newShop] = await db.insert(shops).values(shop).returning();
     return newShop;
+  }
+
+  async getUserShops(userId: number): Promise<Shop[]> {
+    try {
+      const result = await db
+        .select({
+          id: shops.id,
+          name: shops.name,
+          location: shops.location,
+        })
+        .from(shops)
+        .innerJoin(userShops, eq(shops.id, userShops.shopId))
+        .where(eq(userShops.userId, userId));
+
+      return result;
+    } catch (error) {
+      console.error("Error fetching user shops:", error);
+      throw error;
+    }
   }
 
   // Green Coffee
