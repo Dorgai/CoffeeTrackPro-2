@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { GreenCoffee } from "@shared/schema";
-import { Loader2, Coffee, PackagePlus } from "lucide-react";
+import { Loader2, PackagePlus } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -45,7 +45,7 @@ export default function Retail() {
   const { data: retailInventory, isLoading: loadingInventory } = useQuery({
     queryKey: ["/api/retail-inventory", activeShop?.id],
     queryFn: async () => {
-      if (!activeShop?.id) return {};
+      if (!activeShop?.id) return [];
       const res = await apiRequest("GET", `/api/retail-inventory?shopId=${activeShop.id}`);
       return res.json();
     },
@@ -118,7 +118,8 @@ export default function Retail() {
   }
 
   const getCurrentInventory = (coffeeId: number) => {
-    const inventory = retailInventory?.find((item: any) => item.greenCoffeeId === coffeeId);
+    if (!retailInventory) return { smallBags: 0, largeBags: 0, id: undefined, updatedAt: undefined, updatedBy: undefined };
+    const inventory = retailInventory.find((item: any) => item.greenCoffeeId === coffeeId);
     return {
       smallBags: inventory?.smallBags || 0,
       largeBags: inventory?.largeBags || 0,
@@ -149,12 +150,12 @@ export default function Retail() {
           </div>
         </div>
 
-        {/* Add ShopSelector */}
-        {userShops && userShops.length > 0 && (
+        {/* Always show ShopSelector when userShops data is available */}
+        {userShops && userShops.length > 0 ? (
           <div className="w-[200px]">
             <ShopSelector />
           </div>
-        )}
+        ) : null}
       </div>
 
       {!activeShop?.id ? (

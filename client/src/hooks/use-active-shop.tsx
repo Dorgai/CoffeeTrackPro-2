@@ -20,13 +20,14 @@ export const useActiveShop = create<ActiveShopState>((set) => ({
 export function useUserShops() {
   const setUserShops = useActiveShop(state => state.setUserShops);
   const setActiveShop = useActiveShop(state => state.setActiveShop);
+  const activeShop = useActiveShop(state => state.activeShop);
 
-  return useQuery({
+  return useQuery<Shop[]>({
     queryKey: ['/api/user/shops'],
     onSuccess: (data) => {
       setUserShops(data);
-      // If there's only one shop, set it as active
-      if (data.length === 1) {
+      // If there's only one shop or no active shop is selected, set the first shop as active
+      if (data.length === 1 || (!activeShop && data.length > 0)) {
         setActiveShop(data[0]);
       }
     },
