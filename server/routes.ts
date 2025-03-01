@@ -233,9 +233,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch(
     "/api/orders/:id/status",
-    requireRole(["roaster", "shopManager", "barista"]),
+    requireRole(["roaster", "shopManager", "barista", "roasteryOwner"]),
     async (req, res) => {
       try {
+        console.log("Order status update requested by:", req.user?.username, "with role:", req.user?.role);
+        console.log("Update data:", req.body);
+
         const orderId = parseInt(req.params.id);
         const { status, smallBags, largeBags } = req.body;
 
@@ -266,12 +269,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           updatedById: req.user!.id,
         });
 
+        console.log("Order updated successfully:", updatedOrder);
+
         // If there are remaining bags, create a new pending order
         const remainingSmallBags = order.smallBags - smallBags;
         const remainingLargeBags = order.largeBags - largeBags;
 
         if (remainingSmallBags > 0 || remainingLargeBags > 0) {
-          await storage.createOrder({
+          const newOrder = await storage.createOrder({
             shopId: order.shopId,
             greenCoffeeId: order.greenCoffeeId,
             smallBags: remainingSmallBags,
@@ -279,6 +284,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             createdById: order.createdById,
             status: "pending"
           });
+          console.log("Created new order for remaining bags:", newOrder);
         }
 
         res.json(updatedOrder);
