@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { GreenCoffee } from "@shared/schema";
-import { Loader2, Coffee } from "lucide-react";
+import { Loader2, Coffee, PackagePlus } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { RetailInventoryForm } from "@/components/coffee/retail-inventory-form";
+import { OrderForm } from "@/components/coffee/order-form";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Link } from "wouter";
 import { formatDate } from "@/lib/utils";
@@ -31,6 +32,7 @@ export default function Retail() {
   const { user } = useAuth();
   const [selectedCoffee, setSelectedCoffee] = useState<GreenCoffee | null>(null);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
+  const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
 
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
@@ -47,13 +49,12 @@ export default function Retail() {
         throw new Error("No shop assigned to user");
       }
 
-      console.log("Sending inventory update:", {
+      const res = await apiRequest("POST", "/api/retail-inventory", {
         ...data,
         shopId: user.shopId,
         updatedById: user.id
       });
 
-      const res = await apiRequest("POST", "/api/retail-inventory", data);
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.message || "Failed to update inventory");
@@ -137,9 +138,15 @@ export default function Retail() {
             Manage your shop's inventory
           </p>
         </div>
-        <Button variant="outline" asChild>
-          <Link href="/retail/orders">View Orders</Link>
-        </Button>
+        <div className="flex gap-4">
+          <Button variant="outline" asChild>
+            <Link href="/retail/orders">View Orders</Link>
+          </Button>
+          <Button onClick={() => setIsOrderDialogOpen(true)}>
+            <PackagePlus className="h-4 w-4 mr-2" />
+            Place Order
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -214,6 +221,29 @@ export default function Retail() {
               onUpdate={handleUpdateInventory}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isOrderDialogOpen}
+        onOpenChange={setIsOrderDialogOpen}
+      >
+        <DialogContent className="sm:max-w-[500px]">
+          <CardHeader>
+            <CardTitle>Place New Order</CardTitle>
+            <CardDescription>Order coffee from the roastery</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {coffees?.map((coffee) => (
+              <div key={coffee.id} className="mb-4">
+                <OrderForm
+                  coffee={coffee}
+                  availableBags={getCurrentInventory(coffee.id)}
+                  onSuccess={() => setIsOrderDialogOpen(false)}
+                />
+              </div>
+            ))}
+          </CardContent>
         </DialogContent>
       </Dialog>
     </div>
