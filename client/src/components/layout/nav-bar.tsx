@@ -119,16 +119,16 @@ export function NavBar() {
         <div className="ml-auto flex items-center space-x-4">
           {user ? (
             <div className="flex items-center space-x-4">
-              {/* Show shop selector for all roles except roaster */}
+              {/* Show shop selector for everyone except roaster */}
               {user.role !== "roaster" && <ShopSelector />}
 
-              {/* Show GreenBeansStockIndicator for roasteryOwner and roaster */}
+              {/* Show green beans indicator for roaster and roasteryOwner */}
               {(user.role === "roasteryOwner" || user.role === "roaster") && (
                 <GreenBeansStockIndicator />
               )}
 
-              {/* Show StockLevelIndicator and RestockDialog for roasteryOwner, shopManager, and barista */}
-              {(user.role === "roasteryOwner" || user.role === "shopManager" || user.role === "barista") && (
+              {/* Show stock level indicator and restock dialog for all except roaster */}
+              {user.role !== "roaster" && (
                 <>
                   <StockLevelIndicator />
                   <RestockDialog />

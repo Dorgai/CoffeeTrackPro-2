@@ -203,6 +203,25 @@ export default function Dashboard() {
     return latest > orderDate ? latest : orderDate;
   }, new Date(0));
 
+  // Update the shops rendering logic to be more defensive
+  const getShopsToShow = () => {
+    if (!orders || !currentInventory) return [];
+
+    if (user?.role === "barista" && selectedShopId) {
+      const shopName = currentInventory.find(inv => inv.shopId === selectedShopId)?.shop?.name;
+      return [{ id: selectedShopId, name: shopName || "Selected Shop" }];
+    }
+
+    return orders
+      .filter(order => order.shop)
+      .reduce((shops, order) => {
+        if (order.shop && !shops.some(s => s.id === order.shopId)) {
+          shops.push({ id: order.shopId, name: order.shop.name });
+        }
+        return shops;
+      }, [] as Array<{ id: number; name: string }>);
+  };
+
   return (
     <div className="container mx-auto py-8 space-y-8">
       {/* Header section */}
@@ -271,29 +290,24 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              {(user?.role === "barista" && selectedShopId ?
-                [{ id: selectedShopId, name: currentInventory?.find(inv => inv.shopId === selectedShopId)?.shop?.name || "Selected Shop" }]
-                : orders?.filter(order => order.shop).reduce((shops, order) => {
-                  if (order.shop && !shops.some(s => s.id === order.shopId)) {
-                    shops.push({ id: order.shopId, name: order.shop.name });
-                  }
-                  return shops;
-                }, [] as Array<{ id: number; name: string }>)
-              ).map(shop => {
+              {getShopsToShow().map(shop => {
+                if (!shop) return null;
+
                 const shopInventory = currentInventory?.filter(inv => inv.shopId === shop.id) || [];
                 const shopCoffeeIds = new Set(shopInventory.map(inv => inv.greenCoffeeId));
 
                 // Find coffees that exist in other shops but not in this one
                 const missingCoffees = coffees?.filter(coffee => {
+                  if (!coffee) return false;
                   const isInOtherShops = currentInventory?.some(inv =>
                     inv.shopId !== shop.id &&
                     inv.greenCoffeeId === coffee.id &&
                     (inv.smallBags > 0 || inv.largeBags > 0)
                   );
                   return !shopCoffeeIds.has(coffee.id) && isInOtherShops;
-                });
+                }) || [];
 
-                if (!missingCoffees?.length) return null;
+                if (!missingCoffees.length) return null;
 
                 return (
                   <div key={shop.id} className="space-y-2">
@@ -321,7 +335,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                 );
-              }).filter(Boolean)}
+              })}
               {!currentInventory?.length && (
                 <p className="text-center text-muted-foreground py-4">No inventory data available</p>
               )}
