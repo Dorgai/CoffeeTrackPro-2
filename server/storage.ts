@@ -60,7 +60,10 @@ export interface IStorage {
 
   // Retail Inventory  
   getRetailInventory(id: number): Promise<RetailInventory | undefined>;
-  getRetailInventoriesByShop(shopId: number): Promise<RetailInventory[]>;
+  getRetailInventoriesByShop(shopId: number): Promise<(RetailInventory & {
+    greenCoffee: GreenCoffee;
+    updatedBy: User;
+  })[]>;
   updateRetailInventory(inventory: InsertRetailInventory): Promise<RetailInventory>;
 
   // Orders
@@ -257,11 +260,27 @@ export class DatabaseStorage implements IStorage {
     return inv;
   }
 
-  async getRetailInventoriesByShop(shopId: number): Promise<RetailInventory[]> {
+  async getRetailInventoriesByShop(shopId: number): Promise<(RetailInventory & {
+    greenCoffee: GreenCoffee;
+    updatedBy: User;
+  })[]> {
     return await db
-      .select()
+      .select({
+        id: retailInventory.id,
+        shopId: retailInventory.shopId,
+        greenCoffeeId: retailInventory.greenCoffeeId,
+        smallBags: retailInventory.smallBags,
+        largeBags: retailInventory.largeBags,
+        updatedAt: retailInventory.updatedAt,
+        updatedById: retailInventory.updatedById,
+        greenCoffee: greenCoffee,
+        updatedBy: users,
+      })
       .from(retailInventory)
-      .where(eq(retailInventory.shopId, shopId));
+      .where(eq(retailInventory.shopId, shopId))
+      .innerJoin(greenCoffee, eq(retailInventory.greenCoffeeId, greenCoffee.id))
+      .innerJoin(users, eq(retailInventory.updatedById, users.id))
+      .orderBy(desc(retailInventory.updatedAt));
   }
 
   async updateRetailInventory(inventory: InsertRetailInventory): Promise<RetailInventory> {

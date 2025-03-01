@@ -352,7 +352,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Shop ID is required" });
       }
 
-      // Allow roasteryOwner to access any shop's confirmations
+      // For non-roasteryOwner users, verify shop access
       if (req.user?.role !== "roasteryOwner") {
         const hasAccess = await checkShopAccess(req.user!.id, Number(shopId));
         if (!hasAccess) {
@@ -360,7 +360,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      console.log("Fetching confirmations for shop:", shopId);
       const confirmations = await storage.getDispatchedCoffeeConfirmations(Number(shopId));
+      console.log("Found confirmations:", confirmations);
       res.json(confirmations);
     } catch (error) {
       console.error("Error fetching dispatched coffee confirmations:", error);
