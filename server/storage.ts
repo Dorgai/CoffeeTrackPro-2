@@ -128,7 +128,7 @@ export interface IStorage {
       shop: Shop;
     };
   })[]>;
-    getAllDispatchedCoffeeConfirmations(): Promise<(DispatchedCoffeeConfirmation & {
+  getAllDispatchedCoffeeConfirmations(): Promise<(DispatchedCoffeeConfirmation & {
     greenCoffee: GreenCoffee;
     shop: Shop;
   })[]>;
@@ -367,14 +367,31 @@ export class DatabaseStorage implements IStorage {
             role: users.role,
           },
         })
-        .from(retailInventory)
-        .where(eq(retailInventory.shopId, shopId))
-        .innerJoin(greenCoffee, eq(retailInventory.greenCoffeeId, greenCoffee.id))
-        .innerJoin(users, eq(retailInventory.updatedById, users.id))
+        .from(greenCoffee) // Start from green coffee to get all entries
+        .leftJoin(
+          retailInventory,
+          and(
+            eq(retailInventory.greenCoffeeId, greenCoffee.id),
+            eq(retailInventory.shopId, shopId)
+          )
+        )
+        .leftJoin(users, eq(retailInventory.updatedById, users.id))
         .orderBy(desc(retailInventory.updatedAt));
 
-      console.log("Found retail inventory result:", result);
-      return result;
+      // Transform results to ensure zero quantities for non-stocked items
+      const transformedResult = result.map(item => ({
+        ...item,
+        shopId: item.shopId || shopId,
+        greenCoffeeId: item.greenCoffeeId || item.greenCoffee.id,
+        smallBags: item.smallBags || 0,
+        largeBags: item.largeBags || 0,
+        updatedAt: item.updatedAt || null,
+        updatedById: item.updatedById || null,
+        updatedBy: item.updatedBy || null,
+      }));
+
+      console.log("Found retail inventory result:", transformedResult);
+      return transformedResult;
     } catch (error) {
       console.error("Error in getRetailInventoriesByShop:", error);
       throw error;
@@ -680,7 +697,7 @@ export class DatabaseStorage implements IStorage {
         .where(
           and(
             eq(dispatchedCoffeeConfirmations.shopId, shopId),
-            eq(dispatchedCoffeeConfirmations.status, "pending")
+            //Removed the where clause filtering by status.
           )
         )
         .orderBy(desc(dispatchedCoffeeConfirmations.createdAt));
@@ -888,7 +905,7 @@ export class DatabaseStorage implements IStorage {
         .from(dispatchedCoffeeConfirmations)
         .innerJoin(greenCoffee, eq(dispatchedCoffeeConfirmations.greenCoffeeId, greenCoffee.id))
         .innerJoin(shops, eq(dispatchedCoffeeConfirmations.shopId, shops.id))
-        .where(eq(dispatchedCoffeeConfirmations.status, "pending"))
+        //Removed the where clause filtering by status.
         .orderBy(desc(dispatchedCoffeeConfirmations.createdAt));
 
       console.log("Found all confirmations:", confirmations);

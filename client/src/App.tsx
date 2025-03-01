@@ -20,8 +20,7 @@ import Shops from "@/pages/shops";
 import Profile from "@/pages/profile";
 import NotFound from "@/pages/not-found";
 import { ProtectedRoute } from "@/lib/protected-route";
-import RetailNewArrivals from "@/pages/retail-new-arrivals"; // Added import statement
-
+import RetailNewArrivals from "@/pages/retail-new-arrivals";
 
 export default function App() {
   return (
@@ -39,8 +38,8 @@ export default function App() {
             <ProtectedRoute path="/coffee/:id" component={CoffeeDetail} roles={["roasteryOwner"]} />
             <ProtectedRoute path="/roasting" component={Roasting} roles={["roaster"]} />
             <ProtectedRoute path="/roasting/orders" component={RoastingOrders} roles={["roaster"]} />
-            <ProtectedRoute path="/retail" component={Retail} roles={["shopManager", "barista"]} />
-            <ProtectedRoute path="/retail/orders" component={RetailOrders} roles={["shopManager", "barista"]} />
+            <ProtectedRoute path="/retail" component={Retail} roles={["roasteryOwner", "shopManager", "barista"]} />
+            <ProtectedRoute path="/retail/orders" component={RetailOrders} roles={["roasteryOwner", "shopManager", "barista"]} />
             <ProtectedRoute path="/retail-overview" component={RetailOverview} roles={["roasteryOwner"]} />
             <ProtectedRoute path="/analytics" component={Analytics} roles={["roasteryOwner", "shopManager"]} />
             <ProtectedRoute path="/reports" component={Reports} roles={["roasteryOwner", "shopManager"]} />
