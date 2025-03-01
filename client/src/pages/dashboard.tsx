@@ -47,15 +47,18 @@ export default function Dashboard() {
 
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
+    enabled: !!user && user.role === "roasteryOwner",
   });
 
   const { data: batches, isLoading: loadingBatches } = useQuery<RoastingBatch[]>({
     queryKey: ["/api/roasting-batches"],
+    enabled: !!user && (user.role === "roaster" || user.role === "roasteryOwner"),
   });
 
+  // For retail inventory, if roasteryOwner get all, otherwise get by shop
   const { data: inventory, isLoading: loadingInventory } = useQuery<RetailInventory[]>({
-    queryKey: ["/api/retail-inventory", user?.shopId],
-    enabled: user?.shopId !== undefined,
+    queryKey: ["/api/retail-inventory", user?.defaultShopId],
+    enabled: !!user,
   });
 
   if (loadingCoffees || loadingBatches || loadingInventory) {
@@ -105,7 +108,7 @@ export default function Dashboard() {
           title="Roasting Batches"
           value={batches?.length || 0}
           icon={Package}
-          description="Last 30 days"
+          description="Total batches"
         />
         <StatsCard
           title="Low Stock Items"
@@ -131,7 +134,7 @@ export default function Dashboard() {
                   <div>
                     <p className="font-medium">{coffee.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      Current stock: {coffee.currentStock.toString()}kg
+                      Current stock: {coffee.currentStock}kg
                     </p>
                   </div>
                   <Badge variant="destructive">Below Threshold</Badge>
@@ -158,17 +161,20 @@ export default function Dashboard() {
                 <div>
                   <p className="font-medium">Batch #{batch.id}</p>
                   <p className="text-sm text-muted-foreground">
-                    {new Date(batch.roastedAt).toLocaleDateString()}
+                    {new Date(batch.roastedAt || "").toLocaleDateString()}
                   </p>
                 </div>
                 <div className="text-right">
-                  <p>{batch.roastedAmount.toString()}kg roasted</p>
+                  <p>{batch.roastedAmount}kg roasted</p>
                   <p className="text-sm text-muted-foreground">
-                    Loss: {batch.roastingLoss.toString()}kg
+                    Loss: {batch.roastingLoss}kg
                   </p>
                 </div>
               </div>
             ))}
+            {(!batches || batches.length === 0) && (
+              <p className="text-muted-foreground text-center py-4">No roasting batches recorded yet</p>
+            )}
           </CardContent>
         </Card>
 
@@ -188,7 +194,7 @@ export default function Dashboard() {
                   <div>
                     <p className="font-medium">Shop #{inv.shopId}</p>
                     <p className="text-sm text-muted-foreground">
-                      Last updated: {new Date(inv.updatedAt).toLocaleDateString()}
+                      Last updated: {new Date(inv.updatedAt || "").toLocaleDateString()}
                     </p>
                   </div>
                   <div className="text-right">
@@ -197,6 +203,9 @@ export default function Dashboard() {
                   </div>
                 </div>
               ))}
+              {(!inventory || inventory.length === 0) && (
+                <p className="text-muted-foreground text-center py-4">No inventory data available</p>
+              )}
             </div>
           </CardContent>
         </Card>

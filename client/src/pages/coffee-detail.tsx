@@ -1,5 +1,4 @@
-
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { GreenCoffee, RoastingBatch } from "@shared/schema";
@@ -29,10 +28,9 @@ import { Separator } from "@/components/ui/separator";
 import { RoastingForm } from "@/components/coffee/roasting-form";
 
 export default function CoffeeDetail() {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+  const [params] = useParams();
   const { toast } = useToast();
-  const coffeeId = parseInt(id || "0");
+  const coffeeId = parseInt(params.id || "0");
 
   const { data: coffee, isLoading: loadingCoffee } = useQuery<GreenCoffee>({
     queryKey: [`/api/green-coffee/${coffeeId}`],
@@ -46,9 +44,7 @@ export default function CoffeeDetail() {
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest(`/api/green-coffee/${coffeeId}`, {
-        method: "DELETE",
-      });
+      return apiRequest("DELETE", `/api/green-coffee/${coffeeId}`);
     },
     onSuccess: () => {
       toast({
@@ -56,7 +52,7 @@ export default function CoffeeDetail() {
         description: "The coffee has been removed from inventory",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/green-coffee"] });
-      navigate("/inventory");
+      window.location.href = "/inventory";
     },
   });
 
@@ -77,10 +73,12 @@ export default function CoffeeDetail() {
   return (
     <div className="container mx-auto py-8 space-y-8">
       <div className="flex justify-between items-center">
-        <Button variant="outline" onClick={() => navigate("/inventory")}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Inventory
-        </Button>
+        <Link href="/inventory">
+          <Button variant="outline">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Inventory
+          </Button>
+        </Link>
 
         <div className="flex space-x-2">
           <Dialog>
@@ -131,7 +129,7 @@ export default function CoffeeDetail() {
               <div>
                 <h3 className="text-lg font-semibold">Details</h3>
                 <Separator className="my-2" />
-                
+
                 <dl className="space-y-2">
                   <div className="flex justify-between">
                     <dt className="font-medium text-muted-foreground">Altitude:</dt>
@@ -164,7 +162,7 @@ export default function CoffeeDetail() {
             <div>
               <h3 className="text-lg font-semibold">Inventory Summary</h3>
               <Separator className="my-2" />
-              
+
               <div className="grid grid-cols-2 gap-4 mt-4">
                 <Card>
                   <CardContent className="pt-6">
@@ -210,7 +208,7 @@ export default function CoffeeDetail() {
               </div>
             </div>
           </div>
-          
+
           <div>
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold">Roasting History</h3>
@@ -235,7 +233,7 @@ export default function CoffeeDetail() {
               </Dialog>
             </div>
             <Separator className="my-2" />
-            
+
             {loadingBatches ? (
               <div>Loading roasting history...</div>
             ) : batches && batches.length > 0 ? (

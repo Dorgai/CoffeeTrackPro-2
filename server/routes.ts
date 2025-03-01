@@ -286,14 +286,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
-  app.post("/api/orders", requireRole(["shopManager", "barista"]), async (req, res) => {
+  // Create new order
+  app.post("/api/orders", requireRole(["shopManager", "barista", "roasteryOwner"]), async (req, res) => {
     try {
       const { shopId } = req.body;
       if (!shopId) {
         return res.status(400).json({ message: "Shop ID is required" });
       }
 
-      if (!await checkShopAccess(req.user!.id, shopId)) {
+      // Only check shop access for non-roastery owners
+      if (req.user?.role !== "roasteryOwner" && !await checkShopAccess(req.user!.id, shopId)) {
         return res.status(403).json({ message: "User does not have access to this shop" });
       }
 

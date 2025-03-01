@@ -7,6 +7,7 @@ import { PageLayout } from "@/components/layout/page-layout";
 import Dashboard from "@/pages/dashboard";
 import AuthPage from "@/pages/auth-page";
 import Inventory from "@/pages/inventory";
+import CoffeeDetail from "@/pages/coffee-detail";
 import Roasting from "@/pages/roasting";
 import RoastingOrders from "@/pages/roasting-orders";
 import Retail from "@/pages/retail";
@@ -29,6 +30,7 @@ export default function App() {
             {/* Protected routes with roles */}
             <ProtectedRoute path="/" component={Dashboard} />
             <ProtectedRoute path="/inventory" component={Inventory} roles={["roasteryOwner"]} />
+            <ProtectedRoute path="/coffee/:id" component={CoffeeDetail} roles={["roasteryOwner"]} />
             <ProtectedRoute path="/roasting" component={Roasting} roles={["roaster"]} />
             <ProtectedRoute path="/roasting/orders" component={RoastingOrders} roles={["roaster"]} />
             <ProtectedRoute path="/retail" component={Retail} roles={["shopManager", "barista"]} />
