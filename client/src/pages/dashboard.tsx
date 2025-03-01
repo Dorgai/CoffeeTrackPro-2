@@ -25,6 +25,24 @@ import {
 } from "@/components/ui/table";
 import type { GreenCoffee, RoastingBatch, RetailInventory } from "@shared/schema";
 
+type Order = {
+  id: number;
+  shopId: number;
+  greenCoffeeId: number;
+  smallBags: number;
+  largeBags: number;
+  status: string;
+  createdAt: string;
+  shop?: {
+    name: string;
+    location: string;
+  };
+  greenCoffee?: {
+    name: string;
+    producer: string;
+  };
+};
+
 function StatsCard({
   title,
   value,
@@ -83,7 +101,13 @@ export default function Dashboard() {
     enabled: !!user,
   });
 
-  if (loadingCoffees || loadingBatches || loadingInventory) {
+  const { data: orders, isLoading: loadingOrders } = useQuery<Order[]>({
+    queryKey: ["/api/orders"],
+    enabled: !!user && user.role === "roaster",
+  });
+
+
+  if (loadingCoffees || loadingBatches || loadingInventory || loadingOrders) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -214,69 +238,109 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <CardTitle>Stock Overview</CardTitle>
-            {(user?.role === "shopManager" || user?.role === "barista") && (
-              <Button variant="outline" asChild>
-                <Link href="/retail">Manage Stock</Link>
-              </Button>
-            )}
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {inventoryWithChanges?.slice(0, 5).map(inv => (
-                <div key={inv.id} className="space-y-2 p-3 bg-muted rounded-lg">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-medium">{inv.shop?.name || `Shop #${inv.shopId}`}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Last updated: {new Date(inv.updatedAt || "").toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex items-center justify-between">
-                      <span>Small Bags:</span>
-                      <div className="flex items-center gap-2">
-                        <span>{inv.smallBags}</span>
-                        {inv.smallBagChange !== 0 && (
-                          <span className={`text-sm ${inv.smallBagChange > 0 ? 'text-green-500' : 'text-red-500'}`}>
-                            {inv.smallBagChange > 0 ? (
-                              <TrendingUp className="h-4 w-4" />
-                            ) : (
-                              <TrendingDown className="h-4 w-4" />
-                            )}
-                            {Math.abs(inv.smallBagChange)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Large Bags:</span>
-                      <div className="flex items-center gap-2">
-                        <span>{inv.largeBags}</span>
-                        {inv.largeBagChange !== 0 && (
-                          <span className={`text-sm ${inv.largeBagChange > 0 ? 'text-green-500' : 'text-red-500'}`}>
-                            {inv.largeBagChange > 0 ? (
-                              <TrendingUp className="h-4 w-4" />
-                            ) : (
-                              <TrendingDown className="h-4 w-4" />
-                            )}
-                            {Math.abs(inv.largeBagChange)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {(!inventoryWithChanges || inventoryWithChanges.length === 0) && (
-                <p className="text-muted-foreground text-center py-4">No inventory data available</p>
+        {/* Stock Overview Section - Only for shop managers and baristas */}
+        {(user?.role === "shopManager" || user?.role === "barista") && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <CardTitle>Stock Overview</CardTitle>
+              {(user?.role === "shopManager" || user?.role === "barista") && (
+                <Button variant="outline" asChild>
+                  <Link href="/retail">Manage Stock</Link>
+                </Button>
               )}
-            </div>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {inventoryWithChanges?.slice(0, 5).map(inv => (
+                  <div key={inv.id} className="space-y-2 p-3 bg-muted rounded-lg">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-medium">{inv.shop?.name || `Shop #${inv.shopId}`}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Last updated: {new Date(inv.updatedAt || "").toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex items-center justify-between">
+                        <span>Small Bags:</span>
+                        <div className="flex items-center gap-2">
+                          <span>{inv.smallBags}</span>
+                          {inv.smallBagChange !== 0 && (
+                            <span className={`text-sm ${inv.smallBagChange > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                              {inv.smallBagChange > 0 ? (
+                                <TrendingUp className="h-4 w-4" />
+                              ) : (
+                                <TrendingDown className="h-4 w-4" />
+                              )}
+                              {Math.abs(inv.smallBagChange)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Large Bags:</span>
+                        <div className="flex items-center gap-2">
+                          <span>{inv.largeBags}</span>
+                          {inv.largeBagChange !== 0 && (
+                            <span className={`text-sm ${inv.largeBagChange > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                              {inv.largeBagChange > 0 ? (
+                                <TrendingUp className="h-4 w-4" />
+                              ) : (
+                                <TrendingDown className="h-4 w-4" />
+                              )}
+                              {Math.abs(inv.largeBagChange)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {(!inventoryWithChanges || inventoryWithChanges.length === 0) && (
+                  <p className="text-muted-foreground text-center py-4">No inventory data available</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Pending Orders Section - Only for roasters */}
+        {user?.role === "roaster" && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <CardTitle>Pending Orders</CardTitle>
+              <Button variant="outline" asChild>
+                <Link href="/roasting/orders">View All Orders</Link>
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {orders?.filter(order => order.status === "pending").map(order => (
+                  <div key={order.id} className="space-y-2 p-3 bg-muted rounded-lg">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-medium">{order.shop?.name}</p>
+                        <p className="text-sm">{order.greenCoffee?.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Ordered: {new Date(order.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <Badge variant="destructive">Pending</Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>Small Bags: {order.smallBags}</div>
+                      <div>Large Bags: {order.largeBags}</div>
+                    </div>
+                  </div>
+                ))}
+                {(!orders || orders.filter(order => order.status === "pending").length === 0) && (
+                  <p className="text-muted-foreground text-center py-4">No pending orders</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* New Green Coffee Inventory Section */}
