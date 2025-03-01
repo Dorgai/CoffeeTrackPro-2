@@ -26,9 +26,15 @@ export function useUserShops() {
     queryKey: ['/api/user/shops'],
     onSuccess: (data) => {
       setUserShops(data);
-      // If there's only one shop or no active shop is selected, set the first shop as active
-      if (data.length === 1 || (!activeShop && data.length > 0)) {
-        setActiveShop(data[0]);
+      // If no active shop is selected, set Ráday as default
+      if (!activeShop && data.length > 0) {
+        const radayShop = data.find(shop => shop.name === "Ráday");
+        if (radayShop) {
+          setActiveShop(radayShop);
+        } else {
+          // If Ráday not found, set first shop as default
+          setActiveShop(data[0]);
+        }
       }
     },
   });
