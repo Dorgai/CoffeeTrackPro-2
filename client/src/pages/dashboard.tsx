@@ -70,19 +70,12 @@ function StatsCard({
   );
 }
 
-// Helper function to calculate day difference
-function isSameDay(date1: Date, date2: Date) {
-  return date1.getFullYear() === date2.getFullYear() &&
-    date1.getMonth() === date2.getMonth() &&
-    date1.getDate() === date2.getDate();
-}
-
 export default function Dashboard() {
   const { user, logoutMutation } = useAuth();
 
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
-    enabled: !!user && user.role === "roasteryOwner",
+    enabled: !!user && (user.role === "roasteryOwner" || user.role === "roaster"),
   });
 
   const { data: batches, isLoading: loadingBatches } = useQuery<RoastingBatch[]>({
@@ -93,19 +86,18 @@ export default function Dashboard() {
   // Get current and previous day inventory
   const { data: currentInventory, isLoading: loadingInventory } = useQuery<RetailInventory[]>({
     queryKey: ["/api/retail-inventory", user?.defaultShopId],
-    enabled: !!user,
+    enabled: !!user && (user.role === "shopManager" || user.role === "barista"),
   });
 
   const { data: previousInventory } = useQuery<RetailInventory[]>({
     queryKey: ["/api/retail-inventory/history", user?.defaultShopId],
-    enabled: !!user,
+    enabled: !!user && (user.role === "shopManager" || user.role === "barista"),
   });
 
   const { data: orders, isLoading: loadingOrders } = useQuery<Order[]>({
     queryKey: ["/api/orders"],
     enabled: !!user && user.role === "roaster",
   });
-
 
   if (loadingCoffees || loadingBatches || loadingInventory || loadingOrders) {
     return (
@@ -243,11 +235,9 @@ export default function Dashboard() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle>Stock Overview</CardTitle>
-              {(user?.role === "shopManager" || user?.role === "barista") && (
-                <Button variant="outline" asChild>
-                  <Link href="/retail">Manage Stock</Link>
-                </Button>
-              )}
+              <Button variant="outline" asChild>
+                <Link href="/retail">Manage Stock</Link>
+              </Button>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -343,14 +333,16 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* New Green Coffee Inventory Section */}
-      {user?.role === "roasteryOwner" && (
+      {/* Green Coffee Inventory Section - Show for both roasteryOwner and roaster */}
+      {(user?.role === "roasteryOwner" || user?.role === "roaster") && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle>Green Coffee Inventory</CardTitle>
-            <Button variant="outline" asChild>
-              <Link href="/inventory">View All</Link>
-            </Button>
+            {user?.role === "roasteryOwner" && (
+              <Button variant="outline" asChild>
+                <Link href="/inventory">View All</Link>
+              </Button>
+            )}
           </CardHeader>
           <CardContent>
             <Table>
@@ -368,9 +360,13 @@ export default function Dashboard() {
                 {coffees?.map((coffee) => (
                   <TableRow key={coffee.id}>
                     <TableCell className="font-medium">
-                      <Link href={`/coffee/${coffee.id}`} className="hover:underline">
-                        {coffee.name}
-                      </Link>
+                      {user?.role === "roasteryOwner" ? (
+                        <Link href={`/coffee/${coffee.id}`} className="hover:underline">
+                          {coffee.name}
+                        </Link>
+                      ) : (
+                        coffee.name
+                      )}
                     </TableCell>
                     <TableCell>{coffee.producer || '-'}</TableCell>
                     <TableCell>{coffee.country || '-'}</TableCell>
