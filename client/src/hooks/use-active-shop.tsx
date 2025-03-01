@@ -23,7 +23,7 @@ export function useUserShops() {
   const setActiveShop = useActiveShop(state => state.setActiveShop);
   const activeShop = useActiveShop(state => state.activeShop);
 
-  return useQuery<Shop[]>({
+  const { data, isLoading, error } = useQuery<Shop[]>({
     queryKey: ['/api/user/shops'],
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/user/shops");
@@ -32,19 +32,8 @@ export function useUserShops() {
       }
       const shops: Shop[] = await res.json();
       return shops;
-    },
-    onSuccess: (data) => {
-      setUserShops(data);
-      // If no active shop is selected and we have shops, set Ráday as default
-      if (!activeShop && data.length > 0) {
-        const radayShop = data.find(shop => shop.name === "Ráday");
-        if (radayShop) {
-          setActiveShop(radayShop);
-        } else {
-          // If Ráday not found, set first shop as default
-          setActiveShop(data[0]);
-        }
-      }
-    },
+    }
   });
+
+  return { data, isLoading, error, setUserShops, setActiveShop, activeShop };
 }

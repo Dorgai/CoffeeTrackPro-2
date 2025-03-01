@@ -86,7 +86,7 @@ function StatsCard({
 }
 
 export default function Dashboard() {
-  const { user, logoutMutation } = useAuth();
+  const { user, logoutMutation, userShops } = useAuth();
 
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
@@ -100,13 +100,13 @@ export default function Dashboard() {
 
   // Get current and previous day inventory
   const { data: currentInventory, isLoading: loadingInventory } = useQuery<RetailInventory[]>({
-    queryKey: ["/api/retail-inventory", user?.defaultShopId],
-    enabled: !!user && (user.role === "shopManager" || user.role === "barista"),
+    queryKey: ["/api/retail-inventory"], // Removed user?.defaultShopId
+    enabled: !!user, // Removed role check, fetching for all shops
   });
 
   const { data: previousInventory } = useQuery<RetailInventory[]>({
-    queryKey: ["/api/retail-inventory/history", user?.defaultShopId],
-    enabled: !!user && (user.role === "shopManager" || user.role === "barista"),
+    queryKey: ["/api/retail-inventory/history"], // Removed user?.defaultShopId
+    enabled: !!user, // Removed role check, fetching for all shops
   });
 
   // Query for orders (for both roaster and manager)
@@ -142,12 +142,12 @@ export default function Dashboard() {
   });
 
   // Get pending orders grouped by shop (for managers)
-  const pendingOrdersByShop = orders ? 
+  const pendingOrdersByShop = orders ?
     groupOrdersByShop(orders.filter(order => order.status === "pending")) : {};
 
   return (
     <div className="container mx-auto py-8 space-y-8">
-      {/* Header section remains the same */}
+      {/* Header section */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user?.username}</h1>
@@ -196,8 +196,56 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Low stock alerts section */}
-      {lowStockCoffees.length > 0 && (
+      {/* Low stock alerts section for Shop Managers */}
+      {user?.role === "shopManager" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-red-500">Low Stock Alerts</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {currentInventory?.map((shopInventory) => {
+                const shop = userShops?.find(s => s.id === shopInventory.shopId);
+                const coffee = coffees?.find(c => c.id === shopInventory.greenCoffeeId);
+                const isLowStock = shopInventory.smallBags < 3 || shopInventory.largeBags < 3;
+
+                if (!isLowStock) return null;
+
+                return (
+                  <div key={`${shopInventory.shopId}-${shopInventory.greenCoffeeId}`}
+                       className="p-4 bg-muted rounded-lg">
+                    <div className="mb-2">
+                      <h3 className="font-medium">{shop?.name || `Shop #${shopInventory.shopId}`}</h3>
+                    </div>
+                    <div className="flex items-center justify-between p-2 bg-background rounded">
+                      <div>
+                        <p className="font-medium">{coffee?.name}</p>
+                        <div className="text-sm text-muted-foreground space-y-1">
+                          {shopInventory.smallBags < 3 && (
+                            <p>Small Bags: {shopInventory.smallBags} (Below 3)</p>
+                          )}
+                          {shopInventory.largeBags < 3 && (
+                            <p>Large Bags: {shopInventory.largeBags} (Below 3)</p>
+                          )}
+                        </div>
+                      </div>
+                      <Badge variant="destructive">Low Stock</Badge>
+                    </div>
+                  </div>
+                );
+              })}
+              {(!currentInventory || currentInventory.length === 0) && (
+                <p className="text-center text-muted-foreground py-4">
+                  No low stock items to display
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Low stock alerts section for Roastery Owners and Roasters */}
+      {(user?.role === "roasteryOwner" || user?.role === "roaster") && lowStockCoffees.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="text-red-500">Low Stock Alerts</CardTitle>
@@ -219,6 +267,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       )}
+
 
       <div className="grid gap-4 md:grid-cols-2">
         {/* Roasting Batches section */}
