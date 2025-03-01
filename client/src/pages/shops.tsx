@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useState } from 'react';
 import type { Shop } from "@shared/schema";
-import { Store, Plus, Edit2, Trash2 } from "lucide-react";
+import { Store, Plus, Edit2, Trash2, Loader2 } from "lucide-react";
 
 import {
   Form,
@@ -126,12 +126,24 @@ export default function Shops() {
 
   const deleteShopMutation = useMutation({
     mutationFn: async (shopId: number) => {
-      const res = await apiRequest("DELETE", `/api/shops/${shopId}`);
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Failed to delete shop");
+      try {
+        const res = await apiRequest("DELETE", `/api/shops/${shopId}`);
+        if (!res.ok) {
+          const error = await res.text(); // First get the raw text
+          try {
+            // Try to parse as JSON if possible
+            const errorData = JSON.parse(error);
+            throw new Error(errorData.message || "Failed to delete shop");
+          } catch (e) {
+            // If parsing fails, use the raw text
+            throw new Error(error || "Failed to delete shop");
+          }
+        }
+        return await res.json();
+      } catch (error) {
+        console.error("Delete shop error:", error);
+        throw error;
       }
-      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/shops"] });
