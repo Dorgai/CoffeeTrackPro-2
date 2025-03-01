@@ -408,6 +408,10 @@ export class DatabaseStorage implements IStorage {
   })[]> {
     try {
       console.log("Executing getAllOrders query");
+
+      const updatedByUser = users.as('updatedByUser');
+      const createdByUser = users.as('createdByUser');
+
       const result = await db
         .select({
           id: orders.id,
@@ -431,21 +435,21 @@ export class DatabaseStorage implements IStorage {
             producer: greenCoffee.producer,
           },
           user: {
-            id: users.id,
-            username: users.username,
-            role: users.role,
+            id: createdByUser.id,
+            username: createdByUser.username,
+            role: createdByUser.role,
           },
           updatedBy: {
-            id: users2.id,
-            username: users2.username,
-            role: users2.role,
+            id: updatedByUser.id,
+            username: updatedByUser.username,
+            role: updatedByUser.role,
           },
         })
         .from(orders)
         .innerJoin(shops, eq(orders.shopId, shops.id))
         .innerJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
-        .innerJoin(users, eq(orders.createdById, users.id))
-        .leftJoin(users.as('users2'), eq(orders.updatedById, users.as('users2').id))
+        .innerJoin(createdByUser, eq(orders.createdById, createdByUser.id))
+        .leftJoin(updatedByUser, eq(orders.updatedById, updatedByUser.id))
         .orderBy(desc(orders.createdAt));
 
       console.log("getAllOrders query result:", result);
