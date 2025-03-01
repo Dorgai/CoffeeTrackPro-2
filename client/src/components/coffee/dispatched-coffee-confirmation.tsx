@@ -49,6 +49,19 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
     },
   });
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  // Return nothing if there are no pending confirmations
+  if (!confirmations || confirmations.length === 0) {
+    return null;
+  }
+
   // Confirm received quantities
   const confirmMutation = useMutation({
     mutationFn: async (data: {
@@ -80,18 +93,6 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
       });
     },
   });
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
-
-  if (!confirmations || confirmations.length === 0) {
-    return null;
-  }
 
   const handleConfirm = () => {
     if (!selectedConfirmation) return;
