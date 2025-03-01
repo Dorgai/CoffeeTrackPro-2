@@ -176,11 +176,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Orders Routes - accessible by shop manager, barista, and roaster
   app.get("/api/orders", requireRole(["shopManager", "barista", "roaster", "roasteryOwner"]), async (req, res) => {
     try {
+      console.log("Fetching orders for user:", req.user?.username, "with role:", req.user?.role);
       const shopId = Number(req.query.shopId);
 
       // For roaster and roastery owner, if no shopId is provided, return all orders
-      if ((req.user?.role === "roaster" || req.user?.role === "roasteryOwner") && !shopId) {
+      if ((req.user?.role === "roaster" || req.user?.role === "roasteryOwner")) {
+        console.log("Fetching all orders for roaster/owner");
         const allOrders = await storage.getAllOrders();
+        console.log("Found orders:", allOrders.length);
         return res.json(allOrders);
       }
 

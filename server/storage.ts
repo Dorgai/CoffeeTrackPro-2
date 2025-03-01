@@ -407,6 +407,7 @@ export class DatabaseStorage implements IStorage {
     updatedBy: User | null;
   })[]> {
     try {
+      console.log("Executing getAllOrders query");
       const result = await db
         .select({
           id: orders.id,
@@ -421,23 +422,28 @@ export class DatabaseStorage implements IStorage {
           updatedById: orders.updatedById,
           shop: shops,
           greenCoffee: greenCoffee,
-          user: users,
+          user: {
+            id: users.id,
+            username: users.username,
+            role: users.role,
+          },
           updatedBy: {
             id: users.id,
             username: users.username,
-            role: users.role
-          }
+            role: users.role,
+          },
         })
         .from(orders)
         .innerJoin(shops, eq(orders.shopId, shops.id))
         .innerJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
         .innerJoin(users, eq(orders.createdById, users.id))
-        .leftJoin(users as typeof users, eq(orders.updatedById, users.id))
+        .leftJoin(users as typeof users, eq(orders.updatedById, users.id), 'updatedByUser')
         .orderBy(desc(orders.createdAt));
 
+      console.log("getAllOrders query successful, found orders:", result.length);
       return result;
     } catch (error) {
-      console.error("Error fetching all orders:", error);
+      console.error("Error in getAllOrders:", error);
       throw error;
     }
   }
