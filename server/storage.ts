@@ -128,6 +128,10 @@ export interface IStorage {
       shop: Shop;
     };
   })[]>;
+    getAllDispatchedCoffeeConfirmations(): Promise<(DispatchedCoffeeConfirmation & {
+    greenCoffee: GreenCoffee;
+    shop: Shop;
+  })[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -840,6 +844,57 @@ export class DatabaseStorage implements IStorage {
       return deletedShop;
     } catch (error) {
       console.error("Error deleting shop:", error);
+      throw error;
+    }
+  }
+  async getAllDispatchedCoffeeConfirmations(): Promise<(DispatchedCoffeeConfirmation & {
+    greenCoffee: GreenCoffee;
+    shop: Shop;
+  })[]> {
+    try {
+      console.log("Fetching all dispatched coffee confirmations");
+
+      const confirmations = await db
+        .select({
+          id: dispatchedCoffeeConfirmations.id,
+          orderId: dispatchedCoffeeConfirmations.orderId,
+          shopId: dispatchedCoffeeConfirmations.shopId,
+          greenCoffeeId: dispatchedCoffeeConfirmations.greenCoffeeId,
+          dispatchedSmallBags: dispatchedCoffeeConfirmations.dispatchedSmallBags,
+          dispatchedLargeBags: dispatchedCoffeeConfirmations.dispatchedLargeBags,
+          receivedSmallBags: dispatchedCoffeeConfirmations.receivedSmallBags,
+          receivedLargeBags: dispatchedCoffeeConfirmations.receivedLargeBags,
+          status: dispatchedCoffeeConfirmations.status,
+          confirmedById: dispatchedCoffeeConfirmations.confirmedById,
+          confirmedAt: dispatchedCoffeeConfirmations.confirmedAt,
+          createdAt: dispatchedCoffeeConfirmations.createdAt,
+          greenCoffee: {
+            id: greenCoffee.id,
+            name: greenCoffee.name,
+            producer: greenCoffee.producer,
+            country: greenCoffee.country,
+            details: greenCoffee.details,
+            currentStock: greenCoffee.currentStock,
+            minThreshold: greenCoffee.minThreshold,
+          },
+          shop: {
+            id: shops.id,
+            name: shops.name,
+            location: shops.location,
+            isActive: shops.isActive,
+            defaultOrderQuantity: shops.defaultOrderQuantity,
+          },
+        })
+        .from(dispatchedCoffeeConfirmations)
+        .innerJoin(greenCoffee, eq(dispatchedCoffeeConfirmations.greenCoffeeId, greenCoffee.id))
+        .innerJoin(shops, eq(dispatchedCoffeeConfirmations.shopId, shops.id))
+        .where(eq(dispatchedCoffeeConfirmations.status, "pending"))
+        .orderBy(desc(dispatchedCoffeeConfirmations.createdAt));
+
+      console.log("Found all confirmations:", confirmations);
+      return confirmations;
+    } catch (error) {
+      console.error("Error fetching all dispatched coffee confirmations:", error);
       throw error;
     }
   }

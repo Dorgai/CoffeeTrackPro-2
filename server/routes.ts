@@ -482,6 +482,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/dispatched-coffee/confirmations", requireRole(["shopManager", "barista", "roasteryOwner"]), async (req, res) => {
     try {
       const { shopId } = req.query;
+      console.log("Request for confirmations received with shopId:", shopId);
+
+      // For roasteryOwner, allow fetching without shopId to see all confirmations
+      if (req.user?.role === "roasteryOwner" && !shopId) {
+        const allConfirmations = await storage.getAllDispatchedCoffeeConfirmations();
+        console.log("Returning all confirmations for roasteryOwner:", allConfirmations);
+        return res.json(allConfirmations);
+      }
+
       if (!shopId) {
         return res.status(400).json({ message: "Shop ID is required" });
       }
