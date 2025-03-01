@@ -57,13 +57,11 @@ export default function CoffeeDetail() {
   }
 
   const { data: coffee, isLoading: loadingCoffee, error: coffeeError } = useQuery<GreenCoffee>({
-    queryKey: [`/api/green-coffee/${coffeeId}`],
-    enabled: coffeeId > 0,
+    queryKey: ["/api/green-coffee", coffeeId],
   });
 
   const { data: batches, isLoading: loadingBatches } = useQuery<RoastingBatch[]>({
-    queryKey: [`/api/roasting-batches/coffee/${coffeeId}`],
-    enabled: coffeeId > 0,
+    queryKey: ["/api/roasting-batches", coffeeId],
   });
 
   const deleteMutation = useMutation({

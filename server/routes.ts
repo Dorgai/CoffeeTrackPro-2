@@ -190,6 +190,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
 
+  // Add specific endpoint for coffee details
+  app.get("/api/green-coffee/:id", requireRole(["roasteryOwner", "roaster", "shopManager", "barista"]), async (req, res) => {
+    try {
+      const coffeeId = parseInt(req.params.id);
+      if (isNaN(coffeeId)) {
+        return res.status(400).json({ message: "Invalid coffee ID" });
+      }
+
+      const coffee = await storage.getGreenCoffee(coffeeId);
+      if (!coffee) {
+        return res.status(404).json({ message: "Coffee not found" });
+      }
+
+      res.json(coffee);
+    } catch (error) {
+      console.error("Error fetching coffee details:", error);
+      res.status(500).json({ message: "Failed to fetch coffee details" });
+    }
+  });
+
   // Roasting Routes - accessible by roaster
   app.get("/api/roasting-batches", requireRole(["roaster", "roasteryOwner"]), async (req, res) => {
     const batches = await storage.getRoastingBatches();
