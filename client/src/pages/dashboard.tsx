@@ -237,8 +237,8 @@ export default function Dashboard() {
           {/* Stock Overview */}
           <Card>
             <CardHeader>
-              <CardTitle>Stock Overview</CardTitle>
-              <CardDescription>Total inventory across all shops</CardDescription>
+              <CardTitle>Global Stock Overview</CardTitle>
+              <CardDescription>Combined inventory across all locations</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -266,7 +266,15 @@ export default function Dashboard() {
                               </div>
                             </div>
                             {isLowStock && (
-                              <Badge variant="destructive">Low Total Stock</Badge>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                asChild
+                              >
+                                <Link href={`/retail/orders?coffeeId=${coffee.id}`}>
+                                  Low Total Stock
+                                </Link>
+                              </Button>
                             )}
                           </div>
                         </div>
@@ -308,7 +316,15 @@ export default function Dashboard() {
                                     </div>
                                   </div>
                                   {isLowStock && (
-                                    <Badge variant="destructive">Low Stock</Badge>
+                                    <Button
+                                      variant="destructive"
+                                      size="sm"
+                                      asChild
+                                    >
+                                      <Link href={`/retail/orders?coffeeId=${coffee?.id}&shopId=${inv.shopId}`}>
+                                        Low Stock
+                                      </Link>
+                                    </Button>
                                   )}
                                 </div>
                               </div>

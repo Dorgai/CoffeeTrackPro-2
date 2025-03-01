@@ -13,6 +13,8 @@ import RoastingOrders from "@/pages/roasting-orders";
 import Retail from "@/pages/retail";
 import RetailOrders from "@/pages/retail-orders";
 import RetailOverview from "@/pages/retail-overview";
+import Analytics from "@/pages/analytics";
+import Reports from "@/pages/reports";
 import Shops from "@/pages/shops";
 import Profile from "@/pages/profile";
 import NotFound from "@/pages/not-found";
@@ -37,8 +39,10 @@ export default function App() {
             <ProtectedRoute path="/retail" component={Retail} roles={["shopManager", "barista"]} />
             <ProtectedRoute path="/retail/orders" component={RetailOrders} roles={["shopManager", "barista"]} />
             <ProtectedRoute path="/retail-overview" component={RetailOverview} roles={["roasteryOwner"]} />
+            <ProtectedRoute path="/analytics" component={Analytics} roles={["roasteryOwner", "shopManager"]} />
+            <ProtectedRoute path="/reports" component={Reports} roles={["roasteryOwner", "shopManager"]} />
             <ProtectedRoute path="/shops" component={Shops} roles={["roasteryOwner"]} />
-            <ProtectedRoute path="/profile" component={Profile} /> {/* Added profile route */}
+            <ProtectedRoute path="/profile" component={Profile} />
 
             {/* NotFound route must be last */}
             <Route component={NotFound} />
