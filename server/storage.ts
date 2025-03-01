@@ -19,7 +19,7 @@ import {
   orders,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -216,10 +216,34 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getOrdersByShop(shopId: number): Promise<Order[]> {
-    return await db
-      .select()
-      .from(orders)
-      .where(eq(orders.shopId, shopId));
+    try {
+      const orders = await db
+        .select({
+          id: orders.id,
+          shopId: orders.shopId,
+          greenCoffeeId: orders.greenCoffeeId,
+          smallBags: orders.smallBags,
+          largeBags: orders.largeBags,
+          status: orders.status,
+          createdAt: orders.createdAt,
+          createdById: orders.createdById,
+          user: {
+            id: users.id,
+            username: users.username,
+            role: users.role
+          }
+        })
+        .from(orders)
+        .where(eq(orders.shopId, shopId))
+        .leftJoin(users, eq(orders.createdById, users.id))
+        .orderBy(desc(orders.createdAt));
+
+      console.log("Found orders for shop:", orders);
+      return orders;
+    } catch (error) {
+      console.error("Error getting orders:", error);
+      throw error;
+    }
   }
 
   async createOrder(order: InsertOrder): Promise<Order> {

@@ -123,19 +123,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Orders Routes - accessible by shop manager and barista
-  app.get("/api/orders/:shopId", requireRole(["shopManager", "barista"]), async (req, res) => {
-    const orders = await storage.getOrdersByShop(parseInt(req.params.shopId));
-    res.json(orders);
+  app.get("/api/orders", requireRole(["shopManager", "barista"]), async (req, res) => {
+    try {
+      if (!req.user?.shopId) {
+        return res.status(400).json({ message: "User is not assigned to a shop" });
+      }
+
+      console.log("Fetching orders for shop:", req.user.shopId);
+      const orders = await storage.getOrdersByShop(req.user.shopId);
+      res.json(orders);
+    } catch (error) {
+      console.error("Error fetching orders:", error);
+      res.status(500).json({ message: "Failed to fetch orders" });
+    }
   });
 
   app.post("/api/orders", requireRole(["shopManager", "barista"]), async (req, res) => {
-    const data = insertOrderSchema.parse(req.body);
-    const order = await storage.createOrder({
-      ...data,
-      createdById: req.user!.id,
-      status: "pending",
-    });
-    res.status(201).json(order);
+    try {
+      if (!req.user?.shopId) {
+        return res.status(400).json({ message: "User is not assigned to a shop" });
+      }
+
+      const data = insertOrderSchema.parse({
+        ...req.body,
+        shopId: req.user.shopId,
+        createdById: req.user.id,
+        status: "pending"
+      });
+
+      const order = await storage.createOrder(data);
+      res.status(201).json(order);
+    } catch (error) {
+      console.error("Error creating order:", error);
+      res.status(400).json({ 
+        message: error instanceof Error ? error.message : "Failed to create order" 
+      });
+    }
   });
 
   app.patch(

@@ -9,10 +9,10 @@ import AuthPage from "@/pages/auth-page";
 import Inventory from "@/pages/inventory";
 import Roasting from "@/pages/roasting";
 import Retail from "@/pages/retail";
+import RetailOrders from "@/pages/retail-orders";
 import Shops from "@/pages/shops";
 import NotFound from "@/pages/not-found";
 import { ProtectedRoute } from "@/lib/protected-route";
-
 
 export default function App() {
   return (
@@ -27,6 +27,7 @@ export default function App() {
             <ProtectedRoute path="/inventory" component={Inventory} roles={["roasteryOwner"]} />
             <ProtectedRoute path="/roasting" component={Roasting} roles={["roaster"]} />
             <ProtectedRoute path="/retail" component={Retail} roles={["shopManager", "barista"]} />
+            <ProtectedRoute path="/retail/orders" component={RetailOrders} roles={["shopManager", "barista"]} />
             <ProtectedRoute path="/shops" component={Shops} roles={["roasteryOwner"]} />
             <Route path="/:rest*" component={NotFound} />
           </PageLayout>
