@@ -55,7 +55,7 @@ export function StockLevelIndicator() {
   const stockPercentage = Math.min(Math.round((currentStock / desiredStock) * 100), 100);
 
   // Determine stock level status
-  const getStockStatus = () => {
+  const getStockClass = () => {
     if (stockPercentage >= 75) return "bg-green-500";
     if (stockPercentage >= 50) return "bg-yellow-500";
     return "bg-red-500";
@@ -70,8 +70,7 @@ export function StockLevelIndicator() {
             <span className="text-sm font-medium">{stockPercentage}%</span>
             <Progress 
               value={stockPercentage} 
-              className="w-24 h-2"
-              indicatorClassName={getStockStatus()}
+              className={`w-24 h-2 ${getStockClass()}`}
             />
           </div>
         </div>
