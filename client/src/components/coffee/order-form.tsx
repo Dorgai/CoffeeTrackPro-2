@@ -5,6 +5,7 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { GreenCoffee } from "@shared/schema";
+import { useAuth } from "@/hooks/use-auth";
 import { useActiveShop } from "@/hooks/use-active-shop";
 
 import {
@@ -19,12 +20,15 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Loader2 } from "lucide-react";
 
 // Define schema for order form
 const orderFormSchema = z.object({
   greenCoffeeId: z.number(),
   smallBags: z.coerce.number().min(0, "Cannot be negative"),
   largeBags: z.coerce.number().min(0, "Cannot be negative"),
+}).refine(data => data.smallBags > 0 || data.largeBags > 0, {
+  message: "Please order at least one bag",
 });
 
 type OrderFormValues = z.infer<typeof orderFormSchema>;
@@ -39,6 +43,7 @@ export function OrderForm({
   onSuccess?: () => void;
 }) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const { activeShop } = useActiveShop();
 
   const form = useForm<OrderFormValues>({
@@ -56,10 +61,16 @@ export function OrderForm({
         throw new Error("Please select a shop first");
       }
 
+      if (!user?.id) {
+        throw new Error("You must be logged in to place orders");
+      }
+
       const res = await apiRequest("POST", "/api/orders", {
         ...data,
-        shopId: activeShop.id
+        shopId: activeShop.id,
+        createdById: user.id,
       });
+
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.message || "Failed to create order");
@@ -67,12 +78,13 @@ export function OrderForm({
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/orders", activeShop?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       if (onSuccess) onSuccess();
       toast({
         title: "Order Created",
         description: "Your order has been placed successfully",
       });
+      form.reset();
     },
     onError: (error: Error) => {
       toast({
@@ -90,6 +102,14 @@ export function OrderForm({
       console.error("Failed to create order:", error);
     }
   });
+
+  if (!activeShop) {
+    return (
+      <div className="text-muted-foreground text-center py-4">
+        Please select a shop to place orders
+      </div>
+    );
+  }
 
   return (
     <Card>
@@ -134,8 +154,11 @@ export function OrderForm({
             <Button 
               type="submit" 
               className="w-full"
-              disabled={createOrderMutation.isPending || !activeShop}
+              disabled={createOrderMutation.isPending}
             >
+              {createOrderMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
               Place Order
             </Button>
           </form>
