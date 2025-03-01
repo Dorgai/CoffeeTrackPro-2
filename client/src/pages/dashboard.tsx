@@ -1,7 +1,7 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   Coffee,
   Package,
@@ -23,6 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { apiRequest } from "@/lib/queryClient";
 import type { GreenCoffee, RoastingBatch, RetailInventory } from "@shared/schema";
 
 type Order = {
@@ -86,7 +87,7 @@ function StatsCard({
 }
 
 export default function Dashboard() {
-  const { user, logoutMutation, userShops } = useAuth();
+  const { user, logoutMutation } = useAuth();
 
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
@@ -112,7 +113,14 @@ export default function Dashboard() {
   // Query for orders (for both roaster and manager)
   const { data: orders, isLoading: loadingOrders } = useQuery<Order[]>({
     queryKey: ["/api/orders"],
-    enabled: !!user && (user.role === "roaster" || user.role === "shopManager"),
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/orders");
+      if (!res.ok) {
+        throw new Error("Failed to fetch orders");
+      }
+      return res.json();
+    },
+    enabled: !!user && (user.role === "roaster" || user.role === "shopManager" || user.role === "roasteryOwner"),
   });
 
   if (loadingCoffees || loadingBatches || loadingInventory || loadingOrders) {
@@ -142,7 +150,7 @@ export default function Dashboard() {
   });
 
   // Get pending orders grouped by shop (for managers)
-  const pendingOrdersByShop = orders ?
+  const pendingOrdersByShop = orders ? 
     groupOrdersByShop(orders.filter(order => order.status === "pending")) : {};
 
   return (
@@ -205,7 +213,6 @@ export default function Dashboard() {
           <CardContent>
             <div className="space-y-4">
               {currentInventory?.map((shopInventory) => {
-                const shop = userShops?.find(s => s.id === shopInventory.shopId);
                 const coffee = coffees?.find(c => c.id === shopInventory.greenCoffeeId);
                 const isLowStock = shopInventory.smallBags < 3 || shopInventory.largeBags < 3;
 
@@ -215,7 +222,7 @@ export default function Dashboard() {
                   <div key={`${shopInventory.shopId}-${shopInventory.greenCoffeeId}`}
                        className="p-4 bg-muted rounded-lg">
                     <div className="mb-2">
-                      <h3 className="font-medium">{shop?.name || `Shop #${shopInventory.shopId}`}</h3>
+                      <h3 className="font-medium">{shopInventory.shop?.name || `Shop #${shopInventory.shopId}`}</h3>
                     </div>
                     <div className="flex items-center justify-between p-2 bg-background rounded">
                       <div>
@@ -268,7 +275,6 @@ export default function Dashboard() {
         </Card>
       )}
 
-
       <div className="grid gap-4 md:grid-cols-2">
         {/* Roasting Batches section */}
         <Card>
@@ -314,52 +320,55 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {inventoryWithChanges?.slice(0, 5).map(inv => (
-                  <div key={inv.id} className="space-y-2 p-3 bg-muted rounded-lg">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-medium">{inv.shop?.name || `Shop #${inv.shopId}`}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Last updated: {new Date(inv.updatedAt || "").toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex items-center justify-between">
-                        <span>Small Bags:</span>
-                        <div className="flex items-center gap-2">
-                          <span>{inv.smallBags}</span>
-                          {inv.smallBagChange !== 0 && (
-                            <span className={`text-sm ${inv.smallBagChange > 0 ? 'text-green-500' : 'text-red-500'}`}>
-                              {inv.smallBagChange > 0 ? (
-                                <TrendingUp className="h-4 w-4" />
-                              ) : (
-                                <TrendingDown className="h-4 w-4" />
-                              )}
-                              {Math.abs(inv.smallBagChange)}
-                            </span>
-                          )}
+                {inventoryWithChanges?.slice(0, 5).map(inv => {
+                  const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
+                  return (
+                    <div key={inv.id} className="space-y-2 p-3 bg-muted rounded-lg">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-medium">{coffee?.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Last updated: {new Date(inv.updatedAt || "").toLocaleDateString()}
+                          </p>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span>Large Bags:</span>
-                        <div className="flex items-center gap-2">
-                          <span>{inv.largeBags}</span>
-                          {inv.largeBagChange !== 0 && (
-                            <span className={`text-sm ${inv.largeBagChange > 0 ? 'text-green-500' : 'text-red-500'}`}>
-                              {inv.largeBagChange > 0 ? (
-                                <TrendingUp className="h-4 w-4" />
-                              ) : (
-                                <TrendingDown className="h-4 w-4" />
-                              )}
-                              {Math.abs(inv.largeBagChange)}
-                            </span>
-                          )}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="flex items-center justify-between">
+                          <span>Small Bags:</span>
+                          <div className="flex items-center gap-2">
+                            <span>{inv.smallBags}</span>
+                            {inv.smallBagChange !== 0 && (
+                              <span className={`text-sm ${inv.smallBagChange > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                {inv.smallBagChange > 0 ? (
+                                  <TrendingUp className="h-4 w-4" />
+                                ) : (
+                                  <TrendingDown className="h-4 w-4" />
+                                )}
+                                {Math.abs(inv.smallBagChange)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Large Bags:</span>
+                          <div className="flex items-center gap-2">
+                            <span>{inv.largeBags}</span>
+                            {inv.largeBagChange !== 0 && (
+                              <span className={`text-sm ${inv.largeBagChange > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                {inv.largeBagChange > 0 ? (
+                                  <TrendingUp className="h-4 w-4" />
+                                ) : (
+                                  <TrendingDown className="h-4 w-4" />
+                                )}
+                                {Math.abs(inv.largeBagChange)}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {(!inventoryWithChanges || inventoryWithChanges.length === 0) && (
                   <p className="text-muted-foreground text-center py-4">No inventory data available</p>
                 )}
@@ -438,6 +447,125 @@ export default function Dashboard() {
           </Card>
         )}
       </div>
+
+      {/* Retail Inventory Overview - For roasteryOwner */}
+      {user?.role === "roasteryOwner" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Retail Inventory Overview</CardTitle>
+            <CardDescription>Current stock levels across all shops</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {orders?.filter(order => order.shop).reduce((shops, order) => {
+                if (order.shop && !shops.some(s => s.id === order.shopId)) {
+                  shops.push({ id: order.shopId, name: order.shop.name });
+                }
+                return shops;
+              }, [] as Array<{ id: number; name: string }>).map(shop => {
+                const shopInventory = currentInventory?.filter(inv => inv.shopId === shop.id) || [];
+
+                return (
+                  <div key={shop.id} className="space-y-4">
+                    <h3 className="font-semibold text-lg">{shop.name}</h3>
+                    <div className="space-y-2">
+                      {shopInventory.map(inv => {
+                        const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
+                        const isLowStock = inv.smallBags < 3 || inv.largeBags < 3;
+
+                        return (
+                          <div 
+                            key={`${inv.shopId}-${inv.greenCoffeeId}`} 
+                            className={`p-3 rounded-lg ${isLowStock ? 'bg-destructive/10' : 'bg-muted'}`}
+                          >
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="font-medium">{coffee?.name}</p>
+                                <div className="text-sm text-muted-foreground">
+                                  <p>Small Bags: {inv.smallBags}</p>
+                                  <p>Large Bags: {inv.largeBags}</p>
+                                </div>
+                              </div>
+                              {isLowStock && (
+                                <Badge variant="destructive">Low Stock</Badge>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {shopInventory.length === 0 && (
+                        <p className="text-muted-foreground text-center py-2">No inventory data</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Recent Orders by Shop - For roasteryOwner */}
+      {user?.role === "roasteryOwner" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Orders by Shop</CardTitle>
+            <CardDescription>Latest orders from each retail location</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {orders?.filter(order => order.shop).reduce((shops, order) => {
+                if (order.shop && !shops.some(s => s.id === order.shopId)) {
+                  shops.push({ id: order.shopId, name: order.shop.name, location: order.shop.location });
+                }
+                return shops;
+              }, [] as Array<{ id: number; name: string; location: string }>).map(shop => {
+                const shopOrders = orders?.filter(order => order.shopId === shop.id) || [];
+
+                return (
+                  <div key={shop.id} className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="font-semibold text-lg">{shop.name}</h3>
+                      <Badge variant="outline">{shop.location}</Badge>
+                    </div>
+                    <div className="space-y-2">
+                      {shopOrders.slice(0, 3).map(order => {
+                        const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
+
+                        return (
+                          <div key={order.id} className="p-3 bg-muted rounded-lg">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="font-medium">{coffee?.name}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  Ordered: {new Date(order.createdAt).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <Badge 
+                                variant={order.status === "pending" ? "destructive" : "outline"}
+                                className="capitalize"
+                              >
+                                {order.status}
+                              </Badge>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 mt-2 text-sm">
+                              <div>Small Bags: {order.smallBags}</div>
+                              <div>Large Bags: {order.largeBags}</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {shopOrders.length === 0 && (
+                        <p className="text-muted-foreground text-center py-2">No recent orders</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Green Coffee Inventory Section - Show for both roasteryOwner and roaster */}
       {(user?.role === "roasteryOwner" || user?.role === "roaster") && (
