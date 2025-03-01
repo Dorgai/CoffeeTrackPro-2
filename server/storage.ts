@@ -170,6 +170,8 @@ export class DatabaseStorage implements IStorage {
           id: shops.id,
           name: shops.name,
           location: shops.location,
+          isActive: shops.isActive,
+          defaultOrderQuantity: shops.defaultOrderQuantity
         })
         .from(shops)
         .innerJoin(userShops, eq(shops.id, userShops.shopId))

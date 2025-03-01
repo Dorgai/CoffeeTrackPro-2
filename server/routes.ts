@@ -15,8 +15,20 @@ function requireRole(roles: string[]) {
 }
 
 async function checkShopAccess(userId: number, shopId: number) {
-  const userShops = await storage.getUserShops(userId);
-  return userShops.some(shop => shop.id === shopId);
+  try {
+    // For roasteryOwner, grant access to all shops
+    const user = await storage.getUser(userId);
+    if (user?.role === "roasteryOwner") {
+      return true;
+    }
+
+    // For other roles, check userShops table
+    const userShops = await storage.getUserShops(userId);
+    return userShops.some(shop => shop.id === shopId);
+  } catch (error) {
+    console.error("Error checking shop access:", error);
+    return false;
+  }
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {

@@ -2,11 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  DispatchedCoffeeConfirmation,
-  GreenCoffee,
-  Shop
-} from "@shared/schema";
+import { DispatchedCoffeeConfirmation as DispatchConfirmationType } from "@shared/schema";
 import {
   Card,
   CardContent,
@@ -26,7 +22,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, AlertTriangle } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface DispatchedCoffeeProps {
@@ -35,17 +30,14 @@ interface DispatchedCoffeeProps {
 
 export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) {
   const { toast } = useToast();
-  const [selectedConfirmation, setSelectedConfirmation] = useState<DispatchedCoffeeConfirmation | null>(null);
+  const [selectedConfirmation, setSelectedConfirmation] = useState<DispatchConfirmationType | null>(null);
   const [receivedQuantities, setReceivedQuantities] = useState({
     smallBags: 0,
     largeBags: 0
   });
 
   // Fetch pending dispatched coffee confirmations
-  const { data: confirmations, isLoading } = useQuery<(DispatchedCoffeeConfirmation & {
-    greenCoffee: GreenCoffee;
-    shop: Shop;
-  })[]>({
+  const { data: confirmations, isLoading } = useQuery<DispatchConfirmationType[]>({
     queryKey: ["/api/dispatched-coffee/confirmations", shopId],
     queryFn: async () => {
       const res = await apiRequest("GET", `/api/dispatched-coffee/confirmations?shopId=${shopId}`);
@@ -161,7 +153,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
           <DialogHeader>
             <DialogTitle>Confirm Received Quantities</DialogTitle>
             <DialogDescription>
-              Enter the actual quantities received for {selectedConfirmation?.greenCoffee.name}
+              Enter the actual quantities received for {selectedConfirmation?.greenCoffee?.name}
             </DialogDescription>
           </DialogHeader>
 

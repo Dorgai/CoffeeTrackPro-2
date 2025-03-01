@@ -1,6 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, Package, ShoppingCart } from "lucide-react";
 import { Shop } from "@shared/schema";
+import { useAuth } from "@/hooks/use-auth";
+import { DispatchedCoffeeConfirmation } from "@/components/coffee/dispatched-coffee-confirmation";
+import { InventoryDiscrepancyView } from "@/components/coffee/inventory-discrepancy-view";
 import {
   Card,
   CardContent,
@@ -53,6 +56,14 @@ type AllOrderItem = {
 };
 
 export default function RetailOverview() {
+  const { user } = useAuth();
+
+  // Get user's shops
+  const { data: userShops } = useQuery<Shop[]>({
+    queryKey: ["/api/user/shops"],
+    enabled: user?.role !== "roasteryOwner", // Only fetch for non-roasteryOwner users
+  });
+
   const { data: allInventory, isLoading: loadingInventory } = useQuery<AllInventoryItem[]>({
     queryKey: ["/api/retail-inventory"],
   });
@@ -72,6 +83,10 @@ export default function RetailOverview() {
   // Group inventory and orders by shop
   const shopData = allInventory?.reduce((acc, item) => {
     const shopId = item.shop.id;
+    // Only include shops that the user has access to
+    if (user?.role !== "roasteryOwner" && !userShops?.some(s => s.id === shopId)) {
+      return acc;
+    }
     if (!acc[shopId]) {
       acc[shopId] = {
         shop: item.shop,
@@ -96,14 +111,19 @@ export default function RetailOverview() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Retail Overview</h1>
         <p className="text-muted-foreground">
-          Monitor inventory and orders across all retail locations
+          Monitor inventory and orders across retail locations
         </p>
       </div>
+
+      {user?.role === "roasteryOwner" && <InventoryDiscrepancyView />}
 
       {Object.values(shopData || {}).map(({ shop, inventory, orders }) => (
         <div key={shop.id} className="space-y-6 pb-8 border-b last:border-0">
           <h2 className="text-2xl font-semibold">{shop.name}</h2>
           <p className="text-muted-foreground">{shop.location}</p>
+
+          {/* New Inventory Arrivals Section */}
+          <DispatchedCoffeeConfirmation shopId={shop.id} />
 
           <Card>
             <CardHeader>
