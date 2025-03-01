@@ -30,11 +30,12 @@ export function useUserShops() {
       if (!res.ok) {
         throw new Error("Failed to fetch user shops");
       }
-      return res.json();
+      const shops: Shop[] = await res.json();
+      return shops;
     },
     onSuccess: (data) => {
       setUserShops(data);
-      // If no active shop is selected, set Ráday as default
+      // If no active shop is selected and we have shops, set Ráday as default
       if (!activeShop && data.length > 0) {
         const radayShop = data.find(shop => shop.name === "Ráday");
         if (radayShop) {
