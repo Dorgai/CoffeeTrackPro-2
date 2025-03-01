@@ -36,16 +36,29 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
     largeBags: 0
   });
 
-  // Fetch pending dispatched coffee confirmations
-  const { data: confirmations, isLoading } = useQuery<DispatchConfirmationType[]>({
+  // Fetch both pending dispatched coffee confirmations and coffee details
+  const { data: confirmations, isLoading } = useQuery<(DispatchConfirmationType & { coffee?: { name: string } })[]>({
     queryKey: ["/api/dispatched-coffee/confirmations", shopId],
     queryFn: async () => {
+      console.log("Fetching confirmations for shop:", shopId);
       const res = await apiRequest("GET", `/api/dispatched-coffee/confirmations?shopId=${shopId}`);
       if (!res.ok) {
         const error = await res.text();
         throw new Error(error);
       }
-      return res.json();
+      const confirmations = await res.json();
+      console.log("Received confirmations:", confirmations);
+
+      // Fetch coffee details for each confirmation
+      const confirmationsWithCoffee = await Promise.all(
+        confirmations.map(async (confirmation) => {
+          const coffeeRes = await apiRequest("GET", `/api/green-coffee/${confirmation.greenCoffeeId}`);
+          const coffee = await coffeeRes.json();
+          return { ...confirmation, coffee };
+        })
+      );
+
+      return confirmationsWithCoffee;
     },
   });
 
@@ -120,7 +133,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
               className="flex items-center justify-between p-4 border rounded-lg"
             >
               <div>
-                <h4 className="font-medium">{confirmation.greenCoffee.name}</h4>
+                <h4 className="font-medium">{confirmation.coffee?.name}</h4>
                 <p className="text-sm text-muted-foreground">
                   Dispatched: {confirmation.dispatchedSmallBags} small bags, {confirmation.dispatchedLargeBags} large bags
                 </p>
@@ -152,7 +165,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
           <DialogHeader>
             <DialogTitle>Confirm Received Quantities</DialogTitle>
             <DialogDescription>
-              Enter the actual quantities received for {selectedConfirmation?.greenCoffee.name}
+              Enter the actual quantities received for {selectedConfirmation?.coffee?.name}
             </DialogDescription>
           </DialogHeader>
 
