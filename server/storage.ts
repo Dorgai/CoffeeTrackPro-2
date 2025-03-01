@@ -156,8 +156,31 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateRetailInventory(inventory: InsertRetailInventory): Promise<RetailInventory> {
-    const [newInventory] = await db.insert(retailInventory).values(inventory).returning();
-    return newInventory;
+    const [existingInventory] = await db
+      .select()
+      .from(retailInventory)
+      .where(eq(retailInventory.shopId, inventory.shopId))
+      .where(eq(retailInventory.greenCoffeeId, inventory.greenCoffeeId));
+
+    if (existingInventory) {
+      const [updatedInventory] = await db
+        .update(retailInventory)
+        .set({
+          smallBags: inventory.smallBags,
+          largeBags: inventory.largeBags,
+          updatedById: inventory.updatedById,
+          updatedAt: new Date(),
+        })
+        .where(eq(retailInventory.id, existingInventory.id))
+        .returning();
+      return updatedInventory;
+    } else {
+      const [newInventory] = await db
+        .insert(retailInventory)
+        .values(inventory)
+        .returning();
+      return newInventory;
+    }
   }
 
   // Orders

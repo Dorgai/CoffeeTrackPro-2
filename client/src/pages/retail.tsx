@@ -57,7 +57,14 @@ export default function Retail() {
         throw new Error("No shop assigned to user");
       }
 
-      const res = await apiRequest("POST", "/api/retail-inventory", data);
+      const res = await apiRequest("POST", "/api/retail-inventory", {
+        greenCoffeeId: data.greenCoffeeId,
+        smallBags: data.smallBags,
+        largeBags: data.largeBags,
+        shopId: user.shopId,
+        updatedById: user.id
+      });
+
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.message || "Failed to update inventory");
@@ -81,7 +88,6 @@ export default function Retail() {
     },
   });
 
-  // Handle inventory updates with proper error handling
   const handleUpdateInventory = async (coffeeId: number, smallBags: number, largeBags: number) => {
     try {
       if (!user?.shopId) {
@@ -96,7 +102,7 @@ export default function Retail() {
       await updateInventoryMutation.mutateAsync({
         greenCoffeeId: coffeeId,
         smallBags,
-        largeBags,
+        largeBags
       });
     } catch (error) {
       console.error("Failed to update inventory:", error);
@@ -121,7 +127,6 @@ export default function Retail() {
     );
   }
 
-  // Get current inventory for a coffee
   const getCurrentInventory = (coffeeId: number) => {
     const inventory = retailInventory?.find(item => item.greenCoffeeId === coffeeId);
     return {
@@ -133,7 +138,6 @@ export default function Retail() {
     };
   };
 
-  // Get orders for a specific coffee
   const getCoffeeOrders = (coffeeId: number) => {
     return orders?.filter(order => order.greenCoffeeId === coffeeId) || [];
   };
