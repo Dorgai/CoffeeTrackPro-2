@@ -15,6 +15,14 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import type { GreenCoffee, RoastingBatch, RetailInventory } from "@shared/schema";
 
 function StatsCard({
@@ -270,6 +278,61 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* New Green Coffee Inventory Section */}
+      {user?.role === "roasteryOwner" && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle>Green Coffee Inventory</CardTitle>
+            <Button variant="outline" asChild>
+              <Link href="/inventory">View All</Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Coffee</TableHead>
+                  <TableHead>Producer</TableHead>
+                  <TableHead>Country</TableHead>
+                  <TableHead>Current Stock</TableHead>
+                  <TableHead>Min. Threshold</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {coffees?.map((coffee) => (
+                  <TableRow key={coffee.id}>
+                    <TableCell className="font-medium">
+                      <Link href={`/coffee/${coffee.id}`} className="hover:underline">
+                        {coffee.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell>{coffee.producer || '-'}</TableCell>
+                    <TableCell>{coffee.country || '-'}</TableCell>
+                    <TableCell>{coffee.currentStock} kg</TableCell>
+                    <TableCell>{coffee.minThreshold} kg</TableCell>
+                    <TableCell>
+                      {Number(coffee.currentStock) <= Number(coffee.minThreshold) ? (
+                        <Badge variant="destructive">Low Stock</Badge>
+                      ) : (
+                        <Badge variant="outline">In Stock</Badge>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {(!coffees || coffees.length === 0) && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-4">
+                      No green coffee inventory available
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
