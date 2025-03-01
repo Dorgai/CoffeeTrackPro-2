@@ -28,6 +28,7 @@ import { OrderForm } from "@/components/coffee/order-form";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Link } from "wouter";
 import { formatDate } from "@/lib/utils";
+import { DispatchedCoffeeConfirmation } from "@/components/coffee/dispatched-coffee-confirmation";
 
 export default function Retail() {
   const { toast } = useToast();
@@ -139,7 +140,6 @@ export default function Retail() {
           </div>
         </div>
 
-        {/* Add ShopSelector here if user has shops */}
         {userShops && userShops.length > 0 && (
           <div className="flex items-center gap-4">
             <ShopSelector />
@@ -160,6 +160,12 @@ export default function Retail() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {["roasteryOwner", "shopManager", "barista"].includes(user?.role || "") && (
+              <div className="mb-6">
+                <DispatchedCoffeeConfirmation shopId={activeShop.id} />
+              </div>
+            )}
+
             <Table>
               <TableHeader>
                 <TableRow>
