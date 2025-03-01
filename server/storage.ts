@@ -61,7 +61,14 @@ export interface IStorage {
   getOrder(id: number): Promise<Order | undefined>;
   getOrdersByShop(shopId: number): Promise<Order[]>;
   createOrder(order: InsertOrder): Promise<Order>;
-  updateOrderStatus(id: number, status: Order["status"]): Promise<Order>;
+  updateOrderStatus(
+    id: number,
+    update: {
+      status: Order["status"];
+      smallBags: number;
+      largeBags: number;
+    }
+  ): Promise<Order>;
   // Add new method to interface
   getRetailInventoryHistory(shopId: number): Promise<(RetailInventory & { 
     greenCoffeeName: string; 
@@ -288,10 +295,21 @@ export class DatabaseStorage implements IStorage {
     return newOrder;
   }
 
-  async updateOrderStatus(id: number, status: Order["status"]): Promise<Order> {
+  async updateOrderStatus(
+    id: number,
+    update: {
+      status: Order["status"];
+      smallBags: number;
+      largeBags: number;
+    }
+  ): Promise<Order> {
     const [updatedOrder] = await db
       .update(orders)
-      .set({ status })
+      .set({
+        status: update.status,
+        smallBags: update.smallBags,
+        largeBags: update.largeBags,
+      })
       .where(eq(orders.id, id))
       .returning();
     return updatedOrder;

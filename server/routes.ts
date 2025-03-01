@@ -230,14 +230,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch(
     "/api/orders/:id/status",
-    requireRole(["roasteryOwner"]),
+    requireRole(["roaster"]),
     async (req, res) => {
-      const order = await storage.updateOrderStatus(
-        parseInt(req.params.id),
-        req.body.status,
-      );
-      res.json(order);
-    },
+      try {
+        const orderId = parseInt(req.params.id);
+        const { status, smallBags, largeBags } = req.body;
+
+        const order = await storage.getOrder(orderId);
+        if (!order) {
+          return res.status(404).json({ message: "Order not found" });
+        }
+
+        // Validate quantities
+        if (smallBags > order.smallBags || largeBags > order.largeBags) {
+          return res.status(400).json({ 
+            message: "Updated quantities cannot exceed original order quantities" 
+          });
+        }
+
+        // Update the order with new status and quantities
+        const updatedOrder = await storage.updateOrderStatus(orderId, {
+          status,
+          smallBags,
+          largeBags,
+        });
+
+        // If there are remaining bags, create a new pending order
+        const remainingSmallBags = order.smallBags - smallBags;
+        const remainingLargeBags = order.largeBags - largeBags;
+
+        if (remainingSmallBags > 0 || remainingLargeBags > 0) {
+          await storage.createOrder({
+            shopId: order.shopId,
+            greenCoffeeId: order.greenCoffeeId,
+            smallBags: remainingSmallBags,
+            largeBags: remainingLargeBags,
+            createdById: order.createdById,
+            status: "pending"
+          });
+        }
+
+        res.json(updatedOrder);
+      } catch (error) {
+        console.error("Error updating order status:", error);
+        res.status(500).json({ 
+          message: error instanceof Error ? error.message : "Failed to update order" 
+        });
+      }
+    }
   );
 
   const httpServer = createServer(app);

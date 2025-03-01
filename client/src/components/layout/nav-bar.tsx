@@ -79,18 +79,13 @@ export function NavBar() {
               <MenubarTrigger>Roasting</MenubarTrigger>
               <MenubarContent>
                 <MenubarItem>
-                  <Link href="/roasting/profiles" className="flex w-full">
-                    Profiles
+                  <Link href="/roasting/orders" className="flex w-full">
+                    Orders
                   </Link>
                 </MenubarItem>
                 <MenubarItem>
-                  <Link href="/roasting/batches" className="flex w-full">
+                  <Link href="/roasting" className="flex w-full">
                     Batches
-                  </Link>
-                </MenubarItem>
-                <MenubarItem>
-                  <Link href="/roasting/schedule" className="flex w-full">
-                    Schedule
                   </Link>
                 </MenubarItem>
               </MenubarContent>
