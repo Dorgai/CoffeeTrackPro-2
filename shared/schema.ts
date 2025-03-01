@@ -19,6 +19,7 @@ export const shops = pgTable("shops", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   location: text("location").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
 });
 
 // New table for many-to-many relationship between users and shops

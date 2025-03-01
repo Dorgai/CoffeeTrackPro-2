@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { DateRange } from "react-day-picker";
-import { addDays, format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
+import { addDays, format, isWithinInterval, startOfDay, endOfDay, subDays } from "date-fns";
 
 import {
   Card,
@@ -15,7 +15,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -65,61 +65,93 @@ export default function Analytics() {
     );
   }
 
+  // Calculate the previous period date range
+  const previousPeriodRange = dateRange?.from && dateRange?.to ? {
+    from: subDays(dateRange.from, dateRange.to.getTime() - dateRange.from.getTime()),
+    to: subDays(dateRange.to, dateRange.to.getTime() - dateRange.from.getTime()),
+  } : undefined;
+
   // Filter orders by date range and bag types
-  const filteredOrders = orders?.filter((order: any) => {
-    const orderDate = new Date(order.createdAt);
-    const isInRange = dateRange?.from && dateRange?.to
-      ? isWithinInterval(orderDate, {
-          start: startOfDay(dateRange.from),
-          end: endOfDay(dateRange.to),
-        })
-      : true;
+  const filterOrdersByPeriod = (orders: any[], range?: DateRange) => {
+    if (!range?.from || !range?.to) return [];
 
-    const hasBagType =
-      (showSmallBags && order.smallBags > 0) ||
-      (showLargeBags && order.largeBags > 0);
+    return orders?.filter((order: any) => {
+      const orderDate = new Date(order.createdAt);
+      const isInRange = isWithinInterval(orderDate, {
+        start: startOfDay(range.from),
+        end: endOfDay(range.to),
+      });
 
-    return isInRange && hasBagType;
-  });
+      const hasBagType =
+        (showSmallBags && order.smallBags > 0) ||
+        (showLargeBags && order.largeBags > 0);
 
-  // Group orders by shop and calculate totals
-  const shopStats = filteredOrders?.reduce((acc: any, order: any) => {
-    const shopName = order.shop.name;
-    if (!acc[shopName]) {
-      acc[shopName] = {
-        totalSmallBags: 0,
-        totalLargeBags: 0,
-        totalOrders: 0,
-        ordersByDate: {},
-      };
-    }
+      return isInRange && hasBagType;
+    });
+  };
 
-    acc[shopName].totalSmallBags += order.smallBags;
-    acc[shopName].totalLargeBags += order.largeBags;
-    acc[shopName].totalOrders += 1;
+  const currentPeriodOrders = filterOrdersByPeriod(orders, dateRange);
+  const previousPeriodOrders = filterOrdersByPeriod(orders, previousPeriodRange);
 
-    const dateKey = format(new Date(order.createdAt), "yyyy-MM-dd");
-    if (!acc[shopName].ordersByDate[dateKey]) {
-      acc[shopName].ordersByDate[dateKey] = {
-        smallBags: 0,
-        largeBags: 0,
-      };
-    }
-    acc[shopName].ordersByDate[dateKey].smallBags += order.smallBags;
-    acc[shopName].ordersByDate[dateKey].largeBags += order.largeBags;
+  // Group orders by shop and calculate totals for both periods
+  const calculateShopStats = (filteredOrders: any[]) => {
+    return filteredOrders?.reduce((acc: any, order: any) => {
+      const shopName = order.shop.name;
+      if (!acc[shopName]) {
+        acc[shopName] = {
+          totalSmallBags: 0,
+          totalLargeBags: 0,
+          totalOrders: 0,
+          ordersByDate: {},
+        };
+      }
 
-    return acc;
-  }, {});
+      acc[shopName].totalSmallBags += order.smallBags;
+      acc[shopName].totalLargeBags += order.largeBags;
+      acc[shopName].totalOrders += 1;
+
+      const dateKey = format(new Date(order.createdAt), "yyyy-MM-dd");
+      if (!acc[shopName].ordersByDate[dateKey]) {
+        acc[shopName].ordersByDate[dateKey] = {
+          smallBags: 0,
+          largeBags: 0,
+        };
+      }
+      acc[shopName].ordersByDate[dateKey].smallBags += order.smallBags;
+      acc[shopName].ordersByDate[dateKey].largeBags += order.largeBags;
+
+      return acc;
+    }, {});
+  };
+
+  const currentShopStats = calculateShopStats(currentPeriodOrders);
+  const previousShopStats = calculateShopStats(previousPeriodOrders);
+
+  // Calculate percentage changes
+  const calculateChange = (current: number, previous: number) => {
+    if (previous === 0) return null;
+    return ((current - previous) / previous) * 100;
+  };
 
   // Prepare data for the chart
-  const chartData = Object.entries(shopStats || {}).map(([shopName, stats]: [string, any]) => {
+  const chartData = Object.entries(currentShopStats || {}).map(([shopName, stats]: [string, any]) => {
     return Object.entries(stats.ordersByDate).map(([date, bags]: [string, any]) => ({
       date,
       shop: shopName,
       smallBags: showSmallBags ? bags.smallBags : 0,
       largeBags: showLargeBags ? bags.largeBags : 0,
+      // Add previous period data for comparison
+      prevSmallBags: showSmallBags && previousShopStats[shopName]?.ordersByDate[date]?.smallBags || 0,
+      prevLargeBags: showLargeBags && previousShopStats[shopName]?.ordersByDate[date]?.largeBags || 0,
     }));
   }).flat();
+
+  const renderTrend = (change: number | null) => {
+    if (change === null) return <Minus className="h-4 w-4" />;
+    if (change > 0) return <TrendingUp className="h-4 w-4 text-green-500" />;
+    if (change < 0) return <TrendingDown className="h-4 w-4 text-red-500" />;
+    return <Minus className="h-4 w-4" />;
+  };
 
   return (
     <div className="container mx-auto py-8 space-y-8">
@@ -176,7 +208,7 @@ export default function Analytics() {
         <Card>
           <CardHeader>
             <CardTitle>Summary</CardTitle>
-            <CardDescription>Overview of orders by shop</CardDescription>
+            <CardDescription>Overview of orders by shop with period comparison</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
@@ -186,17 +218,46 @@ export default function Analytics() {
                   <TableHead className="text-right">Small Bags</TableHead>
                   <TableHead className="text-right">Large Bags</TableHead>
                   <TableHead className="text-right">Total Orders</TableHead>
+                  <TableHead className="text-right">Change</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {Object.entries(shopStats || {}).map(([shopName, stats]: [string, any]) => (
-                  <TableRow key={shopName}>
-                    <TableCell className="font-medium">{shopName}</TableCell>
-                    <TableCell className="text-right">{stats.totalSmallBags}</TableCell>
-                    <TableCell className="text-right">{stats.totalLargeBags}</TableCell>
-                    <TableCell className="text-right">{stats.totalOrders}</TableCell>
-                  </TableRow>
-                ))}
+                {Object.entries(currentShopStats || {}).map(([shopName, stats]: [string, any]) => {
+                  const prevStats = previousShopStats[shopName];
+                  const totalChange = calculateChange(
+                    stats.totalOrders,
+                    prevStats?.totalOrders || 0
+                  );
+
+                  return (
+                    <TableRow key={shopName}>
+                      <TableCell className="font-medium">{shopName}</TableCell>
+                      <TableCell className="text-right">
+                        {stats.totalSmallBags}
+                        {prevStats && (
+                          <span className="text-xs text-muted-foreground ml-2">
+                            ({renderTrend(calculateChange(stats.totalSmallBags, prevStats.totalSmallBags))})
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {stats.totalLargeBags}
+                        {prevStats && (
+                          <span className="text-xs text-muted-foreground ml-2">
+                            ({renderTrend(calculateChange(stats.totalLargeBags, prevStats.totalLargeBags))})
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">{stats.totalOrders}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end space-x-1">
+                          {renderTrend(totalChange)}
+                          <span>{totalChange ? `${Math.abs(totalChange).toFixed(1)}%` : "-"}</span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>
@@ -207,7 +268,7 @@ export default function Analytics() {
       <Card>
         <CardHeader>
           <CardTitle>Order Trends</CardTitle>
-          <CardDescription>Order volumes over time by shop</CardDescription>
+          <CardDescription>Order volumes over time by shop with previous period comparison</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="h-[400px]">
@@ -219,20 +280,40 @@ export default function Analytics() {
                 <Tooltip />
                 <Legend />
                 {showSmallBags && (
-                  <Line
-                    type="monotone"
-                    dataKey="smallBags"
-                    name="Small Bags"
-                    stroke="#8884d8"
-                  />
+                  <>
+                    <Line
+                      type="monotone"
+                      dataKey="smallBags"
+                      name="Small Bags (Current)"
+                      stroke="#8884d8"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="prevSmallBags"
+                      name="Small Bags (Previous)"
+                      stroke="#8884d8"
+                      strokeDasharray="3 3"
+                      opacity={0.5}
+                    />
+                  </>
                 )}
                 {showLargeBags && (
-                  <Line
-                    type="monotone"
-                    dataKey="largeBags"
-                    name="Large Bags"
-                    stroke="#82ca9d"
-                  />
+                  <>
+                    <Line
+                      type="monotone"
+                      dataKey="largeBags"
+                      name="Large Bags (Current)"
+                      stroke="#82ca9d"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="prevLargeBags"
+                      name="Large Bags (Previous)"
+                      stroke="#82ca9d"
+                      strokeDasharray="3 3"
+                      opacity={0.5}
+                    />
+                  </>
                 )}
               </LineChart>
             </ResponsiveContainer>
