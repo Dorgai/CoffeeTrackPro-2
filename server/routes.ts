@@ -345,11 +345,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Dispatched Coffee Confirmation Routes
-  app.get("/api/dispatched-coffee/confirmations", requireRole(["shopManager", "barista"]), async (req, res) => {
+  app.get("/api/dispatched-coffee/confirmations", requireRole(["shopManager", "barista", "roasteryOwner"]), async (req, res) => {
     try {
       const { shopId } = req.query;
       if (!shopId) {
         return res.status(400).json({ message: "Shop ID is required" });
+      }
+
+      // Allow roasteryOwner to access any shop's confirmations
+      if (req.user?.role !== "roasteryOwner") {
+        const hasAccess = await checkShopAccess(req.user!.id, Number(shopId));
+        if (!hasAccess) {
+          return res.status(403).json({ message: "User does not have access to this shop" });
+        }
       }
 
       const confirmations = await storage.getDispatchedCoffeeConfirmations(Number(shopId));

@@ -104,44 +104,42 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
   };
 
   return (
-    <>
-      <Card>
-        <CardHeader>
-          <CardTitle>New Inventory Arrivals</CardTitle>
-          <CardDescription>
-            Confirm received coffee quantities
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {confirmations.map((confirmation) => (
-              <div
-                key={confirmation.id}
-                className="flex items-center justify-between p-4 border rounded-lg"
-              >
-                <div>
-                  <h4 className="font-medium">{confirmation.greenCoffee.name}</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Dispatched: {confirmation.dispatchedSmallBags} small bags, {confirmation.dispatchedLargeBags} large bags
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSelectedConfirmation(confirmation);
-                    setReceivedQuantities({
-                      smallBags: confirmation.dispatchedSmallBags,
-                      largeBags: confirmation.dispatchedLargeBags,
-                    });
-                  }}
-                >
-                  Confirm Receipt
-                </Button>
+    <Card>
+      <CardHeader>
+        <CardTitle>New Inventory Arrivals</CardTitle>
+        <CardDescription>
+          Confirm received coffee quantities
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {confirmations.map((confirmation) => (
+            <div
+              key={confirmation.id}
+              className="flex items-center justify-between p-4 border rounded-lg"
+            >
+              <div>
+                <h4 className="font-medium">{confirmation.greenCoffee.name}</h4>
+                <p className="text-sm text-muted-foreground">
+                  Dispatched: {confirmation.dispatchedSmallBags} small bags, {confirmation.dispatchedLargeBags} large bags
+                </p>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSelectedConfirmation(confirmation);
+                  setReceivedQuantities({
+                    smallBags: confirmation.dispatchedSmallBags,
+                    largeBags: confirmation.dispatchedLargeBags,
+                  });
+                }}
+              >
+                Confirm Receipt
+              </Button>
+            </div>
+          ))}
+        </div>
+      </CardContent>
 
       <Dialog 
         open={!!selectedConfirmation}
@@ -153,7 +151,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
           <DialogHeader>
             <DialogTitle>Confirm Received Quantities</DialogTitle>
             <DialogDescription>
-              Enter the actual quantities received for {selectedConfirmation?.greenCoffee?.name}
+              Enter the actual quantities received for {selectedConfirmation?.greenCoffee.name}
             </DialogDescription>
           </DialogHeader>
 
@@ -213,6 +211,6 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </Card>
   );
 }
