@@ -420,31 +420,35 @@ export class DatabaseStorage implements IStorage {
           updatedAt: orders.updatedAt,
           createdById: orders.createdById,
           updatedById: orders.updatedById,
-          shop: shops,
-          greenCoffee: greenCoffee,
+          shop: {
+            id: shops.id,
+            name: shops.name,
+            location: shops.location,
+          },
+          greenCoffee: {
+            id: greenCoffee.id,
+            name: greenCoffee.name,
+            producer: greenCoffee.producer,
+          },
           user: {
             id: users.id,
             username: users.username,
             role: users.role,
           },
           updatedBy: {
-            id: db.dynamic.ref('updatedBy.id'),
-            username: db.dynamic.ref('updatedBy.username'),
-            role: db.dynamic.ref('updatedBy.role'),
+            id: users2.id,
+            username: users2.username,
+            role: users2.role,
           },
         })
         .from(orders)
         .innerJoin(shops, eq(orders.shopId, shops.id))
         .innerJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
         .innerJoin(users, eq(orders.createdById, users.id))
-        .leftJoin(
-          users, 
-          eq(orders.updatedById, users.id),
-          'updatedBy'
-        )
+        .leftJoin(users, eq(orders.updatedById, users.id), "users2")
         .orderBy(desc(orders.createdAt));
 
-      console.log("getAllOrders query successful, found orders:", result.length);
+      console.log("getAllOrders query successful, found orders:", result);
       return result;
     } catch (error) {
       console.error("Error in getAllOrders:", error);
