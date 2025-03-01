@@ -409,9 +409,6 @@ export class DatabaseStorage implements IStorage {
     try {
       console.log("Executing getAllOrders query");
 
-      const updatedByUser = users.as('updatedByUser');
-      const createdByUser = users.as('createdByUser');
-
       const result = await db
         .select({
           id: orders.id,
@@ -435,25 +432,36 @@ export class DatabaseStorage implements IStorage {
             producer: greenCoffee.producer,
           },
           user: {
-            id: createdByUser.id,
-            username: createdByUser.username,
-            role: createdByUser.role,
-          },
-          updatedBy: {
-            id: updatedByUser.id,
-            username: updatedByUser.username,
-            role: updatedByUser.role,
+            id: users.id,
+            username: users.username,
+            role: users.role,
           },
         })
         .from(orders)
         .innerJoin(shops, eq(orders.shopId, shops.id))
         .innerJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
-        .innerJoin(createdByUser, eq(orders.createdById, createdByUser.id))
-        .leftJoin(updatedByUser, eq(orders.updatedById, updatedByUser.id))
+        .innerJoin(users, eq(orders.createdById, users.id))
         .orderBy(desc(orders.createdAt));
 
-      console.log("getAllOrders query result:", result);
-      return result;
+      // Add updatedBy information in a separate loop to avoid join complexity
+      const ordersWithUpdatedBy = await Promise.all(
+        result.map(async (order) => {
+          let updatedBy = null;
+          if (order.updatedById) {
+            const [user] = await db
+              .select()
+              .from(users)
+              .where(eq(users.id, order.updatedById));
+            if (user) {
+              updatedBy = user;
+            }
+          }
+          return { ...order, updatedBy };
+        })
+      );
+
+      console.log("getAllOrders query result:", ordersWithUpdatedBy);
+      return ordersWithUpdatedBy;
     } catch (error) {
       console.error("Error in getAllOrders:", error);
       throw error;
