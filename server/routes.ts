@@ -38,7 +38,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Shops Routes - accessible by roastery owner
-  app.get("/api/shops", async (req, res) => {
+  app.get("/api/shops", requireRole(["roasteryOwner"]), async (req, res) => {
     const shops = await storage.getShops();
     res.json(shops);
   });
@@ -54,7 +54,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // Green Coffee Routes - accessible by roastery owner
-  app.get("/api/green-coffee", async (req, res) => {
+  app.get("/api/green-coffee", requireRole(["roasteryOwner"]), async (req, res) => {
     const coffees = await storage.getGreenCoffees();
     res.json(coffees);
   });
@@ -85,7 +85,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         roasterId: req.user!.id,
       });
 
-      // Update green coffee stock
       const coffee = await storage.getGreenCoffee(data.greenCoffeeId);
       if (coffee) {
         await storage.updateGreenCoffeeStock(
@@ -204,33 +203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/orders", requireRole(["shopManager", "barista"]), async (req, res) => {
-    try {
-      const { shopId } = req.body;
-      if (!shopId) {
-        return res.status(400).json({ message: "Shop ID is required" });
-      }
-
-      if (!await checkShopAccess(req.user!.id, shopId)) {
-        return res.status(403).json({ message: "User does not have access to this shop" });
-      }
-
-      const data = insertOrderSchema.parse({
-        ...req.body,
-        createdById: req.user!.id,
-        status: "pending"
-      });
-
-      const order = await storage.createOrder(data);
-      res.status(201).json(order);
-    } catch (error) {
-      console.error("Error creating order:", error);
-      res.status(400).json({ 
-        message: error instanceof Error ? error.message : "Failed to create order" 
-      });
-    }
-  });
-
+  // Update order status - restrict shop manager from changing roasting-related statuses
   app.patch(
     "/api/orders/:id/status",
     requireRole(["roaster", "shopManager", "barista", "roasteryOwner"]),
@@ -247,21 +220,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(404).json({ message: "Order not found" });
         }
 
-        // Validate quantities
-        if (smallBags > order.smallBags || largeBags > order.largeBags) {
-          return res.status(400).json({ 
-            message: "Updated quantities cannot exceed original order quantities" 
-          });
+        // Roastery owner has full access to all status changes
+        if (req.user?.role === "roasteryOwner") {
+          // Only validate quantities
+          if (smallBags > order.smallBags || largeBags > order.largeBags) {
+            return res.status(400).json({ 
+              message: "Updated quantities cannot exceed original order quantities" 
+            });
+          }
+        } else {
+          // Shop manager can only mark orders as delivered
+          if (req.user?.role === "shopManager" && status !== "delivered") {
+            return res.status(403).json({
+              message: "Shop managers can only mark orders as delivered"
+            });
+          }
+
+          // Roaster can only change status to roasted or dispatched
+          if (req.user?.role === "roaster" && !["roasted", "dispatched"].includes(status)) {
+            return res.status(403).json({
+              message: "Roasters can only change status to 'roasted' or 'dispatched'"
+            });
+          }
+
+          // Validate quantities
+          if (smallBags > order.smallBags || largeBags > order.largeBags) {
+            return res.status(400).json({ 
+              message: "Updated quantities cannot exceed original order quantities" 
+            });
+          }
         }
 
-        // Validate status changes based on role
-        if (req.user?.role === "roaster" && status === "delivered") {
-          return res.status(403).json({
-            message: "Roasters can only change status to 'roasted' or 'dispatched'"
-          });
-        }
-
-        // Update the order with new status and quantities
         const updatedOrder = await storage.updateOrderStatus(orderId, {
           status,
           smallBags,
@@ -296,6 +285,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   );
+
+  app.post("/api/orders", requireRole(["shopManager", "barista"]), async (req, res) => {
+    try {
+      const { shopId } = req.body;
+      if (!shopId) {
+        return res.status(400).json({ message: "Shop ID is required" });
+      }
+
+      if (!await checkShopAccess(req.user!.id, shopId)) {
+        return res.status(403).json({ message: "User does not have access to this shop" });
+      }
+
+      const data = insertOrderSchema.parse({
+        ...req.body,
+        createdById: req.user!.id,
+        status: "pending"
+      });
+
+      const order = await storage.createOrder(data);
+      res.status(201).json(order);
+    } catch (error) {
+      console.error("Error creating order:", error);
+      res.status(400).json({ 
+        message: error instanceof Error ? error.message : "Failed to create order" 
+      });
+    }
+  });
+
 
   const httpServer = createServer(app);
   return httpServer;
