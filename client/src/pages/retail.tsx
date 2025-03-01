@@ -6,6 +6,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useActiveShop } from "@/hooks/use-active-shop";
+import { ShopSelector } from "@/components/layout/shop-selector";
 import {
   Card,
   CardContent,
@@ -31,7 +32,7 @@ import { formatDate } from "@/lib/utils";
 export default function Retail() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { activeShop } = useActiveShop();
+  const { activeShop, userShops } = useActiveShop();
   const [selectedCoffee, setSelectedCoffee] = useState<GreenCoffee | null>(null);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
@@ -107,16 +108,6 @@ export default function Retail() {
     }
   };
 
-  if (!activeShop?.id) {
-    return (
-      <div className="container mx-auto py-8">
-        <div className="bg-destructive/10 text-destructive px-4 py-2 rounded">
-          Please select a shop from the dropdown in the navigation bar.
-        </div>
-      </div>
-    );
-  }
-
   if (loadingCoffees || loadingInventory) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -126,7 +117,7 @@ export default function Retail() {
   }
 
   const getCurrentInventory = (coffeeId: number) => {
-    const inventory = retailInventory?.find(item => item.greenCoffeeId === coffeeId);
+    const inventory = retailInventory?.find((item: any) => item.greenCoffeeId === coffeeId);
     return {
       smallBags: inventory?.smallBags || 0,
       largeBags: inventory?.largeBags || 0,
@@ -138,76 +129,91 @@ export default function Retail() {
 
   return (
     <div className="container mx-auto py-8 space-y-8">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Retail Management</h1>
-          <p className="text-muted-foreground">
-            Manage your shop's inventory
-          </p>
+      <div className="flex flex-col space-y-4">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Retail Management</h1>
+            <p className="text-muted-foreground">
+              Manage your shop's inventory
+            </p>
+          </div>
+          <div className="flex gap-4">
+            <Button variant="outline" asChild>
+              <Link href="/retail/orders">View Orders</Link>
+            </Button>
+            <Button onClick={() => setIsOrderDialogOpen(true)}>
+              <PackagePlus className="h-4 w-4 mr-2" />
+              Place Order
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-4">
-          <Button variant="outline" asChild>
-            <Link href="/retail/orders">View Orders</Link>
-          </Button>
-          <Button onClick={() => setIsOrderDialogOpen(true)}>
-            <PackagePlus className="h-4 w-4 mr-2" />
-            Place Order
-          </Button>
-        </div>
+
+        {/* Add ShopSelector */}
+        {userShops && userShops.length > 0 && (
+          <div className="w-[200px]">
+            <ShopSelector />
+          </div>
+        )}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Retail Inventory</CardTitle>
-          <CardDescription>
-            Current stock of roasted coffee available for order
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Coffee</TableHead>
-                <TableHead>Producer</TableHead>
-                <TableHead>Small Bags (200g)</TableHead>
-                <TableHead>Large Bags (1kg)</TableHead>
-                <TableHead>Last Updated</TableHead>
-                <TableHead>Updated By</TableHead>
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {coffees?.map((coffee) => {
-                const inventory = getCurrentInventory(coffee.id);
-                return (
-                  <TableRow key={coffee.id}>
-                    <TableCell className="font-medium">{coffee.name}</TableCell>
-                    <TableCell>{coffee.producer}</TableCell>
-                    <TableCell>{inventory.smallBags}</TableCell>
-                    <TableCell>{inventory.largeBags}</TableCell>
-                    <TableCell>
-                      {inventory.updatedAt ? formatDate(inventory.updatedAt) : 'Never'}
-                    </TableCell>
-                    <TableCell>{inventory.updatedBy?.username || '-'}</TableCell>
-                    <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedCoffee(coffee);
-                          setIsUpdateDialogOpen(true);
-                        }}
-                      >
-                        Update
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {!activeShop?.id ? (
+        <div className="bg-destructive/10 text-destructive px-4 py-2 rounded">
+          Please select a shop from the dropdown above to manage inventory.
+        </div>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>Retail Inventory</CardTitle>
+            <CardDescription>
+              Current stock of roasted coffee available for order
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Coffee</TableHead>
+                  <TableHead>Producer</TableHead>
+                  <TableHead>Small Bags (200g)</TableHead>
+                  <TableHead>Large Bags (1kg)</TableHead>
+                  <TableHead>Last Updated</TableHead>
+                  <TableHead>Updated By</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {coffees?.map((coffee) => {
+                  const inventory = getCurrentInventory(coffee.id);
+                  return (
+                    <TableRow key={coffee.id}>
+                      <TableCell className="font-medium">{coffee.name}</TableCell>
+                      <TableCell>{coffee.producer}</TableCell>
+                      <TableCell>{inventory.smallBags}</TableCell>
+                      <TableCell>{inventory.largeBags}</TableCell>
+                      <TableCell>
+                        {inventory.updatedAt ? formatDate(inventory.updatedAt) : 'Never'}
+                      </TableCell>
+                      <TableCell>{inventory.updatedBy?.username || '-'}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedCoffee(coffee);
+                            setIsUpdateDialogOpen(true);
+                          }}
+                        >
+                          Update
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       <Dialog 
         open={isUpdateDialogOpen && !!selectedCoffee} 
