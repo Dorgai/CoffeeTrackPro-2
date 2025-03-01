@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { useQuery } from '@tanstack/react-query';
 import { Shop } from '@shared/schema';
+import { apiRequest } from "@/lib/queryClient";
 
 interface ActiveShopState {
   activeShop: Shop | null;
@@ -24,6 +25,13 @@ export function useUserShops() {
 
   return useQuery<Shop[]>({
     queryKey: ['/api/user/shops'],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/user/shops");
+      if (!res.ok) {
+        throw new Error("Failed to fetch user shops");
+      }
+      return res.json();
+    },
     onSuccess: (data) => {
       setUserShops(data);
       // If no active shop is selected, set Ráday as default
