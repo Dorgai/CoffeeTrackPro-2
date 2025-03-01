@@ -20,6 +20,8 @@ import Shops from "@/pages/shops";
 import Profile from "@/pages/profile";
 import NotFound from "@/pages/not-found";
 import { ProtectedRoute } from "@/lib/protected-route";
+import RetailNewArrivals from "@/pages/retail-new-arrivals"; // Added import statement
+
 
 export default function App() {
   return (
@@ -44,6 +46,11 @@ export default function App() {
             <ProtectedRoute path="/reports" component={Reports} roles={["roasteryOwner", "shopManager"]} />
             <ProtectedRoute path="/user-management" component={UserManagement} roles={["roasteryOwner"]} />
             <ProtectedRoute path="/shops" component={Shops} roles={["roasteryOwner"]} />
+            <ProtectedRoute 
+              path="/retail/new-arrivals" 
+              component={RetailNewArrivals} 
+              roles={["roasteryOwner", "shopManager", "barista"]} 
+            />
             <ProtectedRoute path="/profile" component={Profile} />
 
             {/* NotFound route must be last */}

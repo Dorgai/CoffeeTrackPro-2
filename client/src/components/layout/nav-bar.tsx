@@ -98,36 +98,45 @@ export function NavBar() {
               </MenubarContent>
             </MenubarMenu>
           )}
-          {(user?.role === "shopManager" || user?.role === "barista") && (
-            <MenubarMenu>
-              <MenubarTrigger>Retail</MenubarTrigger>
-              <MenubarContent>
-                <MenubarItem>
-                  <Link href="/retail" className="flex w-full">
-                    Inventory
-                  </Link>
-                </MenubarItem>
-                <MenubarItem>
-                  <Link href="/retail/orders" className="flex w-full">
-                    Orders
-                  </Link>
-                </MenubarItem>
-              </MenubarContent>
-            </MenubarMenu>
+          {(user?.role === "shopManager" || user?.role === "barista" || user?.role === "roasteryOwner") && (
+            <>
+              <MenubarMenu>
+                <MenubarTrigger>Retail</MenubarTrigger>
+                <MenubarContent>
+                  <MenubarItem>
+                    <Link href="/retail" className="flex w-full">
+                      Inventory
+                    </Link>
+                  </MenubarItem>
+                  <MenubarItem>
+                    <Link href="/retail/orders" className="flex w-full">
+                      Orders
+                    </Link>
+                  </MenubarItem>
+                </MenubarContent>
+              </MenubarMenu>
+              <MenubarMenu>
+                <MenubarTrigger>New Arrivals</MenubarTrigger>
+                <MenubarContent>
+                  <MenubarItem>
+                    <Link href="/retail/new-arrivals" className="flex w-full">
+                      Pending Confirmations
+                    </Link>
+                  </MenubarItem>
+                </MenubarContent>
+              </MenubarMenu>
+            </>
           )}
         </Menubar>
         <div className="ml-auto flex items-center space-x-4">
           {user ? (
             <div className="flex items-center space-x-4">
-              {/* Show shop selector for everyone except roaster */}
               {user.role !== "roaster" && <ShopSelector />}
 
-              {/* Show green beans indicator for roaster and roasteryOwner */}
               {(user.role === "roasteryOwner" || user.role === "roaster") && (
                 <GreenBeansStockIndicator />
               )}
 
-              {/* Show stock level indicator and restock dialog for all except roaster */}
               {user.role !== "roaster" && (
                 <>
                   <StockLevelIndicator />
