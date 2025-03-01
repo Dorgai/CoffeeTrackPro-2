@@ -33,7 +33,7 @@ export default function Retail() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { activeShop } = useActiveShop();
-  const { isLoading: loadingShops } = useUserShops();
+  const { data: userShops, isLoading: loadingShops } = useUserShops();
   const [selectedCoffee, setSelectedCoffee] = useState<GreenCoffee | null>(null);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
