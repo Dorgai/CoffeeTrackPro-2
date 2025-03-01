@@ -66,6 +66,15 @@ export default function RetailOverview() {
 
   const { data: allInventory, isLoading: loadingInventory } = useQuery<AllInventoryItem[]>({
     queryKey: ["/api/retail-inventory"],
+    queryFn: async () => {
+      const res = await fetch("/api/retail-inventory");
+      if (!res.ok) {
+        throw new Error("Failed to fetch inventory");
+      }
+      const data = await res.json();
+      console.log("Fetched inventory data:", data);
+      return data;
+    },
   });
 
   const { data: allOrders, isLoading: loadingOrders } = useQuery<AllOrderItem[]>({
@@ -106,6 +115,9 @@ export default function RetailOverview() {
     }
   });
 
+  console.log("User role:", user?.role);
+  console.log("Shop data:", shopData);
+
   return (
     <div className="container mx-auto py-8 space-y-8">
       <div>
@@ -123,7 +135,7 @@ export default function RetailOverview() {
           <p className="text-muted-foreground">{shop.location}</p>
 
           {/* New Inventory Arrivals Section */}
-          {(user?.role === "roasteryOwner" || user?.role === "shopManager" || user?.role === "barista") && (
+          {["roasteryOwner", "shopManager", "barista"].includes(user?.role || "") && (
             <DispatchedCoffeeConfirmation shopId={shop.id} />
           )}
 

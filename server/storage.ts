@@ -46,6 +46,7 @@ export interface IStorage {
   getShops(): Promise<Shop[]>;
   createShop(shop: InsertShop): Promise<Shop>;
   getUserShops(userId: number): Promise<Shop[]>; // Added method
+  deleteShop(id: number): Promise<Shop>; // Add to IStorage interface
 
   // Green Coffee
   getGreenCoffee(id: number): Promise<GreenCoffee | undefined>;
@@ -716,6 +717,20 @@ export class DatabaseStorage implements IStorage {
       return discrepancies;
     } catch (error) {
       console.error("Error fetching inventory discrepancies:", error);
+      throw error;
+    }
+  }
+  async deleteShop(id: number): Promise<Shop> { // Add to DatabaseStorage implementation
+    try {
+      const [deletedShop] = await db
+        .update(shops)
+        .set({ isActive: false })
+        .where(eq(shops.id, id))
+        .returning();
+
+      return deletedShop;
+    } catch (error) {
+      console.error("Error deleting shop:", error);
       throw error;
     }
   }

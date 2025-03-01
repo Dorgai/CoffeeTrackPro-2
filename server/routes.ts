@@ -66,6 +66,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  // Add DELETE endpoint for shops after the existing shops routes
+  app.delete("/api/shops/:id", requireRole(["roasteryOwner"]), async (req, res) => {
+    try {
+      const shopId = parseInt(req.params.id);
+      const shop = await storage.getShop(shopId);
+
+      if (!shop) {
+        return res.status(404).json({ message: "Shop not found" });
+      }
+
+      const deletedShop = await storage.deleteShop(shopId);
+      res.json(deletedShop);
+    } catch (error) {
+      console.error("Error deleting shop:", error);
+      res.status(500).json({ message: "Failed to delete shop" });
+    }
+  });
+
   // Green Coffee Routes - accessible by roastery owner and roaster
   app.get("/api/green-coffee", requireRole(["roasteryOwner", "roaster"]), async (req, res) => {
     const coffees = await storage.getGreenCoffees();
@@ -115,10 +133,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/retail-inventory", requireRole(["shopManager", "barista", "roasteryOwner"]), async (req, res) => {
     try {
       const shopId = req.query.shopId ? Number(req.query.shopId) : undefined;
+      console.log("Fetching retail inventory for user:", req.user?.username, "role:", req.user?.role, "shopId:", shopId);
 
       // For roastery owner or shop manager, if no shopId is provided, return all inventories
       if ((req.user?.role === "roasteryOwner" || req.user?.role === "shopManager") && !shopId) {
+        console.log("Fetching all retail inventories");
         const allInventory = await storage.getAllRetailInventories();
+        console.log("Found inventories:", allInventory.length);
         return res.json(allInventory);
       }
 
@@ -128,14 +149,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (shopId) {
-        // Allow roastery owner to access any shop's inventory
-        if (req.user?.role !== "roasteryOwner" && !await checkShopAccess(req.user!.id, shopId)) {
+        if (!await checkShopAccess(req.user!.id, shopId)) {
           return res.status(403).json({ message: "User does not have access to this shop" });
         }
 
         const inventory = await storage.getRetailInventoriesByShop(shopId);
+        console.log("Found shop inventory:", inventory.length, "items for shop:", shopId);
         return res.json(inventory);
       }
+
+      // If we get here, return all inventories the user has access to
+      const userShops = await storage.getUserShops(req.user!.id);
+      console.log("User shops:", userShops);
+      const allInventories = await Promise.all(
+        userShops.map(shop => storage.getRetailInventoriesByShop(shop.id))
+      );
+      const flattenedInventories = allInventories.flat();
+      console.log("Found total inventories:", flattenedInventories.length);
+      return res.json(flattenedInventories);
     } catch (error) {
       console.error("Error fetching retail inventory:", error);
       res.status(500).json({ message: "Failed to fetch retail inventory" });
