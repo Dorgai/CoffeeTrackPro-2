@@ -421,26 +421,18 @@ export class DatabaseStorage implements IStorage {
           updatedById: orders.updatedById,
           shop: shops,
           greenCoffee: greenCoffee,
-          user: {
+          user: users,
+          updatedBy: {
             id: users.id,
             username: users.username,
-            role: users.role,
-          },
-          updatedBy: {
-            id: db.dynamic.ref('updated_by.id'),
-            username: db.dynamic.ref('updated_by.username'),
-            role: db.dynamic.ref('updated_by.role'),
-          },
+            role: users.role
+          }
         })
         .from(orders)
         .innerJoin(shops, eq(orders.shopId, shops.id))
         .innerJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
         .innerJoin(users, eq(orders.createdById, users.id))
-        .leftJoin(
-          users, 
-          eq(orders.updatedById, users.id),
-          'updated_by'
-        )
+        .leftJoin(users as typeof users, eq(orders.updatedById, users.id))
         .orderBy(desc(orders.createdAt));
 
       return result;
