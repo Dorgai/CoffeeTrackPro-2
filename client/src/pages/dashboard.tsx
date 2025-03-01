@@ -26,6 +26,7 @@ import { apiRequest } from "@/lib/queryClient";
 import type { GreenCoffee, RoastingBatch, RetailInventory } from "@shared/schema";
 import { useState } from "react";
 import { ShopSelector } from "@/components/layout/shop-selector";
+import { format } from 'date-fns';
 
 
 type Order = {
@@ -196,6 +197,11 @@ export default function Dashboard() {
     return orderDays > oldest ? orderDays : oldest;
   }, 0);
 
+  // Find the most recent order date from all orders
+  const lastOrderDate = orders?.reduce((latest, order) => {
+    const orderDate = new Date(order.createdAt);
+    return latest > orderDate ? latest : orderDate;
+  }, new Date(0));
 
   return (
     <div className="container mx-auto py-8 space-y-8">
@@ -231,8 +237,8 @@ export default function Dashboard() {
       {/* Stats cards section - Update counts based on filtered data */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatsCard
-          title="Total Orders"
-          value={filteredOrders.length}
+          title="Last Order"
+          value={lastOrderDate && lastOrderDate.getTime() > 0 ? format(lastOrderDate, 'MMM d, yyyy') : 'No orders'}
           icon={Package}
         />
         <StatsCard

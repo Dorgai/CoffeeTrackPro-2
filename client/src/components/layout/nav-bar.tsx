@@ -24,9 +24,9 @@ export function NavBar() {
       <div className="flex h-16 items-center px-4">
         <div className="mr-4 flex">
           <Link href="/" className="flex items-center">
-            <img 
-              src="/assets/logo.jpg" 
-              alt="Sonic Beans Logo" 
+            <img
+              src="/assets/logo.jpg"
+              alt="Sonic Beans Logo"
               className="h-8 w-auto"
             />
           </Link>
@@ -77,6 +77,11 @@ export function NavBar() {
                       Shop Management
                     </Link>
                   </MenubarItem>
+                  <MenubarItem>
+                    <Link href="/user-management" className="flex w-full">
+                      User Management
+                    </Link>
+                  </MenubarItem>
                 </MenubarContent>
               </MenubarMenu>
             </>
@@ -119,20 +124,22 @@ export function NavBar() {
         <div className="ml-auto flex items-center space-x-4">
           {user ? (
             <div className="flex items-center space-x-4">
-              {(user.role === "shopManager" || user.role === "barista") && (
+              {/* Show ShopSelector for all roles except roaster */}
+              {user.role !== "roaster" && (
+                <ShopSelector />
+              )}
+
+              {/* Show indicators and RestockDialog for all roles except roaster */}
+              {user.role !== "roaster" && (
                 <>
-                  <ShopSelector />
+                  {user.role === "roasteryOwner" && (
+                    <GreenBeansStockIndicator />
+                  )}
                   <StockLevelIndicator />
                   <RestockDialog />
                 </>
               )}
-              {user.role === "roasteryOwner" && (
-                <>
-                  <GreenBeansStockIndicator />
-                  <StockLevelIndicator />
-                  <RestockDialog />
-                </>
-              )}
+
               <Avatar>
                 <AvatarFallback>
                   {user.username.charAt(0).toUpperCase()}
