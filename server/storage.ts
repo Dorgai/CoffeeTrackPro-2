@@ -20,7 +20,7 @@ import {
   userShops,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, gt } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -62,6 +62,22 @@ export interface IStorage {
   getOrdersByShop(shopId: number): Promise<Order[]>;
   createOrder(order: InsertOrder): Promise<Order>;
   updateOrderStatus(id: number, status: Order["status"]): Promise<Order>;
+  // Add new method to interface
+  getRetailInventoryHistory(shopId: number): Promise<(RetailInventory & { 
+    greenCoffeeName: string; 
+    updatedByUsername: string;
+  })[]>;
+  getAllRetailInventories(): Promise<(RetailInventory & {
+    shop: Shop;
+    greenCoffee: GreenCoffee;
+    updatedBy: User;
+  })[]>;
+
+  getAllOrders(): Promise<(Order & {
+    shop: Shop;
+    greenCoffee: GreenCoffee;
+    user: User;
+  })[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -279,6 +295,106 @@ export class DatabaseStorage implements IStorage {
       .where(eq(orders.id, id))
       .returning();
     return updatedOrder;
+  }
+  async getRetailInventoryHistory(shopId: number): Promise<(RetailInventory & { 
+    greenCoffeeName: string;
+    updatedByUsername: string;
+  })[]> {
+    try {
+      // Get date 12 months ago
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
+      const result = await db
+        .select({
+          id: retailInventory.id,
+          shopId: retailInventory.shopId,
+          greenCoffeeId: retailInventory.greenCoffeeId,
+          smallBags: retailInventory.smallBags,
+          largeBags: retailInventory.largeBags,
+          updatedAt: retailInventory.updatedAt,
+          updatedById: retailInventory.updatedById,
+          greenCoffeeName: greenCoffee.name,
+          updatedByUsername: users.username,
+        })
+        .from(retailInventory)
+        .innerJoin(greenCoffee, eq(retailInventory.greenCoffeeId, greenCoffee.id))
+        .innerJoin(users, eq(retailInventory.updatedById, users.id))
+        .where(
+          eq(retailInventory.shopId, shopId),
+          gt(retailInventory.updatedAt, twelveMonthsAgo)
+        )
+        .orderBy(desc(retailInventory.updatedAt));
+
+      return result;
+    } catch (error) {
+      console.error("Error fetching inventory history:", error);
+      throw error;
+    }
+  }
+  async getAllRetailInventories(): Promise<(RetailInventory & {
+    shop: Shop;
+    greenCoffee: GreenCoffee;
+    updatedBy: User;
+  })[]> {
+    try {
+      const result = await db
+        .select({
+          id: retailInventory.id,
+          shopId: retailInventory.shopId,
+          greenCoffeeId: retailInventory.greenCoffeeId,
+          smallBags: retailInventory.smallBags,
+          largeBags: retailInventory.largeBags,
+          updatedAt: retailInventory.updatedAt,
+          updatedById: retailInventory.updatedById,
+          shop: shops,
+          greenCoffee: greenCoffee,
+          updatedBy: users,
+        })
+        .from(retailInventory)
+        .innerJoin(shops, eq(retailInventory.shopId, shops.id))
+        .innerJoin(greenCoffee, eq(retailInventory.greenCoffeeId, greenCoffee.id))
+        .innerJoin(users, eq(retailInventory.updatedById, users.id))
+        .orderBy(desc(retailInventory.updatedAt));
+
+      return result;
+    } catch (error) {
+      console.error("Error fetching all retail inventories:", error);
+      throw error;
+    }
+  }
+
+  async getAllOrders(): Promise<(Order & {
+    shop: Shop;
+    greenCoffee: GreenCoffee;
+    user: User;
+  })[]> {
+    try {
+      const result = await db
+        .select({
+          id: orders.id,
+          shopId: orders.shopId,
+          greenCoffeeId: orders.greenCoffeeId,
+          smallBags: orders.smallBags,
+          largeBags: orders.largeBags,
+          status: orders.status,
+          createdAt: orders.createdAt,
+          createdById: orders.createdById,
+          shop: shops,
+          greenCoffee: greenCoffee,
+          user: users,
+        })
+        .from(orders)
+        .innerJoin(shops, eq(orders.shopId, shops.id))
+        .innerJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
+        .innerJoin(users, eq(orders.createdById, users.id))
+        .orderBy(desc(orders.createdAt));
+
+      return result;
+    } catch (error) {
+      console.error("Error fetching all orders:", error);
+      throw error;
+    }
   }
 }
 

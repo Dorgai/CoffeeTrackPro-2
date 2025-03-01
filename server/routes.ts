@@ -99,14 +99,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // Retail Inventory Routes - accessible by shop manager and barista
-  app.get("/api/retail-inventory", requireRole(["shopManager", "barista"]), async (req, res) => {
+  app.get("/api/retail-inventory", requireRole(["shopManager", "barista", "roasteryOwner"]), async (req, res) => {
     try {
       const shopId = Number(req.query.shopId);
+
+      // For roastery owner, if no shopId is provided, return all inventories
+      if (req.user?.role === "roasteryOwner" && !shopId) {
+        const allInventory = await storage.getAllRetailInventories();
+        return res.json(allInventory);
+      }
+
       if (!shopId) {
         return res.status(400).json({ message: "Shop ID is required" });
       }
 
-      if (!await checkShopAccess(req.user!.id, shopId)) {
+      // Allow roastery owner to access any shop's inventory
+      if (req.user?.role !== "roasteryOwner" && !await checkShopAccess(req.user!.id, shopId)) {
         return res.status(403).json({ message: "User does not have access to this shop" });
       }
 
@@ -145,8 +153,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Orders Routes - accessible by shop manager and barista
-  app.get("/api/orders", requireRole(["shopManager", "barista"]), async (req, res) => {
+  // Add new endpoint for inventory history after the existing retail inventory routes
+  app.get("/api/retail-inventory/history", requireRole(["shopManager", "barista"]), async (req, res) => {
     try {
       const shopId = Number(req.query.shopId);
       if (!shopId) {
@@ -154,6 +162,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (!await checkShopAccess(req.user!.id, shopId)) {
+        return res.status(403).json({ message: "User does not have access to this shop" });
+      }
+
+      const history = await storage.getRetailInventoryHistory(shopId);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching inventory history:", error);
+      res.status(500).json({ message: "Failed to fetch inventory history" });
+    }
+  });
+
+  // Orders Routes - accessible by shop manager and barista
+  app.get("/api/orders", requireRole(["shopManager", "barista", "roasteryOwner"]), async (req, res) => {
+    try {
+      const shopId = Number(req.query.shopId);
+
+      // For roastery owner, if no shopId is provided, return all orders
+      if (req.user?.role === "roasteryOwner" && !shopId) {
+        const allOrders = await storage.getAllOrders();
+        return res.json(allOrders);
+      }
+
+      if (!shopId) {
+        return res.status(400).json({ message: "Shop ID is required" });
+      }
+
+      // Allow roastery owner to access any shop's orders
+      if (req.user?.role !== "roasteryOwner" && !await checkShopAccess(req.user!.id, shopId)) {
         return res.status(403).json({ message: "User does not have access to this shop" });
       }
 
