@@ -35,6 +35,89 @@ async function checkShopAccess(userId: number, shopId: number) {
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
 
+  // User Management Routes
+  app.get("/api/users", requireRole(["roasteryOwner"]), async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  // Update user role or status
+  app.patch("/api/users/:id", requireRole(["roasteryOwner"]), async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const { role, isActive, defaultShopId } = req.body;
+
+      // Don't allow roasteryOwner to modify their own role
+      if (userId === req.user!.id) {
+        return res.status(403).json({ message: "Cannot modify own user account" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Update user
+      const updatedUser = await storage.updateUser(userId, {
+        role,
+        isActive,
+        defaultShopId
+      });
+
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating user:", error);
+      res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+
+  // Assign user to shop
+  app.post("/api/users/:id/shops", requireRole(["roasteryOwner"]), async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const { shopId } = req.body;
+
+      if (!shopId) {
+        return res.status(400).json({ message: "Shop ID is required" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const shop = await storage.getShop(shopId);
+      if (!shop || !shop.isActive) {
+        return res.status(404).json({ message: "Shop not found or inactive" });
+      }
+
+      await storage.assignUserToShop(userId, shopId);
+      res.json({ message: "User assigned to shop successfully" });
+    } catch (error) {
+      console.error("Error assigning user to shop:", error);
+      res.status(500).json({ message: "Failed to assign user to shop" });
+    }
+  });
+
+  // Remove user from shop
+  app.delete("/api/users/:id/shops/:shopId", requireRole(["roasteryOwner"]), async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const shopId = parseInt(req.params.shopId);
+
+      await storage.removeUserFromShop(userId, shopId);
+      res.json({ message: "User removed from shop successfully" });
+    } catch (error) {
+      console.error("Error removing user from shop:", error);
+      res.status(500).json({ message: "Failed to remove user from shop" });
+    }
+  });
+
   // User's Shops Route
   app.get("/api/user/shops", async (req, res) => {
     try {
@@ -53,7 +136,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Shops Routes - accessible by roastery owner
   app.get("/api/shops", requireRole(["roasteryOwner"]), async (req, res) => {
     const shops = await storage.getShops();
-    res.json(shops);
+    // Filter out inactive shops
+    const activeShops = shops.filter(shop => shop.isActive);
+    res.json(activeShops);
   });
 
   app.post(
@@ -76,8 +161,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Shop not found" });
       }
 
+      if (!shop.isActive) {
+        return res.status(400).json({ message: "Shop is already deleted" });
+      }
+
       const deletedShop = await storage.deleteShop(shopId);
-      res.json(deletedShop);
+      res.json({ message: "Shop deleted successfully", shop: deletedShop });
     } catch (error) {
       console.error("Error deleting shop:", error);
       res.status(500).json({ message: "Failed to delete shop" });

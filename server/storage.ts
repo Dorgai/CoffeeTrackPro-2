@@ -40,6 +40,10 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  getAllUsers(): Promise<User[]>; // Added method
+  updateUser(id: number, update: { role?: User["role"]; isActive?: boolean; defaultShopId?: number | null; }): Promise<User>; // Added method
+  assignUserToShop(userId: number, shopId: number): Promise<void>; // Added method
+  removeUserFromShop(userId: number, shopId: number): Promise<void>; // Added method
 
   // Shops
   getShop(id: number): Promise<Shop | undefined>;
@@ -152,6 +156,67 @@ export class DatabaseStorage implements IStorage {
     return newUser;
   }
 
+  async getAllUsers(): Promise<User[]> {
+    try {
+      return await db
+        .select()
+        .from(users)
+        .orderBy(users.username);
+    } catch (error) {
+      console.error("Error fetching all users:", error);
+      throw error;
+    }
+  }
+
+  async updateUser(
+    id: number,
+    update: {
+      role?: User["role"];
+      isActive?: boolean;
+      defaultShopId?: number | null;
+    }
+  ): Promise<User> {
+    try {
+      const [updatedUser] = await db
+        .update(users)
+        .set(update)
+        .where(eq(users.id, id))
+        .returning();
+      return updatedUser;
+    } catch (error) {
+      console.error("Error updating user:", error);
+      throw error;
+    }
+  }
+
+  async assignUserToShop(userId: number, shopId: number): Promise<void> {
+    try {
+      await db
+        .insert(userShops)
+        .values({ userId, shopId })
+        .onConflictDoNothing();
+    } catch (error) {
+      console.error("Error assigning user to shop:", error);
+      throw error;
+    }
+  }
+
+  async removeUserFromShop(userId: number, shopId: number): Promise<void> {
+    try {
+      await db
+        .delete(userShops)
+        .where(
+          and(
+            eq(userShops.userId, userId),
+            eq(userShops.shopId, shopId)
+          )
+        );
+    } catch (error) {
+      console.error("Error removing user from shop:", error);
+      throw error;
+    }
+  }
+
   // Shops
   async getShop(id: number): Promise<Shop | undefined> {
     const [shop] = await db.select().from(shops).where(eq(shops.id, id));
@@ -177,12 +242,15 @@ export class DatabaseStorage implements IStorage {
 
       console.log("Looking up shops for user:", user?.username, "with role:", user?.role);
 
-      // If roasteryOwner, return all shops
+      // If roasteryOwner, return all active shops
       if (user?.role === "roasteryOwner") {
-        return await db.select().from(shops);
+        return await db
+          .select()
+          .from(shops)
+          .where(eq(shops.isActive, true));
       }
 
-      // For other roles, get associated shops through userShops table
+      // For other roles, get associated active shops through userShops table
       const result = await db
         .select({
           id: shops.id,
@@ -193,7 +261,12 @@ export class DatabaseStorage implements IStorage {
         })
         .from(userShops)
         .innerJoin(shops, eq(userShops.shopId, shops.id))
-        .where(eq(userShops.userId, userId));
+        .where(
+          and(
+            eq(userShops.userId, userId),
+            eq(shops.isActive, true)
+          )
+        );
 
       console.log("Found shops for user:", userId, result);
       return result;
@@ -741,7 +814,7 @@ export class DatabaseStorage implements IStorage {
       throw error;
     }
   }
-  async deleteShop(id: number): Promise<Shop> { // Add to DatabaseStorage implementation
+  async deleteShop(id: number): Promise<Shop> {
     try {
       const [deletedShop] = await db
         .update(shops)
