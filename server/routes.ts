@@ -213,18 +213,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Add PATCH endpoint for updating shop settings after the existing shops routes
-  app.patch("/api/shops/:id", requireRole(["roasteryOwner"]), async (req, res) => {
+  app.patch("/api/shops/:id", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
     try {
       const shopId = parseInt(req.params.id);
-      const { desiredSmallBags } = req.body;
+      const { desiredSmallBags, desiredLargeBags } = req.body;
+
+      // For non-roasteryOwner users, verify shop access
+      if (req.user?.role !== "roasteryOwner") {
+        const hasAccess = await checkShopAccess(req.user!.id, shopId);
+        if (!hasAccess) {
+          return res.status(403).json({ message: "User does not have access to this shop" });
+        }
+      }
 
       const shop = await storage.getShop(shopId);
       if (!shop) {
         return res.status(404).json({ message: "Shop not found" });
       }
 
+      // Validate inputs
+      if (typeof desiredSmallBags !== 'number' || desiredSmallBags < 0) {
+        return res.status(400).json({ message: "Invalid small bags value" });
+      }
+      if (typeof desiredLargeBags !== 'number' || desiredLargeBags < 0) {
+        return res.status(400).json({ message: "Invalid large bags value" });
+      }
+
+      console.log("Updating shop:", shopId, "with new targets - small:", desiredSmallBags, "large:", desiredLargeBags);
       const updatedShop = await storage.updateShop(shopId, {
-        desiredSmallBags: Number(desiredSmallBags)
+        desiredSmallBags,
+        desiredLargeBags
       });
 
       res.json(updatedShop);
@@ -597,10 +615,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/dispatched-coffee/confirm", requireRole(["shopManager", "barista"]), async (req, res) => {
     try {
       const { confirmationId, receivedSmallBags, receivedLargeBags } = req.body;
+      console.log("Received confirmation request:", {
+        user: req.user?.username,
+        role: req.user?.role,
+        confirmationId,
+        receivedSmallBags,
+        receivedLargeBags
+      });
 
       if (!confirmationId) {
         return res.status(400).json({ message: "Confirmation ID is required" });
       }
+
+      // Validate quantities
+      if (typeof receivedSmallBags !== 'number' || receivedSmallBags < 0) {
+        return res.status(400).json({ message: "Invalid received small bags quantity" });
+      }
+      if (typeof receivedLargeBags !== 'number' || receivedLargeBags < 0) {
+        return res.status(400).json({ message: "Invalid received large bags quantity" });
+      }
+
+      // Get the confirmation to verify shop access
+      const existingConfirmation = await storage.getDispatchedCoffeeConfirmation(confirmationId);
+      if (!existingConfirmation) {
+        return res.status(404).json({ message: "Confirmation not found" });
+      }
+
+      // Verify shop access
+      const hasAccess = await checkShopAccess(req.user!.id, existingConfirmation.shopId);
+      if (!hasAccess) {
+        return res.status(403).json({ message: "User does not have access to this shop" });
+      }
+
+      console.log("Processing confirmation:", {
+        confirmationId,
+        receivedSmallBags,
+        receivedLargeBags,
+        userId: req.user!.id
+      });
 
       const confirmation = await storage.confirmDispatchedCoffee(confirmationId, {
         receivedSmallBags: Number(receivedSmallBags),
@@ -608,11 +660,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         confirmedById: req.user!.id,
       });
 
+      console.log("Confirmation processed successfully:", confirmation);
       res.json(confirmation);
     } catch (error) {
       console.error("Error confirming dispatched coffee:", error);
       res.status(500).json({ 
-        message: error instanceof Error ? error.message : "Failed to confirm dispatch" 
+        message: error instanceof Error ? error.message : "Failed to confirm dispatch",
+        details: error instanceof Error ? error.stack : undefined
       });
     }
   });
@@ -680,7 +734,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to update coffee target" });
     }
   });
-
 
 
   const httpServer = createServer(app);

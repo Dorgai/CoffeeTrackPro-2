@@ -76,6 +76,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
       receivedSmallBags: number;
       receivedLargeBags: number;
     }) => {
+      console.log("Sending confirmation data:", data);
       const res = await apiRequest("POST", "/api/dispatched-coffee/confirm", data);
       if (!res.ok) {
         const error = await res.text();
@@ -93,6 +94,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
       });
     },
     onError: (error: Error) => {
+      console.error("Confirmation error:", error);
       toast({
         title: "Error",
         description: error.message,
@@ -106,8 +108,8 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
 
     confirmMutation.mutate({
       confirmationId: selectedConfirmation.id,
-      receivedSmallBags: receivedQuantities.smallBags,
-      receivedLargeBags: receivedQuantities.largeBags,
+      receivedSmallBags: Number(receivedQuantities.smallBags),
+      receivedLargeBags: Number(receivedQuantities.largeBags),
     });
   };
 
