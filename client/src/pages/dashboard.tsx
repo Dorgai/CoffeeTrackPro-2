@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ShopSelector } from "@/components/layout/shop-selector";
 import StockProgress from "@/components/stock-progress";
+import { RestockDialog } from "@/components/coffee/restock-dialog";
 import { apiRequest } from "@/lib/queryClient";
 
 function StatsCard({
@@ -58,32 +59,16 @@ export default function Dashboard() {
   const { user, logoutMutation } = useAuth();
   const [selectedShopId, setSelectedShopId] = useState<number | null>(null);
 
-  // Debug log for current state
-  console.log('Current state:', {
-    user,
-    selectedShopId,
-  });
-
   // Get available shops for user
   const { data: userShops, isLoading: loadingShops } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
-    queryFn: async () => {
-      console.log('Fetching shops for user:', user?.username);
-      const res = await apiRequest("GET", "/api/user/shops");
-      if (!res.ok) throw new Error("Failed to fetch user shops");
-      const data = await res.json();
-      console.log('Shops data received:', data);
-      return data;
-    },
     enabled: !!user && (user.role === "shopManager" || user.role === "barista"),
   });
 
   // Set default shop
   useEffect(() => {
-    console.log('useEffect running with:', { user, userShops, selectedShopId });
     if ((user?.role === "shopManager" || user?.role === "barista") && userShops?.length && !selectedShopId) {
       const defaultShop = userShops.find(s => s.id === user.defaultShopId) || userShops[0];
-      console.log('Setting default shop:', defaultShop);
       setSelectedShopId(defaultShop.id);
     }
   }, [user, userShops, selectedShopId]);
@@ -91,77 +76,34 @@ export default function Dashboard() {
   // Get shop details
   const { data: shop, isLoading: loadingShop } = useQuery<Shop>({
     queryKey: ["/api/shops", selectedShopId],
-    queryFn: async () => {
-      console.log('Fetching shop details:', selectedShopId);
-      const res = await apiRequest("GET", `/api/shops/${selectedShopId}`);
-      if (!res.ok) throw new Error("Failed to fetch shop details");
-      const data = await res.json();
-      console.log('Shop data received:', data);
-      return data;
-    },
     enabled: !!selectedShopId,
-  });
-
-  // Get inventory for selected shop
-  const { data: shopInventory, isLoading: loadingInventory } = useQuery<RetailInventory[]>({
-    queryKey: ["/api/retail-inventory", selectedShopId],
-    queryFn: async () => {
-      console.log('Fetching inventory for shop:', selectedShopId);
-      const res = await apiRequest("GET", `/api/retail-inventory?shopId=${selectedShopId}`);
-      if (!res.ok) throw new Error("Failed to fetch inventory");
-      const data = await res.json();
-      console.log('Shop inventory received:', data);
-      return data;
-    },
-    enabled: !!selectedShopId && (user?.role === "shopManager" || user?.role === "barista"),
-  });
-
-  // Get all inventory for roastery owner
-  const { data: allInventory, isLoading: loadingAllInventory } = useQuery<RetailInventory[]>({
-    queryKey: ["/api/retail-inventory"],
-    queryFn: async () => {
-      console.log('Fetching all inventory');
-      const res = await apiRequest("GET", "/api/retail-inventory");
-      if (!res.ok) throw new Error("Failed to fetch all inventory");
-      const data = await res.json();
-      console.log('All inventory received:', data);
-      return data;
-    },
-    enabled: user?.role === "roasteryOwner",
   });
 
   // Get all coffees
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
-    queryFn: async () => {
-      console.log('Fetching coffee data');
-      const res = await apiRequest("GET", "/api/green-coffee");
-      if (!res.ok) throw new Error("Failed to fetch coffee data");
-      const data = await res.json();
-      console.log('Coffee data received:', data);
-      return data;
-    },
     enabled: !!user,
+  });
+
+  // Get inventory for current shop
+  const { data: shopInventory, isLoading: loadingInventory } = useQuery<RetailInventory[]>({
+    queryKey: ["/api/retail-inventory", selectedShopId],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/retail-inventory?shopId=${selectedShopId}`);
+      if (!res.ok) throw new Error("Failed to fetch inventory");
+      return res.json();
+    },
+    enabled: !!selectedShopId && (user?.role === "shopManager" || user?.role === "barista"),
+  });
+
+  // Get all inventory for roastery owner and roaster
+  const { data: allInventory, isLoading: loadingAllInventory } = useQuery<RetailInventory[]>({
+    queryKey: ["/api/retail-inventory"],
+    enabled: user?.role === "roasteryOwner" || user?.role === "roaster",
   });
 
   // Loading states
   const isLoading = loadingShops || loadingShop || loadingCoffees || loadingInventory || loadingAllInventory;
-
-  // Debug log for loading state and data
-  console.log('Loading state:', {
-    loadingShops,
-    loadingShop,
-    loadingCoffees,
-    loadingInventory,
-    loadingAllInventory
-  });
-  console.log('Data state:', {
-    userShops,
-    shop,
-    shopInventory,
-    allInventory,
-    coffees
-  });
 
   if (isLoading) {
     return (
@@ -171,46 +113,161 @@ export default function Dashboard() {
     );
   }
 
-  // Calculate metrics for roastery owner
+  // Calculate metrics
   const lowStockCoffees = coffees?.filter(coffee =>
     Number(coffee.currentStock) <= Number(coffee.minThreshold)
   ) || [];
+
+  // Common header section
+  const Header = ({ children }: { children?: React.ReactNode }) => (
+    <div className="flex justify-between items-center">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user?.username}</h1>
+        <p className="text-muted-foreground">
+          {user?.role === "roasteryOwner" && "Coffee roasting operations overview"}
+          {user?.role === "roaster" && "Coffee roasting operations"}
+          {(user?.role === "shopManager" || user?.role === "barista") && "Manage your coffee shop inventory"}
+        </p>
+      </div>
+      <div className="flex gap-2">
+        {children}
+        <Button
+          variant="outline"
+          onClick={() => logoutMutation.mutate()}
+          disabled={logoutMutation.isPending}
+        >
+          <LogOut className="h-4 w-4 mr-2" />
+          Logout
+        </Button>
+      </div>
+    </div>
+  );
+
+  // Roaster view
+  if (user?.role === "roaster") {
+    return (
+      <div className="container mx-auto py-8 space-y-8">
+        <Header />
+
+        {/* Stats */}
+        <div className="grid gap-4 md:grid-cols-3">
+          <StatsCard
+            title="Coffee Types"
+            value={coffees?.length || 0}
+            icon={Coffee}
+            description="Available coffee varieties"
+          />
+          <StatsCard
+            title="Pending Orders"
+            value={allInventory?.length || 0}
+            icon={Package}
+            description="Orders waiting for roasting"
+          />
+          <StatsCard
+            title="Low Stock Items"
+            value={lowStockCoffees.length}
+            icon={AlertTriangle}
+            description="Below minimum threshold"
+          />
+        </div>
+
+        {/* Coffee Inventory */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Green Coffee Inventory</CardTitle>
+            <CardDescription>Available coffee for roasting</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!coffees?.length ? (
+              <p className="text-center text-muted-foreground">No coffee inventory available</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Coffee</TableHead>
+                    <TableHead>Producer</TableHead>
+                    <TableHead>Origin</TableHead>
+                    <TableHead className="text-right">Stock</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {coffees.map(coffee => (
+                    <TableRow key={coffee.id}>
+                      <TableCell className="font-medium">{coffee.name}</TableCell>
+                      <TableCell>{coffee.producer}</TableCell>
+                      <TableCell>{coffee.country}</TableCell>
+                      <TableCell className="text-right">{coffee.currentStock}kg</TableCell>
+                      <TableCell>
+                        {Number(coffee.currentStock) <= Number(coffee.minThreshold) ? (
+                          <Badge variant="destructive">Low Stock</Badge>
+                        ) : (
+                          <Badge variant="outline">In Stock</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Button asChild variant="outline" size="sm">
+                          <Link href={`/roasting/orders/${coffee.id}`}>
+                            Start Roasting
+                          </Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Low Stock Alerts */}
+        {lowStockCoffees.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-red-500">Low Stock Alerts</CardTitle>
+              <CardDescription>Coffee types below minimum threshold</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {lowStockCoffees.map(coffee => (
+                  <div key={coffee.id} className="flex items-center justify-between p-2 bg-muted rounded-lg">
+                    <div>
+                      <p className="font-medium">{coffee.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Current stock: {coffee.currentStock}kg
+                      </p>
+                    </div>
+                    <Badge variant="destructive">Below Threshold</Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
+  }
 
   // Shop manager and barista view
   if (user?.role === "shopManager" || user?.role === "barista") {
     return (
       <div className="container mx-auto py-8 space-y-8">
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user.username}</h1>
-            <p className="text-muted-foreground">Manage your coffee shop inventory</p>
-          </div>
-          <div className="flex gap-2">
-            <ShopSelector
-              value={selectedShopId}
-              onChange={(id) => {
-                console.log('Shop selected:', id);
-                setSelectedShopId(id);
-              }}
-            />
-            <Button
-              variant="outline"
-              onClick={() => logoutMutation.mutate()}
-              disabled={logoutMutation.isPending}
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          </div>
-        </div>
+        <Header>
+          <ShopSelector
+            value={selectedShopId}
+            onChange={setSelectedShopId}
+          />
+        </Header>
 
-        {/* Inventory Overview */}
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
-            <CardHeader>
-              <CardTitle>Current Inventory</CardTitle>
-              <CardDescription>Stock levels for selected shop</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Current Inventory</CardTitle>
+                <CardDescription>Stock levels for selected shop</CardDescription>
+              </div>
+              {user.role === "shopManager" && <RestockDialog />}
             </CardHeader>
             <CardContent>
               {!selectedShopId ? (
@@ -273,21 +330,7 @@ export default function Dashboard() {
   if (user?.role === "roasteryOwner") {
     return (
       <div className="container mx-auto py-8 space-y-8">
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user.username}</h1>
-            <p className="text-muted-foreground">Coffee roasting operations overview</p>
-          </div>
-          <Button
-            variant="outline"
-            onClick={() => logoutMutation.mutate()}
-            disabled={logoutMutation.isPending}
-          >
-            <LogOut className="h-4 w-4 mr-2" />
-            Logout
-          </Button>
-        </div>
+        <Header />
 
         {/* Stats Overview */}
         <div className="grid gap-4 md:grid-cols-3">

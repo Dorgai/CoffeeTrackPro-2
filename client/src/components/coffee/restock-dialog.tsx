@@ -39,15 +39,9 @@ export function RestockDialog() {
   const [quantities, setQuantities] = useState<Record<number, number>>({});
 
   // Fetch available coffees
-  const { data: coffees } = useQuery<any[]>({
+  const { data: coffees } = useQuery<CoffeeWithQuantity[]>({
     queryKey: ["/api/green-coffee"],
     enabled: isOpen,
-  });
-
-  // Fetch shop's default quantity
-  const { data: shop } = useQuery<Shop>({
-    queryKey: ["/api/shops", activeShop?.id],
-    enabled: isOpen && !!activeShop,
   });
 
   // Fetch current inventory
@@ -56,36 +50,21 @@ export function RestockDialog() {
     enabled: isOpen && !!activeShop,
     queryFn: async () => {
       const res = await apiRequest("GET", `/api/retail-inventory?shopId=${activeShop?.id}`);
+      if (!res.ok) throw new Error("Failed to fetch inventory");
       return res.json();
     },
   });
-
-  // Initialize quantities with the difference between default and current
-  const initializeQuantities = () => {
-    if (coffees && shop?.defaultOrderQuantity && currentInventory) {
-      const initialQuantities = coffees.reduce((acc, coffee) => {
-        // Find current inventory for this coffee
-        const currentStock = currentInventory.find(inv => inv.greenCoffeeId === coffee.id);
-        const currentQuantity = currentStock ? (currentStock.smallBags || 0) : 0;
-
-        // Calculate how many to order to reach the default quantity
-        const quantityToOrder = Math.max(0, shop.defaultOrderQuantity - currentQuantity);
-
-        acc[coffee.id] = quantityToOrder;
-        return acc;
-      }, {} as Record<number, number>);
-      setQuantities(initialQuantities);
-    }
-  };
 
   // Create order mutation
   const createOrderMutation = useMutation({
     mutationFn: async (orderData: any) => {
       const res = await apiRequest("POST", "/api/orders", orderData);
+      if (!res.ok) throw new Error("Failed to create order");
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", activeShop?.id] });
       toast({
         title: "Success",
         description: "Restock order created successfully",
@@ -111,11 +90,26 @@ export function RestockDialog() {
           shopId: activeShop.id,
           greenCoffeeId: parseInt(coffeeId),
           smallBags: quantity,
-          largeBags: 0, // Could be made configurable in the future
+          largeBags: 0,
           status: "pending",
         });
       }
     });
+  };
+
+  // Initialize quantities when dialog opens
+  const initializeQuantities = () => {
+    if (coffees && currentInventory) {
+      const initialQuantities = coffees.reduce((acc, coffee) => {
+        // Find current inventory for this coffee
+        const currentStock = currentInventory.find(inv => inv.greenCoffeeId === coffee.id);
+        const currentQuantity = currentStock ? (currentStock.smallBags || 0) : 0;
+
+        acc[coffee.id] = 0;
+        return acc;
+      }, {} as Record<number, number>);
+      setQuantities(initialQuantities);
+    }
   };
 
   return (
@@ -142,7 +136,7 @@ export function RestockDialog() {
         {!activeShop && (
           <Alert variant="destructive" className="mb-4">
             <AlertDescription>
-              Please select a shop from the dropdown in the navigation bar before creating a restock order.
+              Please select a shop before creating a restock order.
             </AlertDescription>
           </Alert>
         )}
