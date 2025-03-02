@@ -329,70 +329,57 @@ export function Dashboard() {
       </div>
 
       {/* Available Coffee Types Widget - Not visible for roasters */}
-      {user?.role !== "roaster" && (
+      {user?.role !== "roaster" && selectedShopId && (
         <Card>
           <CardHeader>
-            <CardTitle>Available Coffee Types</CardTitle>
-            <CardDescription>Coffee types available in other shops but not in stock here</CardDescription>
+            <CardTitle>You don't have these coffees in stock</CardTitle>
+            <CardDescription>Coffee types available in other shops but not in your inventory</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              {getShopsToShow().map(shop => {
-                if (!shop) return null;
+              <div className="space-y-2">
+                {coffees?.filter(coffee => {
+                  // Get inventory for this coffee in the selected shop
+                  const shopInventory = currentInventory?.find(inv =>
+                    inv.greenCoffeeId === coffee.id &&
+                    inv.shopId === selectedShopId
+                  );
 
-                const shopInventory = currentInventory?.filter(inv => inv.shopId === shop.id) || [];
-                const shopCoffeeIds = new Set(shopInventory.map(inv => inv.greenCoffeeId));
-
-                // Find coffees that exist in other shops but not in this one
-                const availableCoffees = coffees?.filter(coffee => {
-                  if (!coffee) return false;
-
-                  // Check if this coffee exists in any other shop's inventory
-                  const isInOtherShops = currentInventory?.some(inv =>
-                    inv.shopId !== shop.id &&
+                  // Check if coffee exists in other shops' inventory
+                  const existsInOtherShops = currentInventory?.some(inv =>
+                    inv.shopId !== selectedShopId &&
                     inv.greenCoffeeId === coffee.id &&
                     (inv.smallBags > 0 || inv.largeBags > 0)
                   );
 
-                  // Return true if the coffee is in other shops but not in current shop
-                  return !shopCoffeeIds.has(coffee.id) && isInOtherShops;
-                }) || [];
-
-                if (!availableCoffees.length) return null;
-
-                return (
-                  <div key={shop.id} className="space-y-2">
-                    <h3 className="font-medium">{shop.name}</h3>
-                    <div className="grid gap-2">
-                      {availableCoffees.map(coffee => (
-                        <div key={coffee.id} className="p-3 bg-muted rounded-lg">
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <p className="font-medium">{coffee.name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {coffee.producer} - {coffee.country}
-                              </p>
-                              <p className="text-sm text-muted-foreground mt-1">
-                                Grade: {coffee.grade}
-                              </p>
-                            </div>
-                            {(user?.role === "shopManager" || user?.role === "barista") && (
-                              <Button variant="outline" size="sm" asChild>
-                                <Link href={`/retail/orders?coffeeId=${coffee.id}&shopId=${shop.id}`}>
-                                  Order Now
-                                </Link>
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                  // Show coffee if it's not in current shop but exists in others
+                  return !shopInventory && existsInOtherShops;
+                }).map(coffee => (
+                  <div key={coffee.id} className="p-3 bg-muted rounded-lg">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="font-medium">{coffee.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {coffee.producer} - {coffee.country}
+                        </p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Grade: {coffee.grade}
+                        </p>
+                      </div>
+                      {(user?.role === "shopManager" || user?.role === "barista") && (
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/retail/orders?coffeeId=${coffee.id}&shopId=${selectedShopId}`}>
+                            Order Now
+                          </Link>
+                        </Button>
+                      )}
                     </div>
                   </div>
-                );
-              })}
-              {!currentInventory?.length && (
-                <p className="text-center text-muted-foreground py-4">No inventory data available</p>
-              )}
+                ))}
+                {!currentInventory?.length && (
+                  <p className="text-muted-foreground text-center py-4">No inventory data available</p>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -575,7 +562,7 @@ export function Dashboard() {
       )}
       <div className="grid gap-4 md:grid-cols-2">
         {/* Stock Overview Section - Only for shop managers and baristas */}
-        {(user?.role === "shopManager" || user?.role === "barista") && (
+        {(user?.role === "shopManager" || user?.role === "barista") && selectedShopId && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <div>
@@ -595,10 +582,13 @@ export function Dashboard() {
                     inv.shopId === selectedShopId
                   );
 
-                  // Skip if no inventory for this coffee
-                  if (!shopInventory) {
-                    return null;
-                  }
+                  const coffeeTarget = coffeeTargets?.find(t =>
+                    t.greenCoffeeId === coffee.id &&
+                    t.shopId === selectedShopId
+                  );
+
+                  // Skip if no inventory exists for this coffee
+                  if (!shopInventory) return null;
 
                   return (
                     <div key={coffee.id} className="space-y-4">
@@ -617,14 +607,14 @@ export function Dashboard() {
                         />
                         <StockProgress
                           current={shopInventory.largeBags || 0}
-                          desired={shop?.desiredLargeBags || 0}
+                          desired={coffeeTarget?.desiredLargeBags || 0}
                           label="Large Bags (1kg)"
                         />
                       </div>
                     </div>
                   );
                 })}
-                {(!filteredInventory || filteredInventory.length === 0) && (
+                {(!currentInventory || currentInventory.length === 0) && (
                   <p className="text-muted-foreground text-center py-4">No inventory data available</p>
                 )}
               </div>
