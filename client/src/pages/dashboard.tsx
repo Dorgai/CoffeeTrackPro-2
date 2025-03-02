@@ -171,7 +171,7 @@ export default function Dashboard() {
               <p className="text-center text-muted-foreground">No coffee inventory available</p>
             ) : (
               <Table>
-                <TableHeader>
+                <thead>
                   <TableRow>
                     <TableHead>Coffee</TableHead>
                     <TableHead>Producer</TableHead>
@@ -180,7 +180,7 @@ export default function Dashboard() {
                     <TableHead>Status</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
-                </TableHeader>
+                </thead>
                 <TableBody>
                   {coffees.map(coffee => (
                     <TableRow key={coffee.id}>
@@ -242,12 +242,27 @@ export default function Dashboard() {
   if (user?.role === "shopManager" || user?.role === "barista") {
     return (
       <div className="container mx-auto py-8 space-y-8">
-        <Header>
-          <ShopSelector
-            value={selectedShopId}
-            onChange={setSelectedShopId}
-          />
-        </Header>
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user.username}</h1>
+            <p className="text-muted-foreground">Manage your coffee shop inventory</p>
+          </div>
+          <div className="flex gap-2">
+            <ShopSelector
+              value={selectedShopId}
+              onChange={setSelectedShopId}
+            />
+            <Button
+              variant="outline"
+              onClick={() => logoutMutation.mutate()}
+              disabled={logoutMutation.isPending}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
+          </div>
+        </div>
 
         {/* Stats Overview */}
         <div className="grid gap-4 md:grid-cols-3">
@@ -386,7 +401,21 @@ export default function Dashboard() {
   if (user?.role === "roasteryOwner") {
     return (
       <div className="container mx-auto py-8 space-y-8">
-        <Header />
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user.username}</h1>
+            <p className="text-muted-foreground">Coffee roasting operations overview</p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => logoutMutation.mutate()}
+            disabled={logoutMutation.isPending}
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Logout
+          </Button>
+        </div>
 
         {/* Stats Overview */}
         <div className="grid gap-4 md:grid-cols-3">
