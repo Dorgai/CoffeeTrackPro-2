@@ -348,7 +348,8 @@ export function Dashboard() {
                   // Get inventory for this coffee in the selected shop
                   const shopInventory = currentInventory?.find(inv =>
                     inv.greenCoffeeId === coffee.id &&
-                    inv.shopId === selectedShopId
+                    inv.shopId === selectedShopId &&
+                    (inv.smallBags > 0 || inv.largeBags > 0)
                   );
 
                   // Check if coffee exists in other shops' inventory
@@ -382,8 +383,8 @@ export function Dashboard() {
                     </div>
                   </div>
                 ))}
-                {(!currentInventory || currentInventory.length === 0) && (
-                  <p className="text-muted-foreground text-center py-4">No inventory data available</p>
+                {!coffees?.length && (
+                  <p className="text-muted-foreground text-center py-4">No coffee types available</p>
                 )}
               </div>
             </div>
@@ -403,17 +404,14 @@ export function Dashboard() {
             <CardContent>
               <div className="space-y-4">
                 {currentInventory?.reduce((shops, inv) => {
-                  if (!shops.some(s => s.id === inv.shopId)) {
-                    const shopInventory = currentInventory.filter(i => i.shopId === inv.shopId);
-                    const shop = shopInventory[0]?.shop;
-                    if (shop) {
-                      shops.push({
-                        id: inv.shopId,
-                        name: shop.name,
-                        desiredSmallBags: shop.desiredSmallBags,
-                        inventory: shopInventory
-                      });
-                    }
+                  const shopData = inv.shop;
+                  if (shopData && !shops.some(s => s.id === inv.shopId)) {
+                    shops.push({
+                      id: inv.shopId,
+                      name: shopData.name,
+                      desiredSmallBags: shopData.desiredSmallBags,
+                      inventory: currentInventory.filter(i => i.shopId === inv.shopId)
+                    });
                   }
                   return shops;
                 }, [] as Array<{
@@ -423,15 +421,23 @@ export function Dashboard() {
                   inventory: typeof currentInventory;
                 }>).map(shop => {
                   const totalSmallBags = shop.inventory.reduce((sum, inv) => sum + (inv.smallBags || 0), 0);
+                  const totalLargeBags = shop.inventory.reduce((sum, inv) => sum + (inv.largeBags || 0), 0);
 
                   return (
                     <div key={shop.id} className="space-y-4 pb-4 border-b last:border-0">
                       <h3 className="font-medium text-lg">{shop.name}</h3>
-                      <StockProgress
-                        current={totalSmallBags}
-                        desired={shop.desiredSmallBags || 0}
-                        label="Small Bags (200g)"
-                      />
+                      <div className="space-y-2">
+                        <StockProgress
+                          current={totalSmallBags}
+                          desired={shop.desiredSmallBags || 0}
+                          label="Small Bags (200g)"
+                        />
+                        <StockProgress
+                          current={totalLargeBags}
+                          desired={0}
+                          label="Large Bags (1kg)"
+                        />
+                      </div>
                     </div>
                   );
                 })}
