@@ -393,7 +393,7 @@ export function Dashboard() {
       )}
 
       {/* Stock Overview Section - For both managers and baristas */}
-      {(user?.role === "shopManager" || user?.role === "barista") && (
+      {(user?.role === "shopManager" || user?.role === "barista") && selectedShopId && (
         <div className="grid gap-4 md:grid-cols-2">
           {/* Global Stock Overview */}
           <Card>
@@ -403,24 +403,24 @@ export function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {shop && currentInventory && (
+                {shop && filteredInventory && (
                   <div className="space-y-4 pb-4">
                     <h3 className="font-medium text-lg">{shop.name}</h3>
                     <div className="space-y-2">
                       <StockProgress
-                        current={currentInventory.reduce((sum, inv) => sum + (inv.smallBags || 0), 0)}
+                        current={filteredInventory.reduce((sum, inv) => sum + (inv.smallBags || 0), 0)}
                         desired={shop.desiredSmallBags || 0}
                         label="Small Bags (200g)"
                       />
                       <StockProgress
-                        current={currentInventory.reduce((sum, inv) => sum + (inv.largeBags || 0), 0)}
+                        current={filteredInventory.reduce((sum, inv) => sum + (inv.largeBags || 0), 0)}
                         desired={shop.desiredLargeBags || 0}
                         label="Large Bags (1kg)"
                       />
                     </div>
                   </div>
                 )}
-                {!currentInventory?.length && (
+                {!filteredInventory?.length && (
                   <p className="text-muted-foreground text-center py-4">No inventory data available</p>
                 )}
               </div>
@@ -441,9 +441,8 @@ export function Dashboard() {
             <CardContent>
               <div className="space-y-6">
                 {coffees?.map(coffee => {
-                  const shopInventory = currentInventory?.find(inv =>
-                    inv.greenCoffeeId === coffee.id &&
-                    inv.shopId === selectedShopId
+                  const shopInventory = filteredInventory?.find(inv =>
+                    inv.greenCoffeeId === coffee.id
                   );
 
                   const coffeeTarget = coffeeTargets?.find(t =>
@@ -479,7 +478,7 @@ export function Dashboard() {
                     </div>
                   );
                 })}
-                {(!currentInventory || currentInventory.length === 0) && (
+                {(!filteredInventory || filteredInventory.length === 0) && (
                   <p className="text-muted-foreground text-center py-4">No inventory data available</p>
                 )}
               </div>
