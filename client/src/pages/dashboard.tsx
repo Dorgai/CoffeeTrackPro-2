@@ -345,22 +345,22 @@ export function Dashboard() {
             <div className="space-y-6">
               <div className="space-y-2">
                 {coffees?.filter(coffee => {
-                  // Get inventory for this coffee in the selected shop
-                  const shopInventory = currentInventory?.find(inv =>
-                    inv.greenCoffeeId === coffee.id &&
-                    inv.shopId === selectedShopId &&
+                  // Find all inventory for this coffee
+                  const allInventory = currentInventory?.filter(inv => inv.greenCoffeeId === coffee.id);
+
+                  // Check if the coffee exists in current shop
+                  const hasInCurrentShop = allInventory?.some(inv => 
+                    inv.shopId === selectedShopId && 
                     (inv.smallBags > 0 || inv.largeBags > 0)
                   );
 
-                  // Check if coffee exists in other shops' inventory
-                  const existsInOtherShops = currentInventory?.some(inv =>
-                    inv.shopId !== selectedShopId &&
-                    inv.greenCoffeeId === coffee.id &&
+                  // Check if the coffee exists in other shops
+                  const existsInOtherShops = allInventory?.some(inv => 
+                    inv.shopId !== selectedShopId && 
                     (inv.smallBags > 0 || inv.largeBags > 0)
                   );
 
-                  // Show coffee if it's not in current shop but exists in others
-                  return !shopInventory && existsInOtherShops;
+                  return !hasInCurrentShop && existsInOtherShops;
                 }).map(coffee => (
                   <div key={coffee.id} className="p-3 bg-muted rounded-lg">
                     <div className="flex justify-between items-center">
@@ -403,46 +403,25 @@ export function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {currentInventory?.reduce((shops, inv) => {
-                  const shopData = inv.shop;
-                  if (shopData && !shops.some(s => s.id === inv.shopId)) {
-                    shops.push({
-                      id: inv.shopId,
-                      name: shopData.name,
-                      desiredSmallBags: shopData.desiredSmallBags,
-                      inventory: currentInventory.filter(i => i.shopId === inv.shopId)
-                    });
-                  }
-                  return shops;
-                }, [] as Array<{
-                  id: number;
-                  name: string;
-                  desiredSmallBags?: number;
-                  inventory: typeof currentInventory;
-                }>).map(shop => {
-                  const totalSmallBags = shop.inventory.reduce((sum, inv) => sum + (inv.smallBags || 0), 0);
-                  const totalLargeBags = shop.inventory.reduce((sum, inv) => sum + (inv.largeBags || 0), 0);
-
-                  return (
-                    <div key={shop.id} className="space-y-4 pb-4 border-b last:border-0">
-                      <h3 className="font-medium text-lg">{shop.name}</h3>
-                      <div className="space-y-2">
-                        <StockProgress
-                          current={totalSmallBags}
-                          desired={shop.desiredSmallBags || 0}
-                          label="Small Bags (200g)"
-                        />
-                        <StockProgress
-                          current={totalLargeBags}
-                          desired={0}
-                          label="Large Bags (1kg)"
-                        />
-                      </div>
+                {shop && currentInventory && (
+                  <div className="space-y-4 pb-4">
+                    <h3 className="font-medium text-lg">{shop.name}</h3>
+                    <div className="space-y-2">
+                      <StockProgress
+                        current={currentInventory.reduce((sum, inv) => sum + (inv.smallBags || 0), 0)}
+                        desired={shop.desiredSmallBags || 0}
+                        label="Small Bags (200g)"
+                      />
+                      <StockProgress
+                        current={currentInventory.reduce((sum, inv) => sum + (inv.largeBags || 0), 0)}
+                        desired={shop.desiredLargeBags || 0}
+                        label="Large Bags (1kg)"
+                      />
                     </div>
-                  );
-                })}
+                  </div>
+                )}
                 {!currentInventory?.length && (
-                  <p className="text-center text-muted-foreground py-4">No inventory data available</p>
+                  <p className="text-muted-foreground text-center py-4">No inventory data available</p>
                 )}
               </div>
             </CardContent>
@@ -472,7 +451,6 @@ export function Dashboard() {
                     t.shopId === selectedShopId
                   );
 
-                  // Skip if no inventory exists for this coffee
                   if (!shopInventory) return null;
 
                   return (
@@ -660,14 +638,14 @@ export function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              {currentInventory?.reduce((shops, inv) => {
-                const shopData = inv.shop;
-                if (shopData && !shops.some(s => s.id === inv.shopId)) {
+              {orders?.filter(order => order.shop).reduce((shops, order) => {
+                if (order.shop && !shops.some(s => s.id === order.shopId)) {
+                  const shopInventory = currentInventory?.filter(inv => inv.shopId === order.shopId) || [];
                   shops.push({
-                    id: inv.shopId,
-                    name: shopData.name,
-                    location: shopData.location,
-                    inventory: currentInventory.filter(i => i.shopId === inv.shopId)
+                    id: order.shopId,
+                    name: order.shop.name,
+                    location: order.shop.location,
+                    inventory: shopInventory
                   });
                 }
                 return shops;
