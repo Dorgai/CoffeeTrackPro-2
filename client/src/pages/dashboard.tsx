@@ -349,14 +349,14 @@ export function Dashboard() {
                   const allInventory = currentInventory?.filter(inv => inv.greenCoffeeId === coffee.id);
 
                   // Check if the coffee exists in current shop
-                  const hasInCurrentShop = allInventory?.some(inv => 
-                    inv.shopId === selectedShopId && 
+                  const hasInCurrentShop = allInventory?.some(inv =>
+                    inv.shopId === selectedShopId &&
                     (inv.smallBags > 0 || inv.largeBags > 0)
                   );
 
                   // Check if the coffee exists in other shops
-                  const existsInOtherShops = allInventory?.some(inv => 
-                    inv.shopId !== selectedShopId && 
+                  const existsInOtherShops = allInventory?.some(inv =>
+                    inv.shopId !== selectedShopId &&
                     (inv.smallBags > 0 || inv.largeBags > 0)
                   );
 
@@ -558,7 +558,7 @@ export function Dashboard() {
 
 
       {/* Pending Orders Section - For both roasters and managers */}
-      {(user?.role === "roaster" || user?.role === "shopManager") && (
+      {(user?.role === "roaster" || user?.role === "shopManager" || user?.role === "barista") && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle>Pending Orders</CardTitle>
@@ -570,34 +570,38 @@ export function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              {user?.role === "shopManager" ? (
-                // For managers: Show orders grouped by shop
-                Object.entries(pendingOrdersByShop).map(([shopName, shopOrders]) => (
-                  <div key={shopName} className="space-y-3">
-                    <h3 className="font-medium text-sm text-muted-foreground">{shopName}</h3>
-                    <div className="space-y-2">
-                      {shopOrders.map(order => (
-                        <div key={order.id} className="p-3 bg-muted rounded-lg">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="text-sm font-medium">{order.greenCoffee?.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                Ordered: {new Date(order.createdAt).toLocaleDateString()} ({getDaysSince(order.createdAt)} days ago)
-                              </p>
-                            </div>
-                            <Badge variant={order.status === "pending" ? "destructive" : "outline"} className="capitalize">
-                              {order.status}
-                            </Badge>
-                          </div>
-                          <div className="grid grid-cols-2 gap-4 mt-2 text-sm">
-                            <div>Small Bags: {order.smallBags}</div>
-                            <div>Large Bags: {order.largeBags}</div>
-                          </div>
+              {user?.role === "shopManager" || user?.role === "barista" ? (
+                // For managers and baristas: Show orders for their shop
+                <div className="space-y-3">
+                  {orders?.filter(order =>
+                    order.status === "pending" &&
+                    order.shopId === selectedShopId
+                  ).map(order => (
+                    <div key={order.id} className="p-3 bg-muted rounded-lg">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="text-sm font-medium">{order.greenCoffee?.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Ordered: {new Date(order.createdAt).toLocaleDateString()} ({getDaysSince(order.createdAt)} days ago)
+                          </p>
                         </div>
-                      ))}
+                        <Badge variant="destructive">
+                          Pending {getDaysSince(order.createdAt)}d
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 mt-2 text-sm">
+                        <div>Small Bags: {order.smallBags}</div>
+                        <div>Large Bags: {order.largeBags}</div>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  ))}
+                  {!orders?.filter(order =>
+                    order.status === "pending" &&
+                    order.shopId === selectedShopId
+                  ).length && (
+                    <p className="text-muted-foreground text-center py-4">No pending orders</p>
+                  )}
+                </div>
               ) : (
                 // For roasters: Show all pending orders
                 <div className="space-y-4">
@@ -619,10 +623,10 @@ export function Dashboard() {
                       </div>
                     </div>
                   ))}
+                  {!orders?.filter(order => order.status === "pending").length && (
+                    <p className="text-muted-foreground text-center py-4">No pending orders</p>
+                  )}
                 </div>
-              )}
-              {(!orders || orders.filter(order => order.status === "pending").length === 0) && (
-                <p className="text-muted-foreground text-center py-4">No pending orders</p>
               )}
             </div>
           </CardContent>
@@ -765,7 +769,8 @@ export function Dashboard() {
                               <div>Large Bags: {order.largeBags}</div>
                             </div>
                           </div>
-                        );                      })}
+                        );
+                      })}
                       {shopOrders.length === 0 && (
                         <p className="text-muted-foreground text-center py-2">No recent orders</p>
                       )}
@@ -820,14 +825,13 @@ export function Dashboard() {
                       <TableCell>
                         <div className="flex items-centergap-2">
                           <Link href={`/inventory/${coffee.id}`}>
-                            <Button variant="outline" size="sm">View Details</Button>
-                          </Link>
+                            <Button variant="outline" size="sm">View Details</Button>                          </Link>
                         </div>
                       </TableCell>
                     )}
                   </TableRow>
                 ))}
-                {(!coffees || coffees.length === 0) && (
+                {(!coffees|| coffees.length === 0) && (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center text-muted-foreground py-4">
                       No green coffee inventory available
