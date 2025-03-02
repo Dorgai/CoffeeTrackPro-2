@@ -10,41 +10,11 @@ import { useState } from 'react';
 import type { Shop } from "@shared/schema";
 import { Store, Plus, Edit2, Trash2, Loader2 } from "lucide-react";
 
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+// Extended schema to include the new fields
+const formSchema = insertShopSchema.extend({
+  desiredSmallBags: z.coerce.number().min(0),
+  desiredLargeBags: z.coerce.number().min(0),
+});
 
 export default function Shops() {
   const { toast } = useToast();
@@ -53,18 +23,22 @@ export default function Shops() {
   const [shopToDelete, setShopToDelete] = useState<Shop | null>(null);
 
   const form = useForm({
-    resolver: zodResolver(insertShopSchema),
+    resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
       location: "",
+      desiredSmallBags: 20,
+      desiredLargeBags: 10,
     },
   });
 
   const editForm = useForm({
-    resolver: zodResolver(insertShopSchema),
+    resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
       location: "",
+      desiredSmallBags: 20,
+      desiredLargeBags: 10,
     },
   });
 
@@ -73,7 +47,7 @@ export default function Shops() {
   });
 
   const createShopMutation = useMutation({
-    mutationFn: async (data: z.infer<typeof insertShopSchema>) => {
+    mutationFn: async (data: z.infer<typeof formSchema>) => {
       const res = await apiRequest("POST", "/api/shops", data);
       if (!res.ok) {
         const error = await res.json();
@@ -99,7 +73,7 @@ export default function Shops() {
   });
 
   const updateShopMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: z.infer<typeof insertShopSchema> }) => {
+    mutationFn: async ({ id, data }: { id: number; data: z.infer<typeof formSchema> }) => {
       const res = await apiRequest("PATCH", `/api/shops/${id}`, data);
       if (!res.ok) {
         const error = await res.json();
@@ -126,24 +100,12 @@ export default function Shops() {
 
   const deleteShopMutation = useMutation({
     mutationFn: async (shopId: number) => {
-      try {
-        const res = await apiRequest("DELETE", `/api/shops/${shopId}`);
-        if (!res.ok) {
-          const error = await res.text(); // First get the raw text
-          try {
-            // Try to parse as JSON if possible
-            const errorData = JSON.parse(error);
-            throw new Error(errorData.message || "Failed to delete shop");
-          } catch (e) {
-            // If parsing fails, use the raw text
-            throw new Error(error || "Failed to delete shop");
-          }
-        }
-        return await res.json();
-      } catch (error) {
-        console.error("Delete shop error:", error);
-        throw error;
+      const res = await apiRequest("DELETE", `/api/shops/${shopId}`);
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error || "Failed to delete shop");
       }
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/shops"] });
@@ -221,6 +183,40 @@ export default function Shops() {
                   )}
                 />
 
+                <FormField
+                  control={form.control}
+                  name="desiredSmallBags"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Target Small Bags (200g)</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="0" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                      <p className="text-sm text-muted-foreground">
+                        Set the desired quantity of small bags for this location
+                      </p>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="desiredLargeBags"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Target Large Bags (1kg)</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="0" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                      <p className="text-sm text-muted-foreground">
+                        Set the desired quantity of large bags for this location
+                      </p>
+                    </FormItem>
+                  )}
+                />
+
                 <Button
                   type="submit"
                   disabled={createShopMutation.isPending}
@@ -265,6 +261,8 @@ export default function Shops() {
                           editForm.reset({
                             name: shop.name,
                             location: shop.location,
+                            desiredSmallBags: shop.desiredSmallBags || 20,
+                            desiredLargeBags: shop.desiredLargeBags || 10,
                           });
                         }}
                       >
@@ -295,6 +293,9 @@ export default function Shops() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit Shop Details</DialogTitle>
+            <DialogDescription>
+              Update shop information and target stock levels
+            </DialogDescription>
           </DialogHeader>
           <Form {...editForm}>
             <form
@@ -327,6 +328,40 @@ export default function Shops() {
                       <Input {...field} />
                     </FormControl>
                     <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name="desiredSmallBags"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Target Small Bags (200g)</FormLabel>
+                    <FormControl>
+                      <Input type="number" min="0" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    <p className="text-sm text-muted-foreground">
+                      Set the desired quantity of small bags for this location
+                    </p>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name="desiredLargeBags"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Target Large Bags (1kg)</FormLabel>
+                    <FormControl>
+                      <Input type="number" min="0" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    <p className="text-sm text-muted-foreground">
+                      Set the desired quantity of large bags for this location
+                    </p>
                   </FormItem>
                 )}
               />

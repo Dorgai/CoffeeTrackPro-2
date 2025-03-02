@@ -19,7 +19,7 @@ type InventoryItem = {
 export function StockLevelIndicator() {
   const { activeShop } = useActiveShop();
 
-  // Fetch shop details to get default order quantity
+  // Fetch shop details to get target quantities
   const { data: shop } = useQuery<Shop>({
     queryKey: ["/api/shops", activeShop?.id],
     enabled: !!activeShop,
@@ -41,18 +41,7 @@ export function StockLevelIndicator() {
     },
   });
 
-  // Fetch all available coffees
-  const { data: coffees } = useQuery<any[]>({
-    queryKey: ["/api/green-coffee"],
-    enabled: !!activeShop,
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/green-coffee");
-      if (!res.ok) throw new Error("Failed to fetch coffee types");
-      return res.json();
-    }
-  });
-
-  if (!activeShop || !shop?.defaultOrderQuantity || !inventory || !coffees) {
+  if (!activeShop || !shop?.desiredSmallBags || !shop?.desiredLargeBags || !inventory) {
     return (
       <div className="flex items-center gap-2">
         <Package className="h-4 w-4" />
@@ -61,19 +50,21 @@ export function StockLevelIndicator() {
     );
   }
 
-  // Calculate total desired stock
-  const desiredStock = shop.defaultOrderQuantity * coffees.length;
+  // Calculate current totals
+  const totalSmallBags = inventory.reduce((sum, item) => sum + item.smallBags, 0);
+  const totalLargeBags = inventory.reduce((sum, item) => sum + item.largeBags, 0);
 
-  // Calculate current total stock
-  const currentStock = inventory.reduce((total, item) => total + (item.smallBags || 0) + (item.largeBags || 0), 0);
+  // Calculate percentages for both bag types
+  const smallBagsPercentage = Math.min(Math.round((totalSmallBags / shop.desiredSmallBags) * 100), 100);
+  const largeBagsPercentage = Math.min(Math.round((totalLargeBags / shop.desiredLargeBags) * 100), 100);
 
-  // Calculate stock level percentage
-  const stockPercentage = Math.min(Math.round((currentStock / desiredStock) * 100), 100);
+  // Use the lower percentage for overall status
+  const overallPercentage = Math.min(smallBagsPercentage, largeBagsPercentage);
 
   // Determine stock level status
-  const getStockClass = () => {
-    if (stockPercentage >= 75) return "bg-green-500";
-    if (stockPercentage >= 50) return "bg-yellow-500";
+  const getStockClass = (percentage: number) => {
+    if (percentage >= 75) return "bg-green-500";
+    if (percentage >= 50) return "bg-amber-500";
     return "bg-red-500";
   };
 
@@ -83,10 +74,13 @@ export function StockLevelIndicator() {
         <div className="flex items-center gap-2 cursor-pointer">
           <Package className="h-4 w-4" />
           <div className="flex items-center gap-1">
-            <span className="text-sm font-medium">{stockPercentage}%</span>
+            <span className={`text-sm font-medium ${overallPercentage < 50 ? 'text-red-500' : ''}`}>
+              {overallPercentage}%
+            </span>
             <Progress 
-              value={stockPercentage} 
-              className={`w-24 h-2 ${getStockClass()}`}
+              value={overallPercentage} 
+              className="w-24 h-2"
+              indicatorClassName={getStockClass(overallPercentage)}
             />
           </div>
         </div>
@@ -96,16 +90,26 @@ export function StockLevelIndicator() {
           <h4 className="text-sm font-semibold">Stock Level Details</h4>
           <div className="grid grid-cols-2 gap-2 text-sm">
             <div>
-              <p className="text-muted-foreground">Current Stock:</p>
-              <p className="font-medium">{currentStock} bags</p>
+              <p className="text-muted-foreground">Small Bags (200g):</p>
+              <p className="font-medium">{totalSmallBags} / {shop.desiredSmallBags}</p>
+              <Progress 
+                value={smallBagsPercentage} 
+                className="mt-1 h-1"
+                indicatorClassName={getStockClass(smallBagsPercentage)}
+              />
             </div>
             <div>
-              <p className="text-muted-foreground">Target Stock:</p>
-              <p className="font-medium">{desiredStock} bags</p>
+              <p className="text-muted-foreground">Large Bags (1kg):</p>
+              <p className="font-medium">{totalLargeBags} / {shop.desiredLargeBags}</p>
+              <Progress 
+                value={largeBagsPercentage} 
+                className="mt-1 h-1"
+                indicatorClassName={getStockClass(largeBagsPercentage)}
+              />
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            Based on {shop.defaultOrderQuantity} bags per coffee type × {coffees.length} coffee types
+            Based on your configured target stock levels
           </p>
         </div>
       </HoverCardContent>
