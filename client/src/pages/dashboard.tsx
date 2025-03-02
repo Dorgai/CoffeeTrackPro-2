@@ -260,7 +260,37 @@ export default function Dashboard() {
           />
         </Header>
 
+        {/* Stats Overview */}
+        <div className="grid gap-4 md:grid-cols-3">
+          <StatsCard
+            title="Total Coffee Types"
+            value={shopInventory?.length || 0}
+            icon={Coffee}
+            description="Available varieties"
+          />
+          <StatsCard
+            title="Low Stock Items"
+            value={shopInventory?.filter(item =>
+              (item.smallBags || 0) < (shop?.desiredSmallBags || 20) / 2 ||
+              (item.largeBags || 0) < (shop?.desiredLargeBags || 10) / 2
+            ).length || 0}
+            icon={AlertTriangle}
+            description="Below 50% of target"
+          />
+          <StatsCard
+            title="Stock Health"
+            value={`${Math.round((shopInventory?.reduce((acc, item) =>
+              acc + ((item.smallBags || 0) >= (shop?.desiredSmallBags || 20) / 2 ? 1 : 0),
+              0
+            ) / (shopInventory?.length || 1)) * 100)}%`}
+            icon={Package}
+            description="Items meeting target levels"
+          />
+        </div>
+
+        {/* Main Content */}
         <div className="grid gap-4 md:grid-cols-2">
+          {/* Current Inventory */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
@@ -301,27 +331,64 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
+          {/* Low Stock Items */}
           <Card>
             <CardHeader>
-              <CardTitle>Shop Details</CardTitle>
-              <CardDescription>Selected shop information</CardDescription>
+              <CardTitle>Stock Alerts</CardTitle>
+              <CardDescription>Items requiring attention</CardDescription>
             </CardHeader>
             <CardContent>
               {!selectedShopId ? (
                 <p className="text-center text-muted-foreground">Please select a shop</p>
-              ) : !shop ? (
-                <p className="text-center text-muted-foreground">No shop data available</p>
               ) : (
-                <div className="space-y-2">
-                  <p><strong>Name:</strong> {shop.name}</p>
-                  <p><strong>Location:</strong> {shop.location}</p>
-                  <p><strong>Target Small Bags:</strong> {shop.desiredSmallBags}</p>
-                  <p><strong>Target Large Bags:</strong> {shop.desiredLargeBags}</p>
+                <div className="space-y-4">
+                  {shopInventory?.filter(item =>
+                    (item.smallBags || 0) < (shop?.desiredSmallBags || 20) / 2 ||
+                    (item.largeBags || 0) < (shop?.desiredLargeBags || 10) / 2
+                  ).map(item => {
+                    const coffee = coffees?.find(c => c.id === item.greenCoffeeId);
+                    return (
+                      <div key={item.id} className="p-3 bg-muted rounded-lg">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium">{coffee?.name}</p>
+                            <div className="text-sm text-muted-foreground">
+                              <p>Small Bags: {item.smallBags} / {shop?.desiredSmallBags}</p>
+                              <p>Large Bags: {item.largeBags} / {shop?.desiredLargeBags}</p>
+                            </div>
+                          </div>
+                          <Badge variant="destructive">Low Stock</Badge>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
           </Card>
         </div>
+
+        {/* Shop Details */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Shop Details</CardTitle>
+            <CardDescription>Selected shop information</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!selectedShopId ? (
+              <p className="text-center text-muted-foreground">Please select a shop</p>
+            ) : !shop ? (
+              <p className="text-center text-muted-foreground">No shop data available</p>
+            ) : (
+              <div className="space-y-2">
+                <p><strong>Name:</strong> {shop.name}</p>
+                <p><strong>Location:</strong> {shop.location}</p>
+                <p><strong>Target Small Bags:</strong> {shop.desiredSmallBags}</p>
+                <p><strong>Target Large Bags:</strong> {shop.desiredLargeBags}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     );
   }
