@@ -30,6 +30,13 @@ export function InventoryDiscrepancyView() {
     };
   })[]>({
     queryKey: ["/api/inventory-discrepancies"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/inventory-discrepancies");
+      if (!res.ok) {
+        throw new Error("Failed to fetch discrepancy reports");
+      }
+      return res.json();
+    },
     enabled: user?.role === "roaster",
   });
 

@@ -579,9 +579,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Inventory Discrepancies Routes
-  app.get("/api/inventory-discrepancies", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
+  app.get("/api/inventory-discrepancies", requireRole(["roasteryOwner", "shopManager", "roaster"]), async (req, res) => {
     try {
+      console.log("Fetching discrepancies for user:", req.user?.username, "with role:", req.user?.role);
       const discrepancies = await storage.getInventoryDiscrepancies();
+      console.log("Found discrepancies:", discrepancies.length);
       res.json(discrepancies);
     } catch (error) {
       console.error("Error fetching inventory discrepancies:", error);
