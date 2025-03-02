@@ -43,8 +43,16 @@ export function InventoryDiscrepancyView() {
       shop: { name: string; location: string };
     };
   })[]>({
-    queryKey: ["/api/inventory-discrepancies"],
-    enabled: true,
+    queryKey: [`/api/inventory-discrepancies`, user.role],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/inventory-discrepancies");
+      if (!res.ok) {
+        throw new Error("Failed to fetch discrepancy reports. Please ensure you have the correct permissions.");
+      }
+      return res.json();
+    },
+    enabled: user.role === "roaster",
+    retry: false
   });
 
   if (isLoading) {
@@ -59,9 +67,9 @@ export function InventoryDiscrepancyView() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Error Loading Discrepancies</CardTitle>
+          <CardTitle>Access Error</CardTitle>
           <CardDescription>
-            There was an error loading the discrepancy reports. Please try again later.
+            You don't have permission to view discrepancy reports. Please contact your administrator.
           </CardDescription>
         </CardHeader>
       </Card>

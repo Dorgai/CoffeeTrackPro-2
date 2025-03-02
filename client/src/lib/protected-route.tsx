@@ -24,8 +24,22 @@ export function ProtectedRoute({
           );
         }
 
-        if (!user || (roles.length > 0 && !roles.includes(user.role))) {
+        if (!user) {
           return <Redirect to="/auth" />;
+        }
+
+        // Check if user has required role
+        if (roles.length > 0 && !roles.includes(user.role)) {
+          return (
+            <div className="flex items-center justify-center min-h-screen">
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-destructive">Access Denied</h2>
+                <p className="text-muted-foreground mt-2">
+                  You don't have permission to access this page.
+                </p>
+              </div>
+            </div>
+          );
         }
 
         return <Component />;
