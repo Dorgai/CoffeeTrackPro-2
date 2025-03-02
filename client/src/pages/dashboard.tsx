@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableRow } from "@/components/ui/table";
 import { ShopSelector } from "@/components/layout/shop-selector";
 import StockProgress from "@/components/stock-progress";
 import { RestockDialog } from "@/components/coffee/restock-dialog";
@@ -118,38 +118,27 @@ export default function Dashboard() {
     Number(coffee.currentStock) <= Number(coffee.minThreshold)
   ) || [];
 
-  // Common header section
-  const Header = ({ children }: { children?: React.ReactNode }) => (
-    <div className="flex justify-between items-center">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user?.username}</h1>
-        <p className="text-muted-foreground">
-          {user?.role === "roasteryOwner" && "Coffee roasting operations overview"}
-          {user?.role === "roaster" && "Coffee roasting operations"}
-          {(user?.role === "shopManager" || user?.role === "barista") && "Manage your coffee shop inventory"}
-        </p>
-      </div>
-      <div className="flex gap-2">
-        {children}
-        <Button
-          variant="outline"
-          onClick={() => logoutMutation.mutate()}
-          disabled={logoutMutation.isPending}
-        >
-          <LogOut className="h-4 w-4 mr-2" />
-          Logout
-        </Button>
-      </div>
-    </div>
-  );
-
   // Roaster view
   if (user?.role === "roaster") {
     return (
       <div className="container mx-auto py-8 space-y-8">
-        <Header />
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user.username}</h1>
+            <p className="text-muted-foreground">Coffee roasting operations</p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => logoutMutation.mutate()}
+            disabled={logoutMutation.isPending}
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Logout
+          </Button>
+        </div>
 
-        {/* Stats */}
+        {/* Stats Overview */}
         <div className="grid gap-4 md:grid-cols-3">
           <StatsCard
             title="Coffee Types"
@@ -158,20 +147,20 @@ export default function Dashboard() {
             description="Available coffee varieties"
           />
           <StatsCard
-            title="Pending Orders"
-            value={allInventory?.length || 0}
-            icon={Package}
-            description="Orders waiting for roasting"
-          />
-          <StatsCard
             title="Low Stock Items"
             value={lowStockCoffees.length}
             icon={AlertTriangle}
             description="Below minimum threshold"
           />
+          <StatsCard
+            title="Available Stock"
+            value={`${coffees?.reduce((total, coffee) => total + Number(coffee.currentStock), 0) || 0}kg`}
+            icon={Package}
+            description="Total green coffee available"
+          />
         </div>
 
-        {/* Coffee Inventory */}
+        {/* Green Coffee Inventory */}
         <Card>
           <CardHeader>
             <CardTitle>Green Coffee Inventory</CardTitle>
