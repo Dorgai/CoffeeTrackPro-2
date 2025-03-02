@@ -380,55 +380,113 @@ export function Dashboard() {
       )}
 
       {/* Manager's View - Total Stock Overview and Shop Breakdown */}
-      {user?.role === "shopManager" && shop && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Stock Overview</CardTitle>
-            <CardDescription>Current stock levels against target quantities</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              {coffees?.map(coffee => {
-                // Get inventory for this coffee in the selected shop
-                const shopInventory = filteredInventory?.find(inv =>
-                  inv.greenCoffeeId === coffee.id &&
-                  inv.shopId === selectedShopId
-                );
+      {user?.role === "shopManager" && selectedShopId && (
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* Global Stock Overview */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Global Stock Overview</CardTitle>
+              <CardDescription>Combined inventory across all locations</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {currentInventory?.reduce((shops, inv) => {
+                  if (!shops.some(s => s.id === inv.shopId)) {
+                    const shopInventory = currentInventory.filter(i => i.shopId === inv.shopId);
+                    const shop = shopInventory[0]?.shop;
+                    if (shop) {
+                      shops.push({
+                        id: inv.shopId,
+                        name: shop.name,
+                        desiredSmallBags: shop.desiredSmallBags,
+                        desiredLargeBags: shop.desiredLargeBags,
+                        inventory: shopInventory
+                      });
+                    }
+                  }
+                  return shops;
+                }, [] as Array<{
+                  id: number;
+                  name: string;
+                  desiredSmallBags?: number;
+                  desiredLargeBags?: number;
+                  inventory: typeof currentInventory;
+                }>).map(shop => {
+                  const totalSmallBags = shop.inventory.reduce((sum, inv) => sum + (inv.smallBags || 0), 0);
+                  const totalLargeBags = shop.inventory.reduce((sum, inv) => sum + (inv.largeBags || 0), 0);
 
-                // Skip if no inventory for this coffee
-                if (!shopInventory) {
-                  return null;
-                }
-
-                return (
-                  <div key={coffee.id} className="space-y-4">
-                    <div>
-                      <h3 className="font-medium">{coffee.name}</h3>
-                      {coffee.producer && (
-                        <p className="text-sm text-muted-foreground">{coffee.producer}</p>
-                      )}
-                    </div>
-                    <div className="space-y-4">
+                  return (
+                    <div key={shop.id} className="space-y-4 pb-4 border-b last:border-0">
+                      <h3 className="font-medium text-lg">{shop.name}</h3>
                       <StockProgress
-                        current={shopInventory.smallBags || 0}
+                        current={totalSmallBags}
                         desired={shop.desiredSmallBags || 0}
                         label="Small Bags (200g)"
                       />
                       <StockProgress
-                        current={shopInventory.largeBags || 0}
+                        current={totalLargeBags}
                         desired={shop.desiredLargeBags || 0}
                         label="Large Bags (1kg)"
                       />
                     </div>
-                  </div>
-                );
-              })}
-              {(!filteredInventory || filteredInventory.length === 0) && (
-                <p className="text-muted-foreground text-center py-4">No inventory data available</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                  );
+                })}
+                {!currentInventory?.length && (
+                  <p className="text-center text-muted-foreground py-4">No inventory data available</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Shop-specific Stock Overview */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Stock Overview</CardTitle>
+              <CardDescription>Current stock levels for this location</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {coffees?.map(coffee => {
+                  const shopInventory = filteredInventory?.find(inv =>
+                    inv.greenCoffeeId === coffee.id &&
+                    inv.shopId === selectedShopId
+                  );
+
+                  // Skip if no inventory for this coffee
+                  if (!shopInventory || (!shopInventory.smallBags && !shopInventory.largeBags)) {
+                    return null;
+                  }
+
+                  return (
+                    <div key={coffee.id} className="space-y-4">
+                      <div>
+                        <h3 className="font-medium">{coffee.name}</h3>
+                        {coffee.producer && (
+                          <p className="text-sm text-muted-foreground">{coffee.producer}</p>
+                        )}
+                      </div>
+                      <div className="space-y-4">
+                        <StockProgress
+                          current={shopInventory.smallBags || 0}
+                          desired={shop?.desiredSmallBags || 0}
+                          label="Small Bags (200g)"
+                        />
+                        <StockProgress
+                          current={shopInventory.largeBags || 0}
+                          desired={shop?.desiredLargeBags || 0}
+                          label="Large Bags (1kg)"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+                {(!filteredInventory || filteredInventory.length === 0) && (
+                  <p className="text-muted-foreground text-center py-4">No inventory data available</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Pending Orders */}
@@ -776,8 +834,7 @@ export function Dashboard() {
                     <TableCell className="font-medium">{coffee.name}</TableCell>
                     <TableCell>{coffee.producer || '-'}</TableCell>
                     <TableCell>{coffee.country || '-'}</TableCell>
-                    <TableCell>{coffee.currentStock} kg</TableCell>
-                    <TableCell>{coffee.minThreshold || 0} kg</TableCell>
+                    <TableCell>{coffee.currentStock} kg</TableCell>                    <TableCell>{coffee.minThreshold || 0} kg</TableCell>
                     <TableCell>
                       {Number(coffee.currentStock) <= Number(coffee.minThreshold) ? (
                         <Badge variant="destructive">Low Stock</Badge>
