@@ -10,11 +10,13 @@ import {
   MenubarTrigger,
 } from "@/components/ui/menubar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { ShopSelector } from "./shop-selector";
 import { RestockDialog } from "../coffee/restock-dialog";
 import { StockLevelIndicator } from "./stock-level-indicator";
 import { GreenBeansStockIndicator } from "./green-beans-stock-indicator";
+import { Coffee } from "lucide-react";
 
 export function NavBar() {
   const { user, logoutMutation } = useAuth();
@@ -136,6 +138,14 @@ export function NavBar() {
         <div className="ml-auto flex items-center space-x-4">
           {user ? (
             <div className="flex items-center space-x-4">
+              {(user.role === "roasteryOwner" || user.role === "roaster") && (
+                <Button variant="outline" size="sm" asChild className="flex items-center gap-2">
+                  <Link href="/inventory">
+                    <Coffee className="h-4 w-4" />
+                    Update Green Coffee
+                  </Link>
+                </Button>
+              )}
               {user.role !== "roaster" && <ShopSelector />}
 
               {(user.role === "roasteryOwner" || user.role === "roaster") && (
