@@ -32,12 +32,7 @@ export function InventoryDiscrepancyView() {
   })[]>({
     queryKey: ["/api/inventory-discrepancies"],
     queryFn: async () => {
-      const res = await apiRequest("GET", "/api/inventory-discrepancies", undefined, {
-        headers: {
-          'Authorization': `Bearer ${user?.id}`,
-          'X-User-Role': user?.role || '',
-        }
-      });
+      const res = await apiRequest("GET", "/api/inventory-discrepancies");
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.message || "Failed to fetch discrepancy reports");
