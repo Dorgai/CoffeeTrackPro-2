@@ -150,11 +150,11 @@ export function Dashboard() {
     enabled: !!user && (user.role === "roaster" || user.role === "roasteryOwner"),
   });
 
-  // Get current inventory for all shops  
+  // Update inventory query to always be enabled when user is logged in
   const { data: currentInventory, isLoading: loadingInventory } = useQuery<RetailInventory[]>({
     queryKey: ["/api/retail-inventory", selectedShopId],
     queryFn: async () => {
-      const res = await apiRequest("GET", "/api/retail-inventory" + (selectedShopId ? `?shopId=${selectedShopId}` : ''));
+      const res = await apiRequest("GET", `/api/retail-inventory${selectedShopId ? `?shopId=${selectedShopId}` : ''}`);
       if (!res.ok) {
         throw new Error("Failed to fetch inventory");
       }
@@ -209,19 +209,21 @@ export function Dashboard() {
     );
   }
 
-  // Update data filtering logic
+  // Update data filtering logic to handle undefined data
   const getFilteredData = (data: any[]) => {
-    if (selectedShopId && data) {
+    if (!data) return [];
+    if (selectedShopId) {
       return data.filter(item => item.shopId === selectedShopId);
     }
-    return data || [];
+    return data;
   };
 
   const filteredOrders = getFilteredData(orders || []);
   const filteredInventory = getFilteredData(currentInventory || []);
 
-  // Add debugging logs for development
+  // Add debugging logs
   console.log('Selected Shop:', selectedShopId);
+  console.log('Shop Data:', shop);
   console.log('Current Inventory:', currentInventory);
   console.log('Filtered Inventory:', filteredInventory);
 
@@ -408,7 +410,11 @@ export function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {shop && filteredInventory && (
+                {loadingInventory ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                ) : shop && filteredInventory ? (
                   <div className="space-y-4 pb-4">
                     <h3 className="font-medium text-lg">{shop.name}</h3>
                     <div className="space-y-2">
@@ -424,9 +430,10 @@ export function Dashboard() {
                       />
                     </div>
                   </div>
-                )}
-                {!filteredInventory?.length && (
-                  <p className="text-muted-foreground text-center py-4">No inventory data available</p>
+                ) : (
+                  <p className="text-muted-foreground text-center py-4">
+                    No inventory data available
+                  </p>
                 )}
               </div>
             </CardContent>
@@ -445,46 +452,54 @@ export function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
-                {coffees?.map(coffee => {
-                  const shopInventory = filteredInventory?.find(inv =>
-                    inv.greenCoffeeId === coffee.id
-                  );
+                {loadingInventory ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                ) : (
+                  coffees?.map(coffee => {
+                    const shopInventory = filteredInventory?.find(inv =>
+                      inv.greenCoffeeId === coffee.id
+                    );
 
-                  const coffeeTarget = coffeeTargets?.find(t =>
-                    t.greenCoffeeId === coffee.id &&
-                    t.shopId === selectedShopId
-                  );
+                    const coffeeTarget = coffeeTargets?.find(t =>
+                      t.greenCoffeeId === coffee.id &&
+                      t.shopId === selectedShopId
+                    );
 
-                  if (!shopInventory) return null;
+                    if (!shopInventory) return null;
 
-                  return (
-                    <div key={coffee.id} className="space-y-4">
-                      <div>
-                        <h3 className="font-medium">{coffee.name}</h3>
-                        {coffee.producer && (
-                          <p className="text-sm text-muted-foreground">{coffee.producer}</p>
-                        )}
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="outline">{coffee.grade}</Badge>
+                    return (
+                      <div key={coffee.id} className="space-y-4">
+                        <div>
+                          <h3 className="font-medium">{coffee.name}</h3>
+                          {coffee.producer && (
+                            <p className="text-sm text-muted-foreground">{coffee.producer}</p>
+                          )}
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="outline">{coffee.grade}</Badge>
+                          </div>
+                        </div>
+                        <div className="space-y-4">
+                          <StockProgress
+                            current={shopInventory.smallBags || 0}
+                            desired={shop?.desiredSmallBags || 0}
+                            label="Small Bags (200g)"
+                          />
+                          <StockProgress
+                            current={shopInventory.largeBags || 0}
+                            desired={coffeeTarget?.desiredLargeBags || 0}
+                            label="Large Bags (1kg)"
+                          />
                         </div>
                       </div>
-                      <div className="space-y-4">
-                        <StockProgress
-                          current={shopInventory.smallBags || 0}
-                          desired={shop?.desiredSmallBags || 0}
-                          label="Small Bags (200g)"
-                        />
-                        <StockProgress
-                          current={shopInventory.largeBags || 0}
-                          desired={coffeeTarget?.desiredLargeBags || 0}
-                          label="Large Bags (1kg)"
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-                {(!filteredInventory || filteredInventory.length === 0) && (
-                  <p className="text-muted-foreground text-center py-4">No inventory data available</p>
+                    );
+                  })
+                )}
+                {!filteredInventory?.length && !loadingInventory && (
+                  <p className="text-muted-foreground text-center py-4">
+                    No inventory data available
+                  </p>
                 )}
               </div>
             </CardContent>
@@ -821,21 +836,21 @@ export function Dashboard() {
                     <TableCell>
                       {Number(coffee.currentStock) <= Number(coffee.minThreshold) ? (
                         <Badge variant="destructive">Low Stock</Badge>
-                      ) : (
-                        <Badge variant="outline">In Stock</Badge>
+                      ) : (<Badge variant="outline">In Stock</Badge>
                       )}
                     </TableCell>
                     {user?.role === "roasteryOwner" && (
                       <TableCell>
-                        <div className="flex items-centergap-2">
+                        <div className="flex items-center gap-2">
                           <Link href={`/inventory/${coffee.id}`}>
-                            <Button variant="outline" size="sm">View Details</Button>                          </Link>
+                            <Button variant="outline" size="sm">View Details</Button>
+                          </Link>
                         </div>
                       </TableCell>
                     )}
                   </TableRow>
                 ))}
-                {(!coffees|| coffees.length === 0)&& (
+                {(!coffees || coffees.length === 0) && (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center text-muted-foreground py-4">
                       No green coffee inventory available
@@ -876,7 +891,7 @@ export function Dashboard() {
                 </div>
               </div>
             ))}
-            {(!batches || batches.length ===0) && (
+            {(!batches || batches.length === 0) && (
               <p className="text-muted-foreground text-center py-4">No roasting batches recorded yet</p>
             )}
           </CardContent>
