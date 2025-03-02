@@ -41,26 +41,6 @@ import { apiRequest } from "@/lib/queryClient";
 import { useState } from "react";
 
 
-type Order = {
-  id: number;
-  shopId: number;
-  greenCoffeeId: number;
-  smallBags: number;
-  largeBags: number;
-  status: string;
-  createdAt: string;
-  shop: {
-    name: string;
-    location: string;
-    desiredSmallBags?: number;
-    desiredLargeBags?: number;
-  };
-  greenCoffee: {
-    name: string;
-    producer: string;
-  };
-};
-
 // Helper function to calculate days since a date
 function getDaysSince(date: string) {
   const orderDate = new Date(date);
@@ -109,49 +89,70 @@ function StatsCard({
   );
 }
 
+type Order = {
+  id: number;
+  shopId: number;
+  greenCoffeeId: number;
+  smallBags: number;
+  largeBags: number;
+  status: string;
+  createdAt: string;
+  shop: {
+    name: string;
+    location: string;
+    desiredSmallBags?: number;
+    desiredLargeBags?: number;
+  };
+  greenCoffee: {
+    name: string;
+    producer: string;
+  };
+};
+
 export default function Dashboard() {
   const { user, logoutMutation } = useAuth();
   const [selectedShopId, setSelectedShopId] = useState<number | null>(null);
 
-  // Get shop details
+  // Basic shop data query
   const { data: shop, isLoading: loadingShop } = useQuery<Shop>({
     queryKey: ["/api/shops", selectedShopId],
     queryFn: async () => {
-      if (!selectedShopId) throw new Error("No shop selected");
+      console.log("Fetching shop data for ID:", selectedShopId);
       const res = await apiRequest("GET", `/api/shops/${selectedShopId}`);
       if (!res.ok) throw new Error("Failed to fetch shop details");
-      return res.json();
+      const data = await res.json();
+      console.log("Shop data received:", data);
+      return data;
     },
     enabled: !!selectedShopId,
   });
 
-  // Get current inventory
-  const { data: currentInventory, isLoading: loadingInventory } = useQuery<RetailInventory[]>({
+  // Simplified inventory query
+  const { data: inventory, isLoading: loadingInventory } = useQuery<RetailInventory[]>({
     queryKey: ["/api/retail-inventory"],
     queryFn: async () => {
+      console.log("Fetching inventory data");
       const res = await apiRequest("GET", "/api/retail-inventory");
       if (!res.ok) throw new Error("Failed to fetch inventory");
-      return res.json();
+      const data = await res.json();
+      console.log("Inventory data received:", data);
+      return data;
     },
     enabled: !!user,
   });
 
-  // Get all coffees
+  // Basic coffee data query
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
-    enabled: !!user,
-  });
-
-  // Get coffee targets
-  const { data: coffeeTargets } = useQuery<CoffeeLargeBagTarget[]>({
-    queryKey: ["/api/shops", selectedShopId, "coffee-targets"],
     queryFn: async () => {
-      if (!selectedShopId) throw new Error("No shop selected");
-      const res = await apiRequest("GET", `/api/shops/${selectedShopId}/coffee-targets`);
-      if (!res.ok) throw new Error("Failed to fetch coffee targets");
-      return res.json();
+      console.log("Fetching coffee data");
+      const res = await apiRequest("GET", "/api/green-coffee");
+      if (!res.ok) throw new Error("Failed to fetch coffee data");
+      const data = await res.json();
+      console.log("Coffee data received:", data);
+      return data;
     },
-    enabled: !!selectedShopId && (user?.role === "roasteryOwner" || user?.role === "shopManager"),
+    enabled: !!user,
   });
 
   // Get orders
@@ -159,34 +160,14 @@ export default function Dashboard() {
     queryKey: ["/api/orders"],
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/orders");
-      if (!res.ok) {
-        throw new Error("Failed to fetch orders");
-      }
+      if (!res.ok) throw new Error("Failed to fetch orders");
       return res.json();
     },
     enabled: !!user,
   });
-
-  // Get previous inventory history
-  const { data: previousInventory } = useQuery<RetailInventory[]>({
-    queryKey: ["/api/retail-inventory/history"],
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/retail-inventory/history");
-      if (!res.ok) {
-        throw new Error("Failed to fetch inventory history");
-      }
-      return res.json();
-    },
-    enabled: !!user,
-  });
-
-  // Filter inventory data based on selected shop
-  const filteredInventory = selectedShopId && currentInventory
-    ? currentInventory.filter(item => item.shopId === selectedShopId)
-    : [];
 
   // Loading state
-  if (loadingCoffees || loadingInventory || loadingOrders || loadingShop) {
+  if (loadingShop || loadingInventory || loadingCoffees || loadingOrders) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -194,229 +175,195 @@ export default function Dashboard() {
     );
   }
 
-  // Shop manager and barista view
-  if (user?.role === "shopManager" || user?.role === "barista") {
-    const pendingOrdersByShop = orders
-      ? groupOrdersByShop(orders.filter(order => order.status === "pending"))
-      : {};
+  // Filter inventory for selected shop
+  const shopInventory = selectedShopId && inventory
+    ? inventory.filter(item => item.shopId === selectedShopId)
+    : [];
 
-    const getShopsToShow = () => {
-      if (!orders || !currentInventory) return [];
+  // Calculate key metrics for roastery owner
+  const lowStockCoffees = coffees?.filter(coffee =>
+    Number(coffee.currentStock) <= Number(coffee.minThreshold)
+  ) || [];
 
-      if (user?.role === "barista" && selectedShopId) {
-        const shopName = currentInventory.find(inv => inv.shopId === selectedShopId)?.shop?.name;
-        return [{ id: selectedShopId, name: shopName || "Selected Shop" }];
-      }
+  const pendingOrders = orders?.filter(order =>
+    order.status === "pending"
+  ) || [];
 
-      return orders
-        .filter(order => order.shop)
-        .reduce((shops, order) => {
-          if (order.shop && !shops.some(s => s.id === order.shopId)) {
-            shops.push({ id: order.shopId, name: order.shop.name });
-          }
-          return shops;
-        }, [] as Array<{ id: number; name: string }>);
-    };
-
-    const filteredOrders = orders?.filter(order => order.shopId === selectedShopId) || [];
-
-    // Calculate inventory changes
-    const inventoryWithChanges = currentInventory?.map(current => {
-      const previous = previousInventory?.find(prev =>
-        prev.shopId === current.shopId &&
-        prev.greenCoffeeId === current.greenCoffeeId
-      );
-
-      return {
-        ...current,
-        smallBagChange: previous ? current.smallBags - previous.smallBags : 0,
-        largeBagChange: previous ? current.largeBags - previous.largeBags : 0
-      };
-    });
-
-    // Calculate pending orders with age information
-    const pendingOrders = orders?.filter(o => o.status === "pending") || [];
-    const oldestPendingOrder = pendingOrders.reduce((oldest, order) => {
-      const orderDays = getDaysSince(order.createdAt);
-      return orderDays > oldest ? orderDays : oldest;
-    }, 0);
-
-    // Find the most recent order date from all orders
-    const lastOrderDate = orders?.reduce((latest, order) => {
-      const orderDate = new Date(order.createdAt);
-      return latest > orderDate ? latest : orderDate;
-    }, new Date(0));
-
-
+  // If user is roastery owner, show the roastery dashboard
+  if (user?.role === "roasteryOwner") {
     return (
       <div className="container mx-auto py-8 space-y-8">
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user.username}</h1>
-            <p className="text-muted-foreground">Manage your coffee shop inventory</p>
+            <p className="text-muted-foreground">Coffee roasting operations overview</p>
           </div>
-          <ShopSelector
-            value={selectedShopId}
-            onChange={setSelectedShopId}
+          <div className="flex gap-2">
+            <Button asChild>
+              <Link href="/inventory">Manage Inventory</Link>
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => logoutMutation.mutate()}
+              disabled={logoutMutation.isPending}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
+          </div>
+        </div>
+
+        {/* Stats Overview */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <StatsCard
+            title="Active Shops"
+            value={orders ? new Set(orders.map(o => o.shopId)).size : 0}
+            icon={Store}
+          />
+          <StatsCard
+            title="Coffee Types"
+            value={coffees ? coffees.length : 0}
+            icon={Coffee}
+          />
+          <StatsCard
+            title="Pending Orders"
+            value={pendingOrders.length}
+            icon={Package}
+          />
+          <StatsCard
+            title="Low Stock Items"
+            value={lowStockCoffees.length}
+            icon={AlertTriangle}
           />
         </div>
 
-        {/* Stock Overview Section */}
-        <div className="grid gap-4 md:grid-cols-2">
-          {/* Global Stock Overview */}
+        {/* Low Stock Alerts */}
+        {lowStockCoffees.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Stock Overview</CardTitle>
-              <CardDescription>Current inventory levels</CardDescription>
+              <CardTitle className="text-red-500">Low Stock Alerts</CardTitle>
+              <CardDescription>Coffee types below minimum threshold</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {!selectedShopId ? (
-                  <p className="text-muted-foreground text-center py-4">
-                    Please select a shop to view inventory
-                  </p>
-                ) : shop && filteredInventory ? (
-                  <div className="space-y-4 pb-4">
-                    <h3 className="font-medium text-lg">{shop.name}</h3>
-                    <div className="space-y-2">
-                      <StockProgress
-                        current={filteredInventory.reduce((sum, inv) => sum + (inv.smallBags || 0), 0)}
-                        desired={shop.desiredSmallBags || 0}
-                        label="Small Bags (200g)"
-                      />
-                      <StockProgress
-                        current={filteredInventory.reduce((sum, inv) => sum + (inv.largeBags || 0), 0)}
-                        desired={shop.desiredLargeBags || 0}
-                        label="Large Bags (1kg)"
-                      />
+              <div className="space-y-2">
+                {lowStockCoffees.map(coffee => (
+                  <div key={coffee.id} className="flex items-center justify-between p-2 bg-muted rounded-lg">
+                    <div>
+                      <p className="font-medium">{coffee.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Current stock: {coffee.currentStock}kg
+                      </p>
                     </div>
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground text-center py-4">
-                    No inventory data available
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Individual Coffee Overview */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Coffee Inventory</CardTitle>
-              <CardDescription>Stock levels by coffee type</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {!selectedShopId ? (
-                  <p className="text-muted-foreground text-center py-4">
-                    Please select a shop to view inventory
-                  </p>
-                ) : (
-                  coffees?.map(coffee => {
-                    const shopInventory = filteredInventory?.find(inv =>
-                      inv.greenCoffeeId === coffee.id
-                    );
-
-                    if (!shopInventory) return null;
-
-                    return (
-                      <div key={coffee.id} className="space-y-4">
-                        <div>
-                          <h3 className="font-medium">{coffee.name}</h3>
-                          {coffee.producer && (
-                            <p className="text-sm text-muted-foreground">{coffee.producer}</p>
-                          )}
-                        </div>
-                        <div className="space-y-2">
-                          <StockProgress
-                            current={shopInventory.smallBags || 0}
-                            desired={shop?.desiredSmallBags || 0}
-                            label="Small Bags (200g)"
-                          />
-                          <StockProgress
-                            current={shopInventory.largeBags || 0}
-                            desired={shop?.desiredLargeBags || 0}
-                            label="Large Bags (1kg)"
-                          />
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-                {selectedShopId && (!filteredInventory || filteredInventory.length === 0) && (
-                  <p className="text-muted-foreground text-center py-4">
-                    No inventory data available
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Pending Orders */}
-        {user?.role === "shopManager" && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Pending Orders</CardTitle>
-              <CardDescription>Orders awaiting processing</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {Object.entries(pendingOrdersByShop).map(([shopName, shopOrders]) => (
-                  <div key={shopName} className="space-y-3">
-                    <h3 className="font-medium text-lg">{shopName}</h3>
-                    <div className="space-y-2">
-                      {shopOrders.map(order => {
-                        const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
-                        return (
-                          <div key={order.id} className="p-3 bg-muted rounded-lg">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <p className="font-medium">{coffee?.name}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  Ordered: {new Date(order.createdAt).toLocaleDateString()} ({getDaysSince(order.createdAt)} days ago)
-                                </p>
-                              </div>
-                              <Badge variant="destructive">Pending {getDaysSince(order.createdAt)}d</Badge>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 mt-2">
-                              <div className="text-sm">Small Bags: {order.smallBags}</div>
-                              <div className="text-sm">Large Bags: {order.largeBags}</div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                    <Badge variant="destructive">Below Threshold</Badge>
                   </div>
                 ))}
-                {Object.keys(pendingOrdersByShop).length === 0 && (
-                  <p className="text-center text-muted-foreground">No pending orders</p>
-                )}
               </div>
             </CardContent>
           </Card>
         )}
+
+        {/* Inventory Overview */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Coffee Inventory Overview</CardTitle>
+            <CardDescription>Current stock levels across all shops</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {inventory?.map(inv => {
+                const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
+                const shop = orders?.find(o => o.shopId === inv.shopId)?.shop;
+
+                if (!coffee || !shop) return null;
+
+                return (
+                  <div key={`${inv.shopId}-${inv.greenCoffeeId}`} className="p-4 border rounded-lg">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-medium">{shop.name}</h3>
+                        <p className="text-sm text-muted-foreground">{coffee.name}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm">Small Bags: {inv.smallBags}</p>
+                        <p className="text-sm">Large Bags: {inv.largeBags}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              {!inventory?.length && (
+                <p className="text-center text-muted-foreground">No inventory data available</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Recent Orders */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Orders by Shop</CardTitle>
+            <CardDescription>Latest orders from each retail location</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {orders?.reduce((shops: any[], order) => {
+                if (order.shop && !shops.some(s => s.id === order.shopId)) {
+                  shops.push({
+                    id: order.shopId,
+                    name: order.shop.name,
+                    orders: orders.filter(o => o.shopId === order.shopId)
+                      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                      .slice(0, 3)
+                  });
+                }
+                return shops;
+              }, []).map(shop => (
+                <div key={shop.id} className="space-y-3">
+                  <h3 className="font-medium text-lg">{shop.name}</h3>
+                  <div className="space-y-2">
+                    {shop.orders.map((order: Order) => {
+                      const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
+                      return (
+                        <div key={order.id} className="p-3 bg-muted rounded-lg">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="font-medium">{coffee?.name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {format(new Date(order.createdAt), 'MMM d, yyyy')}
+                              </p>
+                            </div>
+                            <Badge variant={order.status === "pending" ? "destructive" : "outline"}>
+                              {order.status}
+                            </Badge>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4 mt-2">
+                            <div className="text-sm">Small Bags: {order.smallBags}</div>
+                            <div className="text-sm">Large Bags: {order.largeBags}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
-  // Roastery owner and roaster view (default)
-  return (
-    <div className="container mx-auto py-8 space-y-8">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user?.username}</h1>
-          <p className="text-muted-foreground">Coffee roasting operations overview</p>
-        </div>
-        <div className="flex gap-2">
-          {user?.role === "roasteryOwner" && (
-            <Button asChild>
-              <Link href="/inventory">Manage Inventory</Link>
-            </Button>
-          )}
+  // Add roaster-specific view
+  if (user?.role === "roaster") {
+    return (
+      <div className="container mx-auto py-8 space-y-8">
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user.username}</h1>
+            <p className="text-muted-foreground">Coffee roasting operations</p>
+          </div>
           <Button
             variant="outline"
             onClick={() => logoutMutation.mutate()}
@@ -426,30 +373,216 @@ export default function Dashboard() {
             Logout
           </Button>
         </div>
+
+        {/* Stats Overview */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <StatsCard
+            title="Pending Orders"
+            value={pendingOrders.length}
+            icon={Package}
+            description="Orders awaiting roasting"
+          />
+          <StatsCard
+            title="Coffee Types"
+            value={coffees ? coffees.length : 0}
+            icon={Coffee}
+          />
+          <StatsCard
+            title="Low Stock Items"
+            value={lowStockCoffees.length}
+            icon={AlertTriangle}
+          />
+        </div>
+
+        {/* Low Stock Alerts */}
+        {lowStockCoffees.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-red-500">Low Stock Alerts</CardTitle>
+              <CardDescription>Coffee types below minimum threshold</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {lowStockCoffees.map(coffee => (
+                  <div key={coffee.id} className="flex items-center justify-between p-2 bg-muted rounded-lg">
+                    <div>
+                      <p className="font-medium">{coffee.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Current stock: {coffee.currentStock}kg
+                      </p>
+                    </div>
+                    <Badge variant="destructive">Below Threshold</Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Pending Orders for Roasting */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Pending Orders</CardTitle>
+            <CardDescription>Orders awaiting roasting</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {pendingOrders.length > 0 ? (
+                pendingOrders.map(order => {
+                  const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
+                  return (
+                    <div key={order.id} className="p-3 bg-muted rounded-lg">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-medium">{coffee?.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            For: {order.shop?.name}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Ordered: {format(new Date(order.createdAt), 'MMM d, yyyy')}
+                          </p>
+                        </div>
+                        <Badge variant="destructive">
+                          Pending {getDaysSince(order.createdAt)}d
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 mt-2">
+                        <div className="text-sm">Small Bags: {order.smallBags}</div>
+                        <div className="text-sm">Large Bags: {order.largeBags}</div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-2"
+                        asChild
+                      >
+                        <Link href={`/roasting/orders/${order.id}`}>
+                          Start Roasting
+                        </Link>
+                      </Button>
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="text-center text-muted-foreground">No pending orders</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Green Coffee Inventory */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Green Coffee Inventory</CardTitle>
+            <CardDescription>Available green coffee for roasting</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {coffees ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Coffee</TableHead>
+                      <TableHead>Producer</TableHead>
+                      <TableHead>Origin</TableHead>
+                      <TableHead className="text-right">Current Stock</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {coffees.map(coffee => (
+                      <TableRow key={coffee.id}>
+                        <TableCell className="font-medium">{coffee.name}</TableCell>
+                        <TableCell>{coffee.producer}</TableCell>
+                        <TableCell>{coffee.country}</TableCell>
+                        <TableCell className="text-right">{coffee.currentStock}kg</TableCell>
+                        <TableCell>
+                          {Number(coffee.currentStock) <= Number(coffee.minThreshold) ? (
+                            <Badge variant="destructive">Low Stock</Badge>
+                          ) : (
+                            <Badge variant="outline">In Stock</Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-center text-muted-foreground">No coffee inventory available</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // For other roles (shop manager, barista), show the regular dashboard
+  return (
+    <div className="container mx-auto py-8 space-y-8">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user?.username}</h1>
+          <p className="text-muted-foreground">Manage your coffee shop inventory</p>
+        </div>
+        <ShopSelector
+          value={selectedShopId}
+          onChange={setSelectedShopId}
+        />
       </div>
 
-      {/* Stats Overview */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatsCard
-          title="Active Shops"
-          value={orders ? new Set(orders.map(o => o.shopId)).size : 0}
-          icon={Store}
-        />
-        <StatsCard
-          title="Coffee Types"
-          value={coffees ? coffees.length : 0}
-          icon={Coffee}
-        />
-        <StatsCard
-          title="Pending Orders"
-          value={orders ? orders.filter(o => o.status === "pending").length : 0}
-          icon={Package}
-        />
-        <StatsCard
-          title="Low Stock Items"
-          value={coffees ? coffees.filter(c => Number(c.currentStock) <= Number(c.minThreshold)).length : 0}
-          icon={AlertTriangle}
-        />
+      {/* Basic inventory display */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Current Inventory</CardTitle>
+            <CardDescription>Stock levels for selected shop</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!selectedShopId ? (
+              <p className="text-center text-muted-foreground">Please select a shop</p>
+            ) : shopInventory.length === 0 ? (
+              <p className="text-center text-muted-foreground">No inventory data available</p>
+            ) : (
+              <div className="space-y-4">
+                {shopInventory.map(item => {
+                  const coffee = coffees?.find(c => c.id === item.greenCoffeeId);
+                  return (
+                    <div key={item.id} className="p-4 border rounded-lg">
+                      <h3 className="font-medium">{coffee?.name || 'Unknown Coffee'}</h3>
+                      <div className="mt-2 space-y-1">
+                        <p>Small Bags: {item.smallBags}</p>
+                        <p>Large Bags: {item.largeBags}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Shop Details</CardTitle>
+            <CardDescription>Selected shop information</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!selectedShopId ? (
+              <p className="text-center text-muted-foreground">Please select a shop</p>
+            ) : !shop ? (
+              <p className="text-center text-muted-foreground">No shop data available</p>
+            ) : (
+              <div className="space-y-2">
+                <p><strong>Name:</strong> {shop.name}</p>
+                <p><strong>Location:</strong> {shop.location}</p>
+                <p><strong>Target Small Bags:</strong> {shop.desiredSmallBags}</p>
+                <p><strong>Target Large Bags:</strong> {shop.desiredLargeBags}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
