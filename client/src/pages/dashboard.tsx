@@ -1,7 +1,13 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import {
   Coffee,
   Package,
@@ -363,7 +369,7 @@ export function Dashboard() {
                           {coffee.producer} - {coffee.country}
                         </p>
                         <p className="text-sm text-muted-foreground mt-1">
-                          Grade: {coffee.grade}
+                          Grade: <Badge variant="outline">{coffee.grade}</Badge>
                         </p>
                       </div>
                       {(user?.role === "shopManager" || user?.role === "barista") && (
@@ -385,7 +391,7 @@ export function Dashboard() {
         </Card>
       )}
 
-      {/* Manager's View - Total Stock Overview and Shop Breakdown */}
+      {/* Manager's View - Stock Overview and Shop Breakdown */}
       {user?.role === "shopManager" && selectedShopId && (
         <div className="grid gap-4 md:grid-cols-2">
           {/* Global Stock Overview */}
@@ -467,7 +473,9 @@ export function Dashboard() {
                         {coffee.producer && (
                           <p className="text-sm text-muted-foreground">{coffee.producer}</p>
                         )}
-                        <p className="text-sm text-muted-foreground mt-1">Grade: {coffee.grade}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="outline">{coffee.grade}</Badge>
+                        </div>
                       </div>
                       <div className="space-y-4">
                         <StockProgress
@@ -484,7 +492,7 @@ export function Dashboard() {
                     </div>
                   );
                 })}
-                {(!currentInventory || currentInventory.length === 0) && (
+                {!currentInventory?.length && (
                   <p className="text-muted-foreground text-center py-4">No inventory data available</p>
                 )}
               </div>
@@ -597,7 +605,9 @@ export function Dashboard() {
                         {coffee.producer && (
                           <p className="text-sm text-muted-foreground">{coffee.producer}</p>
                         )}
-                        <p className="text-sm text-muted-foreground mt-1">Grade: {coffee.grade}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="outline">{coffee.grade}</Badge>
+                        </div>
                       </div>
                       <div className="space-y-4">
                         <StockProgress
@@ -651,7 +661,9 @@ export function Dashboard() {
                                 Ordered: {new Date(order.createdAt).toLocaleDateString()} ({getDaysSince(order.createdAt)} days ago)
                               </p>
                             </div>
-                            <Badge variant="destructive">Pending {getDaysSince(order.createdAt)}d</Badge>
+                            <Badge variant={order.status === "pending" ? "destructive" : "outline"} className="capitalize">
+                              {order.status}
+                            </Badge>
                           </div>
                           <div className="grid grid-cols-2 gap-4 mt-2 text-sm">
                             <div>Small Bags: {order.smallBags}</div>
@@ -745,7 +757,9 @@ export function Dashboard() {
                                 <div className="text-sm text-muted-foreground">
                                   <p>Small Bags: {inv.smallBags || 0}</p>
                                   <p>Large Bags: {inv.largeBags || 0}</p>
-                                  <p className="mt-1">Grade: {coffee?.grade}</p>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <Badge variant="outline">{coffee?.grade}</Badge>
+                                  </div>
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
@@ -819,8 +833,7 @@ export function Dashboard() {
                               <Badge
                                 variant={order.status === "pending" ? "destructive" : "outline"}
                                 className="capitalize"
-                              >
-                                {order.status}
+                              >{order.status}
                               </Badge>
                             </div>
                             <div className="grid grid-cols-2 gap-4 mt-2 text-sm">
@@ -828,8 +841,7 @@ export function Dashboard() {
                               <div>Large Bags: {order.largeBags}</div>
                             </div>
                           </div>
-                        );
-                      })}
+                        );                      })}
                       {shopOrders.length === 0 && (
                         <p className="text-muted-foreground text-center py-2">No recent orders</p>
                       )}
