@@ -4,6 +4,7 @@ import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { insertGreenCoffeeSchema, insertRoastingBatchSchema, insertOrderSchema, insertShopSchema } from "@shared/schema";
 import {insertRetailInventorySchema} from "@shared/schema";
+import { sql } from "sql-template-strings";
 
 function requireRole(roles: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -248,15 +249,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("Updating shop:", shopId, "with new targets - small:", desiredSmallBags, "large:", desiredLargeBags);
 
-      // Update shop settings directly in the database
-      await storage.execute(`
-        UPDATE shops 
-        SET desired_small_bags = $1, desired_large_bags = $2 
-        WHERE id = $3
-      `, [desiredSmallBags, desiredLargeBags, shopId]);
+      // Execute raw SQL query to update shop targets
+      await storage.executeQuery(
+        `UPDATE shops 
+         SET desired_small_bags = $1, 
+             desired_large_bags = $2 
+         WHERE id = $3`,
+        [desiredSmallBags, desiredLargeBags, shopId]
+      );
 
       // Fetch updated shop
       const updatedShop = await storage.getShop(shopId);
+      console.log("Shop updated successfully:", updatedShop);
       res.json(updatedShop);
     } catch (error) {
       console.error("Error updating shop:", error);
