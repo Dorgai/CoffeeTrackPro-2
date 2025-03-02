@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { ShopSelector } from "./shop-selector";
 import { RestockDialog } from "../coffee/restock-dialog";
-import { StockLevelIndicator } from "./stock-level-indicator";
 import { GreenBeansStockIndicator } from "./green-beans-stock-indicator";
 import { Coffee } from "lucide-react";
 
@@ -144,7 +143,6 @@ export function NavBar() {
                 <GreenBeansStockIndicator />
               )}
 
-              {user.role !== "roaster" && <StockLevelIndicator />}
               {user.role !== "roaster" && <RestockDialog />}
 
               {(user.role === "roasteryOwner" || user.role === "roaster") && (
