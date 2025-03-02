@@ -7,8 +7,14 @@ import {insertRetailInventorySchema} from "@shared/schema";
 
 function requireRole(roles: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.user || !roles.includes(req.user.role)) {
-      return res.status(403).json({ message: "Unauthorized" });
+    if (!req.user) {
+      console.log("Authorization failed: No user in request");
+      return res.status(401).json({ message: "Unauthorized - Please log in" });
+    }
+
+    if (!roles.includes(req.user.role)) {
+      console.log("Authorization failed: User role", req.user.role, "not in allowed roles:", roles);
+      return res.status(403).json({ message: "Unauthorized - Insufficient permissions" });
     }
     next();
   };
@@ -636,7 +642,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get the confirmation to verify shop access
-      const existingConfirmation = await storage.getDispatchedCoffeeConfirmation(confirmationId);
+      const existingConfirmation = await storage.getDispatchedCoffeeConfirmations(Number(confirmationId));
       if (!existingConfirmation) {
         return res.status(404).json({ message: "Confirmation not found" });
       }
