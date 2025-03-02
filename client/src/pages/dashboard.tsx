@@ -23,7 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { apiRequest } from "@/lib/queryClient";
-import type { GreenCoffee, RoastingBatch, RetailInventory } from "@shared/schema";
+import type { GreenCoffee, RoastingBatch, RetailInventory, Shop } from "@shared/schema";
 import { useState } from "react";
 import { ShopSelector } from "@/components/layout/shop-selector";
 import { format } from 'date-fns';
@@ -104,6 +104,17 @@ export function Dashboard() {
   const [selectedShopId, setSelectedShopId] = useState<number | null>(user?.defaultShopId || null);
   const [activeShop, setActiveShop] = useState<{id: number, name: string, desiredSmallBags?: number, desiredLargeBags?: number} | null>(null);
 
+
+  // Add shop query
+  const { data: shop } = useQuery<Shop>({
+    queryKey: ["/api/shops", selectedShopId],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/shops/${selectedShopId}`);
+      if (!res.ok) throw new Error("Failed to fetch shop details");
+      return res.json();
+    },
+    enabled: !!selectedShopId
+  });
 
   // Get all available coffees
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
@@ -494,71 +505,40 @@ export function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
-                {filteredInventory?.reduce((acc, inv) => {
-                  const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
-                  if (!coffee) return acc;
+                {coffees?.map(coffee => {
+                  const inventoryItems = filteredInventory?.filter(inv => inv.greenCoffeeId === coffee.id) || [];
+                  const totalSmallBags = inventoryItems.reduce((sum, inv) => sum + (inv.smallBags || 0), 0);
+                  const totalLargeBags = inventoryItems.reduce((sum, inv) => sum + (inv.largeBags || 0), 0);
 
-                  if (!acc[coffee.name]) {
-                    acc[coffee.name] = {
-                      name: coffee.name,
-                      producer: coffee.producer,
-                      smallBags: inv.smallBags,
-                      largeBags: inv.largeBags
-                    };
-                  } else {
-                    acc[coffee.name].smallBags += inv.smallBags;
-                    acc[coffee.name].largeBags += inv.largeBags;
-                  }
-                  return acc;
-                }, {} as Record<string, { 
-                  name: string; 
-                  producer?: string; 
-                  smallBags: number; 
-                  largeBags: number; 
-                }>)
-                && Object.entries(filteredInventory.reduce((acc, inv) => {
-                  const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
-                  if (!coffee) return acc;
+                  if (totalSmallBags === 0 && totalLargeBags === 0) return null;
 
-                  if (!acc[coffee.name]) {
-                    acc[coffee.name] = {
-                      name: coffee.name,
-                      producer: coffee.producer,
-                      smallBags: inv.smallBags,
-                      largeBags: inv.largeBags
-                    };
-                  } else {
-                    acc[coffee.name].smallBags += inv.smallBags;
-                    acc[coffee.name].largeBags += inv.largeBags;
-                  }
-                  return acc;
-                }, {} as Record<string, { 
-                  name: string; 
-                  producer?: string; 
-                  smallBags: number; 
-                  largeBags: number; 
-                }>)).map(([_, coffee]) => (
-                  <div key={coffee.name} className="space-y-4">
-                    <div>
-                      <h3 className="font-medium">{coffee.name}</h3>
-                      {coffee.producer && (
-                        <p className="text-sm text-muted-foreground">{coffee.producer}</p>
-                      )}
+                  // Find the current shop's inventory item for this coffee
+                  const shopInventory = inventoryItems.find(inv => inv.shopId === selectedShopId);
+                  if (!shopInventory) return null;
+
+                  return (
+                    <div key={coffee.id} className="space-y-4">
+                      <div>
+                        <h3 className="font-medium">{coffee.name}</h3>
+                        {coffee.producer && (
+                          <p className="text-sm text-muted-foreground">{coffee.producer}</p>
+                        )}
+                      </div>
+                      <div className="space-y-4">
+                        <StockProgress
+                          current={totalSmallBags}
+                          desired={shopInventory.desiredSmallBags || 0}
+                          label="Small Bags (200g)"
+                        />
+                        <StockProgress
+                          current={totalLargeBags}
+                          desired={shopInventory.desiredLargeBags || 0}
+                          label="Large Bags (1kg)"
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-4">
-                      <StockProgress
-                        current={coffee.smallBags}
-                        desired={activeShop?.desiredSmallBags || 0}
-                        label="Small Bags (200g)"
-                      />
-                      <StockProgress
-                        current={coffee.largeBags}
-                        desired={activeShop?.desiredLargeBags || 0}
-                        label="Large Bags (1kg)"
-                      />
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {(!filteredInventory || filteredInventory.length === 0) && (
                   <p className="text-muted-foreground text-center py-4">No inventory data available</p>
                 )}
@@ -821,7 +801,7 @@ export function Dashboard() {
       )}
 
       {/* Recent Roasting Batches section */}
-      {(user?.role === "roaster"|| user?.role === "roasteryOwner") && (
+      {(user?.role === "roaster" || user?.role === "roasteryOwner") && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle>Recent Roasting Batches</CardTitle>
@@ -835,7 +815,7 @@ export function Dashboard() {
             {batches?.slice(0, 5).map(batch => (
               <div key={batch.id} className="flex items-center justify-between py-2">
                 <div>
-                  <p className="font-medium">Batch #{batch.id}</p>
+                  <p className="font-medium">`Batch #{batch.id}</p>
                   <p className="text-sm text-muted-foreground">
                     {new Date(batch.roastedAt || "").toLocaleDateString()}
                   </p>
