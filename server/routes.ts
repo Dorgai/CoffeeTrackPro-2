@@ -618,7 +618,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/dispatched-coffee/confirm", requireRole(["shopManager", "barista"]), async (req, res) => {
+  app.post("/api/dispatched-coffee/confirm", requireRole(["roasteryOwner", "shopManager", "barista"]), async (req, res) => {
     try {
       const { confirmationId, receivedSmallBags, receivedLargeBags } = req.body;
       console.log("Received confirmation request:", {
@@ -649,10 +649,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Confirmation not found" });
       }
 
-      // Verify shop access
-      const hasAccess = await checkShopAccess(req.user!.id, existingConfirmation.shopId);
-      if (!hasAccess) {
-        return res.status(403).json({ message: "User does not have access to this shop" });
+      // For non-roasteryOwner users, verify shop access
+      if (req.user?.role !== "roasteryOwner") {
+        const hasAccess = await checkShopAccess(req.user!.id, existingConfirmation.shopId);
+        if (!hasAccess) {
+          return res.status(403).json({ message: "User does not have access to this shop" });
+        }
       }
 
       console.log("Processing confirmation:", {
