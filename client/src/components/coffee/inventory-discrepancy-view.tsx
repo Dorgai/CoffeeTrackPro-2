@@ -16,12 +16,12 @@ import {
   TableBody,
   TableCell,
   TableHead,
-  TableHeader,
   TableRow,
 } from "@/components/ui/table";
 
 export function InventoryDiscrepancyView() {
-  const { data: discrepancies, isLoading } = useQuery<(InventoryDiscrepancy & {
+  // Fetch discrepancies with expanded relations
+  const { data: discrepancies, isLoading, error } = useQuery<(InventoryDiscrepancy & {
     confirmation: {
       greenCoffee: { name: string; producer: string };
       shop: { name: string; location: string };
@@ -43,6 +43,19 @@ export function InventoryDiscrepancyView() {
       <div className="flex items-center justify-center p-8">
         <Loader2 className="h-8 w-8 animate-spin" />
       </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Error</CardTitle>
+          <CardDescription>
+            Failed to load discrepancy reports: {error.message}
+          </CardDescription>
+        </CardHeader>
+      </Card>
     );
   }
 
@@ -69,7 +82,7 @@ export function InventoryDiscrepancyView() {
       </CardHeader>
       <CardContent>
         <Table>
-          <TableHeader>
+          <thead>
             <TableRow>
               <TableHead>Date</TableHead>
               <TableHead>Shop</TableHead>
@@ -78,11 +91,11 @@ export function InventoryDiscrepancyView() {
               <TableHead>Large Bags Difference</TableHead>
               <TableHead>Status</TableHead>
             </TableRow>
-          </TableHeader>
+          </thead>
           <TableBody>
             {discrepancies.map((discrepancy) => (
               <TableRow key={discrepancy.id}>
-                <TableCell>{formatDate(discrepancy.createdAt || "")}</TableCell>
+                <TableCell>{formatDate(discrepancy.createdAt)}</TableCell>
                 <TableCell>
                   <div>
                     <p className="font-medium">{discrepancy.confirmation.shop.name}</p>
@@ -114,7 +127,7 @@ export function InventoryDiscrepancyView() {
                     discrepancy.status === "open" 
                       ? "destructive" 
                       : discrepancy.status === "investigating" 
-                        ? "default"
+                        ? "warning"
                         : "default"
                   }>
                     {discrepancy.status}
