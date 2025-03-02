@@ -393,7 +393,7 @@ export function Dashboard() {
       )}
 
       {/* Stock Overview Section - For both managers and baristas */}
-      {(user?.role === "shopManager" || user?.role === "barista") && selectedShopId && (
+      {(user?.role === "shopManager" || user?.role === "barista") && (
         <div className="grid gap-4 md:grid-cols-2">
           {/* Global Stock Overview */}
           <Card>
@@ -479,7 +479,7 @@ export function Dashboard() {
                     </div>
                   );
                 })}
-                {!currentInventory?.length && (
+                {(!currentInventory || currentInventory.length === 0) && (
                   <p className="text-muted-foreground text-center py-4">No inventory data available</p>
                 )}
               </div>
