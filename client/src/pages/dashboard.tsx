@@ -105,10 +105,11 @@ export function Dashboard() {
   const [activeShop, setActiveShop] = useState<{id: number, name: string, desiredSmallBags?: number, desiredLargeBags?: number} | null>(null);
 
 
-  // Add shop query
-  const { data: shop } = useQuery<Shop>({
+  // Update shop query
+  const { data: shop, isLoading: loadingShop } = useQuery<Shop>({
     queryKey: ["/api/shops", selectedShopId],
     queryFn: async () => {
+      if (!selectedShopId) throw new Error("No shop selected");
       const res = await apiRequest("GET", `/api/shops/${selectedShopId}`);
       if (!res.ok) throw new Error("Failed to fetch shop details");
       return res.json();
@@ -182,7 +183,7 @@ export function Dashboard() {
   });
 
 
-  if (loadingCoffees || loadingBatches || loadingInventory || loadingOrders) {
+  if (loadingCoffees || loadingBatches || loadingInventory || loadingOrders || loadingShop) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -507,13 +508,13 @@ export function Dashboard() {
               <div className="space-y-6">
                 {coffees?.map(coffee => {
                   // Get inventory for this coffee in the selected shop
-                  const shopInventory = filteredInventory?.find(inv => 
-                    inv.greenCoffeeId === coffee.id && 
+                  const shopInventory = filteredInventory?.find(inv =>
+                    inv.greenCoffeeId === coffee.id &&
                     inv.shopId === selectedShopId
                   );
 
                   // Skip if no inventory for this coffee
-                  if (!shopInventory || (!shopInventory.smallBags && !shopInventory.largeBags)) {
+                  if (!shopInventory) {
                     return null;
                   }
 
@@ -527,12 +528,12 @@ export function Dashboard() {
                       </div>
                       <div className="space-y-4">
                         <StockProgress
-                          current={shopInventory.smallBags}
+                          current={shopInventory.smallBags || 0}
                           desired={shop?.desiredSmallBags || 0}
                           label="Small Bags (200g)"
                         />
                         <StockProgress
-                          current={shopInventory.largeBags}
+                          current={shopInventory.largeBags || 0}
                           desired={shop?.desiredLargeBags || 0}
                           label="Large Bags (1kg)"
                         />

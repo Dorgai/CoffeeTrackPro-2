@@ -173,6 +173,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Add PATCH endpoint for updating shop settings after the existing shops routes
+  app.patch("/api/shops/:id", requireRole(["roasteryOwner"]), async (req, res) => {
+    try {
+      const shopId = parseInt(req.params.id);
+      const { desiredSmallBags, desiredLargeBags } = req.body;
+
+      const shop = await storage.getShop(shopId);
+      if (!shop) {
+        return res.status(404).json({ message: "Shop not found" });
+      }
+
+      const updatedShop = await storage.updateShop(shopId, {
+        desiredSmallBags: Number(desiredSmallBags),
+        desiredLargeBags: Number(desiredLargeBags)
+      });
+
+      res.json(updatedShop);
+    } catch (error) {
+      console.error("Error updating shop:", error);
+      res.status(500).json({ message: "Failed to update shop" });
+    }
+  });
+
   // Green Coffee Routes - accessible by roastery owner, roaster, and shop manager
   app.get("/api/green-coffee", requireRole(["roasteryOwner", "roaster", "shopManager", "barista"]), async (req, res) => {
     const coffees = await storage.getGreenCoffees();
