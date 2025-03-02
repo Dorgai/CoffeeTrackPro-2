@@ -69,7 +69,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
     },
   });
 
-  // Define mutation outside of any conditional logic
+  // Mutation for confirming received quantities
   const confirmMutation = useMutation({
     mutationFn: async (data: {
       confirmationId: number;
