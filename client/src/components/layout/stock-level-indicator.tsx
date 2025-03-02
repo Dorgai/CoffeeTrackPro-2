@@ -23,6 +23,11 @@ export function StockLevelIndicator() {
   const { data: shop } = useQuery<Shop>({
     queryKey: ["/api/shops", activeShop?.id],
     enabled: !!activeShop,
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/shops/${activeShop?.id}`);
+      if (!res.ok) throw new Error("Failed to fetch shop details");
+      return res.json();
+    }
   });
 
   // Fetch current inventory
@@ -31,6 +36,7 @@ export function StockLevelIndicator() {
     enabled: !!activeShop,
     queryFn: async () => {
       const res = await apiRequest("GET", `/api/retail-inventory?shopId=${activeShop?.id}`);
+      if (!res.ok) throw new Error("Failed to fetch inventory");
       return res.json();
     },
   });
@@ -39,17 +45,27 @@ export function StockLevelIndicator() {
   const { data: coffees } = useQuery<any[]>({
     queryKey: ["/api/green-coffee"],
     enabled: !!activeShop,
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/green-coffee");
+      if (!res.ok) throw new Error("Failed to fetch coffee types");
+      return res.json();
+    }
   });
 
   if (!activeShop || !shop?.defaultOrderQuantity || !inventory || !coffees) {
-    return null;
+    return (
+      <div className="flex items-center gap-2">
+        <Package className="h-4 w-4" />
+        <span className="text-sm font-medium">No data</span>
+      </div>
+    );
   }
 
   // Calculate total desired stock
   const desiredStock = shop.defaultOrderQuantity * coffees.length;
 
   // Calculate current total stock
-  const currentStock = inventory.reduce((total, item) => total + item.smallBags + item.largeBags, 0);
+  const currentStock = inventory.reduce((total, item) => total + (item.smallBags || 0) + (item.largeBags || 0), 0);
 
   // Calculate stock level percentage
   const stockPercentage = Math.min(Math.round((currentStock / desiredStock) * 100), 100);

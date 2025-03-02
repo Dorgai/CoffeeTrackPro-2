@@ -17,23 +17,32 @@ export function GreenBeansStockIndicator() {
   const { data: coffees } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/green-coffee");
-      if (!response.ok) {
-        throw new Error("Failed to fetch green coffee data");
+      try {
+        const response = await apiRequest("GET", "/api/green-coffee");
+        if (!response.ok) {
+          throw new Error("Failed to fetch green coffee data");
+        }
+        const data = await response.json();
+        return data;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive",
+        });
+        throw error;
       }
-      return response.json();
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
     },
   });
 
-  if (!coffees?.length) {
-    return null;
+  if (!coffees || coffees.length === 0) {
+    return (
+      <div className="flex items-center gap-2">
+        <Coffee className="h-4 w-4" />
+        <span className="text-sm font-medium">No data</span>
+      </div>
+    );
   }
 
   // Calculate total current stock
