@@ -346,11 +346,15 @@ export function Dashboard() {
                 // Find coffees that exist in other shops but not in this one
                 const availableCoffees = coffees?.filter(coffee => {
                   if (!coffee) return false;
+
+                  // Check if this coffee exists in any other shop's inventory
                   const isInOtherShops = currentInventory?.some(inv =>
                     inv.shopId !== shop.id &&
                     inv.greenCoffeeId === coffee.id &&
                     (inv.smallBags > 0 || inv.largeBags > 0)
                   );
+
+                  // Return true if the coffee is in other shops but not in current shop
                   return !shopCoffeeIds.has(coffee.id) && isInOtherShops;
                 }) || [];
 
@@ -367,6 +371,9 @@ export function Dashboard() {
                               <p className="font-medium">{coffee.name}</p>
                               <p className="text-sm text-muted-foreground">
                                 {coffee.producer} - {coffee.country}
+                              </p>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                Grade: {coffee.grade}
                               </p>
                             </div>
                             {(user?.role === "shopManager" || user?.role === "barista") && (
@@ -473,6 +480,7 @@ export function Dashboard() {
                         {coffee.producer && (
                           <p className="text-sm text-muted-foreground">{coffee.producer}</p>
                         )}
+                        <p className="text-sm text-muted-foreground mt-1">Grade: {coffee.grade}</p>
                       </div>
                       <div className="space-y-4">
                         <StockProgress
@@ -599,6 +607,7 @@ export function Dashboard() {
                         {coffee.producer && (
                           <p className="text-sm text-muted-foreground">{coffee.producer}</p>
                         )}
+                        <p className="text-sm text-muted-foreground mt-1">Grade: {coffee.grade}</p>
                       </div>
                       <div className="space-y-4">
                         <StockProgress
@@ -703,15 +712,23 @@ export function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              {orders?.filter(order => order.shop).reduce((shops, order) => {
-                if (order.shop && !shops.some(s => s.id === order.shopId)) {
-                  shops.push({ id: order.shopId, name: order.shop.name, location: order.shop.location });
+              {currentInventory?.reduce((shops, inv) => {
+                const shopData = inv.shop;
+                if (shopData && !shops.some(s => s.id === inv.shopId)) {
+                  shops.push({
+                    id: inv.shopId,
+                    name: shopData.name,
+                    location: shopData.location,
+                    inventory: currentInventory.filter(i => i.shopId === inv.shopId)
+                  });
                 }
                 return shops;
-              }, [] as Array<{ id: number; name: string; location: string }>).map(shop => {
-                const shopInventory = currentInventory?.filter(inv => inv.shopId === shop.id) || [];
-                const shopTargets = coffeeTargets?.filter(t => t.shopId === shop.id) || [];
-
+              }, [] as Array<{
+                id: number;
+                name: string;
+                location: string;
+                inventory: typeof currentInventory;
+              }>).map(shop => {
                 return (
                   <div key={shop.id} className="space-y-4">
                     <div className="flex justify-between items-center">
@@ -719,10 +736,13 @@ export function Dashboard() {
                       <Badge variant="outline">{shop.location}</Badge>
                     </div>
                     <div className="space-y-2">
-                      {shopInventory.map(inv => {
+                      {shop.inventory.map(inv => {
                         const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
-                        const target = shopTargets.find(t => t.greenCoffeeId === inv.greenCoffeeId);
-                        const isLowStock = inv.smallBags < 3 || inv.largeBags < 3;
+                        const coffeeTarget = coffeeTargets?.find(t =>
+                          t.greenCoffeeId === inv.greenCoffeeId &&
+                          t.shopId === shop.id
+                        );
+                        const isLowStock = (inv.smallBags || 0) < 3 || (inv.largeBags || 0) < 3;
 
                         return (
                           <div
@@ -733,19 +753,20 @@ export function Dashboard() {
                               <div>
                                 <p className="font-medium">{coffee?.name}</p>
                                 <div className="text-sm text-muted-foreground">
-                                  <p>Small Bags: {inv.smallBags}</p>
-                                  <p>Large Bags: {inv.largeBags}</p>
+                                  <p>Small Bags: {inv.smallBags || 0}</p>
+                                  <p>Large Bags: {inv.largeBags || 0}</p>
+                                  <p className="mt-1">Grade: {coffee?.grade}</p>
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
                                 {isLowStock && (
                                   <Badge variant="destructive">Low Stock</Badge>
                                 )}
-                                <TargetEditorDialog // Replaced Button with TargetEditorDialog
+                                <TargetEditorDialog
                                   shopId={shop.id}
                                   coffeeId={inv.greenCoffeeId!}
                                   coffeeName={coffee?.name || ""}
-                                  currentTarget={target?.desiredLargeBags}
+                                  currentTarget={coffeeTarget?.desiredLargeBags}
                                   trigger={
                                     <Button variant="outline" size="sm">
                                       Set Target
@@ -757,7 +778,7 @@ export function Dashboard() {
                           </div>
                         );
                       })}
-                      {shopInventory.length === 0 && (
+                      {shop.inventory.length === 0 && (
                         <p className="text-muted-foreground text-center py-2">No inventory data</p>
                       )}
                     </div>

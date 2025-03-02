@@ -3,6 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const userRoles = ["roasteryOwner", "roaster", "shopManager", "barista"] as const;
+export const coffeeGrades = ["Specialty", "Premium", "Rarity"] as const;
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -40,6 +41,7 @@ export const greenCoffee = pgTable("green_coffee", {
   details: json("details").$type<Record<string, string>>(),
   currentStock: decimal("current_stock", { precision: 10, scale: 2 }).notNull(),
   minThreshold: decimal("min_threshold", { precision: 10, scale: 2 }).notNull(),
+  grade: text("grade", { enum: coffeeGrades }).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -126,7 +128,9 @@ export const coffeeLargeBagTargets = pgTable("coffee_large_bag_targets", {
 // Create insert schemas for each table
 export const insertUserSchema = createInsertSchema(users);
 export const insertShopSchema = createInsertSchema(shops);
-export const insertGreenCoffeeSchema = createInsertSchema(greenCoffee);
+export const insertGreenCoffeeSchema = createInsertSchema(greenCoffee).extend({
+  grade: z.enum(coffeeGrades)
+});
 export const insertRoastingBatchSchema = createInsertSchema(roastingBatches).extend({
   greenCoffeeId: z.coerce.number(),
   greenCoffeeAmount: z.coerce.number().min(0, "Amount must be positive"),
