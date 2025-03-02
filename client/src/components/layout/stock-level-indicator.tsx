@@ -7,8 +7,8 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
-import { Progress } from "@/components/ui/progress";
 import { Package } from "lucide-react";
+import StockProgress from "@/components/stock-progress";
 
 type InventoryItem = {
   greenCoffeeId: number;
@@ -61,13 +61,6 @@ export function StockLevelIndicator() {
   // Use the lower percentage for overall status
   const overallPercentage = Math.min(smallBagsPercentage, largeBagsPercentage);
 
-  // Determine stock level status
-  const getStockClass = (percentage: number) => {
-    if (percentage >= 75) return "bg-green-500";
-    if (percentage >= 50) return "bg-amber-500";
-    return "bg-red-500";
-  };
-
   return (
     <HoverCard>
       <HoverCardTrigger asChild>
@@ -77,36 +70,33 @@ export function StockLevelIndicator() {
             <span className={`text-sm font-medium ${overallPercentage < 50 ? 'text-red-500' : ''}`}>
               {overallPercentage}%
             </span>
-            <Progress 
-              value={overallPercentage} 
-              className="w-24 h-2"
-              indicatorClassName={getStockClass(overallPercentage)}
-            />
+            <div className="w-24 h-2 bg-secondary rounded-full overflow-hidden">
+              <div
+                className={`h-full transition-all ${
+                  overallPercentage >= 75 ? "bg-green-500" :
+                  overallPercentage >= 50 ? "bg-amber-500" :
+                  "bg-red-500"
+                }`}
+                style={{ width: `${overallPercentage}%` }}
+              />
+            </div>
           </div>
         </div>
       </HoverCardTrigger>
       <HoverCardContent className="w-80">
-        <div className="space-y-2">
+        <div className="space-y-4">
           <h4 className="text-sm font-semibold">Stock Level Details</h4>
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            <div>
-              <p className="text-muted-foreground">Small Bags (200g):</p>
-              <p className="font-medium">{totalSmallBags} / {shop.desiredSmallBags}</p>
-              <Progress 
-                value={smallBagsPercentage} 
-                className="mt-1 h-1"
-                indicatorClassName={getStockClass(smallBagsPercentage)}
-              />
-            </div>
-            <div>
-              <p className="text-muted-foreground">Large Bags (1kg):</p>
-              <p className="font-medium">{totalLargeBags} / {shop.desiredLargeBags}</p>
-              <Progress 
-                value={largeBagsPercentage} 
-                className="mt-1 h-1"
-                indicatorClassName={getStockClass(largeBagsPercentage)}
-              />
-            </div>
+          <div className="space-y-4">
+            <StockProgress
+              current={totalSmallBags}
+              desired={shop.desiredSmallBags}
+              label="Small Bags (200g)"
+            />
+            <StockProgress
+              current={totalLargeBags}
+              desired={shop.desiredLargeBags}
+              label="Large Bags (1kg)"
+            />
           </div>
           <p className="text-xs text-muted-foreground">
             Based on your configured target stock levels

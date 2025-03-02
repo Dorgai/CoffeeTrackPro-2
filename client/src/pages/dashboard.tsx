@@ -799,13 +799,14 @@ export function Dashboard() {
           </CardContent>
         </Card>
       )}
-      {/* Recent Roasting Batches section - For roaster and roasteryOwner */}
+
+      {/* Recent Roasting Batches section */}
       {(user?.role === "roaster" || user?.role === "roasteryOwner") && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle>Recent Roasting Batches</CardTitle>
             {user?.role === "roaster" && (
-              <Button variant="outlineasChild>
+              <Button variant="outline" asChild>
                 <Link href="/roasting">View All</Link>
               </Button>
             )}
