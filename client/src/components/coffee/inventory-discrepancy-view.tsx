@@ -43,16 +43,18 @@ export function InventoryDiscrepancyView() {
       shop: { name: string; location: string };
     };
   })[]>({
-    queryKey: [`/api/inventory-discrepancies`, user.role],
+    queryKey: [`/api/inventory-discrepancies`],
     queryFn: async () => {
-      const res = await apiRequest("GET", "/api/inventory-discrepancies");
-      if (!res.ok) {
-        throw new Error("Failed to fetch discrepancy reports. Please ensure you have the correct permissions.");
+      try {
+        const res = await apiRequest("GET", "/api/inventory-discrepancies");
+        return await res.json();
+      } catch (error) {
+        console.error("Error fetching discrepancies:", error);
+        throw error;
       }
-      return res.json();
     },
     enabled: user.role === "roaster",
-    retry: false
+    retry: false,
   });
 
   if (isLoading) {
