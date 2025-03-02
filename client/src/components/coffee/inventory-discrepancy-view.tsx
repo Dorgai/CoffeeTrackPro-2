@@ -23,6 +23,19 @@ import { useAuth } from "@/hooks/use-auth";
 export function InventoryDiscrepancyView() {
   const { user } = useAuth();
 
+  if (!user || user.role !== "roaster") {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Access Denied</CardTitle>
+          <CardDescription>
+            You do not have permission to view discrepancy reports.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
   // Fetch discrepancies with expanded relations
   const { data: discrepancies, isLoading, error } = useQuery<(InventoryDiscrepancy & {
     confirmation: {
@@ -31,7 +44,7 @@ export function InventoryDiscrepancyView() {
     };
   })[]>({
     queryKey: ["/api/inventory-discrepancies"],
-    enabled: !!user && user.role === "roaster",
+    enabled: true,
   });
 
   if (isLoading) {
@@ -48,7 +61,7 @@ export function InventoryDiscrepancyView() {
         <CardHeader>
           <CardTitle>Error Loading Discrepancies</CardTitle>
           <CardDescription>
-            Please try refreshing the page. If the problem persists, contact support.
+            There was an error loading the discrepancy reports. Please try again later.
           </CardDescription>
         </CardHeader>
       </Card>
