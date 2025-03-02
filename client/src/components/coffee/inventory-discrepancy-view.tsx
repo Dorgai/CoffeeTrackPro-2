@@ -31,6 +31,7 @@ export function InventoryDiscrepancyView() {
     };
   })[]>({
     queryKey: ["/api/inventory-discrepancies"],
+    enabled: !!user && user.role === "roaster",
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/inventory-discrepancies");
       if (!res.ok) {
@@ -39,7 +40,6 @@ export function InventoryDiscrepancyView() {
       }
       return res.json();
     },
-    enabled: !!user && user.role === "roaster",
   });
 
   if (isLoading) {
