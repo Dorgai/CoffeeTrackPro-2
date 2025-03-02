@@ -153,7 +153,7 @@ export function Dashboard() {
       }
       return res.json();
     },
-    enabled: !!user,
+    enabled: !!user && !!selectedShopId,
   });
 
   // Get previous inventory history
@@ -191,9 +191,9 @@ export function Dashboard() {
     );
   }
 
-  // Filter data by selected shop for baristas
+  // Filter data by selected shop for baristas and managers
   const getFilteredData = (data: any[]) => {
-    if (user?.role === "barista" && selectedShopId) {
+    if ((user?.role === "barista" || user?.role === "shopManager") && selectedShopId) {
       return data?.filter(item => item.shopId === selectedShopId);
     }
     return data;
@@ -380,92 +380,99 @@ export function Dashboard() {
       )}
 
       {/* Manager's View - Total Stock Overview and Shop Breakdown */}
-      {user?.role === "shopManager" && (
-        <div className="grid gap-4 md:grid-cols-2">
-          {/* Stock Overview */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Global Stock Overview</CardTitle>
-              <CardDescription>Combined inventory across all locations</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {orders?.filter(order => order.shop && order.shop.desiredSmallBags !== undefined && order.shop.desiredLargeBags !== undefined).reduce((shops, order) => {
-                  if (order.shop && !shops.some(s => s.id === order.shopId)) {
-                    shops.push({ id: order.shopId, name: order.shop.name, desiredSmallBags: order.shop.desiredSmallBags, desiredLargeBags: order.shop.desiredLargeBags });
-                  }
-                  return shops;
-                }, [] as Array<{ id: number; name: string; desiredSmallBags: number; desiredLargeBags: number;}>).map(shop => {
-                  const shopInventory = currentInventory?.filter(inv => inv.shopId === shop.id) || [];
+      {user?.role === "shopManager" && shop && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Stock Overview</CardTitle>
+            <CardDescription>Current stock levels against target quantities</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {coffees?.map(coffee => {
+                // Get inventory for this coffee in the selected shop
+                const shopInventory = filteredInventory?.find(inv =>
+                  inv.greenCoffeeId === coffee.id &&
+                  inv.shopId === selectedShopId
+                );
 
-                  const totalSmallBags = shopInventory.reduce((sum, inv) => sum + inv.smallBags, 0);
-                  const totalLargeBags = shopInventory.reduce((sum, inv) => sum + inv.largeBags, 0);
+                // Skip if no inventory for this coffee
+                if (!shopInventory) {
+                  return null;
+                }
 
-                  return (
-                    <div key={shop.id} className="space-y-4 pb-4 border-b last:border-0">
-                      <h3 className="font-medium text-lg">{shop.name}</h3>
-                      <StockProgress
-                        current={totalSmallBags}
-                        desired={shop.desiredSmallBags}
-                        label="Small Bags"
-                      />
-                      <StockProgress
-                        current={totalLargeBags}
-                        desired={shop.desiredLargeBags}
-                        label="Large Bags"
-                      />
+                return (
+                  <div key={coffee.id} className="space-y-4">
+                    <div>
+                      <h3 className="font-medium">{coffee.name}</h3>
+                      {coffee.producer && (
+                        <p className="text-sm text-muted-foreground">{coffee.producer}</p>
+                      )}
                     </div>
-                  );
-                })}
-                {!currentInventory?.length && (
-                  <p className="text-center text-muted-foreground py-4">No inventory data available</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Pending Orders */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Pending Orders</CardTitle>
-              <CardDescription>Orders awaiting processing</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {Object.entries(pendingOrdersByShop).map(([shopName, shopOrders]) => (
-                  <div key={shopName} className="space-y-3">
-                    <h3 className="font-medium text-lg">{shopName}</h3>
-                    <div className="space-y-2">
-                      {shopOrders.map(order => {
-                        const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
-                        return (
-                          <div key={order.id} className="p-3 bg-muted rounded-lg">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <p className="font-medium">{coffee?.name}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  Ordered: {new Date(order.createdAt).toLocaleDateString()} ({getDaysSince(order.createdAt)} days ago)
-                                </p>
-                              </div>
-                              <Badge variant="destructive">Pending {getDaysSince(order.createdAt)}d</Badge>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 mt-2">
-                              <div className="text-sm">Small Bags: {order.smallBags}</div>
-                              <div className="text-sm">Large Bags: {order.largeBags}</div>
-                            </div>
-                          </div>
-                        );
-                      })}
+                    <div className="space-y-4">
+                      <StockProgress
+                        current={shopInventory.smallBags || 0}
+                        desired={shop.desiredSmallBags || 0}
+                        label="Small Bags (200g)"
+                      />
+                      <StockProgress
+                        current={shopInventory.largeBags || 0}
+                        desired={shop.desiredLargeBags || 0}
+                        label="Large Bags (1kg)"
+                      />
                     </div>
                   </div>
-                ))}
-                {Object.keys(pendingOrdersByShop).length === 0 && (
-                  <p className="text-center text-muted-foreground">No pending orders</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                );
+              })}
+              {(!filteredInventory || filteredInventory.length === 0) && (
+                <p className="text-muted-foreground text-center py-4">No inventory data available</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Pending Orders */}
+      {user?.role === "shopManager" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Pending Orders</CardTitle>
+            <CardDescription>Orders awaiting processing</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {Object.entries(pendingOrdersByShop).map(([shopName, shopOrders]) => (
+                <div key={shopName} className="space-y-3">
+                  <h3 className="font-medium text-lg">{shopName}</h3>
+                  <div className="space-y-2">
+                    {shopOrders.map(order => {
+                      const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
+                      return (
+                        <div key={order.id} className="p-3 bg-muted rounded-lg">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="font-medium">{coffee?.name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                Ordered: {new Date(order.createdAt).toLocaleDateString()} ({getDaysSince(order.createdAt)} days ago)
+                              </p>
+                            </div>
+                            <Badge variant="destructive">Pending {getDaysSince(order.createdAt)}d</Badge>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4 mt-2">
+                            <div className="text-sm">Small Bags: {order.smallBags}</div>
+                            <div className="text-sm">Large Bags: {order.largeBags}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              {Object.keys(pendingOrdersByShop).length === 0 && (
+                <p className="text-center text-muted-foreground">No pending orders</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Low stock alerts section for Roastery Owners and Roasters */}
@@ -830,7 +837,7 @@ export function Dashboard() {
                 </div>
               </div>
             ))}
-            {(!batches || batches.length === 0) && (
+            {(!batches || batches.length ===0) && (
               <p className="text-muted-foreground text-center py-4">No roasting batches recorded yet</p>
             )}
           </CardContent>
