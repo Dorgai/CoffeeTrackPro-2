@@ -5,16 +5,15 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
-import { Progress } from "@/components/ui/progress";
-import { Coffee } from "lucide-react";
+import { Coffee, Loader2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 export function GreenBeansStockIndicator() {
   const { toast } = useToast();
 
-  // Fetch green coffee data using our standard query client
-  const { data: coffees } = useQuery<GreenCoffee[]>({
+  // Fetch green coffee data
+  const { data: coffees, isLoading } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
     queryFn: async () => {
       try {
@@ -22,8 +21,7 @@ export function GreenBeansStockIndicator() {
         if (!response.ok) {
           throw new Error("Failed to fetch green coffee data");
         }
-        const data = await response.json();
-        return data;
+        return response.json();
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
         toast({
@@ -36,6 +34,15 @@ export function GreenBeansStockIndicator() {
     },
   });
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        <span className="text-sm">Loading...</span>
+      </div>
+    );
+  }
+
   if (!coffees || coffees.length === 0) {
     return (
       <div className="flex items-center gap-2">
@@ -45,17 +52,18 @@ export function GreenBeansStockIndicator() {
     );
   }
 
-  // Calculate total current stock
+  // Calculate total current stock and target stock
   const totalCurrentStock = coffees.reduce((sum, coffee) => sum + Number(coffee.currentStock), 0);
-
-  // Calculate total target stock based on minThresholds
   const totalTargetStock = coffees.reduce((sum, coffee) => sum + Number(coffee.minThreshold), 0);
 
-  // Calculate stock level percentage with a minimum of 0 and maximum of 100
-  const stockPercentage = Math.min(Math.max(Math.round((totalCurrentStock / totalTargetStock) * 100), 0), 100);
+  // Calculate stock level percentage (allow it to go over 100% if we have more than target)
+  const stockPercentage = Math.round((totalCurrentStock / totalTargetStock) * 100);
+  const displayPercentage = Math.min(stockPercentage, 999); // Cap display at 999% to avoid layout issues
 
-  // Determine stock level status and color
-  const getStockClass = () => {
+  // Determine color based on percentage
+  const getProgressColor = () => {
+    if (stockPercentage >= 150) return "bg-blue-500"; // Overstocked
+    if (stockPercentage >= 100) return "bg-green-500"; // Good stock level
     if (stockPercentage >= 75) return "bg-green-500";
     if (stockPercentage >= 50) return "bg-amber-500";
     return "bg-red-500";
@@ -68,13 +76,14 @@ export function GreenBeansStockIndicator() {
           <Coffee className="h-4 w-4" />
           <div className="flex items-center gap-1">
             <span className={`text-sm font-medium ${stockPercentage < 50 ? 'text-red-500' : ''}`}>
-              {stockPercentage}%
+              {displayPercentage}%
             </span>
-            <Progress 
-              value={stockPercentage} 
-              className={`w-24 h-2`}
-              indicatorClassName={getStockClass()}
-            />
+            <div className="w-24 h-2 bg-secondary rounded-full overflow-hidden">
+              <div
+                className={`h-full transition-all ${getProgressColor()}`}
+                style={{ width: `${Math.min(stockPercentage, 100)}%` }}
+              />
+            </div>
           </div>
         </div>
       </HoverCardTrigger>
@@ -92,7 +101,7 @@ export function GreenBeansStockIndicator() {
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            Based on your configured target stock levels
+            Based on configured target stock levels
           </p>
         </div>
       </HoverCardContent>
