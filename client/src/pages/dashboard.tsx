@@ -209,21 +209,26 @@ export function Dashboard() {
     );
   }
 
-  // Filter data by selected shop for baristas and managers
+  // Update data filtering logic
   const getFilteredData = (data: any[]) => {
-    if (selectedShopId) {
-      return data?.filter(item => item.shopId === selectedShopId);
+    if (selectedShopId && data) {
+      return data.filter(item => item.shopId === selectedShopId);
     }
-    return data;
+    return data || [];
   };
 
   const filteredOrders = getFilteredData(orders || []);
   const filteredInventory = getFilteredData(currentInventory || []);
 
+  // Add debugging logs for development
+  console.log('Selected Shop:', selectedShopId);
+  console.log('Current Inventory:', currentInventory);
+  console.log('Filtered Inventory:', filteredInventory);
 
   // Get pending orders grouped by shop (for managers)
-  const pendingOrdersByShop = orders ?
-    groupOrdersByShop(orders.filter(order => order.status === "pending")) : {};
+  const pendingOrdersByShop = orders
+    ? groupOrdersByShop(orders.filter(order => order.status === "pending"))
+    : {};
 
   const lowStockCoffees = coffees?.filter(
     coffee => Number(coffee.currentStock) <= Number(coffee.minThreshold)
