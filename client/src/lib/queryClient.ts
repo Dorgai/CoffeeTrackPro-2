@@ -5,9 +5,9 @@ async function throwIfResNotOk(res: Response) {
     const text = await res.text();
     try {
       const data = JSON.parse(text);
-      throw new Error(`${res.status}: ${JSON.stringify(data)}`);
+      throw new Error(data.message || text);
     } catch {
-      throw new Error(`${res.status}: ${text}`);
+      throw new Error(text);
     }
   }
 }
@@ -56,8 +56,8 @@ export const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
       staleTime: Infinity,
       retry: (failureCount, error) => {
-        if (error instanceof Error && error.message.includes("403")) {
-          return false; // Don't retry on 403 errors
+        if (error instanceof Error && (error.message.includes("403") || error.message.includes("401"))) {
+          return false; // Don't retry on auth errors
         }
         return failureCount < 3;
       },

@@ -23,38 +23,14 @@ import { useAuth } from "@/hooks/use-auth";
 export function InventoryDiscrepancyView() {
   const { user } = useAuth();
 
-  if (!user || user.role !== "roaster") {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Access Denied</CardTitle>
-          <CardDescription>
-            You do not have permission to view discrepancy reports.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    );
-  }
-
-  // Fetch discrepancies with expanded relations
   const { data: discrepancies, isLoading, error } = useQuery<(InventoryDiscrepancy & {
     confirmation: {
       greenCoffee: { name: string; producer: string };
       shop: { name: string; location: string };
     };
   })[]>({
-    queryKey: [`/api/inventory-discrepancies`],
-    queryFn: async () => {
-      try {
-        const res = await apiRequest("GET", "/api/inventory-discrepancies");
-        return await res.json();
-      } catch (error) {
-        console.error("Error fetching discrepancies:", error);
-        throw error;
-      }
-    },
-    enabled: user.role === "roaster",
-    retry: false,
+    queryKey: ["/api/inventory-discrepancies"],
+    enabled: user?.role === "roaster",
   });
 
   if (isLoading) {
@@ -65,20 +41,7 @@ export function InventoryDiscrepancyView() {
     );
   }
 
-  if (error) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Access Error</CardTitle>
-          <CardDescription>
-            You don't have permission to view discrepancy reports. Please contact your administrator.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    );
-  }
-
-  if (!discrepancies || discrepancies.length === 0) {
+  if (!discrepancies) {
     return (
       <Card>
         <CardHeader>
