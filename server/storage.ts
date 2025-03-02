@@ -1142,6 +1142,36 @@ export class DatabaseStorage implements IStorage {
       throw error;
     }
   }
+  async updateShop(
+    id: number,
+    update: {
+      desiredSmallBags?: number;
+      desiredLargeBags?: number;
+      isActive?: boolean;
+      defaultOrderQuantity?: number;
+    }
+  ): Promise<Shop> {
+    try {
+      console.log("Updating shop with id:", id, "with data:", update);
+
+      const [updatedShop] = await db
+        .update(shops)
+        .set(update)
+        .where(eq(shops.id, id))
+        .returning();
+
+      if (!updatedShop) {
+        throw new Error("Failed to update shop");
+      }
+
+      console.log("Successfully updated shop:", updatedShop);
+      return updatedShop;
+    } catch (error) {
+      console.error("Error updating shop:", error);
+      throw error;
+    }
+  }
+
 }
 
 export const storage = new DatabaseStorage();
