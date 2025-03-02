@@ -391,7 +391,7 @@ export function Dashboard() {
         </Card>
       )}
 
-      {/* Manager and Barista View - Stock Overview */}
+      {/* Stock Overview Section - For both managers and baristas */}
       {(user?.role === "shopManager" || user?.role === "barista") && selectedShopId && (
         <div className="grid gap-4 md:grid-cols-2">
           {/* Global Stock Overview */}
@@ -442,11 +442,16 @@ export function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Shop-specific Stock Overview */}
+          {/* Individual Shop Stock Overview */}
           <Card>
-            <CardHeader>
-              <CardTitle>Stock Overview</CardTitle>
-              <CardDescription>Current stock levels for this location</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle>Stock Overview</CardTitle>
+                <CardDescription>Current stock levels against target quantities</CardDescription>
+              </div>
+              <Button variant="outline" asChild>
+                <Link href="/retail">Manage Stock</Link>
+              </Button>
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
@@ -566,70 +571,7 @@ export function Dashboard() {
           </CardContent>
         </Card>
       )}
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* Stock Overview Section - Only for shop managers and baristas */}
-        {(user?.role === "shopManager" || user?.role === "barista") && selectedShopId && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <div>
-                <CardTitle>Stock Overview</CardTitle>
-                <CardDescription>Current stock levels against target quantities</CardDescription>
-              </div>
-              <Button variant="outline" asChild>
-                <Link href="/retail">Manage Stock</Link>
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {coffees?.map(coffee => {
-                  // Get inventory for this coffee in the selected shop
-                  const shopInventory = filteredInventory?.find(inv =>
-                    inv.greenCoffeeId === coffee.id &&
-                    inv.shopId === selectedShopId
-                  );
 
-                  const coffeeTarget = coffeeTargets?.find(t =>
-                    t.greenCoffeeId === coffee.id &&
-                    t.shopId === selectedShopId
-                  );
-
-                  // Skip if no inventory exists for this coffee
-                  if (!shopInventory) return null;
-
-                  return (
-                    <div key={coffee.id} className="space-y-4">
-                      <div>
-                        <h3 className="font-medium">{coffee.name}</h3>
-                        {coffee.producer && (
-                          <p className="text-sm text-muted-foreground">{coffee.producer}</p>
-                        )}
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="outline">{coffee.grade}</Badge>
-                        </div>
-                      </div>
-                      <div className="space-y-4">
-                        <StockProgress
-                          current={shopInventory.smallBags || 0}
-                          desired={shop?.desiredSmallBags || 0}
-                          label="Small Bags (200g)"
-                        />
-                        <StockProgress
-                          current={shopInventory.largeBags || 0}
-                          desired={coffeeTarget?.desiredLargeBags || 0}
-                          label="Large Bags (1kg)"
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-                {(!currentInventory || currentInventory.length === 0) && (
-                  <p className="text-muted-foreground text-center py-4">No inventory data available</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
 
       {/* Pending Orders Section - For both roasters and managers */}
       {(user?.role === "roaster" || user?.role === "shopManager") && (
@@ -892,7 +834,7 @@ export function Dashboard() {
                     </TableCell>
                     {user?.role === "roasteryOwner" && (
                       <TableCell>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-centergap-2">
                           <Link href={`/inventory/${coffee.id}`}>
                             <Button variant="outline" size="sm">View Details</Button>
                           </Link>
