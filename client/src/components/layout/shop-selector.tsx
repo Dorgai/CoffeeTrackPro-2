@@ -22,15 +22,10 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   const { activeShop, setActiveShop } = useActiveShop();
   const { user } = useAuth();
 
-  // Hide shop selector for roaster role
-  if (user?.role === "roaster") {
-    return null;
-  }
-
-  // For all other roles, fetch all shops
+  // For all roles except roaster, fetch all shops
   const { data: shops, isLoading } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
-    enabled: !!user
+    enabled: !!user && (user.role === "shopManager" || user.role === "barista" || user.role === "roasteryOwner"),
   });
 
   // Set default shop when shops are loaded

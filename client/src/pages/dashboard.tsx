@@ -106,13 +106,12 @@ function StatsCard({
   );
 }
 
+// Update the Dashboard component to handle shop selection and data loading better
 export function Dashboard() {
   const { user, logoutMutation } = useAuth();
-  const [selectedShopId, setSelectedShopId] = useState<number | null>(user?.defaultShopId || null);
-  const [activeShop, setActiveShop] = useState<{id: number, name: string, desiredSmallBags?: number, desiredLargeBags?: number} | null>(null);
+  const [selectedShopId, setSelectedShopId] = useState<number | null>(null);
 
-
-  // Update shop query
+  // Get shop details when a shop is selected
   const { data: shop, isLoading: loadingShop } = useQuery<Shop>({
     queryKey: ["/api/shops", selectedShopId],
     queryFn: async () => {
@@ -124,18 +123,35 @@ export function Dashboard() {
     enabled: !!selectedShopId,
   });
 
+  // Get current inventory data with more permissive enabling condition
+  const { data: currentInventory, isLoading: loadingInventory } = useQuery<RetailInventory[]>({
+    queryKey: ["/api/retail-inventory"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/retail-inventory");
+      if (!res.ok) throw new Error("Failed to fetch inventory");
+      return res.json();
+    },
+    enabled: !!user && (user.role === "shopManager" || user.role === "barista"),
+  });
+
   // Get all available coffees
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/green-coffee");
-      if (!res.ok) {
-        throw new Error("Failed to fetch coffees");
-      }
-      return res.json();
-    },
     enabled: !!user,
   });
+
+  // Get shop-specific coffee targets when shop is selected
+  const { data: coffeeTargets } = useQuery<CoffeeLargeBagTarget[]>({
+    queryKey: ["/api/shops", selectedShopId, "coffee-targets"],
+    queryFn: async () => {
+      if (!selectedShopId) throw new Error("No shop selected");
+      const res = await apiRequest("GET", `/api/shops/${selectedShopId}/coffee-targets`);
+      if (!res.ok) throw new Error("Failed to fetch coffee targets");
+      return res.json();
+    },
+    enabled: !!selectedShopId && (user?.role === "roasteryOwner" || user?.role === "shopManager"),
+  });
+
 
   // Get roasting batches for roasters and owners
   const { data: batches, isLoading: loadingBatches } = useQuery<RoastingBatch[]>({
@@ -150,18 +166,6 @@ export function Dashboard() {
     enabled: !!user && (user.role === "roaster" || user.role === "roasteryOwner"),
   });
 
-  // Update inventory query to be enabled when user is logged in
-  const { data: currentInventory, isLoading: loadingInventory } = useQuery<RetailInventory[]>({
-    queryKey: ["/api/retail-inventory", selectedShopId],
-    queryFn: async () => {
-      const res = await apiRequest("GET", `/api/retail-inventory${selectedShopId ? `?shopId=${selectedShopId}` : ''}`);
-      if (!res.ok) {
-        throw new Error("Failed to fetch inventory");
-      }
-      return res.json();
-    },
-    enabled: !!user && (user.role === "shopManager" || user.role === "barista" || user.role === "roasteryOwner"),
-  });
 
   // Get previous inventory history
   const { data: previousInventory } = useQuery<RetailInventory[]>({
@@ -189,37 +193,10 @@ export function Dashboard() {
     enabled: !!user,
   });
 
-  // Add query for coffee targets
-  const { data: coffeeTargets } = useQuery<CoffeeLargeBagTarget[]>({
-    queryKey: ["/api/shops", selectedShopId, "coffee-targets"],
-    queryFn: async () => {
-      if (!selectedShopId) throw new Error("No shop selected");
-      const res = await apiRequest("GET", `/api/shops/${selectedShopId}/coffee-targets`);
-      if (!res.ok) throw new Error("Failed to fetch coffee targets");
-      return res.json();
-    },
-    enabled: !!selectedShopId && (user?.role === "roasteryOwner" || user?.role === "shopManager"),
-  });
-
-  if (loadingCoffees || loadingBatches || loadingInventory || loadingOrders || loadingShop) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
-
-  // Update data filtering logic
-  const getFilteredData = (data: any[]) => {
-    if (!data) return [];
-    if (selectedShopId) {
-      return data.filter(item => item.shopId === selectedShopId);
-    }
-    return data;
-  };
-
-  const filteredOrders = getFilteredData(orders || []);
-  const filteredInventory = getFilteredData(currentInventory || []);
+  // Filter inventory data based on selected shop
+  const filteredInventory = selectedShopId && currentInventory
+    ? currentInventory.filter(item => item.shopId === selectedShopId)
+    : [];
 
   // Add debugging logs
   console.log('Selected Shop:', selectedShopId);
@@ -263,7 +240,6 @@ export function Dashboard() {
     return latest > orderDate ? latest : orderDate;
   }, new Date(0));
 
-  // Update the shops rendering logic to be more defensive
   const getShopsToShow = () => {
     if (!orders || !currentInventory) return [];
 
@@ -281,6 +257,128 @@ export function Dashboard() {
         return shops;
       }, [] as Array<{ id: number; name: string }>);
   };
+
+  if (loadingCoffees || loadingBatches || loadingInventory || loadingOrders || loadingShop) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  // For shop managers and baristas, show the inventory overview
+  if (user?.role === "shopManager" || user?.role === "barista") {
+    return (
+      <div className="container mx-auto py-8 space-y-8">
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user?.username}</h1>
+            <p className="text-muted-foreground">Manage your coffee shop inventory</p>
+          </div>
+          <ShopSelector
+            value={selectedShopId}
+            onChange={setSelectedShopId}
+          />
+        </div>
+
+        {/* Stock Overview Section */}
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* Global Stock Overview */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Stock Overview</CardTitle>
+              <CardDescription>Current inventory levels</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {!selectedShopId ? (
+                  <p className="text-muted-foreground text-center py-4">
+                    Please select a shop to view inventory
+                  </p>
+                ) : shop && filteredInventory ? (
+                  <div className="space-y-4 pb-4">
+                    <h3 className="font-medium text-lg">{shop.name}</h3>
+                    <div className="space-y-2">
+                      <StockProgress
+                        current={filteredInventory.reduce((sum, inv) => sum + (inv.smallBags || 0), 0)}
+                        desired={shop.desiredSmallBags || 0}
+                        label="Small Bags (200g)"
+                      />
+                      <StockProgress
+                        current={filteredInventory.reduce((sum, inv) => sum + (inv.largeBags || 0), 0)}
+                        desired={shop.desiredLargeBags || 0}
+                        label="Large Bags (1kg)"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-center py-4">
+                    No inventory data available
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Individual Coffee Overview */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Coffee Inventory</CardTitle>
+              <CardDescription>Stock levels by coffee type</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {!selectedShopId ? (
+                  <p className="text-muted-foreground text-center py-4">
+                    Please select a shop to view inventory
+                  </p>
+                ) : (
+                  coffees?.map(coffee => {
+                    const shopInventory = filteredInventory?.find(inv =>
+                      inv.greenCoffeeId === coffee.id
+                    );
+
+                    if (!shopInventory) return null;
+
+                    return (
+                      <div key={coffee.id} className="space-y-4">
+                        <div>
+                          <h3 className="font-medium">{coffee.name}</h3>
+                          {coffee.producer && (
+                            <p className="text-sm text-muted-foreground">{coffee.producer}</p>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <StockProgress
+                            current={shopInventory.smallBags || 0}
+                            desired={shop?.desiredSmallBags || 0}
+                            label="Small Bags (200g)"
+                          />
+                          <StockProgress
+                            current={shopInventory.largeBags || 0}
+                            desired={shop?.desiredLargeBags || 0}
+                            label="Large Bags (1kg)"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+                {selectedShopId && (!filteredInventory || filteredInventory.length === 0) && (
+                  <p className="text-muted-foreground text-center py-4">
+                    No inventory data available
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  const filteredOrders = orders?.filter(order => order.shopId === selectedShopId) || [];
 
   return (
     <div className="container mx-auto py-8 space-y-8">
@@ -432,7 +530,7 @@ export function Dashboard() {
                   </div>
                 ) : (
                   <p className="text-muted-foreground text-center py-4">
-                    Select a shop to view inventory
+                    {selectedShopId ? "No inventory data available" : "Select a shop to view inventory"}
                   </p>
                 )}
               </div>
@@ -498,7 +596,7 @@ export function Dashboard() {
                 )}
                 {!filteredInventory?.length && !loadingInventory && (
                   <p className="text-muted-foreground text-center py-4">
-                    No inventory data available
+                    {selectedShopId ? "No inventory data available" : "Select a shop to view inventory"}
                   </p>
                 )}
               </div>
@@ -701,7 +799,7 @@ export function Dashboard() {
                             <div className="flex justify-between items-start">
                               <div>
                                 <p className="font-medium">{coffee?.name}</p>
-                                <div className="text-sm text-muted-foreground">
+                                <div className="text-sm textmuted-foreground">
                                   <p>Small Bags: {inv.smallBags || 0}</p>
                                   <p>Large Bags: {inv.largeBags || 0}</p>
                                   <div className="flex items-center gap-2 mt-1">
@@ -742,65 +840,51 @@ export function Dashboard() {
       )}
 
       {/* Recent Orders by Shop - For roasteryOwner */}
-      {user?.role === "roasteryOwner" && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Orders by Shop</CardTitle>
-            <CardDescription>Latest orders from each retail location</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              {orders?.filter(order => order.shop).reduce((shops, order) => {
-                if (order.shop && !shops.some(s => s.id === order.shopId)) {
-                  shops.push({ id: order.shopId, name: order.shop.name, location: order.shop.location });
-                }
-                return shops;
-              }, [] as Array<{ id: number; name: string; location: string }>).map(shop => {
-                const shopOrders = orders?.filter(order => order.shopId === shop.id) || [];
-
-                return (
-                  <div key={shop.id} className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <h3 className="font-semibold text-lg">{shop.name}</h3>
-                      <Badge variant="outline">{shop.location}</Badge>
-                    </div>
-                    <div className="space-y-2">
-                      {shopOrders.slice(0, 3).map(order => {
-                        const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
-
-                        return (
-                          <div key={order.id} className="p-3 bg-muted rounded-lg">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <p className="font-medium">{coffee?.name}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  Ordered: {new Date(order.createdAt).toLocaleDateString()}
-                                </p>
-                              </div>
-                              <Badge
-                                variant={order.status === "pending" ? "destructive" : "outline"}
-                                className="capitalize"
-                              >{order.status}
-                              </Badge>
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Orders by Shop</CardTitle>
+          <CardDescription>Latest orders from each retail location</CardDescription></CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            {orders?.filter(order => order.shop).reduce((shops, order) => {
+              if (order.shop && !shops.some(s => s.id === order.shopId)) {
+                shops.push({ id: order.shopId, name: order.shop.name });
+              }
+              return shops;
+            }, [] as Array<{ id: number; name: string }>).map(shop => (
+              <div key={shop.id} className="space-y-4">
+                <h3 className="font-medium text-lg">{shop.name}</h3>
+                <div className="space-y-2">
+                  {orders
+                    ?.filter(o => o.shopId === shop.id)
+                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                    .slice(0, 5)
+                    .map(order => {
+                      const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
+                      return (
+                        <div key={order.id} className="p-3 bg-muted rounded-lg">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="font-medium">{coffee?.name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {format(new Date(order.createdAt), 'MMM d, yyyy')}
+                              </p>
                             </div>
-                            <div className="grid grid-cols-2 gap-4 mt-2 text-sm">
-                              <div>Small Bags: {order.smallBags}</div>
-                              <div>Large Bags: {order.largeBags}</div>
-                            </div>
+                            <Badge>{order.status}</Badge>
                           </div>
-                        );
-                      })}
-                      {shopOrders.length === 0 && (
-                        <p className="text-muted-foreground text-center py-2">No recent orders</p>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                          <div className="grid grid-cols-2 gap-4 mt-2">
+                            <div className="text-sm">Small Bags: {order.smallBags}</div>
+                            <div className="text-sm">Large Bags: {order.largeBags}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Green Coffee Inventory Section - Show for both roasteryOwner and roaster */}
       {(user?.role === "roasteryOwner" || user?.role === "roaster") && (
@@ -838,8 +922,7 @@ export function Dashboard() {
                         <Badge variant="destructive">Low Stock</Badge>
                       ) : (<Badge variant="outline">In Stock</Badge>
                       )}
-                    </TableCell>
-                    {user?.role === "roasteryOwner" && (
+                    </TableCell                    {user?.role === "roasteryOwner" && (
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Link href={`/inventory/${coffee.id}`}>
