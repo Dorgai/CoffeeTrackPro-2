@@ -23,7 +23,7 @@ import { useAuth } from "@/hooks/use-auth";
 export function InventoryDiscrepancyView() {
   const { user } = useAuth();
 
-  const { data: discrepancies, isLoading, error } = useQuery<(InventoryDiscrepancy & {
+  const { data: discrepancies, isLoading } = useQuery<(InventoryDiscrepancy & {
     confirmation: {
       greenCoffee: { name: string; producer: string };
       shop: { name: string; location: string };
@@ -41,13 +41,13 @@ export function InventoryDiscrepancyView() {
     );
   }
 
-  if (!discrepancies) {
+  if (!discrepancies || discrepancies.length === 0) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>No Discrepancies</CardTitle>
+          <CardTitle>No Discrepancies Found</CardTitle>
           <CardDescription>
-            All received coffee quantities match the dispatched amounts.
+            Currently there are no inventory discrepancies to review. This means all received quantities match the dispatched amounts.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -59,7 +59,7 @@ export function InventoryDiscrepancyView() {
       <CardHeader>
         <CardTitle>Inventory Discrepancies</CardTitle>
         <CardDescription>
-          Reported differences between dispatched and received coffee quantities
+          Review and manage differences between dispatched and received coffee quantities
         </CardDescription>
       </CardHeader>
       <CardContent>
