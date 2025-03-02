@@ -368,9 +368,9 @@ export function Dashboard() {
                         <p className="text-sm text-muted-foreground">
                           {coffee.producer} - {coffee.country}
                         </p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Grade: <Badge variant="outline">{coffee.grade}</Badge>
-                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="outline">{coffee.grade}</Badge>
+                        </div>
                       </div>
                       {(user?.role === "shopManager" || user?.role === "barista") && (
                         <Button variant="outline" size="sm" asChild>
@@ -382,7 +382,7 @@ export function Dashboard() {
                     </div>
                   </div>
                 ))}
-                {!currentInventory?.length && (
+                {(!currentInventory || currentInventory.length === 0) && (
                   <p className="text-muted-foreground text-center py-4">No inventory data available</p>
                 )}
               </div>
@@ -391,8 +391,8 @@ export function Dashboard() {
         </Card>
       )}
 
-      {/* Manager's View - Stock Overview and Shop Breakdown */}
-      {user?.role === "shopManager" && selectedShopId && (
+      {/* Manager and Barista View - Stock Overview */}
+      {(user?.role === "shopManager" || user?.role === "barista") && selectedShopId && (
         <div className="grid gap-4 md:grid-cols-2">
           {/* Global Stock Overview */}
           <Card>
@@ -456,15 +456,13 @@ export function Dashboard() {
                     inv.shopId === selectedShopId
                   );
 
-                  // Skip if no inventory for this coffee
-                  if (!shopInventory) {
-                    return null;
-                  }
-
                   const coffeeTarget = coffeeTargets?.find(t =>
                     t.greenCoffeeId === coffee.id &&
                     t.shopId === selectedShopId
                   );
+
+                  // Skip if no inventory exists for this coffee
+                  if (!shopInventory) return null;
 
                   return (
                     <div key={coffee.id} className="space-y-4">
