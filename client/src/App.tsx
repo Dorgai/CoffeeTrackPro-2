@@ -49,6 +49,9 @@ export default function App() {
             <Route path="/roasting/orders">
               {() => <ProtectedRoute path="/roasting/orders" component={RoastingOrders} roles={["roaster"]} />}
             </Route>
+            <Route path="/roasting/orders/:id">
+              {() => <ProtectedRoute path="/roasting/orders/:id" component={RoastingOrders} roles={["roaster"]} />}
+            </Route>
             <Route path="/roasting/discrepancies">
               {() => <ProtectedRoute path="/roasting/discrepancies" component={RoastingDiscrepancies} roles={["roaster"]} />}
             </Route>
