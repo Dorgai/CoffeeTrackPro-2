@@ -210,6 +210,45 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
+        {/* Discrepancy Reports */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Discrepancy Reports</CardTitle>
+              <CardDescription>Track inventory discrepancies</CardDescription>
+            </div>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/roasting/discrepancies">
+                View All Reports
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Recent Discrepancies Table */}
+              <Table>
+                <thead>
+                  <TableRow>
+                    <TableHead>Coffee</TableHead>
+                    <TableHead>Expected</TableHead>
+                    <TableHead>Actual</TableHead>
+                    <TableHead>Difference</TableHead>
+                    <TableHead>Date</TableHead>
+                  </TableRow>
+                </thead>
+                <TableBody>
+                  {/* We'll fetch this data in the next step */}
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                      No recent discrepancies found
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Low Stock Alerts */}
         {lowStockCoffees.length > 0 && (
           <Card>
