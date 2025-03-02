@@ -121,7 +121,7 @@ export function Dashboard() {
       if (!res.ok) throw new Error("Failed to fetch shop details");
       return res.json();
     },
-    enabled: !!selectedShopId
+    enabled: !!selectedShopId,
   });
 
   // Get all available coffees
@@ -150,7 +150,7 @@ export function Dashboard() {
     enabled: !!user && (user.role === "roaster" || user.role === "roasteryOwner"),
   });
 
-  // Update inventory query to always be enabled when user is logged in
+  // Update inventory query to be enabled when user is logged in
   const { data: currentInventory, isLoading: loadingInventory } = useQuery<RetailInventory[]>({
     queryKey: ["/api/retail-inventory", selectedShopId],
     queryFn: async () => {
@@ -160,7 +160,7 @@ export function Dashboard() {
       }
       return res.json();
     },
-    enabled: !!user && !!selectedShopId,
+    enabled: !!user && (user.role === "shopManager" || user.role === "barista" || user.role === "roasteryOwner"),
   });
 
   // Get previous inventory history
@@ -209,7 +209,7 @@ export function Dashboard() {
     );
   }
 
-  // Update data filtering logic to handle undefined data
+  // Update data filtering logic
   const getFilteredData = (data: any[]) => {
     if (!data) return [];
     if (selectedShopId) {
@@ -432,7 +432,7 @@ export function Dashboard() {
                   </div>
                 ) : (
                   <p className="text-muted-foreground text-center py-4">
-                    No inventory data available
+                    Select a shop to view inventory
                   </p>
                 )}
               </div>
