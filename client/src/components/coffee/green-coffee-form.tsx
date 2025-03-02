@@ -1,4 +1,3 @@
-
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -57,15 +56,13 @@ export function GreenCoffeeForm({
   const mutation = useMutation({
     mutationFn: async (data: z.infer<typeof formSchema>) => {
       if (isEditing) {
-        return apiRequest(`/api/green-coffee/${coffee.id}`, {
-          method: "PATCH",
-          data,
-        });
+        const response = await apiRequest("PATCH", `/api/green-coffee/${coffee.id}`, data);
+        if (!response.ok) throw new Error("Failed to update coffee");
+        return response.json();
       } else {
-        return apiRequest("/api/green-coffee", {
-          method: "POST",
-          data,
-        });
+        const response = await apiRequest("POST", "/api/green-coffee", data);
+        if (!response.ok) throw new Error("Failed to create coffee");
+        return response.json();
       }
     },
     onSuccess: () => {
@@ -188,11 +185,14 @@ export function GreenCoffeeForm({
                 name="minThreshold"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Minimum Threshold (kg)</FormLabel>
+                    <FormLabel>Target Stock Level (kg)</FormLabel>
                     <FormControl>
                       <Input type="number" step="0.01" {...field} />
                     </FormControl>
                     <FormMessage />
+                    <p className="text-sm text-muted-foreground">
+                      Set your desired stock level. The system will alert when stock falls below this amount.
+                    </p>
                   </FormItem>
                 )}
               />

@@ -138,6 +138,15 @@ export function NavBar() {
         <div className="ml-auto flex items-center space-x-4">
           {user ? (
             <div className="flex items-center space-x-4">
+              {user.role !== "roaster" && <ShopSelector />}
+
+              {(user.role === "roasteryOwner" || user.role === "roaster") && (
+                <GreenBeansStockIndicator />
+              )}
+
+              {user.role !== "roaster" && <StockLevelIndicator />}
+              {user.role !== "roaster" && <RestockDialog />}
+
               {(user.role === "roasteryOwner" || user.role === "roaster") && (
                 <Button variant="outline" size="sm" asChild className="flex items-center gap-2">
                   <Link href="/inventory">
@@ -145,18 +154,6 @@ export function NavBar() {
                     Update Green Coffee
                   </Link>
                 </Button>
-              )}
-              {user.role !== "roaster" && <ShopSelector />}
-
-              {(user.role === "roasteryOwner" || user.role === "roaster") && (
-                <GreenBeansStockIndicator />
-              )}
-
-              {user.role !== "roaster" && (
-                <>
-                  <StockLevelIndicator />
-                  <RestockDialog />
-                </>
               )}
 
               <Avatar>

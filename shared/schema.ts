@@ -20,7 +20,9 @@ export const shops = pgTable("shops", {
   name: text("name").notNull(),
   location: text("location").notNull(),
   isActive: boolean("is_active").notNull().default(true),
-  defaultOrderQuantity: integer("default_order_quantity").notNull().default(10), // Add default quantity
+  defaultOrderQuantity: integer("default_order_quantity").notNull().default(10),
+  desiredSmallBags: integer("desired_small_bags").notNull().default(20),
+  desiredLargeBags: integer("desired_large_bags").notNull().default(10),
 });
 
 // New table for many-to-many relationship between users and shops

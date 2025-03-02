@@ -48,17 +48,17 @@ export function GreenBeansStockIndicator() {
   // Calculate total current stock
   const totalCurrentStock = coffees.reduce((sum, coffee) => sum + Number(coffee.currentStock), 0);
 
-  // Calculate total desired stock based on min thresholds
-  const totalDesiredStock = coffees.reduce((sum, coffee) => sum + Number(coffee.minThreshold), 0);
+  // Calculate total target stock based on minThresholds
+  const totalTargetStock = coffees.reduce((sum, coffee) => sum + Number(coffee.minThreshold), 0);
 
   // Calculate stock level percentage with a minimum of 0 and maximum of 100
-  const stockPercentage = Math.min(Math.max(Math.round((totalCurrentStock / totalDesiredStock) * 100), 0), 100);
+  const stockPercentage = Math.min(Math.max(Math.round((totalCurrentStock / totalTargetStock) * 100), 0), 100);
 
   // Determine stock level status and color
   const getStockClass = () => {
-    if (stockPercentage < 50) return "bg-red-500";
     if (stockPercentage >= 75) return "bg-green-500";
-    return "bg-yellow-500";
+    if (stockPercentage >= 50) return "bg-amber-500";
+    return "bg-red-500";
   };
 
   return (
@@ -72,7 +72,8 @@ export function GreenBeansStockIndicator() {
             </span>
             <Progress 
               value={stockPercentage} 
-              className={`w-24 h-2 ${getStockClass()}`}
+              className={`w-24 h-2`}
+              indicatorClassName={getStockClass()}
             />
           </div>
         </div>
@@ -87,11 +88,11 @@ export function GreenBeansStockIndicator() {
             </div>
             <div>
               <p className="text-muted-foreground">Target Stock:</p>
-              <p className="font-medium">{totalDesiredStock.toFixed(2)}kg</p>
+              <p className="font-medium">{totalTargetStock.toFixed(2)}kg</p>
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            Stock Ratio: {totalCurrentStock.toFixed(2)}kg / {totalDesiredStock.toFixed(2)}kg
+            Based on your configured target stock levels
           </p>
         </div>
       </HoverCardContent>
