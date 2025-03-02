@@ -137,6 +137,15 @@ export interface IStorage {
     greenCoffeeId: number,
     desiredLargeBags: number
   ): Promise<CoffeeLargeBagTarget>;
+  updateShop(
+    id: number,
+    update: {
+      desiredSmallBags?: number;
+      desiredLargeBags?: number;
+      isActive?: boolean;
+      defaultOrderQuantity?: number;
+    }
+  ): Promise<Shop>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -979,8 +988,7 @@ export class DatabaseStorage implements IStorage {
           orderId: dispatchedCoffeeConfirmations.orderId,
           shopId: dispatchedCoffeeConfirmations.shopId,
           greenCoffeeId: dispatchedCoffeeConfirmations.greenCoffeeId,
-          dispatchedSmallBags: dispatchedCoffeeConfirmations.dispatchedSmallBags,
-          dispatchedLargeBags: dispatchedCoffeeConfirmations.dispatchedLargeBags,
+          dispatchedSmallBags: dispatchedCoffeeConfirmations.dispatchedSmallBags,          dispatchedLargeBags: dispatchedCoffeeConfirmations.dispatchedLargeBags,
           receivedSmallBags: dispatchedCoffeeConfirmations.receivedSmallBags,
           receivedLargeBags: dispatchedCoffeeConfirmations.receivedLargeBags,
           status: dispatchedCoffeeConfirmations.status,

@@ -219,7 +219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Add PATCH endpoint for updating shop settings after the existing shops routes
+  // Update shop settings route
   app.patch("/api/shops/:id", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
     try {
       const shopId = parseInt(req.params.id);
@@ -249,17 +249,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("Updating shop:", shopId, "with new targets - small:", desiredSmallBags, "large:", desiredLargeBags);
 
-      // Execute raw SQL query to update shop targets
-      await storage.executeQuery(
-        `UPDATE shops 
-         SET desired_small_bags = $1, 
-             desired_large_bags = $2 
-         WHERE id = $3`,
-        [desiredSmallBags, desiredLargeBags, shopId]
-      );
+      // Update shop using storage method
+      const updatedShop = await storage.updateShop(shopId, {
+        desiredSmallBags,
+        desiredLargeBags,
+      });
 
-      // Fetch updated shop
-      const updatedShop = await storage.getShop(shopId);
       console.log("Shop updated successfully:", updatedShop);
       res.json(updatedShop);
     } catch (error) {
