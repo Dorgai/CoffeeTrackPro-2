@@ -32,14 +32,6 @@ export function InventoryDiscrepancyView() {
   })[]>({
     queryKey: ["/api/inventory-discrepancies"],
     enabled: !!user && user.role === "roaster",
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/inventory-discrepancies");
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Failed to fetch discrepancy reports");
-      }
-      return res.json();
-    },
   });
 
   if (isLoading) {
@@ -54,9 +46,9 @@ export function InventoryDiscrepancyView() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Error</CardTitle>
+          <CardTitle>Error Loading Discrepancies</CardTitle>
           <CardDescription>
-            {error.message}
+            Please try refreshing the page. If the problem persists, contact support.
           </CardDescription>
         </CardHeader>
       </Card>
