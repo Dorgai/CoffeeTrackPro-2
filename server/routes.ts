@@ -177,7 +177,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/shops/:id", requireRole(["roasteryOwner"]), async (req, res) => {
     try {
       const shopId = parseInt(req.params.id);
-      const { desiredSmallBags, desiredLargeBags } = req.body;
+      const { desiredSmallBags } = req.body;
 
       const shop = await storage.getShop(shopId);
       if (!shop) {
@@ -185,8 +185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updatedShop = await storage.updateShop(shopId, {
-        desiredSmallBags: Number(desiredSmallBags),
-        desiredLargeBags: Number(desiredLargeBags)
+        desiredSmallBags: Number(desiredSmallBags)
       });
 
       res.json(updatedShop);
@@ -589,6 +588,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch discrepancies" });
     }
   });
+
+  // Add route for getting coffee-specific large bag targets
+  app.get("/api/shops/:id/coffee-targets", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
+    try {
+      const shopId = parseInt(req.params.id);
+
+      if (!await checkShopAccess(req.user!.id, shopId)) {
+        return res.status(403).json({ message: "User does not have access to this shop" });
+      }
+
+      const targets = await storage.getCoffeeLargeBagTargets(shopId);
+      res.json(targets);
+    } catch (error) {
+      console.error("Error fetching coffee targets:", error);
+      res.status(500).json({ message: "Failed to fetch coffee targets" });
+    }
+  });
+
+  // Add route for updating coffee-specific large bag target
+  app.patch("/api/shops/:shopId/coffee/:coffeeId/target", requireRole(["roasteryOwner"]), async (req, res) => {
+    try {
+      const shopId = parseInt(req.params.shopId);
+      const coffeeId = parseInt(req.params.coffeeId);
+      const { desiredLargeBags } = req.body;
+
+      if (typeof desiredLargeBags !== 'number' || desiredLargeBags < 0) {
+        return res.status(400).json({ message: "Invalid desired large bags value" });
+      }
+
+      const target = await storage.updateCoffeeLargeBagTarget(
+        shopId,
+        coffeeId,
+        desiredLargeBags
+      );
+
+      res.json(target);
+    } catch (error) {
+      console.error("Error updating coffee target:", error);
+      res.status(500).json({ message: "Failed to update coffee target" });
+    }
+  });
+
 
   const httpServer = createServer(app);
   return httpServer;

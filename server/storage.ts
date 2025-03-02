@@ -15,6 +15,7 @@ import {
   type InsertDispatchedCoffeeConfirmation,
   type InventoryDiscrepancy,
   type InsertInventoryDiscrepancy,
+  type CoffeeLargeBagTarget,
   users,
   shops,
   greenCoffee,
@@ -24,6 +25,7 @@ import {
   userShops,
   dispatchedCoffeeConfirmations,
   inventoryDiscrepancies,
+  coffeeLargeBagTargets,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, gt, and } from "drizzle-orm";
@@ -40,17 +42,17 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  getAllUsers(): Promise<User[]>; // Added method
-  updateUser(id: number, update: { role?: User["role"]; isActive?: boolean; defaultShopId?: number | null; }): Promise<User>; // Added method
-  assignUserToShop(userId: number, shopId: number): Promise<void>; // Added method
-  removeUserFromShop(userId: number, shopId: number): Promise<void>; // Added method
+  getAllUsers(): Promise<User[]>;
+  updateUser(id: number, update: { role?: User["role"]; isActive?: boolean; defaultShopId?: number | null; }): Promise<User>;
+  assignUserToShop(userId: number, shopId: number): Promise<void>;
+  removeUserFromShop(userId: number, shopId: number): Promise<void>;
 
   // Shops
   getShop(id: number): Promise<Shop | undefined>;
   getShops(): Promise<Shop[]>;
   createShop(shop: InsertShop): Promise<Shop>;
-  getUserShops(userId: number): Promise<Shop[]>; // Added method
-  deleteShop(id: number): Promise<Shop>; // Add to IStorage interface
+  getUserShops(userId: number): Promise<Shop[]>;
+  deleteShop(id: number): Promise<Shop>;
 
   // Green Coffee
   getGreenCoffee(id: number): Promise<GreenCoffee | undefined>;
@@ -84,7 +86,6 @@ export interface IStorage {
       updatedById: number;
     }
   ): Promise<Order>;
-  // Add new method to interface
   getRetailInventoryHistory(shopId: number): Promise<(RetailInventory & { 
     greenCoffeeName: string; 
     updatedByUsername: string;
@@ -94,7 +95,6 @@ export interface IStorage {
     greenCoffee: GreenCoffee;
     updatedBy: User;
   })[]>;
-
   getAllOrders(): Promise<(Order & {
     shop: Shop;
     greenCoffee: GreenCoffee;
@@ -107,9 +107,7 @@ export interface IStorage {
     greenCoffee: GreenCoffee;
     shop: Shop;
   })[]>;
-
   createDispatchedCoffeeConfirmation(data: InsertDispatchedCoffeeConfirmation): Promise<DispatchedCoffeeConfirmation>;
-
   confirmDispatchedCoffee(
     confirmationId: number,
     data: {
@@ -121,7 +119,6 @@ export interface IStorage {
 
   // Inventory Discrepancies
   createInventoryDiscrepancy(data: InsertInventoryDiscrepancy): Promise<InventoryDiscrepancy>;
-
   getInventoryDiscrepancies(): Promise<(InventoryDiscrepancy & {
     confirmation: DispatchedCoffeeConfirmation & {
       greenCoffee: GreenCoffee;
@@ -132,6 +129,14 @@ export interface IStorage {
     greenCoffee: GreenCoffee;
     shop: Shop;
   })[]>;
+
+  // Add new methods for coffee large bag targets
+  getCoffeeLargeBagTargets(shopId: number): Promise<CoffeeLargeBagTarget[]>;
+  updateCoffeeLargeBagTarget(
+    shopId: number,
+    greenCoffeeId: number,
+    desiredLargeBags: number
+  ): Promise<CoffeeLargeBagTarget>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1008,6 +1013,124 @@ export class DatabaseStorage implements IStorage {
       return confirmations;
     } catch (error) {
       console.error("Error fetching all dispatched coffee confirmations:", error);
+      throw error;
+    }
+  }
+  async getShopCoffeeTargets(shopId: number): Promise<ShopCoffeeTarget[]> {
+    try {
+      return await db
+        .select()
+        .from(shopCoffeeTargets)
+        .where(eq(shopCoffeeTargets.shopId, shopId))
+        .orderBy(shopCoffeeTargets.createdAt);
+    } catch (error) {
+      console.error("Error fetching shop coffee targets:", error);
+      throw error;
+    }
+  }
+
+  async updateShopCoffeeTarget(
+    shopId: number,
+    greenCoffeeId: number,
+    data: {
+      desiredSmallBags: number;
+      desiredLargeBags: number;
+    }
+  ): Promise<ShopCoffeeTarget> {
+    try {
+      const [existing] = await db
+        .select()
+        .from(shopCoffeeTargets)
+        .where(
+          and(
+            eq(shopCoffeeTargets.shopId, shopId),
+            eq(shopCoffeeTargets.greenCoffeeId, greenCoffeeId)
+          )
+        );
+
+      if (existing) {
+        // Update existing target
+        const [updated] = await db
+          .update(shopCoffeeTargets)
+          .set({
+            ...data,
+            updatedAt: new Date(),
+          })
+          .where(eq(shopCoffeeTargets.id, existing.id))
+          .returning();
+        return updated;
+      } else {
+        // Create new target
+        const [created] = await db
+          .insert(shopCoffeeTargets)
+          .values({
+            shopId,
+            greenCoffeeId,
+            ...data,
+          })
+          .returning();
+        return created;
+      }
+    } catch (error) {
+      console.error("Error updating shop coffee target:", error);
+      throw error;
+    }
+  }
+  async getCoffeeLargeBagTargets(shopId: number): Promise<CoffeeLargeBagTarget[]> {
+    try {
+      return await db
+        .select()
+        .from(coffeeLargeBagTargets)
+        .where(eq(coffeeLargeBagTargets.shopId, shopId))
+        .orderBy(coffeeLargeBagTargets.createdAt);
+    } catch (error) {
+      console.error("Error fetching coffee large bag targets:", error);
+      throw error;
+    }
+  }
+
+  async updateCoffeeLargeBagTarget(
+    shopId: number,
+    greenCoffeeId: number,
+    desiredLargeBags: number
+  ): Promise<CoffeeLargeBagTarget> {
+    try {
+      // Check if target exists
+      const [existing] = await db
+        .select()
+        .from(coffeeLargeBagTargets)
+        .where(
+          and(
+            eq(coffeeLargeBagTargets.shopId, shopId),
+            eq(coffeeLargeBagTargets.greenCoffeeId, greenCoffeeId)
+          )
+        );
+
+      if (existing) {
+        // Update existing target
+        const [updated] = await db
+          .update(coffeeLargeBagTargets)
+          .set({
+            desiredLargeBags,
+            updatedAt: new Date()
+          })
+          .where(eq(coffeeLargeBagTargets.id, existing.id))
+          .returning();
+        return updated;
+      } else {
+        // Create new target
+        const [created] = await db
+          .insert(coffeeLargeBagTargets)
+          .values({
+            shopId,
+            greenCoffeeId,
+            desiredLargeBags
+          })
+          .returning();
+        return created;
+      }
+    } catch (error) {
+      console.error("Error updating coffee large bag target:", error);
       throw error;
     }
   }

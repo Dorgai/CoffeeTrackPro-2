@@ -23,11 +23,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { apiRequest } from "@/lib/queryClient";
-import type { GreenCoffee, RoastingBatch, RetailInventory, Shop } from "@shared/schema";
+import type { GreenCoffee, RoastingBatch, RetailInventory, Shop, CoffeeLargeBagTarget } from "@shared/schema";
 import { useState } from "react";
 import { ShopSelector } from "@/components/layout/shop-selector";
 import { format } from 'date-fns';
 import StockProgress from "@/components/stock-progress";
+import { TargetEditorDialog } from "@/components/coffee/target-editor-dialog"; // Added import
 
 type Order = {
   id: number;
@@ -182,6 +183,17 @@ export function Dashboard() {
     enabled: !!user,
   });
 
+  // Add query for coffee targets
+  const { data: coffeeTargets } = useQuery<CoffeeLargeBagTarget[]>({
+    queryKey: ["/api/shops", selectedShopId, "coffee-targets"],
+    queryFn: async () => {
+      if (!selectedShopId) throw new Error("No shop selected");
+      const res = await apiRequest("GET", `/api/shops/${selectedShopId}/coffee-targets`);
+      if (!res.ok) throw new Error("Failed to fetch coffee targets");
+      return res.json();
+    },
+    enabled: !!selectedShopId && (user?.role === "roasteryOwner" || user?.role === "shopManager"),
+  });
 
   if (loadingCoffees || loadingBatches || loadingInventory || loadingOrders || loadingShop) {
     return (
@@ -399,7 +411,6 @@ export function Dashboard() {
                         id: inv.shopId,
                         name: shop.name,
                         desiredSmallBags: shop.desiredSmallBags,
-                        desiredLargeBags: shop.desiredLargeBags,
                         inventory: shopInventory
                       });
                     }
@@ -409,11 +420,9 @@ export function Dashboard() {
                   id: number;
                   name: string;
                   desiredSmallBags?: number;
-                  desiredLargeBags?: number;
                   inventory: typeof currentInventory;
                 }>).map(shop => {
                   const totalSmallBags = shop.inventory.reduce((sum, inv) => sum + (inv.smallBags || 0), 0);
-                  const totalLargeBags = shop.inventory.reduce((sum, inv) => sum + (inv.largeBags || 0), 0);
 
                   return (
                     <div key={shop.id} className="space-y-4 pb-4 border-b last:border-0">
@@ -422,11 +431,6 @@ export function Dashboard() {
                         current={totalSmallBags}
                         desired={shop.desiredSmallBags || 0}
                         label="Small Bags (200g)"
-                      />
-                      <StockProgress
-                        current={totalLargeBags}
-                        desired={shop.desiredLargeBags || 0}
-                        label="Large Bags (1kg)"
                       />
                     </div>
                   );
@@ -453,9 +457,14 @@ export function Dashboard() {
                   );
 
                   // Skip if no inventory for this coffee
-                  if (!shopInventory || (!shopInventory.smallBags && !shopInventory.largeBags)) {
+                  if (!shopInventory) {
                     return null;
                   }
+
+                  const coffeeTarget = coffeeTargets?.find(t =>
+                    t.greenCoffeeId === coffee.id &&
+                    t.shopId === selectedShopId
+                  );
 
                   return (
                     <div key={coffee.id} className="space-y-4">
@@ -473,7 +482,7 @@ export function Dashboard() {
                         />
                         <StockProgress
                           current={shopInventory.largeBags || 0}
-                          desired={shop?.desiredLargeBags || 0}
+                          desired={coffeeTarget?.desiredLargeBags || 0}
                           label="Large Bags (1kg)"
                         />
                       </div>
@@ -696,18 +705,23 @@ export function Dashboard() {
             <div className="space-y-6">
               {orders?.filter(order => order.shop).reduce((shops, order) => {
                 if (order.shop && !shops.some(s => s.id === order.shopId)) {
-                  shops.push({ id: order.shopId, name: order.shop.name });
+                  shops.push({ id: order.shopId, name: order.shop.name, location: order.shop.location });
                 }
                 return shops;
-              }, [] as Array<{ id: number; name: string }>).map(shop => {
+              }, [] as Array<{ id: number; name: string; location: string }>).map(shop => {
                 const shopInventory = currentInventory?.filter(inv => inv.shopId === shop.id) || [];
+                const shopTargets = coffeeTargets?.filter(t => t.shopId === shop.id) || [];
 
                 return (
                   <div key={shop.id} className="space-y-4">
-                    <h3 className="font-semibold text-lg">{shop.name}</h3>
+                    <div className="flex justify-between items-center">
+                      <h3 className="font-semibold text-lg">{shop.name}</h3>
+                      <Badge variant="outline">{shop.location}</Badge>
+                    </div>
                     <div className="space-y-2">
                       {shopInventory.map(inv => {
                         const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
+                        const target = shopTargets.find(t => t.greenCoffeeId === inv.greenCoffeeId);
                         const isLowStock = inv.smallBags < 3 || inv.largeBags < 3;
 
                         return (
@@ -723,9 +737,22 @@ export function Dashboard() {
                                   <p>Large Bags: {inv.largeBags}</p>
                                 </div>
                               </div>
-                              {isLowStock && (
-                                <Badge variant="destructive">Low Stock</Badge>
-                              )}
+                              <div className="flex items-center gap-2">
+                                {isLowStock && (
+                                  <Badge variant="destructive">Low Stock</Badge>
+                                )}
+                                <TargetEditorDialog // Replaced Button with TargetEditorDialog
+                                  shopId={shop.id}
+                                  coffeeId={inv.greenCoffeeId!}
+                                  coffeeName={coffee?.name || ""}
+                                  currentTarget={target?.desiredLargeBags}
+                                  trigger={
+                                    <Button variant="outline" size="sm">
+                                      Set Target
+                                    </Button>
+                                  }
+                                />
+                              </div>
                             </div>
                           </div>
                         );

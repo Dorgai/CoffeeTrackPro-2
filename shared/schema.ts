@@ -22,7 +22,6 @@ export const shops = pgTable("shops", {
   isActive: boolean("is_active").notNull().default(true),
   defaultOrderQuantity: integer("default_order_quantity").notNull().default(10),
   desiredSmallBags: integer("desired_small_bags").notNull().default(20),
-  desiredLargeBags: integer("desired_large_bags").notNull().default(10),
 });
 
 // New table for many-to-many relationship between users and shops
@@ -114,6 +113,16 @@ export const inventoryDiscrepancies = pgTable("inventory_discrepancies", {
   resolvedById: integer("resolved_by_id").references(() => users.id),
 });
 
+// Add new table for coffee-specific targets per shop
+export const coffeeLargeBagTargets = pgTable("coffee_large_bag_targets", {
+  id: serial("id").primaryKey(),
+  shopId: integer("shop_id").references(() => shops.id).notNull(),
+  greenCoffeeId: integer("green_coffee_id").references(() => greenCoffee.id).notNull(),
+  desiredLargeBags: integer("desired_large_bags").notNull().default(10),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Create insert schemas for each table
 export const insertUserSchema = createInsertSchema(users);
 export const insertShopSchema = createInsertSchema(shops);
@@ -135,6 +144,9 @@ export const insertRetailInventorySchema = createInsertSchema(retailInventory).e
 });
 export const insertOrderSchema = createInsertSchema(orders);
 export const insertUserShopSchema = createInsertSchema(userShops);
+
+// Add new insert schema
+export const insertCoffeeLargeBagTargetSchema = createInsertSchema(coffeeLargeBagTargets);
 
 // Create insert schemas for new tables
 export const insertDispatchedCoffeeConfirmationSchema = createInsertSchema(dispatchedCoffeeConfirmations).extend({
@@ -174,3 +186,7 @@ export type InsertRoastingBatch = z.infer<typeof insertRoastingBatchSchema>;
 export type InsertRetailInventory = z.infer<typeof insertRetailInventorySchema>;
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type InsertUserShop = z.infer<typeof insertUserShopSchema>;
+
+// Export type for the new table
+export type CoffeeLargeBagTarget = typeof coffeeLargeBagTargets.$inferSelect;
+export type InsertCoffeeLargeBagTarget = z.infer<typeof insertCoffeeLargeBagTargetSchema>;
