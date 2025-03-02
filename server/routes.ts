@@ -133,12 +133,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Shops Routes - accessible by roastery owner
-  app.get("/api/shops", requireRole(["roasteryOwner"]), async (req, res) => {
-    const shops = await storage.getShops();
-    // Filter out inactive shops
-    const activeShops = shops.filter(shop => shop.isActive);
-    res.json(activeShops);
+  // Shops Routes - accessible by roastery owner and shop manager
+  app.get("/api/shops/:id", requireRole(["roasteryOwner", "shopManager", "barista"]), async (req, res) => {
+    try {
+      const shopId = parseInt(req.params.id);
+
+      // For non-roasteryOwner users, verify shop access
+      if (req.user?.role !== "roasteryOwner") {
+        const hasAccess = await checkShopAccess(req.user!.id, shopId);
+        if (!hasAccess) {
+          return res.status(403).json({ message: "User does not have access to this shop" });
+        }
+      }
+
+      const shop = await storage.getShop(shopId);
+      if (!shop || !shop.isActive) {
+        return res.status(404).json({ message: "Shop not found" });
+      }
+
+      res.json(shop);
+    } catch (error) {
+      console.error("Error fetching shop details:", error);
+      res.status(500).json({ message: "Failed to fetch shop details" });
+    }
+  });
+
+  app.get("/api/shops", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
+    try {
+      let shops;
+
+      // For roasteryOwner, return all active shops
+      if (req.user?.role === "roasteryOwner") {
+        shops = await storage.getShops();
+        shops = shops.filter(shop => shop.isActive);
+      } 
+      // For shopManager, return only their assigned shops
+      else {
+        shops = await storage.getUserShops(req.user!.id);
+        shops = shops.filter(shop => shop.isActive);
+      }
+
+      res.json(shops);
+    } catch (error) {
+      console.error("Error fetching shops:", error);
+      res.status(500).json({ message: "Failed to fetch shops" });
+    }
   });
 
   app.post(
@@ -609,14 +648,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Add route for updating coffee-specific large bag target
-  app.patch("/api/shops/:shopId/coffee/:coffeeId/target", requireRole(["roasteryOwner"]), async (req, res) => {
+  app.patch("/api/shops/:shopId/coffee/:coffeeId/target", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
     try {
       const shopId = parseInt(req.params.shopId);
       const coffeeId = parseInt(req.params.coffeeId);
       const { desiredLargeBags } = req.body;
 
+      // Validate inputs
       if (typeof desiredLargeBags !== 'number' || desiredLargeBags < 0) {
         return res.status(400).json({ message: "Invalid desired large bags value" });
+      }
+
+      // For non-roasteryOwner users, verify shop access
+      if (req.user?.role !== "roasteryOwner") {
+        const hasAccess = await checkShopAccess(req.user!.id, shopId);
+        if (!hasAccess) {
+          return res.status(403).json({ message: "User does not have access to this shop" });
+        }
       }
 
       const target = await storage.updateCoffeeLargeBagTarget(
@@ -625,12 +673,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         desiredLargeBags
       );
 
+      console.log("Updated coffee target for shop:", shopId, "coffee:", coffeeId, "to:", desiredLargeBags);
       res.json(target);
     } catch (error) {
       console.error("Error updating coffee target:", error);
       res.status(500).json({ message: "Failed to update coffee target" });
     }
   });
+
 
 
   const httpServer = createServer(app);
