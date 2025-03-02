@@ -831,7 +831,7 @@ export function Dashboard() {
                     )}
                   </TableRow>
                 ))}
-                {(!coffees|| coffees.length === 0) && (
+                {(!coffees|| coffees.length === 0)&& (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center text-muted-foreground py-4">
                       No green coffee inventory available
