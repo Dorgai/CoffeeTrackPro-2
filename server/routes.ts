@@ -222,7 +222,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/shops/:id", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
     try {
       const shopId = parseInt(req.params.id);
-      const { desiredSmallBags, desiredLargeBags } = req.body;
+      const shop = await storage.getShop(shopId);
+
+      if (!shop) {
+        return res.status(404).json({ message: "Shop not found" });
+      }
 
       // For non-roasteryOwner users, verify shop access
       if (req.user?.role !== "roasteryOwner") {
@@ -232,10 +236,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const shop = await storage.getShop(shopId);
-      if (!shop) {
-        return res.status(404).json({ message: "Shop not found" });
-      }
+      const { desiredSmallBags, desiredLargeBags } = req.body;
 
       // Validate inputs
       if (typeof desiredSmallBags !== 'number' || desiredSmallBags < 0) {
@@ -246,11 +247,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log("Updating shop:", shopId, "with new targets - small:", desiredSmallBags, "large:", desiredLargeBags);
-      const updatedShop = await storage.updateShop(shopId, {
-        desiredSmallBags,
-        desiredLargeBags
-      });
 
+      // Update shop settings directly in the database
+      await storage.execute(`
+        UPDATE shops 
+        SET desired_small_bags = $1, desired_large_bags = $2 
+        WHERE id = $3
+      `, [desiredSmallBags, desiredLargeBags, shopId]);
+
+      // Fetch updated shop
+      const updatedShop = await storage.getShop(shopId);
       res.json(updatedShop);
     } catch (error) {
       console.error("Error updating shop:", error);
