@@ -106,6 +106,12 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
   const handleConfirm = () => {
     if (!selectedConfirmation) return;
 
+    console.log("Attempting to confirm dispatch:", {
+      confirmationId: selectedConfirmation.id,
+      receivedSmallBags: Number(receivedQuantities.smallBags),
+      receivedLargeBags: Number(receivedQuantities.largeBags)
+    });
+
     confirmMutation.mutate({
       confirmationId: selectedConfirmation.id,
       receivedSmallBags: Number(receivedQuantities.smallBags),

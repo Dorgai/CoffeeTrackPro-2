@@ -641,8 +641,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid received large bags quantity" });
       }
 
-      // Get the confirmation to verify shop access
-      const existingConfirmation = await storage.getDispatchedCoffeeConfirmations(Number(confirmationId));
+      // Get the confirmation details
+      const existingConfirmations = await storage.getAllDispatchedCoffeeConfirmations();
+      const existingConfirmation = existingConfirmations.find(c => c.id === confirmationId);
+
       if (!existingConfirmation) {
         return res.status(404).json({ message: "Confirmation not found" });
       }
@@ -657,7 +659,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         confirmationId,
         receivedSmallBags,
         receivedLargeBags,
-        userId: req.user!.id
+        userId: req.user!.id,
+        shopId: existingConfirmation.shopId
       });
 
       const confirmation = await storage.confirmDispatchedCoffee(confirmationId, {
