@@ -7,7 +7,7 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
-import { Package } from "lucide-react";
+import { Package, Loader2 } from "lucide-react";
 import StockProgress from "@/components/stock-progress";
 
 type InventoryItem = {
@@ -20,9 +20,9 @@ export function StockLevelIndicator() {
   const { activeShop } = useActiveShop();
 
   // Fetch shop details to get target quantities
-  const { data: shop } = useQuery<Shop>({
+  const { data: shop, isLoading: loadingShop } = useQuery<Shop>({
     queryKey: ["/api/shops", activeShop?.id],
-    enabled: !!activeShop,
+    enabled: !!activeShop?.id,
     queryFn: async () => {
       const res = await apiRequest("GET", `/api/shops/${activeShop?.id}`);
       if (!res.ok) throw new Error("Failed to fetch shop details");
@@ -31,9 +31,9 @@ export function StockLevelIndicator() {
   });
 
   // Fetch current inventory
-  const { data: inventory } = useQuery<InventoryItem[]>({
+  const { data: inventory, isLoading: loadingInventory } = useQuery<InventoryItem[]>({
     queryKey: ["/api/retail-inventory", activeShop?.id],
-    enabled: !!activeShop,
+    enabled: !!activeShop?.id,
     queryFn: async () => {
       const res = await apiRequest("GET", `/api/retail-inventory?shopId=${activeShop?.id}`);
       if (!res.ok) throw new Error("Failed to fetch inventory");
@@ -41,18 +41,49 @@ export function StockLevelIndicator() {
     },
   });
 
-  if (!activeShop || !shop?.desiredSmallBags || !shop?.desiredLargeBags || !inventory) {
+  // Loading state
+  if (loadingShop || loadingInventory) {
+    return (
+      <div className="flex items-center gap-2">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        <span className="text-sm">Loading...</span>
+      </div>
+    );
+  }
+
+  // No shop selected
+  if (!activeShop?.id) {
     return (
       <div className="flex items-center gap-2">
         <Package className="h-4 w-4" />
-        <span className="text-sm font-medium">No data</span>
+        <span className="text-sm text-muted-foreground">Select a shop</span>
+      </div>
+    );
+  }
+
+  // Missing target quantities
+  if (!shop?.desiredSmallBags || !shop?.desiredLargeBags) {
+    return (
+      <div className="flex items-center gap-2">
+        <Package className="h-4 w-4" />
+        <span className="text-sm text-muted-foreground">Target quantities not set</span>
+      </div>
+    );
+  }
+
+  // No inventory data
+  if (!inventory) {
+    return (
+      <div className="flex items-center gap-2">
+        <Package className="h-4 w-4" />
+        <span className="text-sm text-muted-foreground">No inventory data</span>
       </div>
     );
   }
 
   // Calculate current totals
-  const totalSmallBags = inventory.reduce((sum, item) => sum + item.smallBags, 0);
-  const totalLargeBags = inventory.reduce((sum, item) => sum + item.largeBags, 0);
+  const totalSmallBags = inventory.reduce((sum, item) => sum + (item.smallBags || 0), 0);
+  const totalLargeBags = inventory.reduce((sum, item) => sum + (item.largeBags || 0), 0);
 
   // Calculate percentages for both bag types
   const smallBagsPercentage = Math.min(Math.round((totalSmallBags / shop.desiredSmallBags) * 100), 100);
