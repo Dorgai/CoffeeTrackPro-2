@@ -18,8 +18,11 @@ import {
   TableHead,
   TableRow,
 } from "@/components/ui/table";
+import { useAuth } from "@/hooks/use-auth";
 
 export function InventoryDiscrepancyView() {
+  const { user } = useAuth();
+
   // Fetch discrepancies with expanded relations
   const { data: discrepancies, isLoading, error } = useQuery<(InventoryDiscrepancy & {
     confirmation: {
@@ -29,13 +32,19 @@ export function InventoryDiscrepancyView() {
   })[]>({
     queryKey: ["/api/inventory-discrepancies"],
     queryFn: async () => {
-      const res = await apiRequest("GET", "/api/inventory-discrepancies");
+      const res = await apiRequest("GET", "/api/inventory-discrepancies", undefined, {
+        headers: {
+          'Authorization': `Bearer ${user?.id}`,
+          'X-User-Role': user?.role || '',
+        }
+      });
       if (!res.ok) {
-        const error = await res.text();
-        throw new Error(error);
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to fetch discrepancy reports");
       }
       return res.json();
     },
+    enabled: !!user && user.role === "roaster",
   });
 
   if (isLoading) {
@@ -52,7 +61,7 @@ export function InventoryDiscrepancyView() {
         <CardHeader>
           <CardTitle>Error</CardTitle>
           <CardDescription>
-            Failed to load discrepancy reports: {error.message}
+            {error.message}
           </CardDescription>
         </CardHeader>
       </Card>
@@ -127,7 +136,7 @@ export function InventoryDiscrepancyView() {
                     discrepancy.status === "open" 
                       ? "destructive" 
                       : discrepancy.status === "investigating" 
-                        ? "warning"
+                        ? "outline"
                         : "default"
                   }>
                     {discrepancy.status}
