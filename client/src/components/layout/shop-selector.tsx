@@ -10,6 +10,7 @@ import {
 import { useActiveShop } from "@/hooks/use-active-shop";
 import { Store, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useEffect } from "react";
 
 interface ShopSelectorProps {
   value?: number | null;
@@ -31,6 +32,17 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
     queryKey: ["/api/user/shops"],
     enabled: !!user
   });
+
+  // Set default shop when shops are loaded
+  useEffect(() => {
+    if (shops && shops.length > 0 && !activeShop) {
+      const defaultShop = shops.find(s => s.id === user?.defaultShopId) || shops[0];
+      setActiveShop(defaultShop);
+      if (onChange) {
+        onChange(defaultShop.id);
+      }
+    }
+  }, [shops, user?.defaultShopId, activeShop, setActiveShop, onChange]);
 
   const handleChange = (value: string) => {
     const shopId = value ? parseInt(value, 10) : null;
