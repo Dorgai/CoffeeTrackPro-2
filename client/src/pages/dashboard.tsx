@@ -315,11 +315,11 @@ export function Dashboard() {
         />
       </div>
 
-      {/* Missing Coffee Types Widget - Not visible for roasters */}
+      {/* Available Coffee Types Widget - Not visible for roasters */}
       {user?.role !== "roaster" && (
         <Card>
           <CardHeader>
-            <CardTitle>Missing Coffee Types</CardTitle>
+            <CardTitle>Available Coffee Types</CardTitle>
             <CardDescription>Coffee types available in other shops but not in stock here</CardDescription>
           </CardHeader>
           <CardContent>
@@ -331,7 +331,7 @@ export function Dashboard() {
                 const shopCoffeeIds = new Set(shopInventory.map(inv => inv.greenCoffeeId));
 
                 // Find coffees that exist in other shops but not in this one
-                const missingCoffees = coffees?.filter(coffee => {
+                const availableCoffees = coffees?.filter(coffee => {
                   if (!coffee) return false;
                   const isInOtherShops = currentInventory?.some(inv =>
                     inv.shopId !== shop.id &&
@@ -341,13 +341,13 @@ export function Dashboard() {
                   return !shopCoffeeIds.has(coffee.id) && isInOtherShops;
                 }) || [];
 
-                if (!missingCoffees.length) return null;
+                if (!availableCoffees.length) return null;
 
                 return (
                   <div key={shop.id} className="space-y-2">
                     <h3 className="font-medium">{shop.name}</h3>
                     <div className="grid gap-2">
-                      {missingCoffees.map(coffee => (
+                      {availableCoffees.map(coffee => (
                         <div key={coffee.id} className="p-3 bg-muted rounded-lg">
                           <div className="flex justify-between items-center">
                             <div>
@@ -506,15 +506,16 @@ export function Dashboard() {
             <CardContent>
               <div className="space-y-6">
                 {coffees?.map(coffee => {
-                  const inventoryItems = filteredInventory?.filter(inv => inv.greenCoffeeId === coffee.id) || [];
-                  const totalSmallBags = inventoryItems.reduce((sum, inv) => sum + (inv.smallBags || 0), 0);
-                  const totalLargeBags = inventoryItems.reduce((sum, inv) => sum + (inv.largeBags || 0), 0);
+                  // Get inventory for this coffee in the selected shop
+                  const shopInventory = filteredInventory?.find(inv => 
+                    inv.greenCoffeeId === coffee.id && 
+                    inv.shopId === selectedShopId
+                  );
 
-                  if (totalSmallBags === 0 && totalLargeBags === 0) return null;
-
-                  // Find the current shop's inventory item for this coffee
-                  const shopInventory = inventoryItems.find(inv => inv.shopId === selectedShopId);
-                  if (!shopInventory) return null;
+                  // Skip if no inventory for this coffee
+                  if (!shopInventory || (!shopInventory.smallBags && !shopInventory.largeBags)) {
+                    return null;
+                  }
 
                   return (
                     <div key={coffee.id} className="space-y-4">
@@ -526,13 +527,13 @@ export function Dashboard() {
                       </div>
                       <div className="space-y-4">
                         <StockProgress
-                          current={totalSmallBags}
-                          desired={shopInventory.desiredSmallBags || 0}
+                          current={shopInventory.smallBags}
+                          desired={shop?.desiredSmallBags || 0}
                           label="Small Bags (200g)"
                         />
                         <StockProgress
-                          current={totalLargeBags}
-                          desired={shopInventory.desiredLargeBags || 0}
+                          current={shopInventory.largeBags}
+                          desired={shop?.desiredLargeBags || 0}
                           label="Large Bags (1kg)"
                         />
                       </div>
