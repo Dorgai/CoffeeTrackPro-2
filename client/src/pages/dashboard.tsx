@@ -445,7 +445,7 @@ export function Dashboard() {
             <CardContent>
               <div className="space-y-6">
                 {coffees?.map(coffee => {
-                  const shopInventory = filteredInventory?.find(inv =>
+                  const shopInventory = currentInventory?.find(inv =>
                     inv.greenCoffeeId === coffee.id &&
                     inv.shopId === selectedShopId
                   );
@@ -484,7 +484,7 @@ export function Dashboard() {
                     </div>
                   );
                 })}
-                {(!filteredInventory || filteredInventory.length === 0) && (
+                {(!currentInventory || currentInventory.length === 0) && (
                   <p className="text-muted-foreground text-center py-4">No inventory data available</p>
                 )}
               </div>
