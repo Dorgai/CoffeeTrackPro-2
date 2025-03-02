@@ -211,7 +211,7 @@ export function Dashboard() {
 
   // Filter data by selected shop for baristas and managers
   const getFilteredData = (data: any[]) => {
-    if ((user?.role === "barista" || user?.role === "shopManager") && selectedShopId) {
+    if (selectedShopId) {
       return data?.filter(item => item.shopId === selectedShopId);
     }
     return data;
@@ -393,7 +393,7 @@ export function Dashboard() {
       )}
 
       {/* Stock Overview Section - For both managers and baristas */}
-      {(user?.role === "shopManager" || user?.role === "barista") && selectedShopId && (
+      {(user?.role === "shopManager" || user?.role === "barista") && (
         <div className="grid gap-4 md:grid-cols-2">
           {/* Global Stock Overview */}
           <Card>
