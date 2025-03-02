@@ -28,12 +28,11 @@ import { ShopSelector } from "@/components/layout/shop-selector";
 import StockProgress from "@/components/stock-progress";
 import { apiRequest } from "@/lib/queryClient";
 
-
 function StatsCard({
   title,
   value,
   icon: Icon,
-  description
+  description,
 }: {
   title: string;
   value: string | number;
@@ -61,78 +60,41 @@ export default function Dashboard() {
   const [selectedShopId, setSelectedShopId] = useState<number | null>(null);
 
   // Get available shops for user
-  const { data: userShops, isLoading: loadingShops } = useQuery<Shop[]>({
+  const { data: userShops } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
-    queryFn: async () => {
-      console.log('Fetching shops for user', user?.username);
-      const res = await apiRequest("GET", "/api/user/shops");
-      if (!res.ok) throw new Error("Failed to fetch shops");
-      const data = await res.json();
-      console.log('Available shops:', data);
-      return data;
-    },
     enabled: !!user && (user.role === "shopManager" || user.role === "barista"),
   });
 
   // Automatically select default shop
   useEffect(() => {
-    console.log('useEffect: Setting default shop');
-    console.log('Current user:', user);
-    console.log('Available shops:', userShops);
-
     if (user?.role === "shopManager" || user?.role === "barista") {
-      if (userShops && userShops.length > 0) {
+      if (userShops && userShops.length > 0 && !selectedShopId) {
         const defaultShop = userShops.find(s => s.id === user.defaultShopId) || userShops[0];
-        console.log('Selected default shop:', defaultShop);
         setSelectedShopId(defaultShop.id);
       }
     }
-  }, [user, userShops]);
+  }, [user, userShops, selectedShopId]);
 
-  // Get shop details when shop is selected
+  // Get shop details
   const { data: shop, isLoading: loadingShop } = useQuery<Shop>({
     queryKey: ["/api/shops", selectedShopId],
-    queryFn: async () => {
-      console.log('Fetching details for shop:', selectedShopId);
-      const res = await apiRequest("GET", `/api/shops/${selectedShopId}`);
-      if (!res.ok) throw new Error("Failed to fetch shop details");
-      const data = await res.json();
-      console.log('Shop details:', data);
-      return data;
-    },
     enabled: !!selectedShopId,
   });
 
-  // Get inventory data
+  // Get inventory
   const { data: inventory, isLoading: loadingInventory } = useQuery<RetailInventory[]>({
-    queryKey: ["/api/retail-inventory", selectedShopId],
-    queryFn: async () => {
-      console.log('Fetching inventory for shop:', selectedShopId);
-      const res = await apiRequest("GET", `/api/retail-inventory${selectedShopId ? `?shopId=${selectedShopId}` : ''}`);
-      if (!res.ok) throw new Error("Failed to fetch inventory");
-      const data = await res.json();
-      console.log('Inventory data:', data);
-      return data;
-    },
+    queryKey: ["/api/retail-inventory"],
     enabled: !!user,
   });
 
   // Get coffee data
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
-    queryFn: async () => {
-      console.log('Fetching coffee data');
-      const res = await apiRequest("GET", "/api/green-coffee");
-      if (!res.ok) throw new Error("Failed to fetch coffee data");
-      const data = await res.json();
-      console.log('Coffee data:', data);
-      return data;
-    },
     enabled: !!user,
   });
 
   // Loading state
-  if (loadingShops || loadingShop || loadingInventory || loadingCoffees) {
+  if (loadingShop || loadingInventory || loadingCoffees) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -145,35 +107,47 @@ export default function Dashboard() {
     ? inventory.filter(item => item.shopId === selectedShopId)
     : [];
 
-  console.log('Filtered inventory:', shopInventory);
+  // Calculate metrics for roastery owner view
+  const lowStockCoffees = coffees?.filter(coffee =>
+    Number(coffee.currentStock) <= Number(coffee.minThreshold)
+  ) || [];
 
-  // Manager and Barista View
+  // Common header section
+  const Header = () => (
+    <div className="flex justify-between items-center">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user?.username}</h1>
+        <p className="text-muted-foreground">
+          {user?.role === "roasteryOwner" && "Coffee roasting operations overview"}
+          {user?.role === "roaster" && "Coffee roasting operations"}
+          {(user?.role === "shopManager" || user?.role === "barista") && "Manage your coffee shop inventory"}
+        </p>
+      </div>
+      <div className="flex gap-2">
+        {(user?.role === "shopManager" || user?.role === "barista") && (
+          <ShopSelector
+            value={selectedShopId}
+            onChange={setSelectedShopId}
+          />
+        )}
+        <Button
+          variant="outline"
+          onClick={() => logoutMutation.mutate()}
+          disabled={logoutMutation.isPending}
+        >
+          <LogOut className="h-4 w-4 mr-2" />
+          Logout
+        </Button>
+      </div>
+    </div>
+  );
+
+  // Shop manager and barista view
   if (user?.role === "shopManager" || user?.role === "barista") {
     return (
       <div className="container mx-auto py-8 space-y-8">
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user.username}</h1>
-            <p className="text-muted-foreground">Manage your coffee shop inventory</p>
-          </div>
-          <div className="flex gap-2">
-            <ShopSelector
-              value={selectedShopId}
-              onChange={setSelectedShopId}
-            />
-            <Button
-              variant="outline"
-              onClick={() => logoutMutation.mutate()}
-              disabled={logoutMutation.isPending}
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          </div>
-        </div>
+        <Header />
 
-        {/* Shop Overview */}
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
             <CardHeader>
@@ -237,32 +211,12 @@ export default function Dashboard() {
     );
   }
 
-  // Roaster View
+  // Roaster view
   if (user?.role === "roaster") {
-    const lowStockCoffees = coffees?.filter(coffee =>
-      Number(coffee.currentStock) <= Number(coffee.minThreshold)
-    ) || [];
-
     return (
       <div className="container mx-auto py-8 space-y-8">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user?.username}</h1>
-            <p className="text-muted-foreground">Coffee roasting operations</p>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => logoutMutation.mutate()}
-              disabled={logoutMutation.isPending}
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          </div>
-        </div>
+        <Header />
 
-        {/* Stats Overview */}
         <div className="grid gap-4 md:grid-cols-3">
           <StatsCard
             title="Coffee Types"
@@ -276,7 +230,6 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Green Coffee Inventory */}
         <Card>
           <CardHeader>
             <CardTitle>Green Coffee Inventory</CardTitle>
@@ -321,32 +274,12 @@ export default function Dashboard() {
     );
   }
 
-  // Roastery Owner View
+  // Roastery owner view
   if (user?.role === "roasteryOwner") {
-    const lowStockCoffees = coffees?.filter(coffee =>
-      Number(coffee.currentStock) <= Number(coffee.minThreshold)
-    ) || [];
-
     return (
       <div className="container mx-auto py-8 space-y-8">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user?.username}</h1>
-            <p className="text-muted-foreground">Coffee roasting operations overview</p>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => logoutMutation.mutate()}
-              disabled={logoutMutation.isPending}
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          </div>
-        </div>
+        <Header />
 
-        {/* Stats Overview */}
         <div className="grid gap-4 md:grid-cols-3">
           <StatsCard
             title="Active Shops"
@@ -365,7 +298,6 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Low Stock Alerts */}
         {lowStockCoffees.length > 0 && (
           <Card>
             <CardHeader>
@@ -390,7 +322,6 @@ export default function Dashboard() {
           </Card>
         )}
 
-        {/* Inventory Overview */}
         <Card>
           <CardHeader>
             <CardTitle>Coffee Inventory Overview</CardTitle>
