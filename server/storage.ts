@@ -113,7 +113,12 @@ export interface IStorage {
     }
   ): Promise<DispatchedCoffeeConfirmation>;
   createInventoryDiscrepancy(data: InsertInventoryDiscrepancy): Promise<InventoryDiscrepancy>;
-  getInventoryDiscrepancies(): Promise<InventoryDiscrepancy[]>;
+  getInventoryDiscrepancies(): Promise<(InventoryDiscrepancy & {
+    confirmation: DispatchedCoffeeConfirmation & {
+      greenCoffee: GreenCoffee;
+      shop: Shop;
+    };
+  })[]>;
   getAllDispatchedCoffeeConfirmations(): Promise<DispatchedCoffeeConfirmation[]>;
   getCoffeeLargeBagTargets(shopId: number): Promise<CoffeeLargeBagTarget[]>;
   updateCoffeeLargeBagTarget(
@@ -797,7 +802,12 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getInventoryDiscrepancies(): Promise<InventoryDiscrepancy[]> {
+  async getInventoryDiscrepancies(): Promise<(InventoryDiscrepancy & {
+    confirmation: DispatchedCoffeeConfirmation & {
+      greenCoffee: GreenCoffee;
+      shop: Shop;
+    };
+  })[]> {
     try {
       const discrepancies = await db
         .select({
@@ -808,8 +818,42 @@ export class DatabaseStorage implements IStorage {
           notes: inventoryDiscrepancies.notes,
           status: inventoryDiscrepancies.status,
           createdAt: inventoryDiscrepancies.createdAt,
+          confirmation: {
+            id: dispatchedCoffeeConfirmations.id,
+            orderId: dispatchedCoffeeConfirmations.orderId,
+            shopId: dispatchedCoffeeConfirmations.shopId,
+            greenCoffeeId: dispatchedCoffeeConfirmations.greenCoffeeId,
+            dispatchedSmallBags: dispatchedCoffeeConfirmations.dispatchedSmallBags,
+            dispatchedLargeBags: dispatchedCoffeeConfirmations.dispatchedLargeBags,
+            receivedSmallBags: dispatchedCoffeeConfirmations.receivedSmallBags,
+            receivedLargeBags: dispatchedCoffeeConfirmations.receivedLargeBags,
+            status: dispatchedCoffeeConfirmations.status,
+            confirmedAt: dispatchedCoffeeConfirmations.confirmedAt,
+            greenCoffee: {
+              id: greenCoffee.id,
+              name: greenCoffee.name,
+              producer: greenCoffee.producer,
+            },
+            shop: {
+              id: shops.id,
+              name: shops.name,
+              location: shops.location,
+            },
+          },
         })
         .from(inventoryDiscrepancies)
+        .innerJoin(
+          dispatchedCoffeeConfirmations,
+          eq(inventoryDiscrepancies.confirmationId, dispatchedCoffeeConfirmations.id)
+        )
+        .innerJoin(
+          greenCoffee,
+          eq(dispatchedCoffeeConfirmations.greenCoffeeId, greenCoffee.id)
+        )
+        .innerJoin(
+          shops,
+          eq(dispatchedCoffeeConfirmations.shopId, shops.id)
+        )
         .orderBy(desc(inventoryDiscrepancies.createdAt));
 
       return discrepancies;

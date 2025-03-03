@@ -352,23 +352,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post(
     "/api/roasting-batches",
-    requireRole(["roaster"]),
+    requireRole(["roaster", "roasteryOwner"]),
     async (req, res) => {
-      const data = insertRoastingBatchSchema.parse(req.body);
-      const batch = await storage.createRoastingBatch({
-        ...data,
-        roasterId: req.user!.id,
-      });
+      try {
+        const data = insertRoastingBatchSchema.parse(req.body);
+        const batch = await storage.createRoastingBatch({
+          ...data,
+          roasterId: req.user!.id,
+        });
 
-      const coffee = await storage.getGreenCoffee(data.greenCoffeeId);
-      if (coffee) {
-        await storage.updateGreenCoffeeStock(
-          coffee.id,
-          Number(coffee.currentStock) - Number(data.greenCoffeeAmount),
-        );
+        // Update green coffee stock
+        const coffee = await storage.getGreenCoffee(data.greenCoffeeId);
+        if (coffee) {
+          const newStock = Number(coffee.currentStock) - Number(data.greenCoffeeAmount);
+          await storage.updateGreenCoffeeStock(
+            coffee.id,
+            newStock
+          );
+        }
+
+        res.status(201).json(batch);
+      } catch (error) {
+        console.error("Error creating roasting batch:", error);
+        res.status(400).json({ 
+          message: error instanceof Error ? error.message : "Failed to create roasting batch",
+          details: error instanceof Error ? error.stack : undefined
+        });
       }
-
-      res.status(201).json(batch);
     },
   );
 
@@ -791,8 +801,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(target);
     } catch (error) {
       console.error("Error updating coffee target:", error);
-      res.status(500).json({ message: "Failed to update coffee target" });
-    }
+      res.status(500).json({ message: "Failed to update coffee target" });    }
   });
 
   // Add new billing routes after the existing ones
