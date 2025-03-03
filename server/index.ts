@@ -6,8 +6,11 @@ import { seedInitialData } from "./db";
 
 const app = express();
 
-// Add CORS middleware
-app.use(cors());
+// Add CORS middleware with proper configuration
+app.use(cors({
+  origin: true,
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
@@ -72,6 +75,7 @@ app.use((req, res, next) => {
 
     const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 5000;
 
+    // Updated server error handling
     server.on('error', (error: any) => {
       if (error.code === 'EADDRINUSE') {
         log(`Port ${port} is already in use. Trying port ${port + 1}...`);
@@ -84,6 +88,7 @@ app.use((req, res, next) => {
       }
     });
 
+    // Updated server listening setup
     server.listen(port, "0.0.0.0", () => {
       log(`Server is running on port ${port}`);
     });
