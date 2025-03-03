@@ -36,7 +36,7 @@ export function RestockDialog() {
   const { toast } = useToast();
   const { activeShop } = useActiveShop();
   const [isOpen, setIsOpen] = useState(false);
-  const [quantities, setQuantities] = useState<Record<number, number>>({});
+  const [quantities, setQuantities] = useState<Record<number, { small: number; large: number }>>({});
 
   // Fetch available coffees
   const { data: coffees } = useQuery<CoffeeWithQuantity[]>({
@@ -84,13 +84,13 @@ export function RestockDialog() {
     if (!activeShop) return;
 
     // Create an order for each coffee with a quantity > 0
-    Object.entries(quantities).forEach(([coffeeId, quantity]) => {
-      if (quantity > 0) {
+    Object.entries(quantities).forEach(([coffeeId, { small, large }]) => {
+      if (small > 0 || large > 0) {
         createOrderMutation.mutate({
           shopId: activeShop.id,
           greenCoffeeId: parseInt(coffeeId),
-          smallBags: quantity,
-          largeBags: 0,
+          smallBags: small,
+          largeBags: large,
           status: "pending",
         });
       }
@@ -101,13 +101,9 @@ export function RestockDialog() {
   const initializeQuantities = () => {
     if (coffees && currentInventory) {
       const initialQuantities = coffees.reduce((acc, coffee) => {
-        // Find current inventory for this coffee
-        const currentStock = currentInventory.find(inv => inv.greenCoffeeId === coffee.id);
-        const currentQuantity = currentStock ? (currentStock.smallBags || 0) : 0;
-
-        acc[coffee.id] = 0;
+        acc[coffee.id] = { small: 0, large: 0 };
         return acc;
-      }, {} as Record<number, number>);
+      }, {} as Record<number, { small: number; large: number }>);
       setQuantities(initialQuantities);
     }
   };
@@ -148,29 +144,43 @@ export function RestockDialog() {
                 <TableHead>Coffee</TableHead>
                 <TableHead>Producer</TableHead>
                 <TableHead className="text-right">Current Stock</TableHead>
-                <TableHead className="text-right">Order Quantity</TableHead>
+                <TableHead className="text-center">Small Bags</TableHead>
+                <TableHead className="text-center">Large Bags</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {coffees?.map((coffee) => {
                 const currentStock = currentInventory?.find(inv => inv.greenCoffeeId === coffee.id);
-                const currentQuantity = currentStock ? (currentStock.smallBags || 0) : 0;
-
                 return (
                   <TableRow key={coffee.id}>
                     <TableCell className="font-medium">{coffee.name}</TableCell>
                     <TableCell>{coffee.producer}</TableCell>
-                    <TableCell className="text-right">{currentQuantity}</TableCell>
                     <TableCell className="text-right">
+                      <div>Small: {currentStock?.smallBags || 0}</div>
+                      <div>Large: {currentStock?.largeBags || 0}</div>
+                    </TableCell>
+                    <TableCell className="text-center">
                       <Input
                         type="number"
                         min="0"
-                        value={quantities[coffee.id] || 0}
+                        value={quantities[coffee.id]?.small || 0}
                         onChange={(e) => setQuantities(prev => ({
                           ...prev,
-                          [coffee.id]: parseInt(e.target.value) || 0
+                          [coffee.id]: { ...prev[coffee.id], small: parseInt(e.target.value) || 0 }
                         }))}
-                        className="w-20 ml-auto"
+                        className="w-20 mx-auto"
+                      />
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Input
+                        type="number"
+                        min="0"
+                        value={quantities[coffee.id]?.large || 0}
+                        onChange={(e) => setQuantities(prev => ({
+                          ...prev,
+                          [coffee.id]: { ...prev[coffee.id], large: parseInt(e.target.value) || 0 }
+                        }))}
+                        className="w-20 mx-auto"
                       />
                     </TableCell>
                   </TableRow>
