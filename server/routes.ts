@@ -802,12 +802,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("Updated coffee target for shop:", shopId, "coffee:", coffeeId, "to:", desiredLargeBags);
       res.json(target);
-    } catch (error) {
+    } catch(error) {
       console.error("Error updating coffee target:", error);
       res.status(500).json({ message: "Failed to update coffee target" });    }
   });
 
-  // Add new billing routes after the existing ones
+  // Add new billing routes after theexisting ones
   app.get("/api/billing/lastevent", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
     try {
       const lastEvent = await storage.getLastBillingEvent();
