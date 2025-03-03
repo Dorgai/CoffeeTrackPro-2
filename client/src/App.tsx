@@ -38,10 +38,10 @@ export default function App() {
               {() => <ProtectedRoute path="/" component={Dashboard} />}
             </Route>
             <Route path="/inventory">
-              {() => <ProtectedRoute path="/inventory" component={Inventory} roles={["roasteryOwner"]} />}
+              {() => <ProtectedRoute path="/inventory" component={Inventory} roles={["roasteryOwner", "roaster"]} />}
             </Route>
             <Route path="/coffee/:id">
-              {() => <ProtectedRoute path="/coffee/:id" component={CoffeeDetail} roles={["roasteryOwner"]} />}
+              {() => <ProtectedRoute path="/coffee/:id" component={CoffeeDetail} roles={["roasteryOwner", "roaster"]} />}
             </Route>
             <Route path="/roasting">
               {() => <ProtectedRoute path="/roasting" component={Roasting} roles={["roaster"]} />}
