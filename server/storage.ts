@@ -21,7 +21,7 @@ import {
   type InsertBillingEvent,
   type InsertBillingEventDetail,
   users,
-  shops as shopsTable,
+  shops,
   greenCoffee,
   roastingBatches,
   retailInventory,
@@ -73,10 +73,7 @@ export interface IStorage {
 
   // Retail Inventory  
   getRetailInventory(id: number): Promise<RetailInventory | undefined>;
-  getRetailInventoriesByShop(shopId: number): Promise<(RetailInventory & {
-    greenCoffee: GreenCoffee;
-    updatedBy: User;
-  })[]>;
+  getRetailInventoriesByShop(shopId: number): Promise<RetailInventory[]>;
   updateRetailInventory(inventory: InsertRetailInventory): Promise<RetailInventory>;
 
   // Orders
@@ -92,27 +89,20 @@ export interface IStorage {
       updatedById: number;
     }
   ): Promise<Order>;
+
+  // Additional methods
   getRetailInventoryHistory(shopId: number): Promise<(RetailInventory & { 
     greenCoffeeName: string; 
     updatedByUsername: string;
   })[]>;
-  getAllRetailInventories(): Promise<(RetailInventory & {
-    shop: Shop;
-    greenCoffee: GreenCoffee;
-    updatedBy: User;
-  })[]>;
+  getAllRetailInventories(): Promise<RetailInventory[]>;
   getAllOrders(): Promise<(Order & {
     shop: Shop;
     greenCoffee: GreenCoffee;
     user: User;
     updatedBy: User | null;
   })[]>;
-
-  // Dispatched Coffee Confirmations
-  getDispatchedCoffeeConfirmations(shopId: number): Promise<(DispatchedCoffeeConfirmation & {
-    greenCoffee: GreenCoffee;
-    shop: Shop;
-  })[]>;
+  getDispatchedCoffeeConfirmations(shopId: number): Promise<DispatchedCoffeeConfirmation[]>;
   createDispatchedCoffeeConfirmation(data: InsertDispatchedCoffeeConfirmation): Promise<DispatchedCoffeeConfirmation>;
   confirmDispatchedCoffee(
     confirmationId: number,
@@ -122,21 +112,9 @@ export interface IStorage {
       confirmedById: number;
     }
   ): Promise<DispatchedCoffeeConfirmation>;
-
-  // Inventory Discrepancies
   createInventoryDiscrepancy(data: InsertInventoryDiscrepancy): Promise<InventoryDiscrepancy>;
-  getInventoryDiscrepancies(): Promise<(InventoryDiscrepancy & {
-    confirmation: DispatchedCoffeeConfirmation & {
-      greenCoffee: GreenCoffee;
-      shop: Shop;
-    };
-  })[]>;
-  getAllDispatchedCoffeeConfirmations(): Promise<(DispatchedCoffeeConfirmation & {
-    greenCoffee: GreenCoffee;
-    shop: Shop;
-  })[]>;
-
-  // Add new methods for coffee large bag targets
+  getInventoryDiscrepancies(): Promise<InventoryDiscrepancy[]>;
+  getAllDispatchedCoffeeConfirmations(): Promise<DispatchedCoffeeConfirmation[]>;
   getCoffeeLargeBagTargets(shopId: number): Promise<CoffeeLargeBagTarget[]>;
   updateCoffeeLargeBagTarget(
     shopId: number,
@@ -252,16 +230,16 @@ export class DatabaseStorage implements IStorage {
 
   // Shops
   async getShop(id: number): Promise<Shop | undefined> {
-    const [shop] = await db.select().from(shopsTable).where(eq(shopsTable.id, id));
+    const [shop] = await db.select().from(shops).where(eq(shops.id, id));
     return shop;
   }
 
   async getShops(): Promise<Shop[]> {
-    return await db.select().from(shopsTable);
+    return await db.select().from(shops);
   }
 
   async createShop(shop: InsertShop): Promise<Shop> {
-    const [newShop] = await db.insert(shopsTable).values(shop).returning();
+    const [newShop] = await db.insert(shops).values(shop).returning();
     return newShop;
   }
 
@@ -275,31 +253,31 @@ export class DatabaseStorage implements IStorage {
       if (user?.role === "roasteryOwner") {
         return await db
           .select()
-          .from(shopsTable)
-          .where(eq(shopsTable.isActive, true))
-          .orderBy(shopsTable.name);
+          .from(shops)
+          .where(eq(shops.isActive, true))
+          .orderBy(shops.name);
       }
 
       if (user?.role === "shopManager") {
         return await db
           .select()
-          .from(shopsTable)
-          .where(eq(shopsTable.isActive, true))
-          .orderBy(shopsTable.name);
+          .from(shops)
+          .where(eq(shops.isActive, true))
+          .orderBy(shops.name);
       }
 
       if (user?.role === "barista") {
         return await db
           .select()
           .from(userShops)
-          .innerJoin(shopsTable, eq(userShops.shopId, shopsTable.id))
+          .innerJoin(shops, eq(userShops.shopId, shops.id))
           .where(
             and(
               eq(userShops.userId, userId),
-              eq(shopsTable.isActive, true)
+              eq(shops.isActive, true)
             )
           )
-          .orderBy(shopsTable.name);
+          .orderBy(shops.name);
       }
 
       return [];
@@ -387,10 +365,7 @@ export class DatabaseStorage implements IStorage {
     return inv;
   }
 
-  async getRetailInventoriesByShop(shopId: number): Promise<(RetailInventory & {
-    greenCoffee: GreenCoffee;
-    updatedBy: User;
-  })[]> {
+  async getRetailInventoriesByShop(shopId: number): Promise<RetailInventory[]> {
     try {
       const result = await db
         .select({
@@ -401,46 +376,11 @@ export class DatabaseStorage implements IStorage {
           largeBags: retailInventory.largeBags,
           updatedAt: retailInventory.updatedAt,
           updatedById: retailInventory.updatedById,
-          greenCoffee: {
-            id: greenCoffee.id,
-            name: greenCoffee.name,
-            producer: greenCoffee.producer,
-            country: greenCoffee.country,
-            altitude: greenCoffee.altitude,
-            cuppingNotes: greenCoffee.cuppingNotes,
-            details: greenCoffee.details,
-            currentStock: greenCoffee.currentStock,
-          },
-          updatedBy: {
-            id: users.id,
-            username: users.username,
-            role: users.role,
-          },
         })
-        .from(greenCoffee)
-        .leftJoin(
-          retailInventory,
-          and(
-            eq(retailInventory.greenCoffeeId, greenCoffee.id),
-            eq(retailInventory.shopId, shopId)
-          )
-        )
-        .leftJoin(users, eq(retailInventory.updatedById, users.id))
+        .from(retailInventory)
+        .where(eq(retailInventory.shopId, shopId))
         .orderBy(desc(retailInventory.updatedAt));
-
-      const transformedResult = result.map(item => ({
-        id: item.id ?? -1, 
-        shopId: shopId,
-        greenCoffeeId: item.greenCoffee.id,
-        smallBags: item.smallBags ?? 0,
-        largeBags: item.largeBags ?? 0,
-        updatedAt: item.updatedAt ?? null,
-        updatedById: item.updatedById ?? null,
-        greenCoffee: item.greenCoffee,
-        updatedBy: item.updatedBy ?? null,
-      }));
-
-      return transformedResult;
+      return result;
     } catch (error) {
       console.error("Error in getRetailInventoriesByShop:", error);
       throw error;
@@ -556,7 +496,7 @@ export class DatabaseStorage implements IStorage {
     return updatedOrder;
   }
   async getRetailInventoryHistory(shopId: number): Promise<(RetailInventory & { 
-    greenCoffeeName: string;
+    greenCoffeeName: string; 
     updatedByUsername: string;
   })[]> {
     try {
@@ -590,11 +530,7 @@ export class DatabaseStorage implements IStorage {
       throw error;
     }
   }
-  async getAllRetailInventories(): Promise<(RetailInventory & {
-    shop: Shop;
-    greenCoffee: GreenCoffee;
-    updatedBy: User;
-  })[]> {
+  async getAllRetailInventories(): Promise<RetailInventory[]> {
     try {
       const result = await db
         .select({
@@ -605,14 +541,8 @@ export class DatabaseStorage implements IStorage {
           largeBags: retailInventory.largeBags,
           updatedAt: retailInventory.updatedAt,
           updatedById: retailInventory.updatedById,
-          shop: shopsTable,
-          greenCoffee: greenCoffee,
-          updatedBy: users,
         })
         .from(retailInventory)
-        .innerJoin(shopsTable, eq(retailInventory.shopId, shopsTable.id))
-        .innerJoin(greenCoffee, eq(retailInventory.greenCoffeeId, greenCoffee.id))
-        .innerJoin(users, eq(retailInventory.updatedById, users.id))
         .orderBy(desc(retailInventory.updatedAt));
 
       return result;
@@ -642,9 +572,9 @@ export class DatabaseStorage implements IStorage {
           createdById: orders.createdById,
           updatedById: orders.updatedById,
           shop: {
-            id: shopsTable.id,
-            name: shopsTable.name,
-            location: shopsTable.location,
+            id: shops.id,
+            name: shops.name,
+            location: shops.location,
           },
           greenCoffee: {
             id: greenCoffee.id,
@@ -658,7 +588,7 @@ export class DatabaseStorage implements IStorage {
           },
         })
         .from(orders)
-        .innerJoin(shopsTable, eq(orders.shopId, shopsTable.id))
+        .innerJoin(shops, eq(orders.shopId, shops.id))
         .innerJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
         .innerJoin(users, eq(orders.createdById, users.id))
         .orderBy(desc(orders.createdAt));
@@ -686,10 +616,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getDispatchedCoffeeConfirmations(shopId: number): Promise<(DispatchedCoffeeConfirmation & {
-    greenCoffee: GreenCoffee;
-    shop: Shop;
-  })[]> {
+  async getDispatchedCoffeeConfirmations(shopId: number): Promise<DispatchedCoffeeConfirmation[]> {
     try {
       const confirmations = await db
         .select({
@@ -705,29 +632,8 @@ export class DatabaseStorage implements IStorage {
           confirmedById: dispatchedCoffeeConfirmations.confirmedById,
           confirmedAt: dispatchedCoffeeConfirmations.confirmedAt,
           createdAt: dispatchedCoffeeConfirmations.createdAt,
-          greenCoffee: {
-            id: greenCoffee.id,
-            name: greenCoffee.name,
-            producer: greenCoffee.producer,
-            country: greenCoffee.country,
-            altitude: greenCoffee.altitude,
-            cuppingNotes: greenCoffee.cuppingNotes,
-            details: greenCoffee.details,
-            currentStock: greenCoffee.currentStock,
-            minThreshold: greenCoffee.minThreshold,
-            createdAt: greenCoffee.createdAt,
-          },
-          shop: {
-            id: shopsTable.id,
-            name: shopsTable.name,
-            location: shopsTable.location,
-            isActive: shopsTable.isActive,
-            defaultOrderQuantity: shopsTable.defaultOrderQuantity,
-          },
         })
         .from(dispatchedCoffeeConfirmations)
-        .innerJoin(greenCoffee, eq(dispatchedCoffeeConfirmations.greenCoffeeId, greenCoffee.id))
-        .innerJoin(shopsTable, eq(dispatchedCoffeeConfirmations.shopId, shopsTable.id))
         .where(eq(dispatchedCoffeeConfirmations.shopId, shopId))
         .orderBy(desc(dispatchedCoffeeConfirmations.createdAt));
 
@@ -875,7 +781,7 @@ export class DatabaseStorage implements IStorage {
         .insert(inventoryDiscrepancies)
         .values({
           ...data,
-          status: data.status || "open", 
+          status: data.status || "open",
           createdAt: new Date(),
         })
         .returning();
@@ -891,12 +797,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getInventoryDiscrepancies(): Promise<(InventoryDiscrepancy & {
-    confirmation: DispatchedCoffeeConfirmation & {
-      greenCoffee: GreenCoffee;
-      shop: Shop;
-    };
-  })[]> {
+  async getInventoryDiscrepancies(): Promise<InventoryDiscrepancy[]> {
     try {
       const discrepancies = await db
         .select({
@@ -907,41 +808,8 @@ export class DatabaseStorage implements IStorage {
           notes: inventoryDiscrepancies.notes,
           status: inventoryDiscrepancies.status,
           createdAt: inventoryDiscrepancies.createdAt,
-          confirmation: {
-            id: dispatchedCoffeeConfirmations.id,
-            orderId: dispatchedCoffeeConfirmations.orderId,
-            shopId: dispatchedCoffeeConfirmations.shopId,
-            greenCoffeeId: dispatchedCoffeeConfirmations.greenCoffeeId,
-            dispatchedSmallBags: dispatchedCoffeeConfirmations.dispatchedSmallBags,
-            dispatchedLargeBags: dispatchedCoffeeConfirmations.dispatchedLargeBags,
-            receivedSmallBags: dispatchedCoffeeConfirmations.receivedSmallBags,
-            receivedLargeBags: dispatchedCoffeeConfirmations.receivedLargeBags,
-            status: dispatchedCoffeeConfirmations.status,
-            confirmedAt: dispatchedCoffeeConfirmations.confirmedAt,
-            greenCoffee: {
-              id: greenCoffee.id,
-              name: greenCoffee.name,              producer: greenCoffee.producer,
-            },
-            shop: {
-              id: shopsTable.id,
-              name: shopsTable.name,
-              location: shopsTable.location,
-            },
-          },
         })
         .from(inventoryDiscrepancies)
-        .innerJoin(
-          dispatchedCoffeeConfirmations,
-          eq(inventoryDiscrepancies.confirmationId, dispatchedCoffeeConfirmations.id)
-        )
-        .innerJoin(
-          greenCoffee,
-          eq(dispatchedCoffeeConfirmations.greenCoffeeId, greenCoffee.id)
-        ))
-        .innerJoin(
-          shopsTable,
-          eq(dispatchedCoffeeConfirmations.shopId,shopsTable.id)
-        )
         .orderBy(desc(inventoryDiscrepancies.createdAt));
 
       return discrepancies;
@@ -953,20 +821,18 @@ export class DatabaseStorage implements IStorage {
   async deleteShop(id: number): Promise<Shop> {
     try {
       const [deletedShop] = await db
-        .update(shopsTable)
+        .update(shops)
         .set({ isActive: false })
-        .where(eq(shopsTable.id, id))
+        .where(eq(shops.id, id))
         .returning();
 
       return deletedShop;
     } catch (error) {
-      console.error("Error deleting shop:", error);      throw error;
+      console.error("Error deleting shop:", error);
+      throw error;
     }
   }
-  async getAllDispatchedCoffeeConfirmations(): Promise<(DispatchedCoffeeConfirmation & {
-    greenCoffee: GreenCoffee;
-    shop: Shop;
-  })[]> {
+  async getAllDispatchedCoffeeConfirmations(): Promise<DispatchedCoffeeConfirmation[]> {
     try {
       const confirmations = await db
         .select({
@@ -974,33 +840,16 @@ export class DatabaseStorage implements IStorage {
           orderId: dispatchedCoffeeConfirmations.orderId,
           shopId: dispatchedCoffeeConfirmations.shopId,
           greenCoffeeId: dispatchedCoffeeConfirmations.greenCoffeeId,
-          dispatchedSmallBags: dispatchedCoffeeConfirmations.dispatchedSmallBags,          dispatchedLargeBags: dispatchedCoffeeConfirmations.dispatchedLargeBags,
+          dispatchedSmallBags: dispatchedCoffeeConfirmations.dispatchedSmallBags,
+          dispatchedLargeBags: dispatchedCoffeeConfirmations.dispatchedLargeBags,
           receivedSmallBags: dispatchedCoffeeConfirmations.receivedSmallBags,
           receivedLargeBags: dispatchedCoffeeConfirmations.receivedLargeBags,
           status: dispatchedCoffeeConfirmations.status,
           confirmedById: dispatchedCoffeeConfirmations.confirmedById,
           confirmedAt: dispatchedCoffeeConfirmations.confirmedAt,
           createdAt: dispatchedCoffeeConfirmations.createdAt,
-          greenCoffee: {
-            id: greenCoffee.id,
-            name: greenCoffee.name,
-            producer: greenCoffee.producer,
-            country: greenCoffee.country,
-            details: greenCoffee.details,
-            currentStock: greenCoffee.currentStock,
-            minThreshold: greenCoffee.minThreshold,
-          },
-          shop: {
-            id: shopsTable.id,
-            name: shopsTable.name,
-            location: shopsTable.location,
-            isActive: shopsTable.isActive,
-            defaultOrderQuantity: shopsTable.defaultOrderQuantity,
-          },
         })
         .from(dispatchedCoffeeConfirmations)
-        .innerJoin(greenCoffee, eq(dispatchedCoffeeConfirmations.greenCoffeeId, greenCoffee.id))
-        .innerJoin(shopsTable, eq(dispatchedCoffeeConfirmations.shopId, shopsTable.id))
         .orderBy(desc(dispatchedCoffeeConfirmations.createdAt));
 
       return confirmations;
@@ -1009,64 +858,7 @@ export class DatabaseStorage implements IStorage {
       throw error;
     }
   }
-  async getShopCoffeeTargets(shopId: number): Promise<ShopCoffeeTarget[]> {
-    try {
-      return await db
-        .select()
-        .from(shopCoffeeTargets)
-        .where(eq(shopCoffeeTargets.shopId, shopId))
-        .orderBy(shopCoffeeTargets.createdAt);
-    } catch (error) {
-      console.error("Error fetching shop coffee targets:", error);
-      throw error;
-    }
-  }
 
-  async updateShopCoffeeTarget(
-    shopId: number,
-    greenCoffeeId: number,
-    data: {
-      desiredSmallBags: number;
-      desiredLargeBags: number;
-    }
-  ): Promise<ShopCoffeeTarget> {
-    try {
-      const [existing] = await db
-        .select()
-        .from(shopCoffeeTargets)
-        .where(
-          and(
-            eq(shopCoffeeTargets.shopId, shopId),
-            eq(shopCoffeeTargets.greenCoffeeId, greenCoffeeId)
-          )
-        );
-
-      if (existing) {
-        const [updated] = await db
-          .update(shopCoffeeTargets)
-          .set({
-            ...data,
-            updatedAt: new Date(),
-          })
-          .where(eq(shopCoffeeTargets.id, existing.id))
-          .returning();
-        return updated;
-      } else {
-        const [created] = await db
-          .insert(shopCoffeeTargets)
-          .values({
-            shopId,
-            greenCoffeeId,
-            ...data,
-          })
-          .returning();
-        return created;
-      }
-    } catch (error) {
-      console.error("Error updating shop coffee target:", error);
-      throw error;
-    }
-  }
   async getCoffeeLargeBagTargets(shopId: number): Promise<CoffeeLargeBagTarget[]> {
     try {
       return await db
@@ -1133,9 +925,9 @@ export class DatabaseStorage implements IStorage {
   ): Promise<Shop> {
     try {
       const [updatedShop] = await db
-        .update(shopsTable)
+        .update(shops)
         .set(update)
-        .where(eq(shopsTable.id, id))
+        .where(eq(shops.id, id))
         .returning();
 
       if (!updatedShop) {
