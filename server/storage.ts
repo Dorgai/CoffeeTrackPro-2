@@ -1015,8 +1015,7 @@ export class DatabaseStorage implements IStorage {
           grade: greenCoffee.grade,
           smallBags: orders.smallBags,
           largeBags: orders.largeBags,
-        })
-        .from(orders)
+        })        .from(orders)
         .innerJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
         .where(
           and(
