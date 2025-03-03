@@ -37,7 +37,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
   });
 
   // Query for confirmations
-  const { data: confirmations, isLoading } = useQuery<(DispatchConfirmationType & { coffee?: { name: string } })[]>({
+  const { data: confirmations, isLoading } = useQuery({
     queryKey: ["/api/dispatched-coffee/confirmations", shopId],
     queryFn: async () => {
       console.log("Fetching confirmations for shop:", shopId);
@@ -51,7 +51,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
 
       // Fetch coffee details for each confirmation
       const confirmationsWithCoffee = await Promise.all(
-        confirmations.map(async (confirmation) => {
+        confirmations.map(async (confirmation: any) => {
           try {
             const coffeeRes = await apiRequest("GET", `/api/green-coffee/${confirmation.greenCoffeeId}`);
             if (!coffeeRes.ok) {
@@ -67,7 +67,9 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
       );
 
       // Filter only pending confirmations
-      return confirmationsWithCoffee.filter(conf => conf.status === "pending");
+      const pendingConfirmations = confirmationsWithCoffee.filter(conf => conf.status === "pending");
+      console.log("Pending confirmations:", pendingConfirmations);
+      return pendingConfirmations;
     },
     enabled: !!shopId,
   });
@@ -116,10 +118,19 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
 
   if (!confirmations || confirmations.length === 0) {
     return (
-      <div className="text-center p-8 text-muted-foreground">
-        <p>No pending coffee shipments to confirm at this time.</p>
-        <p className="text-sm mt-2">Once coffee is dispatched to your shop, you'll be able to confirm the received quantities here.</p>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>No New Arrivals</CardTitle>
+          <CardDescription>
+            There are currently no pending coffee shipments to confirm.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center p-8 text-muted-foreground">
+            <p>Once coffee is dispatched to your shop, you'll be able to confirm the received quantities here.</p>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -140,103 +151,113 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
   };
 
   return (
-    <div className="space-y-4">
-      {confirmations.map((confirmation) => (
-        <div
-          key={confirmation.id}
-          className="flex items-center justify-between p-4 border rounded-lg"
-        >
-          <div>
-            <h4 className="font-medium">{confirmation.coffee?.name}</h4>
-            <p className="text-sm text-muted-foreground">
-              Dispatched: {confirmation.dispatchedSmallBags} small bags, {confirmation.dispatchedLargeBags} large bags
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            onClick={() => {
-              setSelectedConfirmation(confirmation);
-              setReceivedQuantities({
-                smallBags: confirmation.dispatchedSmallBags,
-                largeBags: confirmation.dispatchedLargeBags,
-              });
-            }}
-          >
-            Confirm Receipt
-          </Button>
-        </div>
-      ))}
-
-      <Dialog 
-        open={!!selectedConfirmation}
-        onOpenChange={(open) => {
-          if (!open) setSelectedConfirmation(null);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirm Received Quantities</DialogTitle>
-            <DialogDescription>
-              Enter the actual quantities received for {selectedConfirmation?.coffee?.name}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Small Bags (200g)</Label>
-              <Input
-                type="number"
-                min="0"
-                value={receivedQuantities.smallBags}
-                onChange={(e) => setReceivedQuantities(prev => ({
-                  ...prev,
-                  smallBags: parseInt(e.target.value) || 0
-                }))}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Large Bags (1kg)</Label>
-              <Input
-                type="number"
-                min="0"
-                value={receivedQuantities.largeBags}
-                onChange={(e) => setReceivedQuantities(prev => ({
-                  ...prev,
-                  largeBags: parseInt(e.target.value) || 0
-                }))}
-              />
-            </div>
-
-            {selectedConfirmation && (
-              receivedQuantities.smallBags !== selectedConfirmation.dispatchedSmallBags ||
-              receivedQuantities.largeBags !== selectedConfirmation.dispatchedLargeBags
-            ) && (
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  The quantities entered differ from what was dispatched. This will create a discrepancy report.
-                </AlertDescription>
-              </Alert>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSelectedConfirmation(null)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleConfirm}
-              disabled={confirmMutation.isPending}
+    <Card>
+      <CardHeader>
+        <CardTitle>New Inventory Arrivals</CardTitle>
+        <CardDescription>
+          Confirm received coffee quantities
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {confirmations.map((confirmation) => (
+            <div
+              key={confirmation.id}
+              className="flex items-center justify-between p-4 border rounded-lg"
             >
-              {confirmMutation.isPending && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <div>
+                <h4 className="font-medium">{confirmation.coffee?.name}</h4>
+                <p className="text-sm text-muted-foreground">
+                  Dispatched: {confirmation.dispatchedSmallBags} small bags, {confirmation.dispatchedLargeBags} large bags
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSelectedConfirmation(confirmation);
+                  setReceivedQuantities({
+                    smallBags: confirmation.dispatchedSmallBags,
+                    largeBags: confirmation.dispatchedLargeBags,
+                  });
+                }}
+              >
+                Confirm Receipt
+              </Button>
+            </div>
+          ))}
+        </div>
+
+        <Dialog 
+          open={!!selectedConfirmation}
+          onOpenChange={(open) => {
+            if (!open) setSelectedConfirmation(null);
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Confirm Received Quantities</DialogTitle>
+              <DialogDescription>
+                Enter the actual quantities received for {selectedConfirmation?.coffee?.name}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Small Bags (200g)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={receivedQuantities.smallBags}
+                  onChange={(e) => setReceivedQuantities(prev => ({
+                    ...prev,
+                    smallBags: parseInt(e.target.value) || 0
+                  }))}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Large Bags (1kg)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={receivedQuantities.largeBags}
+                  onChange={(e) => setReceivedQuantities(prev => ({
+                    ...prev,
+                    largeBags: parseInt(e.target.value) || 0
+                  }))}
+                />
+              </div>
+
+              {selectedConfirmation && (
+                receivedQuantities.smallBags !== selectedConfirmation.dispatchedSmallBags ||
+                receivedQuantities.largeBags !== selectedConfirmation.dispatchedLargeBags
+              ) && (
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    The quantities entered differ from what was dispatched. This will create a discrepancy report.
+                  </AlertDescription>
+                </Alert>
               )}
-              Confirm Receipt
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSelectedConfirmation(null)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleConfirm}
+                disabled={confirmMutation.isPending}
+              >
+                {confirmMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Confirm Receipt
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </CardContent>
+    </Card>
   );
 }
