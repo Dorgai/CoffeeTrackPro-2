@@ -113,12 +113,7 @@ export interface IStorage {
     }
   ): Promise<DispatchedCoffeeConfirmation>;
   createInventoryDiscrepancy(data: InsertInventoryDiscrepancy): Promise<InventoryDiscrepancy>;
-  getInventoryDiscrepancies(): Promise<(InventoryDiscrepancy & {
-    confirmation: DispatchedCoffeeConfirmation & {
-      greenCoffee: GreenCoffee;
-      shop: Shop;
-    };
-  })[]>;
+  getInventoryDiscrepancies(): Promise<InventoryDiscrepancy[]>;
   getAllDispatchedCoffeeConfirmations(): Promise<DispatchedCoffeeConfirmation[]>;
   getCoffeeLargeBagTargets(shopId: number): Promise<CoffeeLargeBagTarget[]>;
   updateCoffeeLargeBagTarget(
@@ -802,12 +797,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getInventoryDiscrepancies(): Promise<(InventoryDiscrepancy & {
-    confirmation: DispatchedCoffeeConfirmation & {
-      greenCoffee: GreenCoffee;
-      shop: Shop;
-    };
-  })[]> {
+  async getInventoryDiscrepancies(): Promise<InventoryDiscrepancy[]> {
     try {
       const discrepancies = await db
         .select({
