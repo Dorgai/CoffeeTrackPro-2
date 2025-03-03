@@ -292,6 +292,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Coffee not found" });
       }
 
+      console.log("Fetching coffee details:", {
+        coffeeId,
+        requestedBy: req.user?.username,
+        role: req.user?.role
+      });
+
       res.json(coffee);
     } catch (error) {
       console.error("Error fetching coffee details:", error);
