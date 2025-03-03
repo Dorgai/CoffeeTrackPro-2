@@ -8,31 +8,38 @@ import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
-type GradeQuantities = {
-  [key: string]: {
-    smallBags: number;
-    largeBags: number;
-  };
+type BillingQuantityResponse = {
+  fromDate: string;
+  quantities: {
+    grade: string;
+    smallBagsQuantity: number;
+    largeBagsQuantity: number;
+  }[];
 };
 
 export function BillingEventGrid() {
   const { toast } = useToast();
   const [primarySplit, setPrimarySplit] = useState(70);
   const [secondarySplit, setSecondarySplit] = useState(30);
-  
+
   // Fetch quantities since last billing event
-  const { data: quantities, isLoading } = useQuery<GradeQuantities>({
+  const { data: billingData, isLoading, error } = useQuery<BillingQuantityResponse>({
     queryKey: ["/api/billing/quantities"],
   });
 
   // Create billing event mutation
   const createBillingEventMutation = useMutation({
-    mutationFn: async (data: {
-      primarySplit: number;
-      secondarySplit: number;
-    }) => {
-      const res = await apiRequest("POST", "/api/billing/events", data);
+    mutationFn: async () => {
+      if (!billingData?.quantities) return;
+
+      const res = await apiRequest("POST", "/api/billing/events", {
+        primarySplitPercentage: primarySplit,
+        secondarySplitPercentage: secondarySplit,
+        quantities: billingData.quantities
+      });
+
       if (!res.ok) {
         throw new Error("Failed to create billing event");
       }
@@ -62,12 +69,31 @@ export function BillingEventGrid() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="text-center text-destructive">
+        Error loading billing data: {error.message}
+      </div>
+    );
+  }
+
   const calculateSplitQuantities = (quantity: number, split: number) => {
     return Math.round((quantity * split) / 100);
   };
 
   return (
     <div className="space-y-8">
+      {/* Billing Interval Information */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Current Billing Cycle</CardTitle>
+          <CardDescription>
+            Data gathered since: {billingData?.fromDate ? format(new Date(billingData.fromDate), 'PPP') : 'N/A'}
+          </CardDescription>
+        </CardHeader>
+      </Card>
+
+      {/* Quantities Grid */}
       <Card>
         <CardHeader>
           <CardTitle>Current Billing Cycle Quantities</CardTitle>
@@ -87,14 +113,15 @@ export function BillingEventGrid() {
             </TableHeader>
             <TableBody>
               {coffeeGrades.map((grade) => {
-                const gradeData = quantities?.[grade] || { smallBags: 0, largeBags: 0 };
+                const gradeData = billingData?.quantities.find(q => q.grade === grade) || 
+                  { smallBagsQuantity: 0, largeBagsQuantity: 0 };
                 return (
                   <TableRow key={grade}>
                     <TableCell className="font-medium">{grade}</TableCell>
-                    <TableCell>{gradeData.smallBags}</TableCell>
-                    <TableCell>{gradeData.largeBags}</TableCell>
+                    <TableCell>{gradeData.smallBagsQuantity}</TableCell>
+                    <TableCell>{gradeData.largeBagsQuantity}</TableCell>
                     <TableCell>
-                      {gradeData.smallBags + gradeData.largeBags}
+                      {gradeData.smallBagsQuantity + gradeData.largeBagsQuantity}
                     </TableCell>
                   </TableRow>
                 );
@@ -104,6 +131,7 @@ export function BillingEventGrid() {
         </CardContent>
       </Card>
 
+      {/* Split View */}
       <Card>
         <CardHeader>
           <CardTitle>Revenue Split View</CardTitle>
@@ -153,8 +181,9 @@ export function BillingEventGrid() {
             </TableHeader>
             <TableBody>
               {coffeeGrades.map((grade) => {
-                const gradeData = quantities?.[grade] || { smallBags: 0, largeBags: 0 };
-                const totalBags = gradeData.smallBags + gradeData.largeBags;
+                const gradeData = billingData?.quantities.find(q => q.grade === grade) || 
+                  { smallBagsQuantity: 0, largeBagsQuantity: 0 };
+                const totalBags = gradeData.smallBagsQuantity + gradeData.largeBagsQuantity;
                 return (
                   <TableRow key={grade}>
                     <TableCell className="font-medium">{grade}</TableCell>
@@ -172,13 +201,8 @@ export function BillingEventGrid() {
 
           <div className="mt-6">
             <Button
-              onClick={() => 
-                createBillingEventMutation.mutate({
-                  primarySplit,
-                  secondarySplit,
-                })
-              }
-              disabled={createBillingEventMutation.isPending}
+              onClick={() => createBillingEventMutation.mutate()}
+              disabled={createBillingEventMutation.isPending || !billingData?.quantities}
             >
               {createBillingEventMutation.isPending ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
