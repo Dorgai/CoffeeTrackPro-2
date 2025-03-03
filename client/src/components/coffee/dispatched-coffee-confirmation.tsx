@@ -29,7 +29,6 @@ interface DispatchedCoffeeProps {
 }
 
 export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) {
-  // Always declare hooks at the top level
   const { toast } = useToast();
   const [selectedConfirmation, setSelectedConfirmation] = useState<DispatchConfirmationType | null>(null);
   const [receivedQuantities, setReceivedQuantities] = useState({
@@ -55,6 +54,9 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
         confirmations.map(async (confirmation) => {
           try {
             const coffeeRes = await apiRequest("GET", `/api/green-coffee/${confirmation.greenCoffeeId}`);
+            if (!coffeeRes.ok) {
+              throw new Error(`Failed to fetch coffee details for ID ${confirmation.greenCoffeeId}`);
+            }
             const coffee = await coffeeRes.json();
             return { ...confirmation, coffee };
           } catch (error) {
@@ -67,6 +69,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
       // Filter only pending confirmations
       return confirmationsWithCoffee.filter(conf => conf.status === "pending");
     },
+    enabled: !!shopId,
   });
 
   // Mutation for confirming received quantities
@@ -103,6 +106,23 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
     },
   });
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!confirmations || confirmations.length === 0) {
+    return (
+      <div className="text-center p-8 text-muted-foreground">
+        <p>No pending coffee shipments to confirm at this time.</p>
+        <p className="text-sm mt-2">Once coffee is dispatched to your shop, you'll be able to confirm the received quantities here.</p>
+      </div>
+    );
+  }
+
   const handleConfirm = () => {
     if (!selectedConfirmation) return;
 
@@ -119,69 +139,33 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
     });
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
-
-  if (!confirmations || confirmations.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>No New Arrivals</CardTitle>
-          <CardDescription>
-            There are currently no pending coffee shipments to confirm.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center p-8 text-muted-foreground">
-            <p>Once coffee is dispatched to your shop, you'll be able to confirm the received quantities here.</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>New Inventory Arrivals</CardTitle>
-        <CardDescription>
-          Confirm received coffee quantities
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {confirmations.map((confirmation) => (
-            <div
-              key={confirmation.id}
-              className="flex items-center justify-between p-4 border rounded-lg"
-            >
-              <div>
-                <h4 className="font-medium">{confirmation.coffee?.name}</h4>
-                <p className="text-sm text-muted-foreground">
-                  Dispatched: {confirmation.dispatchedSmallBags} small bags, {confirmation.dispatchedLargeBags} large bags
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSelectedConfirmation(confirmation);
-                  setReceivedQuantities({
-                    smallBags: confirmation.dispatchedSmallBags,
-                    largeBags: confirmation.dispatchedLargeBags,
-                  });
-                }}
-              >
-                Confirm Receipt
-              </Button>
-            </div>
-          ))}
+    <div className="space-y-4">
+      {confirmations.map((confirmation) => (
+        <div
+          key={confirmation.id}
+          className="flex items-center justify-between p-4 border rounded-lg"
+        >
+          <div>
+            <h4 className="font-medium">{confirmation.coffee?.name}</h4>
+            <p className="text-sm text-muted-foreground">
+              Dispatched: {confirmation.dispatchedSmallBags} small bags, {confirmation.dispatchedLargeBags} large bags
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setSelectedConfirmation(confirmation);
+              setReceivedQuantities({
+                smallBags: confirmation.dispatchedSmallBags,
+                largeBags: confirmation.dispatchedLargeBags,
+              });
+            }}
+          >
+            Confirm Receipt
+          </Button>
         </div>
-      </CardContent>
+      ))}
 
       <Dialog 
         open={!!selectedConfirmation}
@@ -253,6 +237,6 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Card>
+    </div>
   );
 }

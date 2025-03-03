@@ -6,17 +6,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ShopSelector } from "@/components/layout/shop-selector";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
+import { useActiveShop } from "@/hooks/use-active-shop";
 
 export default function RetailNewArrivals() {
   const { user } = useAuth();
+  const { activeShop } = useActiveShop();
 
   // Get the active shop
   const { data: userShops, isLoading: isLoadingShops } = useQuery({
     queryKey: ["/api/user/shops"],
     enabled: !!user
   });
-
-  const activeShop = userShops?.[0];
 
   if (isLoadingShops) {
     return (
@@ -28,11 +28,16 @@ export default function RetailNewArrivals() {
 
   if (!activeShop) {
     return (
-      <Alert>
-        <AlertDescription>
-          No shop selected. Please select a shop to view new arrivals.
-        </AlertDescription>
-      </Alert>
+      <div className="container mx-auto py-8">
+        <Alert>
+          <AlertDescription>
+            Please select a shop to view new arrivals.
+          </AlertDescription>
+        </Alert>
+        <div className="mt-4">
+          <ShopSelector />
+        </div>
+      </div>
     );
   }
 
