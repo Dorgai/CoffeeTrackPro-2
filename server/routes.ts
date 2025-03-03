@@ -263,7 +263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Green Coffee Routes - accessible by roastery owner, roaster, and shop manager
+  // Green Coffee Routes - accessible by roastery owner and roaster
   app.get("/api/green-coffee", requireRole(["roasteryOwner", "roaster", "shopManager", "barista"]), async (req, res) => {
     try {
       console.log("Fetching green coffee list, requested by:", req.user?.username, "role:", req.user?.role);
@@ -272,31 +272,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching green coffee list:", error);
       res.status(500).json({ message: "Failed to fetch coffee list" });
-    }
-  });
-
-  app.get("/api/green-coffee/:id", requireRole(["roasteryOwner", "roaster", "shopManager", "barista"]), async (req, res) => {
-    try {
-      const coffeeId = parseInt(req.params.id);
-      if (isNaN(coffeeId)) {
-        return res.status(400).json({ message: "Invalid coffee ID" });
-      }
-
-      const coffee = await storage.getGreenCoffee(coffeeId);
-      if (!coffee) {
-        return res.status(404).json({ message: "Coffee not found" });
-      }
-
-      console.log("Fetching coffee details:", {
-        coffeeId,
-        requestedBy: req.user?.username,
-        role: req.user?.role
-      });
-
-      res.json(coffee);
-    } catch (error) {
-      console.error("Error fetching coffee details:", error);
-      res.status(500).json({ message: "Failed to fetch coffee details" });
     }
   });
 
@@ -335,6 +310,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   );
+
+  // Get specific green coffee details
+  app.get("/api/green-coffee/:id", requireRole(["roasteryOwner", "roaster", "shopManager", "barista"]), async (req, res) => {
+    try {
+      const coffeeId = parseInt(req.params.id);
+      if (isNaN(coffeeId)) {
+        return res.status(400).json({ message: "Invalid coffee ID" });
+      }
+
+      const coffee = await storage.getGreenCoffee(coffeeId);
+      if (!coffee) {
+        return res.status(404).json({ message: "Coffee not found" });
+      }
+
+      console.log("Fetching coffee details:", {
+        coffeeId,
+        requestedBy: req.user?.username,
+        role: req.user?.role
+      });
+
+      res.json(coffee);
+    } catch (error) {
+      console.error("Error fetching coffee details:", error);
+      res.status(500).json({ message: "Failed to fetch coffee details" });
+    }
+  });
 
 
   // Roasting Routes - accessible by roaster
