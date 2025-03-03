@@ -34,7 +34,7 @@ import {
   billingEventDetails,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, gt, and } from "drizzle-orm";
+import { eq, desc, gt, and, lt, sql } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -144,6 +144,16 @@ export interface IStorage {
     largeBagsQuantity: number;
   }[]>;
   createBillingEvent(event: InsertBillingEvent, details: InsertBillingEventDetail[]): Promise<BillingEvent>;
+
+  //Analytics
+  getAnalyticsInventoryHistory(fromDate: Date, toDate: Date): Promise<any[]>;
+  getAnalyticsOrders(fromDate: Date, toDate: Date): Promise<any[]>;
+  getAnalyticsRoasting(fromDate: Date, toDate: Date): Promise<any[]>;
+
+  //Reports
+  generateInventoryStatusReport(): Promise<any>;
+  generateShopPerformanceReport(): Promise<any>;
+  generateCoffeeConsumptionReport(): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1017,7 +1027,7 @@ export class DatabaseStorage implements IStorage {
           largeBags: orders.largeBags,
         })        .from(orders)
         .innerJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
-                .where(
+        .where(
           and(
             eq(orders.status, "dispatched"),
             gt(orders.createdAt, fromDate)
@@ -1072,6 +1082,214 @@ export class DatabaseStorage implements IStorage {
       throw error;
     }
   }
+    // Analytics methods
+  async getAnalyticsInventoryHistory(fromDate: Date, toDate: Date): Promise<any[]> {
+    try {
+      const result = await db
+        .select({
+          date: retailInventory.updatedAt,
+          shopId: retailInventory.shopId,
+          shopName: shops.name,
+          greenCoffeeId: retailInventory.greenCoffeeId,
+          coffeeName: greenCoffee.name,
+          smallBags: retailInventory.smallBags,
+          largeBags: retailInventory.largeBags,
+        })
+        .from(retailInventory)
+        .innerJoin(shops, eq(retailInventory.shopId, shops.id))
+        .innerJoin(greenCoffee, eq(retailInventory.greenCoffeeId, greenCoffee.id))
+        .where(
+          and(
+            gt(retailInventory.updatedAt, fromDate),
+            lt(retailInventory.updatedAt, toDate)
+          )
+        )
+        .orderBy(retailInventory.updatedAt);
+
+      return result;
+    } catch (error) {
+      console.error("Error in getAnalyticsInventoryHistory:", error);
+      throw error;
+    }
+  }
+
+  async getAnalyticsOrders(fromDate: Date, toDate: Date): Promise<any[]> {
+    try {
+      const result = await db
+        .select({
+          date: orders.createdAt,
+          shopId: orders.shopId,
+          shopName: shops.name,
+          greenCoffeeId: orders.greenCoffeeId,
+          coffeeName: greenCoffee.name,
+          status: orders.status,
+          smallBags: orders.smallBags,
+          largeBags: orders.largeBags,
+        })
+        .from(orders)
+        .innerJoin(shops, eq(orders.shopId, shops.id))
+        .innerJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
+        .where(
+          and(
+            gt(orders.createdAt, fromDate),
+            lt(orders.createdAt, toDate)
+          )
+        )
+        .orderBy(orders.createdAt);
+
+      return result;
+    } catch (error) {
+      console.error("Error in getAnalyticsOrders:", error);
+      throw error;
+    }
+  }
+
+  async getAnalyticsRoasting(fromDate: Date, toDate: Date): Promise<any[]> {
+    try {
+      const result = await db
+        .select({
+          date: roastingBatches.roastedAt,
+          greenCoffeeId: roastingBatches.greenCoffeeId,
+          coffeeName: greenCoffee.name,
+          roasterId: roastingBatches.roasterId,
+          roasterName: users.username,
+          greenCoffeeAmount: roastingBatches.greenCoffeeAmount,
+          roastedAmount: roastingBatches.roastedAmount,
+          roastingLoss: roastingBatches.roastingLoss,
+          smallBagsProduced: roastingBatches.smallBagsProduced,
+          largeBagsProduced: roastingBatches.largeBagsProduced,
+        })
+        .from(roastingBatches)
+        .innerJoin(greenCoffee, eq(roastingBatches.greenCoffeeId, greenCoffee.id))
+        .innerJoin(users, eq(roastingBatches.roasterId, users.id))
+        .where(
+          and(
+            gt(roastingBatches.roastedAt, fromDate),
+            lt(roastingBatches.roastedAt, toDate)
+          )
+        )
+        .orderBy(roastingBatches.roastedAt);
+
+      return result;
+    } catch (error) {
+      console.error("Error in getAnalyticsRoasting:", error);
+      throw error;
+    }
+  }
+
+  // Reports methods
+  async generateInventoryStatusReport(): Promise<any> {
+    try {
+      const greenCoffeeStatus = await db
+        .select({
+          id: greenCoffee.id,
+          name: greenCoffee.name,
+          currentStock: greenCoffee.currentStock,
+          minThreshold: greenCoffee.minThreshold,
+        })
+        .from(greenCoffee);
+
+      const shopInventories = await db
+        .select({
+          shopId: retailInventory.shopId,
+          shopName: shops.name,
+          greenCoffeeId: retailInventory.greenCoffeeId,
+          coffeeName: greenCoffee.name,
+          smallBags: retailInventory.smallBags,
+          largeBags: retailInventory.largeBags,
+        })
+        .from(retailInventory)
+        .innerJoin(shops, eq(retailInventory.shopId, shops.id))
+        .innerJoin(greenCoffee, eq(retailInventory.greenCoffeeId, greenCoffee.id));
+
+      return {
+        greenCoffeeStatus,
+        shopInventories,
+        generatedAt: new Date(),
+      };
+    } catch (error) {
+      console.error("Error generating inventory status report:", error);
+      throw error;
+    }
+  }
+
+  async generateShopPerformanceReport(): Promise<any> {
+    try {
+      const shopOrders = await db
+        .select({
+          shopId: orders.shopId,
+          shopName: shops.name,
+          ordersCount: sql`count(*)`.as('ordersCount'),
+          totalSmallBags: sql`sum(${orders.smallBags})`.as('totalSmallBags'),
+          totalLargeBags: sql`sum(${orders.largeBags})`.as('totalLargeBags'),
+        })
+        .from(orders)
+        .innerJoin(shops, eq(orders.shopId, shops.id))
+        .groupBy(orders.shopId, shops.name);
+
+      const discrepancies = await db
+        .select({
+          shopId: shops.id,
+          shopName: shops.name,
+          discrepancyCount: sql`count(*)`.as('discrepancyCount'),
+        })
+        .from(inventoryDiscrepancies)
+        .innerJoin(
+          dispatchedCoffeeConfirmations,
+          eq(inventoryDiscrepancies.confirmationId, dispatchedCoffeeConfirmations.id)
+        )
+        .innerJoin(shops, eq(dispatchedCoffeeConfirmations.shopId, shops.id))
+        .groupBy(shops.id, shops.name);
+
+      return {
+        shopOrders,
+        discrepancies,
+        generatedAt: new Date(),
+      };
+    } catch (error) {
+      console.error("Error generating shop performance report:", error);
+      throw error;
+    }
+  }
+
+  async generateCoffeeConsumptionReport(): Promise<any> {
+    try {
+      const coffeeConsumption = await db
+        .select({
+          greenCoffeeId: orders.greenCoffeeId,
+          coffeeName: greenCoffee.name,
+          totalSmallBags: sql`sum(${orders.smallBags})`.as('totalSmallBags'),
+          totalLargeBags: sql`sum(${orders.largeBags})`.as('totalLargeBags'),
+          ordersCount: sql`count(*)`.as('ordersCount'),
+        })
+        .from(orders)
+        .innerJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
+        .where(eq(orders.status, 'delivered'))
+        .groupBy(orders.greenCoffeeId, greenCoffee.name);
+
+      const roastingStats = await db
+        .select({
+          greenCoffeeId: roastingBatches.greenCoffeeId,
+          coffeeName: greenCoffee.name,
+          totalRoasted: sql`sum(${roastingBatches.roastedAmount})`.as('totalRoasted'),
+          avgRoastingLoss: sql`avg(${roastingBatches.roastingLoss})`.as('avgRoastingLoss'),
+          batchesCount: sql`count(*)`.as('batchesCount'),
+        })
+        .from(roastingBatches)
+        .innerJoin(greenCoffee, eq(roastingBatches.greenCoffeeId, greenCoffee.id))
+        .groupBy(roastingBatches.greenCoffeeId, greenCoffee.name);
+
+      return {
+        coffeeConsumption,
+        roastingStats,
+        generatedAt: new Date(),
+      };
+    } catch (error) {
+      console.error("Error generating coffee consumption report:", error);
+      throw error;
+    }
+  }
+
 }
 
 export const storage = new DatabaseStorage();

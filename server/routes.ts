@@ -742,11 +742,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Inventory Discrepancies Routes
-  app.get("/api/inventory-discrepancies", requireRole(["roaster", "roasteryOwner"]), async (req, res) => {
+  app.get("/api/inventory-discrepancies", requireRole(["roaster", "roasteryOwner", "shopManager"]), async (req, res) => {
     try {
       console.log("Fetching discrepancies for user:", req.user?.username, "with role:", req.user?.role);
       const discrepancies = await storage.getInventoryDiscrepancies();
       console.log("Found discrepancies:", discrepancies.length);
+
+      // For shop managers, filter discrepancies to only show their shops
+      if (req.user?.role === "shopManager") {
+        const userShops = await storage.getUserShops(req.user.id);
+        const shopIds = userShops.map(shop => shop.id);
+        const filteredDiscrepancies = discrepancies.filter(
+          d => shopIds.includes(d.confirmation.shopId)
+        );
+        return res.json(filteredDiscrepancies);
+      }
+
       res.json(discrepancies);
     } catch (error) {
       console.error("Error fetching inventory discrepancies:", error);
@@ -875,6 +886,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating billing event:", error);
       res.status(500).json({ message: "Failed to create billing event" });
+    }
+  });
+
+  // Add analytics routes for roastery owner
+  app.get("/api/analytics/inventory", requireRole(["roasteryOwner"]), async (req, res) => {
+    try {
+      console.log("Fetching inventory analytics");
+      const fromDate = req.query.fromDate ? new Date(req.query.fromDate as string) : new Date(0);
+      const toDate = req.query.toDate ? new Date(req.query.toDate as string) : new Date();
+
+      // Get inventory data for analysis
+      const inventoryHistory = await storage.getAnalyticsInventoryHistory(fromDate, toDate);
+      res.json(inventoryHistory);
+    } catch (error) {
+      console.error("Error fetching inventory analytics:", error);
+      res.status(500).json({ 
+        message: "Failed to fetch inventory analytics",
+        details: error instanceof Error ? error.message : undefined
+      });
+    }
+  });
+
+  app.get("/api/analytics/orders", requireRole(["roasteryOwner"]), async (req, res) => {
+    try {
+      console.log("Fetching order analytics");
+      const fromDate = req.query.fromDate ? new Date(req.query.fromDate as string) : new Date(0);
+      const toDate = req.query.toDate ? new Date(req.query.toDate as string) : new Date();
+
+      // Get order data for analysis
+      const orderAnalytics = await storage.getAnalyticsOrders(fromDate, toDate);
+      res.json(orderAnalytics);
+    } catch (error) {
+      console.error("Error fetching order analytics:", error);
+      res.status(500).json({ 
+        message: "Failed to fetch order analytics",
+        details: error instanceof Error ? error.message : undefined
+      });
+    }
+  });
+
+  app.get("/api/analytics/roasting", requireRole(["roasteryOwner"]), async (req, res) => {
+    try {
+      console.log("Fetching roasting analytics");
+      const fromDate = req.query.fromDate ? new Date(req.query.fromDate as string) : new Date(0);
+      const toDate = req.query.toDate ? new Date(req.query.toDate as string) : new Date();
+
+      // Get roasting data for analysis
+      const roastingAnalytics = await storage.getAnalyticsRoasting(fromDate, toDate);
+      res.json(roastingAnalytics);
+    } catch (error) {
+      console.error("Error fetching roasting analytics:", error);
+      res.status(500).json({ 
+        message: "Failed to fetch roasting analytics",
+        details: error instanceof Error ? error.message : undefined
+      });
+    }
+  });
+
+  // Add reports routes for roastery owner
+  app.get("/api/reports/inventory-status", requireRole(["roasteryOwner"]), async (req, res) => {
+    try {
+      console.log("Generating inventory status report");
+      const report = await storage.generateInventoryStatusReport();
+      res.json(report);
+    } catch (error) {
+      console.error("Error generating inventory status report:", error);
+      res.status(500).json({ 
+        message: "Failed to generate inventory status report",
+        details: error instanceof Error ? error.message : undefined
+      });
+    }
+  });
+
+  app.get("/api/reports/shop-performance", requireRole(["roasteryOwner"]), async (req, res) => {
+    try {
+      console.log("Generating shop performance report");
+      const report = await storage.generateShopPerformanceReport();
+      res.json(report);
+    } catch (error) {
+      console.error("Error generating shop performance report:", error);
+      res.status(500).json({ 
+        message: "Failed to generate shop performance report",
+        details: error instanceof Error ? error.message : undefined
+      });
+    }
+  });
+
+  app.get("/api/reports/coffee-consumption", requireRole(["roasteryOwner"]), async (req, res) => {
+    try {
+      console.log("Generating coffee consumption report");
+      const report = await storage.generateCoffeeConsumptionReport();
+      res.json(report);
+    } catch (error) {
+      console.error("Error generating coffee consumption report:", error);
+      res.status(500).json({ 
+        message: "Failed to generate coffee consumption report",
+        details: error instanceof Error ? error.message : undefined
+      });
     }
   });
 
