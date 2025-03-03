@@ -183,7 +183,6 @@ export default function Dashboard() {
             title="Low Stock Items"
             value={lowStockCoffees.length}
             icon={AlertTriangle}
-            onClick={() => setIsRestockOpen(true)}
             description="Items Below Threshold"
           />
           <StatsCard
@@ -195,7 +194,6 @@ export default function Dashboard() {
           />
         </div>
 
-        <RestockDialog open={isRestockOpen} onOpenChange={setIsRestockOpen} />
 
         <Card>
           <CardHeader>
@@ -271,7 +269,7 @@ export default function Dashboard() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    discrepancies.map((discrepancy) => {
+                    discrepancies.map((discrepancy: any) => {
                       const coffee = coffees?.find(c => c.id === discrepancy.greenCoffeeId);
                       return (
                         <TableRow key={discrepancy.id}>
@@ -301,6 +299,57 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Roasting Batches</CardTitle>
+            <CardDescription>Latest roasting activities</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Coffee</TableHead>
+                  <TableHead>Green Coffee Used</TableHead>
+                  <TableHead>Roasted Amount</TableHead>
+                  <TableHead>Bags Produced</TableHead>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {!allOrders?.length ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                      No recent batches found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  allOrders.slice(0, 5).map(order => {
+                    const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
+                    return (
+                      <TableRow key={order.id}>
+                        <TableCell>{order.createdAt ? format(new Date(order.createdAt), 'MMM d, yyyy') : 'N/A'}</TableCell>
+                        <TableCell>{coffee?.name}</TableCell>
+                        <TableCell>{order.greenCoffeeAmount} kg</TableCell>
+                        <TableCell>{order.roastedAmount} kg</TableCell>
+                        <TableCell>
+                          {order.smallBags > 0 && `${order.smallBags} small`}
+                          {order.smallBags > 0 && order.largeBags > 0 && ', '}
+                          {order.largeBags > 0 && `${order.largeBags} large`}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+            <div className="mt-4 flex justify-end">
+              <Button asChild variant="outline" size="sm">
+                <Link href="/roasting/orders">View All Batches</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {lowStockCoffees.length > 0 && (
           <Card>
             <CardHeader>
@@ -324,6 +373,279 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         )}
+      </div>
+    );
+  }
+
+  if (user?.role === "shopManager" || user?.role === "barista") {
+    const totalItems = shopInventory?.length || 0;
+    const lowStockItems = shopInventory?.filter(item =>
+      (item.smallBags || 0) < (shop?.desiredSmallBags || 20) / 2 ||
+      (item.largeBags || 0) < (shop?.desiredLargeBags || 10) / 2
+    ).length || 0;
+    const stockHealth = totalItems ? Math.round(((totalItems - lowStockItems) / totalItems) * 100) : 0;
+
+    return (
+      <div className="container mx-auto py-8 space-y-8">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user.username}</h1>
+            <p className="text-muted-foreground">Manage your coffee shop inventory</p>
+          </div>
+          <div className="flex gap-2">
+            <ShopSelector
+              value={selectedShopId}
+              onChange={setSelectedShopId}
+            />
+            <Button
+              variant="outline"
+              onClick={() => logoutMutation.mutate()}
+              disabled={logoutMutation.isPending}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <StatsCard
+            title="Total Coffee Types"
+            value={totalItems}
+            icon={Coffee}
+            description="Available varieties"
+          />
+          <StatsCard
+            title="Low Stock Items"
+            value={lowStockItems}
+            icon={AlertTriangle}
+            onClick={() => setIsRestockOpen(true)}
+            description="View Restock Options"
+          />
+          <StatsCard
+            title="Stock Health"
+            value={`${stockHealth}%`}
+            icon={Package}
+            description="Items meeting target levels"
+          />
+        </div>
+
+        <RestockDialog open={isRestockOpen} onOpenChange={setIsRestockOpen} />
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Performance Overview</CardTitle>
+            <CardDescription>Key metrics for selected shop</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <StockProgress
+              current={totalItems - lowStockItems}
+              desired={totalItems}
+              label="Overall Stock Health"
+            />
+            <StockProgress
+              current={shopInventory?.reduce((sum, item) => sum + (item.smallBags || 0), 0) || 0}
+              desired={shop?.desiredSmallBags || 0}
+              label="Total Small Bags"
+            />
+            <StockProgress
+              current={shopInventory?.reduce((sum, item) => sum + (item.largeBags || 0), 0) || 0}
+              desired={shop?.desiredLargeBags || 0}
+              label="Total Large Bags"
+            />
+          </CardContent>
+        </Card>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Current Inventory</CardTitle>
+                <CardDescription>Stock levels for selected shop</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {!selectedShopId ? (
+                <p className="text-center text-muted-foreground">Please select a shop</p>
+              ) : !shopInventory?.length ? (
+                <p className="text-center text-muted-foreground">No inventory data available</p>
+              ) : (
+                <div className="space-y-4">
+                  {shopInventory.map(item => {
+                    const coffee = coffees?.find(c => c.id === item.greenCoffeeId);
+                    return (
+                      <div key={item.id} className="p-4 border rounded-lg">
+                        <h3 className="font-medium">{coffee?.name || 'Unknown Coffee'}</h3>
+                        <div className="mt-2 space-y-2">
+                          <StockProgress
+                            current={item.smallBags || 0}
+                            desired={shop?.desiredSmallBags || 0}
+                            label="Small Bags (200g)"
+                          />
+                          <StockProgress
+                            current={item.largeBags || 0}
+                            desired={shop?.desiredLargeBags || 0}
+                            label="Large Bags (1kg)"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Stock Alerts</CardTitle>
+              <CardDescription>Items requiring attention</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!selectedShopId ? (
+                <p className="text-center text-muted-foreground">Please select a shop</p>
+              ) : (
+                <div className="space-y-4">
+                  {shopInventory?.filter(item =>
+                    (item.smallBags || 0) < (shop?.desiredSmallBags || 20) / 2 ||
+                    (item.largeBags || 0) < (shop?.desiredLargeBags || 10) / 2
+                  ).map(item => {
+                    const coffee = coffees?.find(c => c.id === item.greenCoffeeId);
+                    return (
+                      <div key={item.id} className="p-3 bg-muted rounded-lg">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium">{coffee?.name}</p>
+                            <div className="text-sm text-muted-foreground">
+                              <p>Small Bags: {item.smallBags} / {shop?.desiredSmallBags}</p>
+                              <p>Large Bags: {item.largeBags} / {shop?.desiredLargeBags}</p>
+                            </div>
+                          </div>
+                          <Badge variant="destructive">Low Stock</Badge>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent Orders Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Orders</CardTitle>
+            <CardDescription>Latest order status and activities</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableHead>Coffee</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Created By</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Date</TableHead>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {!shopOrders?.length ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                      No recent orders found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  shopOrders.slice(0, 5).map(order => {
+                    const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
+                    return (
+                      <TableRow key={order.id}>
+                        <TableCell>{coffee?.name}</TableCell>
+                        <TableCell>
+                          {order.smallBags > 0 && `${order.smallBags} small`}
+                          {order.smallBags > 0 && order.largeBags > 0 && ', '}
+                          {order.largeBags > 0 && `${order.largeBags} large`}
+                        </TableCell>
+                        <TableCell>{order.createdById}</TableCell>
+                        <TableCell>
+                          <Badge variant={
+                            order.status === 'pending' ? 'outline' :
+                            order.status === 'roasted' ? 'secondary' :
+                            order.status === 'dispatched' ? 'default' :
+                            order.status === 'delivered' ? 'default' : 'outline'
+                          }>
+                            {order.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {order.createdAt ? format(new Date(order.createdAt), 'MMM d, yyyy') : 'N/A'}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+            <div className="mt-4 flex justify-end">
+              <Button asChild variant="outline" size="sm">
+                <Link href="/retail/orders">View All Orders</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Shop Details</CardTitle>
+            <CardDescription>Selected shop information</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!selectedShopId ? (
+              <p className="text-center text-muted-foreground">Please select a shop</p>
+            ) : !shop ? (
+              <p className="text-center text-muted-foreground">No shop data available</p>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Name</p>
+                    <p className="font-medium">{shop.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Location</p>
+                    <p className="font-medium">{shop.location}</p>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <StockProgress
+                    current={shopInventory?.reduce((sum, item) => sum + (item.smallBags || 0), 0) || 0}
+                    desired={shop.desiredSmallBags || 0}
+                    label="Total Small Bags (200g)"
+                  />
+                  <StockProgress
+                    current={shopInventory?.reduce((sum, item) => sum + (item.largeBags || 0), 0) || 0}
+                    desired={shop.desiredLargeBags || 0}
+                    label="Total Large Bags (1kg)"
+                  />
+                </div>
+                <div className="mt-4 pt-4 border-t">
+                  <h4 className="text-sm font-medium mb-2">Target Stock Levels</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Target Small Bags</p>
+                      <p className="font-medium">{shop.desiredSmallBags}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Target Large Bags</p>
+                      <p className="font-medium">{shop.desiredLargeBags}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     );
   }
