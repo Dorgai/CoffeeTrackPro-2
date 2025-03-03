@@ -742,7 +742,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Inventory Discrepancies Routes
-  app.get("/api/inventory-discrepancies", requireRole(["roasteryOwner", "roaster"]), async (req, res) => {
+  app.get("/api/inventory-discrepancies", requireRole(["roaster", "roasteryOwner"]), async (req, res) => {
     try {
       console.log("Fetching discrepancies for user:", req.user?.username, "with role:", req.user?.role);
       const discrepancies = await storage.getInventoryDiscrepancies();
