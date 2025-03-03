@@ -148,13 +148,10 @@ export function NavBar() {
           {user ? (
             <div className="flex items-center space-x-4">
               {(user.role === "shopManager" || user.role === "barista") && <ShopSelector />}
-
               {(user.role === "roasteryOwner" || user.role === "roaster") && (
                 <GreenBeansStockIndicator />
               )}
-
-              {user.role === "shopManager" && <RestockDialog />}
-
+              {(user.role === "roasteryOwner" || user.role === "shopManager") && <RestockDialog />}
               {/* Update Green Coffee button with proper navigation */}
               {(user.role === "roasteryOwner" || user.role === "roaster") && (
                 <Button variant="outline" size="sm" asChild>
@@ -164,7 +161,6 @@ export function NavBar() {
                   </Link>
                 </Button>
               )}
-
               <Avatar>
                 <AvatarFallback>
                   {user.username.charAt(0).toUpperCase()}
