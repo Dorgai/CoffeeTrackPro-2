@@ -250,25 +250,25 @@ export default function Dashboard() {
               <CardDescription>Recent inventory adjustments</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableHead>Coffee</TableHead>
-                    <TableHead>Expected</TableHead>
-                    <TableHead>Actual</TableHead>
-                    <TableHead>Difference</TableHead>
-                    <TableHead>Date</TableHead>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {!discrepancies?.length ? (
+              {loadingDiscrepancies ? (
+                <div className="flex items-center justify-center p-4">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+              ) : !discrepancies?.length ? (
+                <p className="text-center text-muted-foreground">No recent discrepancies found</p>
+              ) : (
+                <Table>
+                  <TableHead>
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground">
-                        No recent discrepancies found
-                      </TableCell>
+                      <TableHead>Coffee</TableHead>
+                      <TableHead>Expected</TableHead>
+                      <TableHead>Actual</TableHead>
+                      <TableHead>Difference</TableHead>
+                      <TableHead>Date</TableHead>
                     </TableRow>
-                  ) : (
-                    discrepancies.map((discrepancy: any) => {
+                  </TableHead>
+                  <TableBody>
+                    {discrepancies.map((discrepancy: any) => {
                       const coffee = coffees?.find(c => c.id === discrepancy.greenCoffeeId);
                       return (
                         <TableRow key={discrepancy.id}>
@@ -290,10 +290,10 @@ export default function Dashboard() {
                           </TableCell>
                         </TableRow>
                       );
-                    })
-                  )}
-                </TableBody>
-              </Table>
+                    })}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </div>

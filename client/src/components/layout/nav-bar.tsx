@@ -155,9 +155,10 @@ export function NavBar() {
 
               {user.role === "shopManager" && <RestockDialog />}
 
+              {/* Update Green Coffee button with proper navigation */}
               {(user.role === "roasteryOwner" || user.role === "roaster") && (
                 <Button variant="outline" size="sm" asChild>
-                  <Link href="/inventory">
+                  <Link href="/inventory" className="flex items-center">
                     <Coffee className="h-4 w-4 mr-2" />
                     Update Green Coffee
                   </Link>
