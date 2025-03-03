@@ -90,6 +90,16 @@ export function NavBar() {
                   </MenubarItem>
                 </MenubarContent>
               </MenubarMenu>
+              <MenubarMenu>
+                <MenubarTrigger>Finance</MenubarTrigger>
+                <MenubarContent>
+                  <MenubarItem>
+                    <Link href="/billing" className="flex w-full">
+                      Billing Events
+                    </Link>
+                  </MenubarItem>
+                </MenubarContent>
+              </MenubarMenu>
             </>
           )}
           {user?.role === "roaster" && (

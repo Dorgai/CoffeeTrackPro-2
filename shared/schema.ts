@@ -125,6 +125,27 @@ export const coffeeLargeBagTargets = pgTable("coffee_large_bag_targets", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Add new table for billing events
+export const billingEvents = pgTable("billing_events", {
+  id: serial("id").primaryKey(),
+  cycleStartDate: timestamp("cycle_start_date").notNull(),
+  cycleEndDate: timestamp("cycle_end_date").notNull(),
+  primarySplitPercentage: decimal("primary_split_percentage", { precision: 5, scale: 2 }).notNull().default('70.00'),
+  secondarySplitPercentage: decimal("secondary_split_percentage", { precision: 5, scale: 2 }).notNull().default('30.00'),
+  createdAt: timestamp("created_at").defaultNow(),
+  createdById: integer("created_by_id").references(() => users.id).notNull(),
+});
+
+// Add table for grade-wise quantities in billing events
+export const billingEventDetails = pgTable("billing_event_details", {
+  id: serial("id").primaryKey(),
+  billingEventId: integer("billing_event_id").references(() => billingEvents.id).notNull(),
+  grade: text("grade", { enum: coffeeGrades }).notNull(),
+  smallBagsQuantity: integer("small_bags_quantity").notNull(),
+  largeBagsQuantity: integer("large_bags_quantity").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Create insert schemas for each table
 export const insertUserSchema = createInsertSchema(users);
 export const insertShopSchema = createInsertSchema(shops);
@@ -169,6 +190,20 @@ export const insertInventoryDiscrepancySchema = createInsertSchema(inventoryDisc
   largeBagsDifference: z.number().int(),
 });
 
+// Create insert schemas
+export const insertBillingEventSchema = createInsertSchema(billingEvents).extend({
+  cycleStartDate: z.coerce.date(),
+  cycleEndDate: z.coerce.date(),
+  primarySplitPercentage: z.coerce.number().min(0).max(100),
+  secondarySplitPercentage: z.coerce.number().min(0).max(100),
+});
+
+export const insertBillingEventDetailSchema = createInsertSchema(billingEventDetails).extend({
+  grade: z.enum(coffeeGrades),
+  smallBagsQuantity: z.number().int().min(0),
+  largeBagsQuantity: z.number().int().min(0),
+});
+
 // Export types for use in application code
 export type User = typeof users.$inferSelect;
 export type Shop = typeof shops.$inferSelect;
@@ -194,3 +229,9 @@ export type InsertUserShop = z.infer<typeof insertUserShopSchema>;
 // Export type for the new table
 export type CoffeeLargeBagTarget = typeof coffeeLargeBagTargets.$inferSelect;
 export type InsertCoffeeLargeBagTarget = z.infer<typeof insertCoffeeLargeBagTargetSchema>;
+
+// Export types
+export type BillingEvent = typeof billingEvents.$inferSelect;
+export type BillingEventDetail = typeof billingEventDetails.$inferSelect;
+export type InsertBillingEvent = z.infer<typeof insertBillingEventSchema>;
+export type InsertBillingEventDetail = z.infer<typeof insertBillingEventDetailSchema>;
