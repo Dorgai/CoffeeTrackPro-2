@@ -795,6 +795,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Add new billing routes after the existing ones
+  app.get("/api/billing/last-event", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
+    try {
+      const lastEvent = await storage.getLastBillingEvent();
+      res.json(lastEvent);
+    } catch (error) {
+      console.error("Error fetchinglast billing event:", error);
+      res.status(500).json({ message: "Failed to fetch last billing event" });
+    }
+  });
+
+  app.get("/api/billing/quantities", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
+    try {
+      // Get the last billing event to determine the start date
+      const lastEvent = await storage.getLastBillingEvent();
+      const fromDate = lastEvent ? lastEvent.cycleEndDate : new Date(0); // Use epoch if no previous event
+
+      // Get quantities since last billing event
+      const quantities = await storage.getBillingQuantities(fromDate);
+
+      res.json({
+        fromDate,
+        quantities
+      });
+    } catch (error) {
+      console.error("Error fetching billing quantities:", error);
+      res.status(500).json({ message: "Failed to fetch billing quantities" });
+    }
+  });
+
+  app.post("/api/billing/events", requireRole(["roasteryOwner"]), async (req, res) => {
+    try {
+      const { primarySplitPercentage, secondarySplitPercentage, quantities } = req.body;
+
+      // Get the last billing event to determine the cycle start date
+      const lastEvent = await storage.getLastBillingEvent();
+      const cycleStartDate = lastEvent ? lastEvent.cycleEndDate : new Date(0);
+      const cycleEndDate = new Date(); // Current time
+
+      // Create the billing event
+      const event = await storage.createBillingEvent(
+        {
+          cycleStartDate,
+          cycleEndDate,
+          primarySplitPercentage,
+          secondarySplitPercentage,
+          createdById: req.user!.id
+        },
+        quantities.map((q: any) => ({
+          grade: q.grade,
+          smallBagsQuantity: q.smallBagsQuantity,
+          largeBagsQuantity: q.largeBagsQuantity
+        }))
+      );
+
+      res.status(201).json(event);
+    } catch (error) {
+      console.error("Error creating billing event:", error);
+      res.status(500).json({ message: "Failed to create billing event" });
+    }
+  });
+
+  // Keep the existing code below
   const httpServer = createServer(app);
   return httpServer;
 }

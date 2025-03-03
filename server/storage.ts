@@ -33,6 +33,11 @@ import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
 
+// Assuming BillingEvent and related types are defined elsewhere, perhaps in @shared/schema
+type BillingEvent = { id: number; createdAt: Date; /* ...other fields */ };
+type InsertBillingEvent = { /* ...fields for creating a billing event */ };
+type InsertBillingEventDetail = { /* ...fields for creating a billing event detail */ };
+
 const PostgresSessionStore = connectPg(session);
 
 export interface IStorage {
@@ -146,6 +151,15 @@ export interface IStorage {
       defaultOrderQuantity?: number;
     }
   ): Promise<Shop>;
+
+  // Billing
+  getLastBillingEvent(): Promise<BillingEvent | undefined>;
+  getBillingQuantities(fromDate: Date): Promise<{ 
+    grade: string;
+    smallBagsQuantity: number;
+    largeBagsQuantity: number;
+  }[]>;
+  createBillingEvent(event: InsertBillingEvent, details: InsertBillingEventDetail[]): Promise<BillingEvent>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1172,6 +1186,91 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  // Billing methods
+  async getLastBillingEvent(): Promise<BillingEvent | undefined> {
+    try {
+      const [lastEvent] = await db
+        .select()
+        .from(billingEvents)
+        .orderBy(desc(billingEvents.createdAt))
+        .limit(1);
+
+      return lastEvent;
+    } catch (error) {
+      console.error("Error fetching last billing event:", error);
+      throw error;
+    }
+  }
+
+  async getBillingQuantities(fromDate: Date): Promise<{
+    grade: string;
+    smallBagsQuantity: number;
+    largeBagsQuantity: number;
+  }[]> {
+    try {
+      // Get all orders since the fromDate that are in 'dispatched' status
+      const orders = await db
+        .select({
+          greenCoffeeGrade: greenCoffee.grade,
+          smallBags: orders.smallBags,
+          largeBags: orders.largeBags,
+        })
+        .from(orders)
+        .innerJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
+        .where(
+          and(
+            gt(orders.createdAt, fromDate),
+            eq(orders.status, 'dispatched')
+          )
+        );
+
+      // Aggregate quantities by grade
+      const quantities = orders.reduce((acc, order) => {
+        const grade = order.greenCoffeeGrade;
+        if (!acc[grade]) {
+          acc[grade] = { smallBagsQuantity: 0, largeBagsQuantity: 0 };
+        }
+        acc[grade].smallBagsQuantity += order.smallBags || 0;
+        acc[grade].largeBagsQuantity += order.largeBags || 0;
+        return acc;
+      }, {} as Record<string, { smallBagsQuantity: number; largeBagsQuantity: number }>);
+
+      // Convert to array format
+      return Object.entries(quantities).map(([grade, quantities]) => ({
+        grade,
+        ...quantities
+      }));
+    } catch (error) {
+      console.error("Error fetching billing quantities:", error);
+      throw error;
+    }
+  }
+
+  async createBillingEvent(event: InsertBillingEvent, details: InsertBillingEventDetail[]): Promise<BillingEvent> {
+    try {
+      return await db.transaction(async (tx) => {
+        // Create the billing event
+        const [newEvent] = await tx
+          .insert(billingEvents)
+          .values(event)
+          .returning();
+
+        // Create the billing event details
+        await Promise.all(
+          details.map(detail =>
+            tx
+              .insert(billingEventDetails)
+              .values({ ...detail, billingEventId: newEvent.id })
+          )
+        );
+
+        return newEvent;
+      });
+    } catch (error) {
+      console.error("Error creating billing event:", error);
+      throw error;
+    }
+  }
 }
 
 export const storage = new DatabaseStorage();
