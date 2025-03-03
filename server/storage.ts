@@ -267,27 +267,19 @@ export class DatabaseStorage implements IStorage {
 
   async getUserShops(userId: number): Promise<Shop[]> {
     try {
-      // First get the user to check their role
       const [user] = await db
         .select()
         .from(users)
         .where(eq(users.id, userId));
 
-      console.log("Looking up shops for user:", user?.username, "with role:", user?.role);
-
-      // For roasteryOwner, return all active shops
       if (user?.role === "roasteryOwner") {
-        const activeShops = await db
+        return await db
           .select()
           .from(shopsTable)
           .where(eq(shopsTable.isActive, true))
           .orderBy(shopsTable.name);
-
-        console.log("Found shops for roasteryOwner:", activeShops);
-        return activeShops;
       }
 
-      // For shopManager, return all active shops
       if (user?.role === "shopManager") {
         return await db
           .select()
@@ -296,7 +288,6 @@ export class DatabaseStorage implements IStorage {
           .orderBy(shopsTable.name);
       }
 
-      // For baristas, return only assigned shops
       if (user?.role === "barista") {
         return await db
           .select()
@@ -311,7 +302,6 @@ export class DatabaseStorage implements IStorage {
           .orderBy(shopsTable.name);
       }
 
-      // For roasters, return empty array
       return [];
     } catch (error) {
       console.error("Error fetching user shops:", error);
@@ -322,7 +312,6 @@ export class DatabaseStorage implements IStorage {
   // Green Coffee
   async getGreenCoffee(id: number): Promise<GreenCoffee | undefined> {
     try {
-      console.log("Fetching green coffee details for ID:", id);
       const [coffee] = await db
         .select({
           id: greenCoffee.id,
@@ -339,7 +328,6 @@ export class DatabaseStorage implements IStorage {
         .from(greenCoffee)
         .where(eq(greenCoffee.id, id));
 
-      console.log("Found coffee details:", coffee);
       return coffee;
     } catch (error) {
       console.error("Error fetching green coffee:", error);
@@ -404,7 +392,6 @@ export class DatabaseStorage implements IStorage {
     updatedBy: User;
   })[]> {
     try {
-      console.log("Fetching retail inventory for shop:", shopId);
       const result = await db
         .select({
           id: retailInventory.id,
@@ -453,7 +440,6 @@ export class DatabaseStorage implements IStorage {
         updatedBy: item.updatedBy ?? null,
       }));
 
-      console.log("Found retail inventory result:", transformedResult);
       return transformedResult;
     } catch (error) {
       console.error("Error in getRetailInventoriesByShop:", error);
@@ -462,10 +448,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateRetailInventory(inventory: InsertRetailInventory): Promise<RetailInventory> {
-    console.log("Updating retail inventory with data:", inventory);
-
     try {
-      // First try to find existing inventory
       const existingInventory = await db
         .select()
         .from(retailInventory)
@@ -475,10 +458,7 @@ export class DatabaseStorage implements IStorage {
         )
         .limit(1);
 
-      console.log("Found existing inventory:", existingInventory);
-
       if (existingInventory.length > 0) {
-        // Update existing inventory
         const [updatedInventory] = await db
           .update(retailInventory)
           .set({
@@ -490,10 +470,8 @@ export class DatabaseStorage implements IStorage {
           .where(eq(retailInventory.id, existingInventory[0].id))
           .returning();
 
-        console.log("Updated existing inventory:", updatedInventory);
         return updatedInventory;
       } else {
-        // Create new inventory entry
         const [newInventory] = await db
           .insert(retailInventory)
           .values({
@@ -506,7 +484,6 @@ export class DatabaseStorage implements IStorage {
           })
           .returning();
 
-        console.log("Created new inventory:", newInventory);
         return newInventory;
       }
     } catch (error) {
@@ -544,7 +521,6 @@ export class DatabaseStorage implements IStorage {
         .leftJoin(users, eq(orders.createdById, users.id))
         .orderBy(desc(orders.createdAt));
 
-      console.log("Found orders for shop:", results);
       return results;
     } catch (error) {
       console.error("Error getting orders:", error);
@@ -584,7 +560,6 @@ export class DatabaseStorage implements IStorage {
     updatedByUsername: string;
   })[]> {
     try {
-      // Get date 12 months ago
       const twelveMonthsAgo = new Date();
       twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
 
@@ -640,7 +615,6 @@ export class DatabaseStorage implements IStorage {
         .innerJoin(users, eq(retailInventory.updatedById, users.id))
         .orderBy(desc(retailInventory.updatedAt));
 
-      console.log("Found retail inventories:", result);
       return result;
     } catch (error) {
       console.error("Error fetching all retail inventories:", error);
@@ -655,8 +629,6 @@ export class DatabaseStorage implements IStorage {
     updatedBy: User | null;
   })[]> {
     try {
-      console.log("Executing getAllOrders query");
-
       const result = await db
         .select({
           id: orders.id,
@@ -707,7 +679,6 @@ export class DatabaseStorage implements IStorage {
         })
       );
 
-      console.log("getAllOrders query result:", ordersWithUpdatedBy);
       return ordersWithUpdatedBy;
     } catch (error) {
       console.error("Error in getAllOrders:", error);
@@ -720,8 +691,6 @@ export class DatabaseStorage implements IStorage {
     shop: Shop;
   })[]> {
     try {
-      console.log("Fetching dispatched coffee confirmations for shop:", shopId);
-
       const confirmations = await db
         .select({
           id: dispatchedCoffeeConfirmations.id,
@@ -762,7 +731,6 @@ export class DatabaseStorage implements IStorage {
         .where(eq(dispatchedCoffeeConfirmations.shopId, shopId))
         .orderBy(desc(dispatchedCoffeeConfirmations.createdAt));
 
-      console.log("Found confirmations:", confirmations);
       return confirmations;
     } catch (error) {
       console.error("Error fetching dispatched coffee confirmations:", error);
@@ -793,9 +761,6 @@ export class DatabaseStorage implements IStorage {
     }
   ): Promise<DispatchedCoffeeConfirmation> {
     try {
-      console.log("Confirming dispatched coffee for confirmation:", confirmationId, "with data:", data);
-
-      // Get the original confirmation with shop and coffee details
       const [confirmation] = await db
         .select()
         .from(dispatchedCoffeeConfirmations)
@@ -805,9 +770,7 @@ export class DatabaseStorage implements IStorage {
         throw new Error("Confirmation not found");
       }
 
-      // Start a transaction to ensure data consistency
       const result = await db.transaction(async (tx) => {
-        // Update the confirmation status
         const [updatedConfirmation] = await tx
           .update(dispatchedCoffeeConfirmations)
           .set({
@@ -824,9 +787,6 @@ export class DatabaseStorage implements IStorage {
           throw new Error("Failed to update confirmation record");
         }
 
-        console.log("Updated confirmation:", updatedConfirmation);
-
-        // Update or create retail inventory
         const [existingInventory] = await tx
           .select()
           .from(retailInventory)
@@ -838,8 +798,6 @@ export class DatabaseStorage implements IStorage {
           );
 
         if (existingInventory) {
-          console.log("Updating existing inventory:", existingInventory);
-          // Update existing inventory
           const [updatedInventory] = await tx
             .update(retailInventory)
             .set({
@@ -854,10 +812,7 @@ export class DatabaseStorage implements IStorage {
           if (!updatedInventory) {
             throw new Error("Failed to update retail inventory");
           }
-          console.log("Updated inventory:", updatedInventory);
         } else {
-          console.log("Creating new inventory entry");
-          // Create new inventory entry
           const [newInventory] = await tx
             .insert(retailInventory)
             .values({
@@ -873,15 +828,12 @@ export class DatabaseStorage implements IStorage {
           if (!newInventory) {
             throw new Error("Failed to create retail inventory");
           }
-          console.log("Created new inventory:", newInventory);
         }
 
-        // Create discrepancy report if quantities don't match
         if (
           confirmation.dispatchedSmallBags !== data.receivedSmallBags ||
           confirmation.dispatchedLargeBags !== data.receivedLargeBags
         ) {
-          console.log("Creating discrepancy report");
           const [discrepancy] = await tx
             .insert(inventoryDiscrepancies)
             .values({
@@ -910,7 +862,6 @@ export class DatabaseStorage implements IStorage {
         return updatedConfirmation;
       });
 
-      console.log("Successfully confirmed dispatched coffee:", result);
       return result;
     } catch (error) {
       console.error("Error confirming dispatched coffee:", error);
@@ -920,12 +871,11 @@ export class DatabaseStorage implements IStorage {
 
   async createInventoryDiscrepancy(data: InsertInventoryDiscrepancy): Promise<InventoryDiscrepancy> {
     try {
-      console.log("Creating inventory discrepancy with data:", data);
       const [discrepancy] = await db
         .insert(inventoryDiscrepancies)
         .values({
           ...data,
-          status: data.status || "open", // Ensure status is set
+          status: data.status || "open", 
           createdAt: new Date(),
         })
         .returning();
@@ -934,7 +884,6 @@ export class DatabaseStorage implements IStorage {
         throw new Error("Failed to create inventory discrepancy");
       }
 
-      console.log("Created discrepancy:", discrepancy);
       return discrepancy;
     } catch (error) {
       console.error("Error creating inventory discrepancy:", error);
@@ -1019,8 +968,6 @@ export class DatabaseStorage implements IStorage {
     shop: Shop;
   })[]> {
     try {
-      console.log("Fetching all dispatched coffee confirmations");
-
       const confirmations = await db
         .select({
           id: dispatchedCoffeeConfirmations.id,
@@ -1056,7 +1003,6 @@ export class DatabaseStorage implements IStorage {
         .innerJoin(shopsTable, eq(dispatchedCoffeeConfirmations.shopId, shopsTable.id))
         .orderBy(desc(dispatchedCoffeeConfirmations.createdAt));
 
-      console.log("Found all confirmations:", confirmations);
       return confirmations;
     } catch (error) {
       console.error("Error fetching all dispatched coffee confirmations:", error);
@@ -1096,7 +1042,6 @@ export class DatabaseStorage implements IStorage {
         );
 
       if (existing) {
-        // Update existing target
         const [updated] = await db
           .update(shopCoffeeTargets)
           .set({
@@ -1107,7 +1052,6 @@ export class DatabaseStorage implements IStorage {
           .returning();
         return updated;
       } else {
-        // Create new target
         const [created] = await db
           .insert(shopCoffeeTargets)
           .values({
@@ -1142,7 +1086,6 @@ export class DatabaseStorage implements IStorage {
     desiredLargeBags: number
   ): Promise<CoffeeLargeBagTarget> {
     try {
-      // Check if target exists
       const [existing] = await db
         .select()
         .from(coffeeLargeBagTargets)
@@ -1154,7 +1097,6 @@ export class DatabaseStorage implements IStorage {
         );
 
       if (existing) {
-        // Update existing target
         const [updated] = await db
           .update(coffeeLargeBagTargets)
           .set({
@@ -1165,7 +1107,6 @@ export class DatabaseStorage implements IStorage {
           .returning();
         return updated;
       } else {
-        // Create new target
         const [created] = await db
           .insert(coffeeLargeBagTargets)
           .values({
@@ -1191,8 +1132,6 @@ export class DatabaseStorage implements IStorage {
     }
   ): Promise<Shop> {
     try {
-      console.log("Updating shop with id:", id, "with data:", update);
-
       const [updatedShop] = await db
         .update(shopsTable)
         .set(update)
@@ -1203,7 +1142,6 @@ export class DatabaseStorage implements IStorage {
         throw new Error("Failed to update shop");
       }
 
-      console.log("Successfully updated shop:", updatedShop);
       return updatedShop;
     } catch (error) {
       console.error("Error updating shop:", error);
@@ -1233,9 +1171,6 @@ export class DatabaseStorage implements IStorage {
     largeBagsQuantity: number;
   }[]> {
     try {
-      console.log("Fetching billing quantities since:", fromDate);
-
-      // Get all orders since the fromDate that are in 'dispatched' status
       const ordersData = await db
         .select({
           grade: greenCoffee.grade,
@@ -1251,14 +1186,12 @@ export class DatabaseStorage implements IStorage {
           )
         );
 
-      // Initialize quantities for all grades
       const initialQuantities = {
         'Specialty': { smallBagsQuantity: 0, largeBagsQuantity: 0 },
         'Premium': { smallBagsQuantity: 0, largeBagsQuantity: 0 },
         'Rarity': { smallBagsQuantity: 0, largeBagsQuantity: 0 }
       };
 
-      // Aggregate quantities by grade
       const aggregatedQuantities = ordersData.reduce((acc, order) => {
         if (order.grade && acc[order.grade]) {
           acc[order.grade].smallBagsQuantity += Number(order.smallBags) || 0;
@@ -1267,13 +1200,11 @@ export class DatabaseStorage implements IStorage {
         return acc;
       }, initialQuantities);
 
-      // Convert to array format
       return Object.entries(aggregatedQuantities).map(([grade, quantities]) => ({
         grade,
         smallBagsQuantity: quantities.smallBagsQuantity,
         largeBagsQuantity: quantities.largeBagsQuantity
       }));
-
     } catch (error) {
       console.error("Error fetching billing quantities:", error);
       throw error;
@@ -1283,17 +1214,11 @@ export class DatabaseStorage implements IStorage {
   async createBillingEvent(event: InsertBillingEvent, details: InsertBillingEventDetail[]): Promise<BillingEvent> {
     try {
       return await db.transaction(async (tx) => {
-        console.log("Creating billing event:", event);
-        // Create the billing event
         const [newEvent] = await tx
           .insert(billingEvents)
           .values(event)
           .returning();
 
-        console.log("Created billing event:", newEvent);
-        console.log("Creating billing event details:", details);
-
-        // Create the billing event details
         await Promise.all(
           details.map(detail =>
             tx
