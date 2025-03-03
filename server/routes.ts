@@ -321,11 +321,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           updates: req.body
         });
 
+        // Use updateGreenCoffeeStock for both roaster and roasteryOwner
         const updatedCoffee = await storage.updateGreenCoffeeStock(coffeeId, req.body);
+
+        console.log("Successfully updated coffee:", updatedCoffee);
         res.json(updatedCoffee);
       } catch (error) {
         console.error("Error updating green coffee:", error);
-        res.status(500).json({ message: "Failed to update green coffee" });
+        res.status(500).json({ 
+          message: error instanceof Error ? error.message : "Failed to update green coffee",
+          details: error instanceof Error ? error.stack : undefined
+        });
       }
     }
   );
