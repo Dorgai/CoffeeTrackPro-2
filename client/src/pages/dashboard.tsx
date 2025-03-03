@@ -37,7 +37,7 @@ function StatsCard({
   title: string;
   value: string | number;
   icon: React.ElementType;
-  description?: string;
+  description?: string | React.ReactNode; // Updated to accept ReactNode
 }) {
   return (
     <Card>
@@ -175,7 +175,11 @@ export default function Dashboard() {
             title="Available Stock"
             value={`${coffees?.reduce((total, coffee) => total + Number(coffee.currentStock), 0) || 0}kg`}
             icon={Package}
-            description="Total green coffee available"
+            description={
+              <Link href="/roasting/orders" className="text-primary hover:underline">
+                View Orders
+              </Link>
+            }
           />
         </div>
 
@@ -489,9 +493,9 @@ export default function Dashboard() {
                         <TableCell>
                           <Badge variant={
                             order.status === 'pending' ? 'outline' :
-                            order.status === 'roasted' ? 'secondary' :
-                            order.status === 'dispatched' ? 'default' :
-                            'success'
+                              order.status === 'roasted' ? 'secondary' :
+                                order.status === 'dispatched' ? 'default' :
+                                  'success'
                           }>
                             {order.status}
                           </Badge>
@@ -597,7 +601,11 @@ export default function Dashboard() {
             title="Order Fulfillment"
             value={`${orderFulfillmentRate}%`}
             icon={Package}
-            description="Orders completed successfully"
+            description={
+              <Link href="/roasting/orders" className="text-primary hover:underline">
+                Manage Orders
+              </Link>
+            }
           />
           <StatsCard
             title="Active Shops"
@@ -671,8 +679,8 @@ export default function Dashboard() {
                         <Badge variant={
                           order.status === 'pending' ? 'outline' :
                             order.status === 'roasted' ? 'secondary' :
-                            order.status === 'dispatched' ? 'default' :
-                            'success'
+                              order.status === 'dispatched' ? 'default' :
+                                'success'
                         }>
                           {order.status}
                         </Badge>
@@ -865,7 +873,7 @@ export default function Dashboard() {
                         </div>
                       </div>
                     </div>
-                  );
+                                    );
                 })}
               </div>
             )}

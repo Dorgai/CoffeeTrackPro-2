@@ -300,6 +300,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Add PATCH endpoint for green coffee after the existing green coffee routes
+  app.patch(
+    "/api/green-coffee/:id",
+    requireRole(["roasteryOwner", "roaster"]),
+    async (req, res) => {
+      try {
+        const coffeeId = parseInt(req.params.id);
+        const coffee = await storage.getGreenCoffee(coffeeId);
+
+        if (!coffee) {
+          return res.status(404).json({ message: "Coffee not found" });
+        }
+
+        const updatedCoffee = await storage.updateGreenCoffee(coffeeId, req.body);
+        res.json(updatedCoffee);
+      } catch (error) {
+        console.error("Error updating green coffee:", error);
+        res.status(500).json({ message: "Failed to update green coffee" });
+      }
+    }
+  );
+
   // Roasting Routes - accessible by roaster
   app.get("/api/roasting-batches", requireRole(["roaster", "roasteryOwner"]), async (req, res) => {
     const batches = await storage.getRoastingBatches();
