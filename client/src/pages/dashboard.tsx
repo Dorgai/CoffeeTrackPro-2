@@ -120,8 +120,20 @@ export default function Dashboard() {
     enabled: !!user && (user.role === "roasteryOwner" || user?.role === "roaster"),
   });
 
+  // Update the orders query for managers to include shop-specific filtering
+  const { data: shopOrders, isLoading: loadingShopOrders } = useQuery<Order[]>({
+    queryKey: ["/api/orders", selectedShopId],
+    queryFn: async () => {
+      if (!selectedShopId) return [];
+      const res = await apiRequest("GET", `/api/orders?shopId=${selectedShopId}`);
+      if (!res.ok) throw new Error("Failed to fetch orders");
+      return res.json();
+    },
+    enabled: !!selectedShopId && (user?.role === "shopManager" || user?.role === "barista"),
+  });
 
-  const isLoading = loadingShops || loadingShop || loadingCoffees || loadingInventory || loadingAllInventory || loadingOrders || loadingRoasteryOwnerShops || loadingAllOrders;
+
+  const isLoading = loadingShops || loadingShop || loadingCoffees || loadingInventory || loadingAllInventory || loadingOrders || loadingRoasteryOwnerShops || loadingAllOrders || loadingShopOrders;
 
   if (isLoading) {
     return (
@@ -228,16 +240,9 @@ export default function Dashboard() {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Discrepancy Reports</CardTitle>
-              <CardDescription>Track inventory discrepancies</CardDescription>
-            </div>
-            <Button asChild variant="outline" size="sm">
-              <Link href="/roasting/discrepancies">
-                View All Reports
-              </Link>
-            </Button>
+          <CardHeader>
+            <CardTitle>Discrepancy Reports</CardTitle>
+            <CardDescription>Track inventory discrepancies</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -376,7 +381,6 @@ export default function Dashboard() {
                 <CardTitle>Current Inventory</CardTitle>
                 <CardDescription>Stock levels for selected shop</CardDescription>
               </div>
-              {/* Removed redundant RestockDialog */}
             </CardHeader>
             <CardContent>
               {!selectedShopId ? (
@@ -446,6 +450,7 @@ export default function Dashboard() {
           </Card>
         </div>
 
+        {/* Recent Orders Table */}
         <Card>
           <CardHeader>
             <CardTitle>Recent Orders</CardTitle>
@@ -457,14 +462,20 @@ export default function Dashboard() {
                 <TableRow>
                   <TableHead>Coffee</TableHead>
                   <TableHead>Amount</TableHead>
+                  <TableHead>Created By</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Date</TableHead>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {allOrders?.filter(order => order.shopId === selectedShopId)
-                  .slice(0, 5)
-                  .map(order => {
+                {!shopOrders?.length ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                      No recent orders found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  shopOrders.slice(0, 5).map(order => {
                     const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
                     return (
                       <TableRow key={order.id}>
@@ -474,20 +485,24 @@ export default function Dashboard() {
                           {order.smallBags > 0 && order.largeBags > 0 && ', '}
                           {order.largeBags > 0 && `${order.largeBags} large`}
                         </TableCell>
+                        <TableCell>{order.createdById}</TableCell>
                         <TableCell>
                           <Badge variant={
                             order.status === 'pending' ? 'outline' :
-                              order.status === 'roasted' ? 'secondary' :
-                                order.status === 'dispatched' ? 'default' :
-                                  'success'
+                            order.status === 'roasted' ? 'secondary' :
+                            order.status === 'dispatched' ? 'default' :
+                            order.status === 'delivered' ? 'default' : 'outline'
                           }>
                             {order.status}
                           </Badge>
                         </TableCell>
-                        <TableCell>{format(new Date(order.createdAt), 'MMM d, yyyy')}</TableCell>
+                        <TableCell>
+                          {order.createdAt ? format(new Date(order.createdAt), 'MMM d, yyyy') : 'N/A'}
+                        </TableCell>
                       </TableRow>
                     );
-                  })}
+                  })
+                )}
               </TableBody>
             </Table>
             <div className="mt-4 flex justify-end">
@@ -687,9 +702,9 @@ export default function Dashboard() {
                       <TableCell>
                         <Badge variant={
                           order.status === 'pending' ? 'outline' :
-                            order.status === 'roasted' ? 'secondary' :
-                              order.status === 'dispatched' ? 'default' :
-                                'success'
+                          order.status === 'roasted' ? 'secondary' :
+                          order.status === 'dispatched' ? 'default' :
+                          'success'
                         }>
                           {order.status}
                         </Badge>
