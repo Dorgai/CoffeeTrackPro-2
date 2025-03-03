@@ -280,7 +280,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
 
-  // Add specific endpoint for coffee details
   app.get("/api/green-coffee/:id", requireRole(["roasteryOwner", "roaster", "shopManager", "barista"]), async (req, res) => {
     try {
       const coffeeId = parseInt(req.params.id);
@@ -324,8 +323,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Roasting Routes - accessible by roaster
   app.get("/api/roasting-batches", requireRole(["roaster", "roasteryOwner"]), async (req, res) => {
-    const batches = await storage.getRoastingBatches();
-    res.json(batches);
+    try {
+      const batches = await storage.getRoastingBatches();
+      console.log("Fetched roasting batches:", batches);
+      res.json(batches);
+    } catch (error) {
+      console.error("Error fetching roasting batches:", error);
+      res.status(500).json({ message: "Failed to fetch roasting batches" });
+    }
   });
 
   app.post(
