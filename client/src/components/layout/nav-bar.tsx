@@ -75,6 +75,21 @@ export function NavBar() {
                   </MenubarItem>
                 </MenubarContent>
               </MenubarMenu>
+              <MenubarMenu>
+                <MenubarTrigger>Retail</MenubarTrigger>
+                <MenubarContent>
+                  <MenubarItem>
+                    <Link href="/retail" className="flex w-full">
+                      Inventory
+                    </Link>
+                  </MenubarItem>
+                  <MenubarItem>
+                    <Link href="/retail/orders" className="flex w-full">
+                      Orders
+                    </Link>
+                  </MenubarItem>
+                </MenubarContent>
+              </MenubarMenu>
             </>
           )}
           {user?.role === "roaster" && (
@@ -132,7 +147,7 @@ export function NavBar() {
         <div className="ml-auto flex items-center space-x-4">
           {user ? (
             <div className="flex items-center space-x-4">
-              {user.role === "shopManager" && <ShopSelector />}
+              {(user.role === "shopManager" || user.role === "barista") && <ShopSelector />}
 
               {(user.role === "roasteryOwner" || user.role === "roaster") && (
                 <GreenBeansStockIndicator />

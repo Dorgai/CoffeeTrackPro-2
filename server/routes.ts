@@ -265,20 +265,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Green Coffee Routes - accessible by roastery owner, roaster, and shop manager
   app.get("/api/green-coffee", requireRole(["roasteryOwner", "roaster", "shopManager", "barista"]), async (req, res) => {
-    const coffees = await storage.getGreenCoffees();
-    res.json(coffees);
+    try {
+      console.log("Fetching green coffee list, requested by:", req.user?.username, "role:", req.user?.role);
+      const coffees = await storage.getGreenCoffees();
+      res.json(coffees);
+    } catch (error) {
+      console.error("Error fetching green coffee list:", error);
+      res.status(500).json({ message: "Failed to fetch coffee list" });
+    }
   });
-
-  app.post(
-    "/api/green-coffee",
-    requireRole(["roasteryOwner"]),
-    async (req, res) => {
-      const data = insertGreenCoffeeSchema.parse(req.body);
-      const coffee = await storage.createGreenCoffee(data);
-      res.status(201).json(coffee);
-    },
-  );
-
 
   app.get("/api/green-coffee/:id", requireRole(["roasteryOwner", "roaster", "shopManager", "barista"]), async (req, res) => {
     try {
@@ -326,7 +321,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           updates: req.body
         });
 
-        const updatedCoffee = await storage.updateGreenCoffee(coffeeId, req.body);
+        const updatedCoffee = await storage.updateGreenCoffeeStock(coffeeId, req.body);
         res.json(updatedCoffee);
       } catch (error) {
         console.error("Error updating green coffee:", error);
@@ -334,6 +329,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   );
+
 
   // Roasting Routes - accessible by roaster
   app.get("/api/roasting-batches", requireRole(["roaster", "roasteryOwner"]), async (req, res) => {
