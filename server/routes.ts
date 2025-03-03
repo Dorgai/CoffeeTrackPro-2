@@ -750,7 +750,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(discrepancies);
     } catch (error) {
       console.error("Error fetching inventory discrepancies:", error);
-      res.status(500).json({ message: "Failed to fetch discrepancies" });
+      res.status(500).json({ 
+        message: "Failed to fetch discrepancies",
+        details: error instanceof Error ? error.message : undefined
+      });
     }
   });
 
@@ -801,21 +804,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(target);
     } catch (error) {
       console.error("Error updating coffee target:", error);
-      res.status(500).json({ message: "Failed to update coffee target" });    }
+      res.status(500).json({ message: "Failed to update coffee target" });
+    }
   });
 
   // Add new billing routes after the existing ones
-  app.get("/api/billing/last-event", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
+  app.get("/api/billing/lastevent", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
     try {
       const lastEvent = await storage.getLastBillingEvent();
       res.json(lastEvent);
     } catch (error) {
-      console.error("Error fetchinglast billing event:", error);
+      console.error("Error fetching last billing event:", error);
       res.status(500).json({ message: "Failed to fetch last billing event" });
     }
   });
 
-app.get("/api/billing/quantities", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
+  app.get("/api/billing/quantities", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
     try {
       console.log("Fetching billing quantities...");
 

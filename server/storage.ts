@@ -113,7 +113,12 @@ export interface IStorage {
     }
   ): Promise<DispatchedCoffeeConfirmation>;
   createInventoryDiscrepancy(data: InsertInventoryDiscrepancy): Promise<InventoryDiscrepancy>;
-  getInventoryDiscrepancies(): Promise<InventoryDiscrepancy[]>;
+  getInventoryDiscrepancies(): Promise<(InventoryDiscrepancy & {
+    confirmation: DispatchedCoffeeConfirmation & {
+      greenCoffee: Pick<GreenCoffee, "id" | "name" | "producer">;
+      shop: Pick<Shop, "id" | "name" | "location">;
+    };
+  })[]>;
   getAllDispatchedCoffeeConfirmations(): Promise<DispatchedCoffeeConfirmation[]>;
   getCoffeeLargeBagTargets(shopId: number): Promise<CoffeeLargeBagTarget[]>;
   updateCoffeeLargeBagTarget(
@@ -797,7 +802,12 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getInventoryDiscrepancies(): Promise<InventoryDiscrepancy[]> {
+  async getInventoryDiscrepancies(): Promise<(InventoryDiscrepancy & {
+    confirmation: DispatchedCoffeeConfirmation & {
+      greenCoffee: Pick<GreenCoffee, "id" | "name" | "producer">;
+      shop: Pick<Shop, "id" | "name" | "location">;
+    };
+  })[]> {
     try {
       const discrepancies = await db
         .select({
@@ -846,6 +856,7 @@ export class DatabaseStorage implements IStorage {
         )
         .orderBy(desc(inventoryDiscrepancies.createdAt));
 
+      console.log("Retrieved inventory discrepancies:", discrepancies);
       return discrepancies;
     } catch (error) {
       console.error("Error fetching inventory discrepancies:", error);
