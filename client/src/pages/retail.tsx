@@ -250,15 +250,18 @@ export default function Retail() {
             <CardDescription>Order coffee from the roastery</CardDescription>
           </CardHeader>
           <CardContent>
-            {coffees?.map((coffee) => (
-              <div key={coffee.id} className="mb-4">
-                <OrderForm
-                  coffee={coffee}
-                  availableBags={getCurrentInventory(coffee.id)}
-                  onSuccess={() => setIsOrderDialogOpen(false)}
-                />
-              </div>
-            ))}
+            {coffees?.map((coffee) => {
+              const inventory = getCurrentInventory(coffee.id);
+              return (
+                <div key={coffee.id} className="mb-4">
+                  <OrderForm
+                    coffee={coffee}
+                    availableBags={inventory}
+                    onSuccess={() => setIsOrderDialogOpen(false)}
+                  />
+                </div>
+              );
+            })}
           </CardContent>
         </DialogContent>
       </Dialog>
