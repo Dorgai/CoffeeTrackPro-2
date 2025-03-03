@@ -50,7 +50,7 @@ function StatsCard({
       <CardContent>
         <div className="text-2xl font-bold">{value}</div>
         {description && (
-          <button 
+          <button
             onClick={onClick}
             className={`text-xs ${onClick ? 'text-primary hover:underline cursor-pointer' : 'text-muted-foreground'} mt-1`}
           >
@@ -324,7 +324,7 @@ export default function Dashboard() {
         <div className="grid gap-4 md:grid-cols-3">
           <StatsCard
             title="Total Coffee Types"
-            value={shopInventory?.length || 0}
+            value={totalItems}
             icon={Coffee}
             description="Available varieties"
           />
@@ -333,7 +333,7 @@ export default function Dashboard() {
             value={lowStockItems}
             icon={AlertTriangle}
             onClick={() => setIsRestockOpen(true)}
-            description="Restock Now"
+            description="View Restock Options"
           />
           <StatsCard
             title="Stock Health"
@@ -376,7 +376,7 @@ export default function Dashboard() {
                 <CardTitle>Current Inventory</CardTitle>
                 <CardDescription>Stock levels for selected shop</CardDescription>
               </div>
-              {user.role === "shopManager" && <RestockDialog />}
+              {/* Removed redundant RestockDialog */}
             </CardHeader>
             <CardContent>
               {!selectedShopId ? (
