@@ -731,7 +731,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Inventory Discrepancies Routes
-  app.get("/api/inventory-discrepancies", requireRole(["roasteryOwner", "shopManager", "roaster"]), async (req, res) => {
+  app.get("/api/inventory-discrepancies", requireRole(["roasteryOwner", "roaster"]), async (req, res) => {
     try {
       console.log("Fetching discrepancies for user:", req.user?.username, "with role:", req.user?.role);
       const discrepancies = await storage.getInventoryDiscrepancies();
@@ -793,7 +793,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to update coffee target" });
     }
   });
-
 
   const httpServer = createServer(app);
   return httpServer;
