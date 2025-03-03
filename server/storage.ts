@@ -299,15 +299,7 @@ export class DatabaseStorage implements IStorage {
       // For baristas, return only assigned shops
       if (user?.role === "barista") {
         return await db
-          .select({
-            id: shopsTable.id,
-            name: shopsTable.name,
-            location: shopsTable.location,
-            isActive: shopsTable.isActive,
-            defaultOrderQuantity: shopsTable.defaultOrderQuantity,
-            desiredSmallBags: shopsTable.desiredSmallBags,
-            desiredLargeBags: shopsTable.desiredLargeBags,
-          })
+          .select()
           .from(userShops)
           .innerJoin(shopsTable, eq(userShops.shopId, shopsTable.id))
           .where(
@@ -1254,12 +1246,10 @@ export class DatabaseStorage implements IStorage {
         .innerJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
         .where(
           and(
-            gt(orders.createdAt, fromDate),
-            eq(orders.status, 'dispatched')
+            eq(orders.status, "dispatched"),
+            gt(orders.createdAt, fromDate)
           )
         );
-
-      console.log("Found orders data:", ordersData);
 
       // Initialize quantities for all grades
       const initialQuantities = {
@@ -1270,29 +1260,20 @@ export class DatabaseStorage implements IStorage {
 
       // Aggregate quantities by grade
       const aggregatedQuantities = ordersData.reduce((acc, order) => {
-        try {
-          const { grade } = order;
-          if (grade && acc[grade]) {
-            acc[grade].smallBagsQuantity += Number(order.smallBags) || 0;
-            acc[grade].largeBagsQuantity += Number(order.largeBags) || 0;
-          }
-        } catch (error) {
-          console.error("Error processing order:", order, error);
+        if (order.grade && acc[order.grade]) {
+          acc[order.grade].smallBagsQuantity += Number(order.smallBags) || 0;
+          acc[order.grade].largeBagsQuantity += Number(order.largeBags) || 0;
         }
         return acc;
       }, initialQuantities);
 
-      console.log("Aggregated quantities by grade:", aggregatedQuantities);
-
-      // Convert to array format with all grades
-      const result = Object.entries(aggregatedQuantities).map(([grade, quantities]) => ({
+      // Convert to array format
+      return Object.entries(aggregatedQuantities).map(([grade, quantities]) => ({
         grade,
         smallBagsQuantity: quantities.smallBagsQuantity,
         largeBagsQuantity: quantities.largeBagsQuantity
       }));
 
-      console.log("Final billing quantities result:", result);
-      return result;
     } catch (error) {
       console.error("Error fetching billing quantities:", error);
       throw error;
