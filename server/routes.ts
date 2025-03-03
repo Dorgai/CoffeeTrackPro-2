@@ -805,7 +805,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const target = await storage.updateCoffeeLargeBagTarget(
+      const target = awaitstorage.updateCoffeeLargeBagTarget(
         shopId,
         coffeeId,
         desiredLargeBags
@@ -889,14 +889,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Add billing history route
+  app.get("/api/billing/history", requireRole(["roasteryOwner"]), async (req, res) => {
+    try {
+      console.log("Fetching billing history...");
+
+      // Get all billing events with their details
+      const billingHistory = await storage.getBillingHistory();
+      console.log("Retrieved billing history events:", billingHistory.length);
+
+      res.json(billingHistory);
+    } catch (error) {
+      console.error("Error in /api/billing/history:", error);
+      res.status(500).json({ 
+        message: "Failed to fetch billing history",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
   // Add analytics routes for roastery owner
   app.get("/api/analytics/inventory", requireRole(["roasteryOwner"]), async (req, res) => {
     try {
-      console.log("Fetching inventory analytics");
-      const fromDate = req.query.fromDate ? new Date(req.query.fromDate as string) : new Date(0);
+      const fromDate = req.query.fromDate ? new Date(req.query.fromDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // Default to last 30 days
       const toDate = req.query.toDate ? new Date(req.query.toDate as string) : new Date();
 
-      // Get inventory data for analysis
+      console.log("Fetching inventory analytics from", fromDate, "to", toDate);
       const inventoryHistory = await storage.getAnalyticsInventoryHistory(fromDate, toDate);
       res.json(inventoryHistory);
     } catch (error) {
@@ -910,11 +928,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/analytics/orders", requireRole(["roasteryOwner"]), async (req, res) => {
     try {
-      console.log("Fetching order analytics");
-      const fromDate = req.query.fromDate ? new Date(req.query.fromDate as string) : new Date(0);
+      const fromDate = req.query.fromDate ? new Date(req.query.fromDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const toDate = req.query.toDate ? new Date(req.query.toDate as string) : new Date();
 
-      // Get order data for analysis
+      console.log("Fetching order analytics from", fromDate, "to", toDate);
       const orderAnalytics = await storage.getAnalyticsOrders(fromDate, toDate);
       res.json(orderAnalytics);
     } catch (error) {
@@ -928,11 +945,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/analytics/roasting", requireRole(["roasteryOwner"]), async (req, res) => {
     try {
-      console.log("Fetching roasting analytics");
-      const fromDate = req.query.fromDate ? new Date(req.query.fromDate as string) : new Date(0);
+      const fromDate = req.query.fromDate ? new Date(req.query.fromDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const toDate = req.query.toDate ? new Date(req.query.toDate as string) : new Date();
 
-      // Get roasting data for analysis
+      console.log("Fetching roasting analytics from", fromDate, "to", toDate);
       const roastingAnalytics = await storage.getAnalyticsRoasting(fromDate, toDate);
       res.json(roastingAnalytics);
     } catch (error) {

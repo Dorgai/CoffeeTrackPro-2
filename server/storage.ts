@@ -154,6 +154,11 @@ export interface IStorage {
   generateInventoryStatusReport(): Promise<any>;
   generateShopPerformanceReport(): Promise<any>;
   generateCoffeeConsumptionReport(): Promise<any>;
+  
+  // Add billing history method
+  getBillingHistory(): Promise<(BillingEvent & {
+    details: BillingEventDetail[];
+  })[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1092,19 +1097,22 @@ export class DatabaseStorage implements IStorage {
           shopName: shops.name,
           greenCoffeeId: retailInventory.greenCoffeeId,
           coffeeName: greenCoffee.name,
+          coffeeGrade: greenCoffee.grade,
           smallBags: retailInventory.smallBags,
           largeBags: retailInventory.largeBags,
+          updatedByUsername: users.username
         })
         .from(retailInventory)
         .innerJoin(shops, eq(retailInventory.shopId, shops.id))
         .innerJoin(greenCoffee, eq(retailInventory.greenCoffeeId, greenCoffee.id))
+        .innerJoin(users, eq(retailInventory.updatedById, users.id))
         .where(
           and(
             gt(retailInventory.updatedAt, fromDate),
             lt(retailInventory.updatedAt, toDate)
           )
         )
-        .orderBy(retailInventory.updatedAt);
+        .orderBy(desc(retailInventory.updatedAt));
 
       return result;
     } catch (error) {
@@ -1122,20 +1130,28 @@ export class DatabaseStorage implements IStorage {
           shopName: shops.name,
           greenCoffeeId: orders.greenCoffeeId,
           coffeeName: greenCoffee.name,
+          coffeeGrade: greenCoffee.grade,
           status: orders.status,
           smallBags: orders.smallBags,
           largeBags: orders.largeBags,
+          createdByUsername: users.username,
+          updatedAt: orders.updatedAt,
+          updatedByUsername: {
+            username: users.username
+          }
         })
         .from(orders)
         .innerJoin(shops, eq(orders.shopId, shops.id))
         .innerJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
+        .innerJoin(users, eq(orders.createdById, users.id))
+        .leftJoin(users, eq(orders.updatedById, users.id))
         .where(
           and(
             gt(orders.createdAt, fromDate),
             lt(orders.createdAt, toDate)
           )
         )
-        .orderBy(orders.createdAt);
+        .orderBy(desc(orders.createdAt));
 
       return result;
     } catch (error) {
@@ -1143,7 +1159,6 @@ export class DatabaseStorage implements IStorage {
       throw error;
     }
   }
-
   async getAnalyticsRoasting(fromDate: Date, toDate: Date): Promise<any[]> {
     try {
       const result = await db
@@ -1290,6 +1305,50 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async getBillingHistory(): Promise<(BillingEvent & { details: BillingEventDetail[] })[]> {
+    try {
+      // Get all billing events
+      const events = await db
+        .select({
+          id: billingEvents.id,
+          cycleStartDate: billingEvents.cycleStartDate,
+          cycleEndDate: billingEvents.cycleEndDate,
+          primarySplitPercentage: billingEvents.primarySplitPercentage,
+          secondarySplitPercentage: billingEvents.secondarySplitPercentage,
+          createdById: billingEvents.createdById,
+          createdAt: billingEvents.createdAt
+        })
+        .from(billingEvents)
+        .orderBy(desc(billingEvents.cycleEndDate));
+
+      // For each event, get its details
+      const eventsWithDetails = await Promise.all(
+        events.map(async (event) => {
+          const details = await db
+            .select({
+              id: billingEventDetails.id,
+              billingEventId: billingEventDetails.billingEventId,
+              grade: billingEventDetails.grade,
+              smallBagsQuantity: billingEventDetails.smallBagsQuantity,
+              largeBagsQuantity: billingEventDetails.largeBagsQuantity
+            })
+            .from(billingEventDetails)
+            .where(eq(billingEventDetails.billingEventId, event.id))
+            .orderBy(billingEventDetails.grade);
+
+          return {
+            ...event,
+            details
+          };
+        })
+      );
+
+      return eventsWithDetails;
+    } catch (error) {
+      console.error("Error fetching billing history:", error);
+      throw error;
+    }
+  }
 }
 
 export const storage = new DatabaseStorage();
