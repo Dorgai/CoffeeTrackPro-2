@@ -1,6 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import type { GreenCoffee, RetailInventory, Shop, Order } from "@shared/schema";
 import { format } from 'date-fns';
 import { useEffect, useState } from 'react';
@@ -32,12 +32,14 @@ function StatsCard({
   title,
   value,
   icon: Icon,
+  onClick,
   description,
 }: {
   title: string;
   value: string | number;
   icon: React.ElementType;
-  description?: string | React.ReactNode;
+  onClick?: () => void;
+  description?: string;
 }) {
   return (
     <Card>
@@ -48,7 +50,12 @@ function StatsCard({
       <CardContent>
         <div className="text-2xl font-bold">{value}</div>
         {description && (
-          <p className="text-xs text-muted-foreground mt-1">{description}</p>
+          <button 
+            onClick={onClick}
+            className={`text-xs ${onClick ? 'text-primary hover:underline cursor-pointer' : 'text-muted-foreground'} mt-1`}
+          >
+            {description}
+          </button>
         )}
       </CardContent>
     </Card>
@@ -59,6 +66,7 @@ export default function Dashboard() {
   const { user, logoutMutation } = useAuth();
   const [selectedShopId, setSelectedShopId] = useState<number | null>(null);
   const [isRestockOpen, setIsRestockOpen] = useState(false);
+  const [, navigate] = useLocation();
 
   const { data: userShops, isLoading: loadingShops } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
@@ -156,24 +164,15 @@ export default function Dashboard() {
             title="Low Stock Items"
             value={lowStockCoffees.length}
             icon={AlertTriangle}
-            description={
-              <button
-                onClick={() => setIsRestockOpen(true)}
-                className="text-primary hover:underline"
-              >
-                View Restock Options
-              </button>
-            }
+            onClick={() => setIsRestockOpen(true)}
+            description="Items Below Threshold"
           />
           <StatsCard
             title="Available Stock"
             value={`${coffees?.reduce((total, coffee) => total + Number(coffee.currentStock), 0) || 0}kg`}
             icon={Package}
-            description={
-              <Link href="/roasting/orders" className="text-primary hover:underline">
-                View Orders
-              </Link>
-            }
+            onClick={() => navigate("/roasting/orders")}
+            description="View Orders"
           />
         </div>
 
@@ -333,14 +332,8 @@ export default function Dashboard() {
             title="Low Stock Items"
             value={lowStockItems}
             icon={AlertTriangle}
-            description={
-              <button
-                onClick={() => setIsRestockOpen(true)}
-                className="text-primary hover:underline"
-              >
-                Restock Now
-              </button>
-            }
+            onClick={() => setIsRestockOpen(true)}
+            description="Restock Now"
           />
           <StatsCard
             title="Stock Health"
@@ -587,11 +580,8 @@ export default function Dashboard() {
             title="Order Fulfillment"
             value={`${orderFulfillmentRate}%`}
             icon={Package}
-            description={
-              <Link href="/roasting/orders" className="text-primary hover:underline">
-                Manage Orders
-              </Link>
-            }
+            onClick={() => navigate("/roasting/orders")}
+            description="Manage Orders"
           />
           <StatsCard
             title="Active Shops"
@@ -603,14 +593,8 @@ export default function Dashboard() {
             title="Low Stock Items"
             value={lowStockCoffees.length}
             icon={AlertTriangle}
-            description={
-              <button
-                onClick={() => setIsRestockOpen(true)}
-                className="text-primary hover:underline"
-              >
-                View Restock Options
-              </button>
-            }
+            onClick={() => setIsRestockOpen(true)}
+            description="View Restock Options"
           />
         </div>
 
@@ -618,25 +602,57 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Performance Overview</CardTitle>
-            <CardDescription>Key metrics across all operations</CardDescription>
+            <CardTitle>Green Coffee Inventory</CardTitle>
+            <CardDescription>Current stock levels and details</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <StockProgress
-              current={completedOrders}
-              desired={totalOrders}
-              label="Order Fulfillment Rate"
-            />
-            <StockProgress
-              current={coffees?.filter(c => Number(c.currentStock) > Number(c.minThreshold)).length || 0}
-              desired={coffees?.length || 0}
-              label="Coffee Stock Health"
-            />
-            <StockProgress
-              current={roasteryOwnerShops?.filter(s => s.isActive).length || 0}
-              desired={roasteryOwnerShops?.length || 0}
-              label="Active Shops"
-            />
+          <CardContent>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Producer</TableHead>
+                  <TableHead>Country</TableHead>
+                  <TableHead>Current Stock</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {coffees?.map(coffee => (
+                  <TableRow key={coffee.id}>
+                    <TableCell className="font-medium">{coffee.name}</TableCell>
+                    <TableCell>{coffee.producer}</TableCell>
+                    <TableCell>{coffee.country}</TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{coffee.currentStock}kg</div>
+                        <StockProgress
+                          current={Number(coffee.currentStock)}
+                          desired={Number(coffee.minThreshold) * 2}
+                          label="Stock Level"
+                        />
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {Number(coffee.currentStock) <= Number(coffee.minThreshold) ? (
+                        <Badge variant="destructive">Low Stock</Badge>
+                      ) : (
+                        <Badge variant="outline">In Stock</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/coffee/${coffee.id}`)}
+                      >
+                        View Details
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
 
@@ -754,28 +770,6 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Coffee Inventory Overview</CardTitle>
-            <CardDescription>Current stock levels across all varieties</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {coffees?.map(coffee => (
-              <div key={coffee.id} className="mb-4 last:mb-0">
-                <div className="flex justify-between items-center mb-2">
-                  <h3 className="font-medium">{coffee.name}</h3>
-                  <span className="text-sm text-muted-foreground">{coffee.producer}</span>
-                </div>
-                <StockProgress
-                  current={Number(coffee.currentStock)}
-                  desired={Number(coffee.minThreshold) * 2}
-                  label="Current Stock"
-                />
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
             <CardTitle>Recent Activities</CardTitle>
             <CardDescription>Latest updates and changes</CardDescription>
           </CardHeader>
@@ -833,40 +827,6 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         )}
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Coffee Inventory Overview</CardTitle>
-            <CardDescription>Current stock levels across all shops</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!allInventory?.length ? (
-              <p className="text-center text-muted-foreground">No inventory data available</p>
-            ) : (
-              <div className="space-y-4">
-                {allInventory.map(inv => {
-                  const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
-                  if (!coffee) return null;
-
-                  return (
-                    <div key={`${inv.shopId}-${inv.greenCoffeeId}`} className="p-4 border rounded-lg">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="font-medium">{coffee.name}</h3>
-                          <p className="text-sm text-muted-foreground">{coffee.producer}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm">Small Bags: {inv.smallBags}</p>
-                          <p className="text-sm">Large Bags: {inv.largeBags}</p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </div>
     );
   }
