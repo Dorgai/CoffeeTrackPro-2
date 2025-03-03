@@ -1017,7 +1017,7 @@ export class DatabaseStorage implements IStorage {
           largeBags: orders.largeBags,
         })        .from(orders)
         .innerJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
-        .where(
+                .where(
           and(
             eq(orders.status, "dispatched"),
             gt(orders.createdAt, fromDate)
