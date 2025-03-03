@@ -806,22 +806,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/billing/quantities", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
+app.get("/api/billing/quantities", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
     try {
+      console.log("Fetching billing quantities...");
+
       // Get the last billing event to determine the start date
       const lastEvent = await storage.getLastBillingEvent();
       const fromDate = lastEvent ? lastEvent.cycleEndDate : new Date(0); // Use epoch if no previous event
 
+      console.log("Using fromDate:", fromDate);
+
       // Get quantities since last billing event
       const quantities = await storage.getBillingQuantities(fromDate);
+      console.log("Retrieved quantities:", quantities);
 
+      // Send response with both fromDate and quantities
       res.json({
-        fromDate,
-        quantities
+        fromDate: fromDate.toISOString(),
+        quantities: quantities
       });
     } catch (error) {
-      console.error("Error fetching billing quantities:", error);
-      res.status(500).json({ message: "Failed to fetch billing quantities" });
+      console.error("Error in /api/billing/quantities:", error);
+      res.status(500).json({ 
+        message: "Failed to fetch billing quantities",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 

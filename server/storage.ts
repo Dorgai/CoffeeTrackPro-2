@@ -21,7 +21,7 @@ import {
   type InsertBillingEvent,
   type InsertBillingEventDetail,
   users,
-  shops,
+  shops as shopsTable,
   greenCoffee,
   roastingBatches,
   retailInventory,
@@ -252,16 +252,16 @@ export class DatabaseStorage implements IStorage {
 
   // Shops
   async getShop(id: number): Promise<Shop | undefined> {
-    const [shop] = await db.select().from(shops).where(eq(shops.id, id));
+    const [shop] = await db.select().from(shopsTable).where(eq(shopsTable.id, id));
     return shop;
   }
 
   async getShops(): Promise<Shop[]> {
-    return await db.select().from(shops);
+    return await db.select().from(shopsTable);
   }
 
   async createShop(shop: InsertShop): Promise<Shop> {
-    const [newShop] = await db.insert(shops).values(shop).returning();
+    const [newShop] = await db.insert(shopsTable).values(shop).returning();
     return newShop;
   }
 
@@ -275,18 +275,52 @@ export class DatabaseStorage implements IStorage {
 
       console.log("Looking up shops for user:", user?.username, "with role:", user?.role);
 
-      // If roaster, return empty array as they don't need shop access
-      if (user?.role === "roaster") {
-        return [];
+      // For roasteryOwner, return all active shops
+      if (user?.role === "roasteryOwner") {
+        const activeShops = await db
+          .select()
+          .from(shopsTable)
+          .where(eq(shopsTable.isActive, true))
+          .orderBy(shopsTable.name);
+
+        console.log("Found shops for roasteryOwner:", activeShops);
+        return activeShops;
       }
 
-      // For all other roles, return all active shops
-      return await db
-        .select()
-        .from(shops)
-        .where(eq(shops.isActive, true))
-        .orderBy(shops.name);
+      // For shopManager, return all active shops
+      if (user?.role === "shopManager") {
+        return await db
+          .select()
+          .from(shopsTable)
+          .where(eq(shopsTable.isActive, true))
+          .orderBy(shopsTable.name);
+      }
 
+      // For baristas, return only assigned shops
+      if (user?.role === "barista") {
+        return await db
+          .select({
+            id: shopsTable.id,
+            name: shopsTable.name,
+            location: shopsTable.location,
+            isActive: shopsTable.isActive,
+            defaultOrderQuantity: shopsTable.defaultOrderQuantity,
+            desiredSmallBags: shopsTable.desiredSmallBags,
+            desiredLargeBags: shopsTable.desiredLargeBags,
+          })
+          .from(userShops)
+          .innerJoin(shopsTable, eq(userShops.shopId, shopsTable.id))
+          .where(
+            and(
+              eq(userShops.userId, userId),
+              eq(shopsTable.isActive, true)
+            )
+          )
+          .orderBy(shopsTable.name);
+      }
+
+      // For roasters, return empty array
+      return [];
     } catch (error) {
       console.error("Error fetching user shops:", error);
       throw error;
@@ -604,12 +638,12 @@ export class DatabaseStorage implements IStorage {
           largeBags: retailInventory.largeBags,
           updatedAt: retailInventory.updatedAt,
           updatedById: retailInventory.updatedById,
-          shop: shops,
+          shop: shopsTable,
           greenCoffee: greenCoffee,
           updatedBy: users,
         })
         .from(retailInventory)
-        .innerJoin(shops, eq(retailInventory.shopId, shops.id))
+        .innerJoin(shopsTable, eq(retailInventory.shopId, shopsTable.id))
         .innerJoin(greenCoffee, eq(retailInventory.greenCoffeeId, greenCoffee.id))
         .innerJoin(users, eq(retailInventory.updatedById, users.id))
         .orderBy(desc(retailInventory.updatedAt));
@@ -644,9 +678,9 @@ export class DatabaseStorage implements IStorage {
           createdById: orders.createdById,
           updatedById: orders.updatedById,
           shop: {
-            id: shops.id,
-            name: shops.name,
-            location: shops.location,
+            id: shopsTable.id,
+            name: shopsTable.name,
+            location: shopsTable.location,
           },
           greenCoffee: {
             id: greenCoffee.id,
@@ -660,7 +694,7 @@ export class DatabaseStorage implements IStorage {
           },
         })
         .from(orders)
-        .innerJoin(shops, eq(orders.shopId, shops.id))
+        .innerJoin(shopsTable, eq(orders.shopId, shopsTable.id))
         .innerJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
         .innerJoin(users, eq(orders.createdById, users.id))
         .orderBy(desc(orders.createdAt));
@@ -723,16 +757,16 @@ export class DatabaseStorage implements IStorage {
             createdAt: greenCoffee.createdAt,
           },
           shop: {
-            id: shops.id,
-            name: shops.name,
-            location: shops.location,
-            isActive: shops.isActive,
-            defaultOrderQuantity: shops.defaultOrderQuantity,
+            id: shopsTable.id,
+            name: shopsTable.name,
+            location: shopsTable.location,
+            isActive: shopsTable.isActive,
+            defaultOrderQuantity: shopsTable.defaultOrderQuantity,
           },
         })
         .from(dispatchedCoffeeConfirmations)
         .innerJoin(greenCoffee, eq(dispatchedCoffeeConfirmations.greenCoffeeId, greenCoffee.id))
-        .innerJoin(shops, eq(dispatchedCoffeeConfirmations.shopId, shops.id))
+        .innerJoin(shopsTable, eq(dispatchedCoffeeConfirmations.shopId, shopsTable.id))
         .where(eq(dispatchedCoffeeConfirmations.shopId, shopId))
         .orderBy(desc(dispatchedCoffeeConfirmations.createdAt));
 
@@ -945,13 +979,12 @@ export class DatabaseStorage implements IStorage {
             confirmedAt: dispatchedCoffeeConfirmations.confirmedAt,
             greenCoffee: {
               id: greenCoffee.id,
-              name: greenCoffee.name,
-              producer: greenCoffee.producer,
+              name: greenCoffee.name,              producer: greenCoffee.producer,
             },
             shop: {
-              id: shops.id,
-              name: shops.name,
-              location: shops.location,
+              id: shopsTable.id,
+              name: shopsTable.name,
+              location: shopsTable.location,
             },
           },
         })
@@ -963,10 +996,10 @@ export class DatabaseStorage implements IStorage {
         .innerJoin(
           greenCoffee,
           eq(dispatchedCoffeeConfirmations.greenCoffeeId, greenCoffee.id)
-        )
+        ))
         .innerJoin(
-          shops,
-          eq(dispatchedCoffeeConfirmations.shopId, shops.id)
+          shopsTable,
+          eq(dispatchedCoffeeConfirmations.shopId,shopsTable.id)
         )
         .orderBy(desc(inventoryDiscrepancies.createdAt));
 
@@ -979,9 +1012,9 @@ export class DatabaseStorage implements IStorage {
   async deleteShop(id: number): Promise<Shop> {
     try {
       const [deletedShop] = await db
-        .update(shops)
+        .update(shopsTable)
         .set({ isActive: false })
-        .where(eq(shops.id, id))
+        .where(eq(shopsTable.id, id))
         .returning();
 
       return deletedShop;
@@ -1019,16 +1052,16 @@ export class DatabaseStorage implements IStorage {
             minThreshold: greenCoffee.minThreshold,
           },
           shop: {
-            id: shops.id,
-            name: shops.name,
-            location: shops.location,
-            isActive: shops.isActive,
-            defaultOrderQuantity: shops.defaultOrderQuantity,
+            id: shopsTable.id,
+            name: shopsTable.name,
+            location: shopsTable.location,
+            isActive: shopsTable.isActive,
+            defaultOrderQuantity: shopsTable.defaultOrderQuantity,
           },
         })
         .from(dispatchedCoffeeConfirmations)
         .innerJoin(greenCoffee, eq(dispatchedCoffeeConfirmations.greenCoffeeId, greenCoffee.id))
-        .innerJoin(shops, eq(dispatchedCoffeeConfirmations.shopId, shops.id))
+        .innerJoin(shopsTable, eq(dispatchedCoffeeConfirmations.shopId, shopsTable.id))
         .orderBy(desc(dispatchedCoffeeConfirmations.createdAt));
 
       console.log("Found all confirmations:", confirmations);
@@ -1169,9 +1202,9 @@ export class DatabaseStorage implements IStorage {
       console.log("Updating shop with id:", id, "with data:", update);
 
       const [updatedShop] = await db
-        .update(shops)
+        .update(shopsTable)
         .set(update)
-        .where(eq(shops.id, id))
+        .where(eq(shopsTable.id, id))
         .returning();
 
       if (!updatedShop) {
@@ -1211,7 +1244,7 @@ export class DatabaseStorage implements IStorage {
       console.log("Fetching billing quantities since:", fromDate);
 
       // Get all orders since the fromDate that are in 'dispatched' status
-      const orders = await db
+      const ordersData = await db
         .select({
           grade: greenCoffee.grade,
           smallBags: orders.smallBags,
@@ -1226,26 +1259,39 @@ export class DatabaseStorage implements IStorage {
           )
         );
 
-      console.log("Found orders:", orders);
+      console.log("Found orders data:", ordersData);
+
+      // Initialize quantities for all grades
+      const initialQuantities = {
+        'Specialty': { smallBagsQuantity: 0, largeBagsQuantity: 0 },
+        'Premium': { smallBagsQuantity: 0, largeBagsQuantity: 0 },
+        'Rarity': { smallBagsQuantity: 0, largeBagsQuantity: 0 }
+      };
 
       // Aggregate quantities by grade
-      const quantities = orders.reduce((acc, order) => {
-        const grade = order.grade;
-        if (!acc[grade]) {
-          acc[grade] = { smallBagsQuantity: 0, largeBagsQuantity: 0 };
+      const aggregatedQuantities = ordersData.reduce((acc, order) => {
+        try {
+          const { grade } = order;
+          if (grade && acc[grade]) {
+            acc[grade].smallBagsQuantity += Number(order.smallBags) || 0;
+            acc[grade].largeBagsQuantity += Number(order.largeBags) || 0;
+          }
+        } catch (error) {
+          console.error("Error processing order:", order, error);
         }
-        acc[grade].smallBagsQuantity += order.smallBags || 0;
-        acc[grade].largeBagsQuantity += order.largeBags || 0;
         return acc;
-      }, {} as Record<string, { smallBagsQuantity: number; largeBagsQuantity: number }>);
+      }, initialQuantities);
 
-      // Convert to array format
-      const result = Object.entries(quantities).map(([grade, quantities]) => ({
+      console.log("Aggregated quantities by grade:", aggregatedQuantities);
+
+      // Convert to array format with all grades
+      const result = Object.entries(aggregatedQuantities).map(([grade, quantities]) => ({
         grade,
-        ...quantities
+        smallBagsQuantity: quantities.smallBagsQuantity,
+        largeBagsQuantity: quantities.largeBagsQuantity
       }));
 
-      console.log("Aggregated quantities:", result);
+      console.log("Final billing quantities result:", result);
       return result;
     } catch (error) {
       console.error("Error fetching billing quantities:", error);
