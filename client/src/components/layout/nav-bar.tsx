@@ -42,13 +42,8 @@ export function NavBar() {
                 </Link>
               </MenubarItem>
               <MenubarItem>
-                <Link href="/analytics" className="flex w-full">
-                  Analytics
-                </Link>
-              </MenubarItem>
-              <MenubarItem>
-                <Link href="/reports" className="flex w-full">
-                  Reports
+                <Link href="/inventory" className="flex w-full">
+                  Inventory
                 </Link>
               </MenubarItem>
             </MenubarContent>
@@ -97,14 +92,14 @@ export function NavBar() {
                   </Link>
                 </MenubarItem>
                 <MenubarItem>
-                  <Link href="/roasting/discrepancies" className="flex w-full">
-                    Discrepancy Reports
+                  <Link href="/inventory" className="flex w-full">
+                    Inventory
                   </Link>
                 </MenubarItem>
               </MenubarContent>
             </MenubarMenu>
           )}
-          {(user?.role === "shopManager" || user?.role === "barista" || user?.role === "roasteryOwner") && (
+          {(user?.role === "shopManager" || user?.role === "barista") && (
             <>
               <MenubarMenu>
                 <MenubarTrigger>Retail</MenubarTrigger>
@@ -137,18 +132,18 @@ export function NavBar() {
         <div className="ml-auto flex items-center space-x-4">
           {user ? (
             <div className="flex items-center space-x-4">
-              {user.role !== "roaster" && <ShopSelector />}
+              {user.role === "shopManager" && <ShopSelector />}
 
               {(user.role === "roasteryOwner" || user.role === "roaster") && (
                 <GreenBeansStockIndicator />
               )}
 
-              {user.role !== "roaster" && <RestockDialog />}
+              {user.role === "shopManager" && <RestockDialog />}
 
               {(user.role === "roasteryOwner" || user.role === "roaster") && (
-                <Button variant="outline" size="sm" asChild className="flex items-center gap-2">
+                <Button variant="outline" size="sm" asChild>
                   <Link href="/inventory">
-                    <Coffee className="h-4 w-4" />
+                    <Coffee className="h-4 w-4 mr-2" />
                     Update Green Coffee
                   </Link>
                 </Button>

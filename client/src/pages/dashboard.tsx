@@ -189,68 +189,59 @@ export default function Dashboard() {
             title="Available Stock"
             value={`${coffees?.reduce((total, coffee) => total + Number(coffee.currentStock), 0) || 0}kg`}
             icon={Package}
-            onClick={() => navigate("/roasting/orders")}
-            description="View Orders"
+            onClick={() => navigate("/inventory")}
+            description="View Inventory"
           />
         </div>
 
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Green Coffee Inventory</CardTitle>
-            <CardDescription>Available coffee for roasting</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!coffees?.length ? (
-              <p className="text-center text-muted-foreground">No coffee inventory available</p>
-            ) : (
-              <Table>
-                <thead>
-                  <TableRow>
-                    <TableHead>Coffee</TableHead>
-                    <TableHead>Producer</TableHead>
-                    <TableHead>Origin</TableHead>
-                    <TableHead className="text-right">Stock</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </thead>
-                <TableBody>
-                  {coffees.map(coffee => (
-                    <TableRow key={coffee.id}>
-                      <TableCell className="font-medium">{coffee.name}</TableCell>
-                      <TableCell>{coffee.producer}</TableCell>
-                      <TableCell>{coffee.country}</TableCell>
-                      <TableCell className="text-right">{coffee.currentStock}kg</TableCell>
-                      <TableCell>
-                        {Number(coffee.currentStock) <= Number(coffee.minThreshold) ? (
-                          <Badge variant="destructive">Low Stock</Badge>
-                        ) : (
-                          <Badge variant="outline">In Stock</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Button asChild variant="outline" size="sm">
-                          <Link href={`/roasting/orders/${coffee.id}`}>
-                            Start Roasting
-                          </Link>
-                        </Button>
-                      </TableCell>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Green Coffee Inventory</CardTitle>
+              <CardDescription>Available coffee for roasting</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!coffees?.length ? (
+                <p className="text-center text-muted-foreground">No coffee inventory available</p>
+              ) : (
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableHead>Coffee</TableHead>
+                      <TableHead>Producer</TableHead>
+                      <TableHead>Origin</TableHead>
+                      <TableHead className="text-right">Stock</TableHead>
+                      <TableHead>Status</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+                  </TableHead>
+                  <TableBody>
+                    {coffees.map(coffee => (
+                      <TableRow key={coffee.id}>
+                        <TableCell className="font-medium">{coffee.name}</TableCell>
+                        <TableCell>{coffee.producer}</TableCell>
+                        <TableCell>{coffee.country}</TableCell>
+                        <TableCell className="text-right">{coffee.currentStock}kg</TableCell>
+                        <TableCell>
+                          {Number(coffee.currentStock) <= Number(coffee.minThreshold) ? (
+                            <Badge variant="destructive">Low Stock</Badge>
+                          ) : (
+                            <Badge variant="outline">In Stock</Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Discrepancy Reports</CardTitle>
-            <CardDescription>Track inventory discrepancies</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Inventory Discrepancies</CardTitle>
+              <CardDescription>Recent inventory adjustments</CardDescription>
+            </CardHeader>
+            <CardContent>
               <Table>
                 <TableHead>
                   <TableRow>
@@ -295,9 +286,9 @@ export default function Dashboard() {
                   )}
                 </TableBody>
               </Table>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
 
         <Card>
           <CardHeader>
@@ -877,8 +868,7 @@ export default function Dashboard() {
             {!selectedShopId ? (
               <p className="text-center text-muted-foreground">Please select a shop</p>
             ) : !shop ? (
-              <p className="text-center text-muted-foreground">No shop data available</p>
-            ) : (
+              <p className="text-center text-muted-foreground">No shop data available</p>) : (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
