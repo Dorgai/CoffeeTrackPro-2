@@ -1,9 +1,10 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import type { GreenCoffee, RetailInventory, Shop, Order } from "@shared/schema"; // Added Order type
+import type { GreenCoffee, RetailInventory, Shop, Order } from "@shared/schema";
 import { format } from 'date-fns';
 import { useEffect, useState } from 'react';
+import { RestockDialog } from "@/components/coffee/restock-dialog";
 
 import {
   Card,
@@ -25,7 +26,6 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableRow } from "@/components/ui/table";
 import { ShopSelector } from "@/components/layout/shop-selector";
 import StockProgress from "@/components/stock-progress";
-import { RestockDialog } from "@/components/coffee/restock-dialog";
 import { apiRequest } from "@/lib/queryClient";
 
 function StatsCard({
@@ -37,7 +37,7 @@ function StatsCard({
   title: string;
   value: string | number;
   icon: React.ElementType;
-  description?: string | React.ReactNode; // Updated to accept ReactNode
+  description?: string | React.ReactNode;
 }) {
   return (
     <Card>
@@ -58,14 +58,13 @@ function StatsCard({
 export default function Dashboard() {
   const { user, logoutMutation } = useAuth();
   const [selectedShopId, setSelectedShopId] = useState<number | null>(null);
+  const [isRestockOpen, setIsRestockOpen] = useState(false);
 
-  // Get available shops for user
   const { data: userShops, isLoading: loadingShops } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
     enabled: !!user && (user.role === "shopManager" || user.role === "barista"),
   });
 
-  // Set default shop
   useEffect(() => {
     if ((user?.role === "shopManager" || user?.role === "barista") && userShops?.length && !selectedShopId) {
       const defaultShop = userShops.find(s => s.id === user.defaultShopId) || userShops[0];
@@ -73,19 +72,16 @@ export default function Dashboard() {
     }
   }, [user, userShops, selectedShopId]);
 
-  // Get shop details
   const { data: shop, isLoading: loadingShop } = useQuery<Shop>({
     queryKey: ["/api/shops", selectedShopId],
     enabled: !!selectedShopId,
   });
 
-  // Get all coffees
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
     enabled: !!user,
   });
 
-  // Get inventory for current shop
   const { data: shopInventory, isLoading: loadingInventory } = useQuery<RetailInventory[]>({
     queryKey: ["/api/retail-inventory", selectedShopId],
     queryFn: async () => {
@@ -96,32 +92,27 @@ export default function Dashboard() {
     enabled: !!selectedShopId && (user?.role === "shopManager" || user?.role === "barista"),
   });
 
-  // Get all inventory for roastery owner and roaster
   const { data: allInventory, isLoading: loadingAllInventory } = useQuery<RetailInventory[]>({
     queryKey: ["/api/retail-inventory"],
     enabled: user?.role === "roasteryOwner" || user?.role === "roaster",
   });
 
-  //Get all orders for roastery owner
   const { data: orders, isLoading: loadingOrders } = useQuery<Order[]>({
     queryKey: ["/api/orders"],
     enabled: user?.role === "roasteryOwner",
   });
 
-  // Get user's shops for roastery owner
   const { data: roasteryOwnerShops, isLoading: loadingRoasteryOwnerShops } = useQuery<Shop[]>({
     queryKey: ["/api/shops"],
     enabled: user?.role === "roasteryOwner",
   });
 
-  // Get all orders for roastery owner and roaster
   const { data: allOrders, isLoading: loadingAllOrders } = useQuery<Order[]>({
     queryKey: ["/api/orders"],
     enabled: !!user && (user.role === "roasteryOwner" || user?.role === "roaster"),
   });
 
 
-  // Loading states
   const isLoading = loadingShops || loadingShop || loadingCoffees || loadingInventory || loadingAllInventory || loadingOrders || loadingRoasteryOwnerShops || loadingAllOrders;
 
   if (isLoading) {
@@ -132,16 +123,13 @@ export default function Dashboard() {
     );
   }
 
-  // Calculate metrics
   const lowStockCoffees = coffees?.filter(coffee =>
     Number(coffee.currentStock) <= Number(coffee.minThreshold)
   ) || [];
 
-  // Roaster view
   if (user?.role === "roaster") {
     return (
       <div className="container mx-auto py-8 space-y-8">
-        {/* Header */}
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user.username}</h1>
@@ -157,7 +145,6 @@ export default function Dashboard() {
           </Button>
         </div>
 
-        {/* Stats Overview */}
         <div className="grid gap-4 md:grid-cols-3">
           <StatsCard
             title="Coffee Types"
@@ -169,7 +156,14 @@ export default function Dashboard() {
             title="Low Stock Items"
             value={lowStockCoffees.length}
             icon={AlertTriangle}
-            description="Below minimum threshold"
+            description={
+              <button
+                onClick={() => setIsRestockOpen(true)}
+                className="text-primary hover:underline"
+              >
+                View Restock Options
+              </button>
+            }
           />
           <StatsCard
             title="Available Stock"
@@ -183,7 +177,8 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Green Coffee Inventory */}
+        <RestockDialog open={isRestockOpen} onOpenChange={setIsRestockOpen} />
+
         <Card>
           <CardHeader>
             <CardTitle>Green Coffee Inventory</CardTitle>
@@ -233,7 +228,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Discrepancy Reports */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
@@ -248,7 +242,6 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {/* Recent Discrepancies Table */}
               <Table>
                 <thead>
                   <TableRow>
@@ -260,7 +253,6 @@ export default function Dashboard() {
                   </TableRow>
                 </thead>
                 <TableBody>
-                  {/* We'll fetch this data in the next step */}
                   <TableRow>
                     <TableCell colSpan={5} className="text-center text-muted-foreground">
                       No recent discrepancies found
@@ -272,7 +264,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Low Stock Alerts */}
         {lowStockCoffees.length > 0 && (
           <Card>
             <CardHeader>
@@ -300,9 +291,7 @@ export default function Dashboard() {
     );
   }
 
-  // Shop manager and barista view
   if (user?.role === "shopManager" || user?.role === "barista") {
-    // Calculate stats
     const totalItems = shopInventory?.length || 0;
     const lowStockItems = shopInventory?.filter(item =>
       (item.smallBags || 0) < (shop?.desiredSmallBags || 20) / 2 ||
@@ -312,7 +301,6 @@ export default function Dashboard() {
 
     return (
       <div className="container mx-auto py-8 space-y-8">
-        {/* Header */}
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user.username}</h1>
@@ -334,7 +322,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Stats Overview */}
         <div className="grid gap-4 md:grid-cols-3">
           <StatsCard
             title="Total Coffee Types"
@@ -346,7 +333,14 @@ export default function Dashboard() {
             title="Low Stock Items"
             value={lowStockItems}
             icon={AlertTriangle}
-            description="Below 50% of target"
+            description={
+              <button
+                onClick={() => setIsRestockOpen(true)}
+                className="text-primary hover:underline"
+              >
+                Restock Now
+              </button>
+            }
           />
           <StatsCard
             title="Stock Health"
@@ -356,7 +350,8 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Performance Overview */}
+        <RestockDialog open={isRestockOpen} onOpenChange={setIsRestockOpen} />
+
         <Card>
           <CardHeader>
             <CardTitle>Performance Overview</CardTitle>
@@ -381,9 +376,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Main Content */}
         <div className="grid gap-4 md:grid-cols-2">
-          {/* Current Inventory */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
@@ -424,7 +417,6 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Stock Alerts */}
           <Card>
             <CardHeader>
               <CardTitle>Stock Alerts</CardTitle>
@@ -461,7 +453,6 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* Recent Orders */}
         <Card>
           <CardHeader>
             <CardTitle>Recent Orders</CardTitle>
@@ -514,7 +505,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Shop Details */}
         <Card>
           <CardHeader>
             <CardTitle>Shop Details</CardTitle>
@@ -570,16 +560,13 @@ export default function Dashboard() {
     );
   }
 
-  // Roastery owner view
   if (user?.role === "roasteryOwner") {
-    // Calculate some aggregate stats
     const totalOrders = allOrders?.length || 0;
     const completedOrders = allOrders?.filter(o => o.status === 'delivered').length || 0;
     const orderFulfillmentRate = totalOrders ? Math.round((completedOrders / totalOrders) * 100) : 0;
 
     return (
       <div className="container mx-auto py-8 space-y-8">
-        {/* Header section remains the same */}
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user.username}</h1>
@@ -595,7 +582,6 @@ export default function Dashboard() {
           </Button>
         </div>
 
-        {/* Stats Overview */}
         <div className="grid gap-4 md:grid-cols-3">
           <StatsCard
             title="Order Fulfillment"
@@ -617,11 +603,19 @@ export default function Dashboard() {
             title="Low Stock Items"
             value={lowStockCoffees.length}
             icon={AlertTriangle}
-            description="Items below threshold"
+            description={
+              <button
+                onClick={() => setIsRestockOpen(true)}
+                className="text-primary hover:underline"
+              >
+                View Restock Options
+              </button>
+            }
           />
         </div>
 
-        {/* Overall Performance */}
+        <RestockDialog open={isRestockOpen} onOpenChange={setIsRestockOpen} />
+
         <Card>
           <CardHeader>
             <CardTitle>Performance Overview</CardTitle>
@@ -646,7 +640,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Orders Overview */}
         <Card>
           <CardHeader>
             <CardTitle>Orders Overview</CardTitle>
@@ -699,7 +692,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Shops Performance */}
         <Card>
           <CardHeader>
             <CardTitle>Shops Performance</CardTitle>
@@ -760,7 +752,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Coffee Inventory Overview */}
         <Card>
           <CardHeader>
             <CardTitle>Coffee Inventory Overview</CardTitle>
@@ -783,7 +774,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Recent Activities */}
         <Card>
           <CardHeader>
             <CardTitle>Recent Activities</CardTitle>
@@ -820,7 +810,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Low Stock Alerts */}
         {lowStockCoffees.length > 0 && (
           <Card>
             <CardHeader>
@@ -845,7 +834,6 @@ export default function Dashboard() {
           </Card>
         )}
 
-        {/* Inventory Overview */}
         <Card>
           <CardHeader>
             <CardTitle>Coffee Inventory Overview</CardTitle>
@@ -873,7 +861,7 @@ export default function Dashboard() {
                         </div>
                       </div>
                     </div>
-                                    );
+                  );
                 })}
               </div>
             )}
