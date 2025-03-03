@@ -1,7 +1,7 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import type { GreenCoffee, RetailInventory, Shop } from "@shared/schema";
+import type { GreenCoffee, RetailInventory, Shop, Order } from "@shared/schema"; // Added Order type
 import { format } from 'date-fns';
 import { useEffect, useState } from 'react';
 
@@ -102,8 +102,27 @@ export default function Dashboard() {
     enabled: user?.role === "roasteryOwner" || user?.role === "roaster",
   });
 
+  //Get all orders for roastery owner
+  const { data: orders, isLoading: loadingOrders } = useQuery<Order[]>({
+    queryKey: ["/api/orders"],
+    enabled: user?.role === "roasteryOwner",
+  });
+
+  // Get user's shops for roastery owner
+  const { data: roasteryOwnerShops, isLoading: loadingRoasteryOwnerShops } = useQuery<Shop[]>({
+    queryKey: ["/api/shops"],
+    enabled: user?.role === "roasteryOwner",
+  });
+
+  // Get all orders for roastery owner and roaster
+  const { data: allOrders, isLoading: loadingAllOrders } = useQuery<Order[]>({
+    queryKey: ["/api/orders"],
+    enabled: !!user && (user.role === "roasteryOwner" || user.role === "roaster"),
+  });
+
+
   // Loading states
-  const isLoading = loadingShops || loadingShop || loadingCoffees || loadingInventory || loadingAllInventory;
+  const isLoading = loadingShops || loadingShop || loadingCoffees || loadingInventory || loadingAllInventory || loadingOrders || loadingRoasteryOwnerShops || loadingAllOrders;
 
   if (isLoading) {
     return (
@@ -474,6 +493,144 @@ export default function Dashboard() {
             icon={AlertTriangle}
           />
         </div>
+
+        {/* Orders Overview */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Orders Overview</CardTitle>
+            <CardDescription>Recent order status and activities</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableHead>Shop</TableHead>
+                  <TableHead>Coffee</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Date</TableHead>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {allOrders?.slice(0, 5).map(order => {
+                  const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
+                  return (
+                    <TableRow key={order.id}>
+                      <TableCell>{order.shop?.name}</TableCell>
+                      <TableCell>{coffee?.name}</TableCell>
+                      <TableCell>
+                        {order.smallBags > 0 && `${order.smallBags} small`}
+                        {order.smallBags > 0 && order.largeBags > 0 && ', '}
+                        {order.largeBags > 0 && `${order.largeBags} large`}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={
+                          order.status === 'pending' ? 'outline' :
+                            order.status === 'roasted' ? 'secondary' :
+                              order.status === 'dispatched' ? 'default' :
+                                'success'
+                        }>
+                          {order.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{format(new Date(order.createdAt), 'MMM d, yyyy')}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+            <div className="mt-4 flex justify-end">
+              <Button asChild variant="outline" size="sm">
+                <Link href="/roasting/orders">View All Orders</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Shops Performance */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Shops Performance</CardTitle>
+            <CardDescription>Stock levels and order status across shops</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {roasteryOwnerShops?.map(shop => {
+              const shopInventory = allInventory?.filter(inv => inv.shopId === shop.id) || [];
+              const lowStockItems = shopInventory.filter(item =>
+                (item.smallBags || 0) < (shop.desiredSmallBags || 20) / 2 ||
+                (item.largeBags || 0) < (shop.desiredLargeBags || 10) / 2
+              );
+
+              return (
+                <div key={shop.id} className="mb-6 last:mb-0">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-medium">{shop.name}</h3>
+                    <Badge variant={lowStockItems.length > 0 ? "destructive" : "outline"}>
+                      {lowStockItems.length > 0 ? `${lowStockItems.length} Low Stock` : "Stock OK"}
+                    </Badge>
+                  </div>
+                  <div className="space-y-2">
+                    {shopInventory.map(inv => {
+                      const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
+                      return (
+                        <div key={`${shop.id}-${inv.greenCoffeeId}`} className="p-2 bg-muted rounded">
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm">{coffee?.name}</span>
+                            <span className="text-sm text-muted-foreground">
+                              {inv.smallBags} small, {inv.largeBags} large
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+            <div className="mt-4 flex justify-end">
+              <Button asChild variant="outline" size="sm">
+                <Link href="/shops">Manage Shops</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Recent Activities */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Activities</CardTitle>
+            <CardDescription>Latest updates and changes</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {allOrders?.slice(0, 5).map(order => {
+                const shop = order.shop;
+                const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
+                const updatedBy = order.updatedBy;
+
+                return (
+                  <div key={order.id} className="flex items-start space-x-4">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Package className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <p className="text-sm font-medium">
+                        {shop?.name} - {coffee?.name}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Status changed to {order.status}
+                        {updatedBy && ` by ${updatedBy.username}`}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(order.updatedAt || order.createdAt), 'MMM d, yyyy HH:mm')}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Low Stock Alerts */}
         {lowStockCoffees.length > 0 && (
