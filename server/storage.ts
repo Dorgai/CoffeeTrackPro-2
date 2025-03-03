@@ -16,6 +16,10 @@ import {
   type InventoryDiscrepancy,
   type InsertInventoryDiscrepancy,
   type CoffeeLargeBagTarget,
+  type BillingEvent,
+  type BillingEventDetail,
+  type InsertBillingEvent,
+  type InsertBillingEventDetail,
   users,
   shops,
   greenCoffee,
@@ -26,17 +30,14 @@ import {
   dispatchedCoffeeConfirmations,
   inventoryDiscrepancies,
   coffeeLargeBagTargets,
+  billingEvents,
+  billingEventDetails,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, gt, and } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
-
-// Assuming BillingEvent and related types are defined elsewhere, perhaps in @shared/schema
-type BillingEvent = { id: number; createdAt: Date; /* ...other fields */ };
-type InsertBillingEvent = { /* ...fields for creating a billing event */ };
-type InsertBillingEventDetail = { /* ...fields for creating a billing event detail */ };
 
 const PostgresSessionStore = connectPg(session);
 
@@ -985,8 +986,7 @@ export class DatabaseStorage implements IStorage {
 
       return deletedShop;
     } catch (error) {
-      console.error("Error deleting shop:", error);
-      throw error;
+      console.error("Error deleting shop:", error);      throw error;
     }
   }
   async getAllDispatchedCoffeeConfirmations(): Promise<(DispatchedCoffeeConfirmation & {
@@ -1208,10 +1208,12 @@ export class DatabaseStorage implements IStorage {
     largeBagsQuantity: number;
   }[]> {
     try {
+      console.log("Fetching billing quantities since:", fromDate);
+
       // Get all orders since the fromDate that are in 'dispatched' status
       const orders = await db
         .select({
-          greenCoffeeGrade: greenCoffee.grade,
+          grade: greenCoffee.grade,
           smallBags: orders.smallBags,
           largeBags: orders.largeBags,
         })
@@ -1224,9 +1226,11 @@ export class DatabaseStorage implements IStorage {
           )
         );
 
+      console.log("Found orders:", orders);
+
       // Aggregate quantities by grade
       const quantities = orders.reduce((acc, order) => {
-        const grade = order.greenCoffeeGrade;
+        const grade = order.grade;
         if (!acc[grade]) {
           acc[grade] = { smallBagsQuantity: 0, largeBagsQuantity: 0 };
         }
@@ -1236,10 +1240,13 @@ export class DatabaseStorage implements IStorage {
       }, {} as Record<string, { smallBagsQuantity: number; largeBagsQuantity: number }>);
 
       // Convert to array format
-      return Object.entries(quantities).map(([grade, quantities]) => ({
+      const result = Object.entries(quantities).map(([grade, quantities]) => ({
         grade,
         ...quantities
       }));
+
+      console.log("Aggregated quantities:", result);
+      return result;
     } catch (error) {
       console.error("Error fetching billing quantities:", error);
       throw error;
@@ -1249,11 +1256,15 @@ export class DatabaseStorage implements IStorage {
   async createBillingEvent(event: InsertBillingEvent, details: InsertBillingEventDetail[]): Promise<BillingEvent> {
     try {
       return await db.transaction(async (tx) => {
+        console.log("Creating billing event:", event);
         // Create the billing event
         const [newEvent] = await tx
           .insert(billingEvents)
           .values(event)
           .returning();
+
+        console.log("Created billing event:", newEvent);
+        console.log("Creating billing event details:", details);
 
         // Create the billing event details
         await Promise.all(
