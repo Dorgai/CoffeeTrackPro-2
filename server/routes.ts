@@ -804,8 +804,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(target);
     } catch (error) {
       console.error("Error updating coffee target:", error);
-      res.status(500).json({ message: "Failed to update coffee target" });
-    }
+      res.status(500).json({ message: "Failed to update coffee target" });    }
   });
 
   // Add new billing routes after the existing ones

@@ -809,6 +809,8 @@ export class DatabaseStorage implements IStorage {
     };
   })[]> {
     try {
+      console.log("Starting getInventoryDiscrepancies query...");
+
       const discrepancies = await db
         .select({
           id: inventoryDiscrepancies.id,
@@ -856,7 +858,7 @@ export class DatabaseStorage implements IStorage {
         )
         .orderBy(desc(inventoryDiscrepancies.createdAt));
 
-      console.log("Retrieved inventory discrepancies:", discrepancies);
+      console.log("Retrieved inventory discrepancies:", JSON.stringify(discrepancies, null, 2));
       return discrepancies;
     } catch (error) {
       console.error("Error fetching inventory discrepancies:", error);
