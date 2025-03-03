@@ -117,7 +117,7 @@ export default function Dashboard() {
   // Get all orders for roastery owner and roaster
   const { data: allOrders, isLoading: loadingAllOrders } = useQuery<Order[]>({
     queryKey: ["/api/orders"],
-    enabled: !!user && (user.role === "roasteryOwner" || user.role === "roaster"),
+    enabled: !!user && (user.role === "roasteryOwner" || user?.role === "roaster"),
   });
 
 
@@ -457,9 +457,14 @@ export default function Dashboard() {
 
   // Roastery owner view
   if (user?.role === "roasteryOwner") {
+    // Calculate some aggregate stats
+    const totalOrders = allOrders?.length || 0;
+    const completedOrders = allOrders?.filter(o => o.status === 'delivered').length || 0;
+    const orderFulfillmentRate = totalOrders ? Math.round((completedOrders / totalOrders) * 100) : 0;
+
     return (
       <div className="container mx-auto py-8 space-y-8">
-        {/* Header */}
+        {/* Header section remains the same */}
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user.username}</h1>
@@ -478,21 +483,49 @@ export default function Dashboard() {
         {/* Stats Overview */}
         <div className="grid gap-4 md:grid-cols-3">
           <StatsCard
-            title="Active Shops"
-            value={allInventory ? new Set(allInventory.map(i => i.shopId)).size : 0}
-            icon={Store}
+            title="Order Fulfillment"
+            value={`${orderFulfillmentRate}%`}
+            icon={Package}
+            description="Orders completed successfully"
           />
           <StatsCard
-            title="Coffee Types"
-            value={coffees?.length || 0}
-            icon={Coffee}
+            title="Active Shops"
+            value={roasteryOwnerShops?.length || 0}
+            icon={Store}
+            description="Total managed locations"
           />
           <StatsCard
             title="Low Stock Items"
             value={lowStockCoffees.length}
             icon={AlertTriangle}
+            description="Items below threshold"
           />
         </div>
+
+        {/* Overall Performance */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Performance Overview</CardTitle>
+            <CardDescription>Key metrics across all operations</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <StockProgress
+              current={completedOrders}
+              desired={totalOrders}
+              label="Order Fulfillment Rate"
+            />
+            <StockProgress
+              current={coffees?.filter(c => Number(c.currentStock) > Number(c.minThreshold)).length || 0}
+              desired={coffees?.length || 0}
+              label="Coffee Stock Health"
+            />
+            <StockProgress
+              current={roasteryOwnerShops?.filter(s => s.isActive).length || 0}
+              desired={roasteryOwnerShops?.length || 0}
+              label="Active Shops"
+            />
+          </CardContent>
+        </Card>
 
         {/* Orders Overview */}
         <Card>
@@ -556,29 +589,42 @@ export default function Dashboard() {
           <CardContent>
             {roasteryOwnerShops?.map(shop => {
               const shopInventory = allInventory?.filter(inv => inv.shopId === shop.id) || [];
-              const lowStockItems = shopInventory.filter(item =>
-                (item.smallBags || 0) < (shop.desiredSmallBags || 20) / 2 ||
-                (item.largeBags || 0) < (shop.desiredLargeBags || 10) / 2
-              );
+              const totalItems = shopInventory.length;
+              const healthyItems = shopInventory.filter(item =>
+                (item.smallBags || 0) >= (shop.desiredSmallBags || 20) / 2 &&
+                (item.largeBags || 0) >= (shop.desiredLargeBags || 10) / 2
+              ).length;
 
               return (
                 <div key={shop.id} className="mb-6 last:mb-0">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="font-medium">{shop.name}</h3>
-                    <Badge variant={lowStockItems.length > 0 ? "destructive" : "outline"}>
-                      {lowStockItems.length > 0 ? `${lowStockItems.length} Low Stock` : "Stock OK"}
+                    <Badge variant={healthyItems < totalItems ? "destructive" : "outline"}>
+                      {healthyItems < totalItems ? `${totalItems - healthyItems} Low Stock` : "Stock OK"}
                     </Badge>
                   </div>
-                  <div className="space-y-2">
+                  <StockProgress
+                    current={healthyItems}
+                    desired={totalItems}
+                    label="Stock Health"
+                  />
+                  <div className="mt-4 space-y-2">
                     {shopInventory.map(inv => {
                       const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
                       return (
                         <div key={`${shop.id}-${inv.greenCoffeeId}`} className="p-2 bg-muted rounded">
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm">{coffee?.name}</span>
-                            <span className="text-sm text-muted-foreground">
-                              {inv.smallBags} small, {inv.largeBags} large
-                            </span>
+                          <div className="text-sm font-medium mb-2">{coffee?.name}</div>
+                          <div className="space-y-2">
+                            <StockProgress
+                              current={inv.smallBags || 0}
+                              desired={shop.desiredSmallBags || 20}
+                              label="Small Bags (200g)"
+                            />
+                            <StockProgress
+                              current={inv.largeBags || 0}
+                              desired={shop.desiredLargeBags || 10}
+                              label="Large Bags (1kg)"
+                            />
                           </div>
                         </div>
                       );
@@ -592,6 +638,29 @@ export default function Dashboard() {
                 <Link href="/shops">Manage Shops</Link>
               </Button>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Coffee Inventory Overview */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Coffee Inventory Overview</CardTitle>
+            <CardDescription>Current stock levels across all varieties</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {coffees?.map(coffee => (
+              <div key={coffee.id} className="mb-4 last:mb-0">
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="font-medium">{coffee.name}</h3>
+                  <span className="text-sm text-muted-foreground">{coffee.producer}</span>
+                </div>
+                <StockProgress
+                  current={Number(coffee.currentStock)}
+                  desired={Number(coffee.minThreshold) * 2}
+                  label="Current Stock"
+                />
+              </div>
+            ))}
           </CardContent>
         </Card>
 

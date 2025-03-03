@@ -22,7 +22,7 @@ export function StockProgress({ current, desired, label }: StockProgressProps) {
         <span>{label}</span>
         <span>{percentage}% of target</span>
       </div>
-      <Progress
+      <Progress 
         value={percentage}
         className="h-2"
         indicatorClassName={getColorClass()}
