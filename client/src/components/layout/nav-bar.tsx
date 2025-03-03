@@ -151,7 +151,7 @@ export function NavBar() {
               {(user.role === "roasteryOwner" || user.role === "roaster") && (
                 <GreenBeansStockIndicator />
               )}
-              {(user.role === "roasteryOwner" || user.role === "shopManager") && <RestockDialog />}
+              {(user.role === "roasteryOwner" || user.role === "shopManager" || user.role === "barista") && <RestockDialog />}
               {(user.role === "roasteryOwner" || user.role === "roaster") && (
                 <Button variant="outline" size="sm" asChild>
                   <Link href="/inventory" className="flex items-center">
