@@ -298,6 +298,14 @@ export default function Dashboard() {
 
   // Shop manager and barista view
   if (user?.role === "shopManager" || user?.role === "barista") {
+    // Calculate stats
+    const totalItems = shopInventory?.length || 0;
+    const lowStockItems = shopInventory?.filter(item =>
+      (item.smallBags || 0) < (shop?.desiredSmallBags || 20) / 2 ||
+      (item.largeBags || 0) < (shop?.desiredLargeBags || 10) / 2
+    ).length || 0;
+    const stockHealth = totalItems ? Math.round(((totalItems - lowStockItems) / totalItems) * 100) : 0;
+
     return (
       <div className="container mx-auto py-8 space-y-8">
         {/* Header */}
@@ -332,23 +340,42 @@ export default function Dashboard() {
           />
           <StatsCard
             title="Low Stock Items"
-            value={shopInventory?.filter(item =>
-              (item.smallBags || 0) < (shop?.desiredSmallBags || 20) / 2 ||
-              (item.largeBags || 0) < (shop?.desiredLargeBags || 10) / 2
-            ).length || 0}
+            value={lowStockItems}
             icon={AlertTriangle}
             description="Below 50% of target"
           />
           <StatsCard
             title="Stock Health"
-            value={`${Math.round((shopInventory?.reduce((acc, item) =>
-              acc + ((item.smallBags || 0) >= (shop?.desiredSmallBags || 20) / 2 ? 1 : 0),
-              0
-            ) / (shopInventory?.length || 1)) * 100)}%`}
+            value={`${stockHealth}%`}
             icon={Package}
             description="Items meeting target levels"
           />
         </div>
+
+        {/* Performance Overview */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Performance Overview</CardTitle>
+            <CardDescription>Key metrics for selected shop</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <StockProgress
+              current={totalItems - lowStockItems}
+              desired={totalItems}
+              label="Overall Stock Health"
+            />
+            <StockProgress
+              current={shopInventory?.reduce((sum, item) => sum + (item.smallBags || 0), 0) || 0}
+              desired={shop?.desiredSmallBags || 0}
+              label="Total Small Bags"
+            />
+            <StockProgress
+              current={shopInventory?.reduce((sum, item) => sum + (item.largeBags || 0), 0) || 0}
+              desired={shop?.desiredLargeBags || 0}
+              label="Total Large Bags"
+            />
+          </CardContent>
+        </Card>
 
         {/* Main Content */}
         <div className="grid gap-4 md:grid-cols-2">
@@ -373,7 +400,7 @@ export default function Dashboard() {
                     return (
                       <div key={item.id} className="p-4 border rounded-lg">
                         <h3 className="font-medium">{coffee?.name || 'Unknown Coffee'}</h3>
-                        <div className="mt-2 space-y-1">
+                        <div className="mt-2 space-y-2">
                           <StockProgress
                             current={item.smallBags || 0}
                             desired={shop?.desiredSmallBags || 0}
@@ -393,7 +420,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Low Stock Items */}
+          {/* Stock Alerts */}
           <Card>
             <CardHeader>
               <CardTitle>Stock Alerts</CardTitle>
@@ -430,6 +457,59 @@ export default function Dashboard() {
           </Card>
         </div>
 
+        {/* Recent Orders */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Orders</CardTitle>
+            <CardDescription>Latest order status and activities</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableHead>Coffee</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Date</TableHead>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {allOrders?.filter(order => order.shopId === selectedShopId)
+                  .slice(0, 5)
+                  .map(order => {
+                    const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
+                    return (
+                      <TableRow key={order.id}>
+                        <TableCell>{coffee?.name}</TableCell>
+                        <TableCell>
+                          {order.smallBags > 0 && `${order.smallBags} small`}
+                          {order.smallBags > 0 && order.largeBags > 0 && ', '}
+                          {order.largeBags > 0 && `${order.largeBags} large`}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={
+                            order.status === 'pending' ? 'outline' :
+                            order.status === 'roasted' ? 'secondary' :
+                            order.status === 'dispatched' ? 'default' :
+                            'success'
+                          }>
+                            {order.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{format(new Date(order.createdAt), 'MMM d, yyyy')}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+              </TableBody>
+            </Table>
+            <div className="mt-4 flex justify-end">
+              <Button asChild variant="outline" size="sm">
+                <Link href="/retail/orders">View All Orders</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Shop Details */}
         <Card>
           <CardHeader>
@@ -442,11 +522,42 @@ export default function Dashboard() {
             ) : !shop ? (
               <p className="text-center text-muted-foreground">No shop data available</p>
             ) : (
-              <div className="space-y-2">
-                <p><strong>Name:</strong> {shop.name}</p>
-                <p><strong>Location:</strong> {shop.location}</p>
-                <p><strong>Target Small Bags:</strong> {shop.desiredSmallBags}</p>
-                <p><strong>Target Large Bags:</strong> {shop.desiredLargeBags}</p>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Name</p>
+                    <p className="font-medium">{shop.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Location</p>
+                    <p className="font-medium">{shop.location}</p>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <StockProgress
+                    current={shopInventory?.reduce((sum, item) => sum + (item.smallBags || 0), 0) || 0}
+                    desired={shop.desiredSmallBags || 0}
+                    label="Total Small Bags (200g)"
+                  />
+                  <StockProgress
+                    current={shopInventory?.reduce((sum, item) => sum + (item.largeBags || 0), 0) || 0}
+                    desired={shop.desiredLargeBags || 0}
+                    label="Total Large Bags (1kg)"
+                  />
+                </div>
+                <div className="mt-4 pt-4 border-t">
+                  <h4 className="text-sm font-medium mb-2">Target Stock Levels</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Target Small Bags</p>
+                      <p className="font-medium">{shop.desiredSmallBags}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Target Large Bags</p>
+                      <p className="font-medium">{shop.desiredLargeBags}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </CardContent>
@@ -560,8 +671,8 @@ export default function Dashboard() {
                         <Badge variant={
                           order.status === 'pending' ? 'outline' :
                             order.status === 'roasted' ? 'secondary' :
-                              order.status === 'dispatched' ? 'default' :
-                                'success'
+                            order.status === 'dispatched' ? 'default' :
+                            'success'
                         }>
                           {order.status}
                         </Badge>
