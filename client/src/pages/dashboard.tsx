@@ -1,9 +1,9 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useQuery } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { useState } from 'react';
 import { useLocation } from "wouter";
 import type { GreenCoffee, RetailInventory, Shop, Order } from "@shared/schema";
-import { format } from 'date-fns';
-import { useState } from 'react';
+import { useQuery } from "@tanstack/react-query";
 import { RestockDialog } from "@/components/coffee/restock-dialog";
 import {
   Card,
@@ -112,7 +112,7 @@ export default function Dashboard() {
               className="whitespace-nowrap"
             >
               <Package className="h-4 w-4 mr-2" />
-              Restock Inventory
+              Restock
             </Button>
             <Button
               variant="outline"
@@ -195,43 +195,25 @@ export default function Dashboard() {
               ) : !shopInventory?.length ? (
                 <p className="text-center text-muted-foreground">No inventory data available</p>
               ) : (
-                <div key={selectedShopId} className="space-y-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-medium">{shop?.name}</h3>
-                    <Badge variant={
-                      shopInventory.some(item =>
-                        (item.smallBags || 0) < (shop?.desiredSmallBags || 20) / 2 ||
-                        (item.largeBags || 0) < (shop?.desiredLargeBags || 10) / 2
-                      ) ? "destructive" : "outline"
-                    }>
-                      {shopInventory.filter(item =>
-                        (item.smallBags || 0) < (shop?.desiredSmallBags || 20) / 2 ||
-                        (item.largeBags || 0) < (shop?.desiredLargeBags || 10) / 2
-                      ).length > 0 ? "Low Stock Items" : "Stock OK"}
-                    </Badge>
-                  </div>
-                  <div className="mt-4 space-y-2">
-                    {shopInventory.map(inv => {
-                      const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
-                      return (
-                        <div key={`${selectedShopId}-${inv.greenCoffeeId}`} className="p-2 bg-muted rounded">
-                          <div className="text-sm font-medium mb-2">{coffee?.name}</div>
-                          <div className="space-y-2">
-                            <StockProgress
-                              current={inv.smallBags || 0}
-                              desired={shop?.desiredSmallBags || 20}
-                              label="Small Bags (200g)"
-                            />
-                            <StockProgress
-                              current={inv.largeBags || 0}
-                              desired={shop?.desiredLargeBags || 10}
-                              label="Large Bags (1kg)"
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                <div className="space-y-4">
+                  {shopInventory.map(inv => {
+                    const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
+                    return (
+                      <div key={`${selectedShopId}-${inv.greenCoffeeId}`} className="p-2 bg-muted rounded">
+                        <div className="text-sm font-medium mb-2">{coffee?.name}</div>
+                        <StockProgress
+                          current={inv.smallBags || 0}
+                          desired={shop?.desiredSmallBags || 20}
+                          label="Small Bags (200g)"
+                        />
+                        <StockProgress
+                          current={inv.largeBags || 0}
+                          desired={shop?.desiredLargeBags || 10}
+                          label="Large Bags (1kg)"
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
