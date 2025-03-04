@@ -134,7 +134,7 @@ export default function Dashboard() {
     <div className="container mx-auto py-8 space-y-8">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user.username}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user?.username}</h1>
           <p className="text-muted-foreground">
             {user?.role === "roasteryOwner"
               ? "Coffee roasting operations overview"
@@ -338,7 +338,6 @@ export default function Dashboard() {
           </Card>
         </div>
       )}
-
 
       {(user?.role === "shopManager" || user?.role === "barista") && (
         <>
@@ -705,7 +704,11 @@ export default function Dashboard() {
         </>
       )}
 
-      <RestockDialog open={isRestockOpen} onOpenChange={setIsRestockOpen} />
+      <RestockDialog 
+        open={isRestockOpen} 
+        onOpenChange={setIsRestockOpen}
+        shopId={selectedShopId}
+      />
     </div>
   );
 }

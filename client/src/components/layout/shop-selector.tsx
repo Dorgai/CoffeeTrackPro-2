@@ -11,6 +11,7 @@ import { useActiveShop } from "@/hooks/use-active-shop";
 import { Store, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect } from "react";
+import { apiRequest } from "@/lib/queryClient";
 
 interface ShopSelectorProps {
   value?: number | null;
@@ -22,12 +23,31 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   const { activeShop, setActiveShop } = useActiveShop();
   const { user } = useAuth();
 
-  const { data: shops, isLoading } = useQuery<Shop[]>({
+  // Fetch user's authorized shops for barista/manager
+  const { data: userShops, isLoading: loadingUserShops } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
-    enabled: !!user && (user.role === "shopManager" || user.role === "barista" || user.role === "roasteryOwner"),
+    enabled: !!user && (user.role === "shopManager" || user.role === "barista"),
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/user/shops");
+      if (!res.ok) throw new Error("Failed to fetch user shops");
+      return res.json();
+    }
   });
 
+  // Fetch all shops for roasteryOwner
+  const { data: allShops, isLoading: loadingAllShops } = useQuery<Shop[]>({
+    queryKey: ["/api/shops"],
+    enabled: !!user && user.role === "roasteryOwner",
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/shops");
+      if (!res.ok) throw new Error("Failed to fetch all shops");
+      return res.json();
+    }
+  });
+
+  // Set default shop on mount and when shops data changes
   useEffect(() => {
+    const shops = user?.role === "roasteryOwner" ? allShops : userShops;
     if (shops && shops.length > 0 && !activeShop) {
       const defaultShop = shops.find(s => s.id === user?.defaultShopId) || shops[0];
       setActiveShop(defaultShop);
@@ -35,10 +55,11 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
         onChange(defaultShop.id);
       }
     }
-  }, [shops, user?.defaultShopId, activeShop, setActiveShop, onChange]);
+  }, [userShops, allShops, user?.defaultShopId, activeShop, setActiveShop, onChange, user?.role]);
 
   const handleChange = (value: string) => {
     const shopId = value ? parseInt(value, 10) : null;
+    const shops = user?.role === "roasteryOwner" ? allShops : userShops;
     const shop = shops?.find((s) => s.id === shopId);
 
     if (onChange) {
@@ -47,6 +68,8 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
     setActiveShop(shop || null);
   };
 
+  const isLoading = loadingUserShops || loadingAllShops;
+  const shops = user?.role === "roasteryOwner" ? allShops : userShops;
   const currentValue = value !== undefined ? value : activeShop?.id;
 
   return (
