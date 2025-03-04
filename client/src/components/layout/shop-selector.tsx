@@ -33,9 +33,9 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   const { data: userShops, isLoading } = useQuery<UserShopResponse[]>({
     queryKey: ["/api/user/shops"],
     enabled: !!user && (user.role === "shopManager" || user.role === "barista"),
+    retry: 1,
   });
 
-  // Transform nested shop data into a flat array of shops
   const shops = userShops?.map(item => item.shop).filter(Boolean) || [];
 
   useEffect(() => {
@@ -43,9 +43,7 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
       const defaultShop = shops.find(s => s.id === user?.defaultShopId) || shops[0];
       if (defaultShop) {
         setActiveShop(defaultShop);
-        if (onChange) {
-          onChange(defaultShop.id);
-        }
+        onChange?.(defaultShop.id);
       }
     }
   }, [shops, user?.defaultShopId, activeShop, setActiveShop, onChange]);
@@ -54,14 +52,9 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
     const shopId = value ? parseInt(value, 10) : null;
     const shop = shops.find((s) => s.id === shopId);
 
-    if (onChange) {
-      onChange(shopId);
-    }
+    onChange?.(shopId);
     setActiveShop(shop || null);
   };
-
-  // Use controlled value if provided, otherwise use context
-  const currentValue = value !== undefined ? value : activeShop?.id;
 
   if (!user || (user.role !== "shopManager" && user.role !== "barista")) {
     return null;
@@ -71,7 +64,7 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
     <div className={`flex items-center gap-2 ${className || ''}`}>
       <Store className="h-4 w-4 text-muted-foreground" />
       <Select
-        value={currentValue?.toString() || ""}
+        value={String(value ?? activeShop?.id ?? '')}
         onValueChange={handleChange}
         disabled={isLoading}
       >
@@ -86,7 +79,7 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
           )}
         </SelectTrigger>
         <SelectContent>
-          {shops.map((shop) => (
+          {!isLoading && shops.map((shop) => (
             <SelectItem 
               key={shop.id} 
               value={String(shop.id)}
@@ -94,7 +87,7 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
               {shop.name}
             </SelectItem>
           ))}
-          {!isLoading && (!shops || shops.length === 0) && (
+          {!isLoading && shops.length === 0 && (
             <div className="relative flex items-center justify-center py-2 text-sm text-muted-foreground">
               No shops available
             </div>

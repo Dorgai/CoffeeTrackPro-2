@@ -68,15 +68,17 @@ export default function Dashboard() {
   const [isRestockOpen, setIsRestockOpen] = useState(false);
   const [, navigate] = useLocation();
 
+  // For shop managers and baristas
   const { data: userShops, isLoading: loadingShops } = useQuery<{ user_shops: any, shop: Shop }[]>({
     queryKey: ["/api/user/shops"],
     enabled: !!user && (user.role === "shopManager" || user.role === "barista"),
+    retry: 1,
   });
 
   const shops = userShops?.map(item => item.shop).filter(Boolean) || [];
 
   useEffect(() => {
-    if ((user?.role === "shopManager" || user?.role === "barista") && shops.length && !selectedShopId) {
+    if ((user?.role === "shopManager" || user?.role === "barista") && shops.length > 0 && !selectedShopId) {
       const defaultShop = shops.find(s => s.id === user.defaultShopId) || shops[0];
       if (defaultShop) {
         setSelectedShopId(defaultShop.id);
@@ -92,16 +94,19 @@ export default function Dashboard() {
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
     enabled: !!user,
+    retry: 1,
   });
 
   const { data: shopInventory, isLoading: loadingInventory } = useQuery<RetailInventory[]>({
     queryKey: ["/api/retail-inventory", selectedShopId],
     queryFn: async () => {
+      if (!selectedShopId) return [];
       const res = await apiRequest("GET", `/api/retail-inventory?shopId=${selectedShopId}`);
       if (!res.ok) throw new Error("Failed to fetch inventory");
       return res.json();
     },
-    enabled: !!selectedShopId && (user?.role === "shopManager" || user?.role === "barista"),
+    enabled: !!selectedShopId && !!user && (user.role === "shopManager" || user.role === "barista"),
+    retry: 1,
   });
 
   const { data: allInventory, isLoading: loadingAllInventory } = useQuery<RetailInventory[]>({
@@ -153,6 +158,14 @@ export default function Dashboard() {
     loadingAllOrders || loadingShopOrders || loadingDiscrepancies;
 
   if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -575,9 +588,9 @@ export default function Dashboard() {
                         <TableCell className="text-left">
                           <Badge variant={
                             order.status === 'pending' ? 'outline' :
-                            order.status === 'roasted' ? 'secondary' :
-                            order.status === 'dispatched' ? 'default' :
-                            order.status === 'delivered' ? 'default' : 'outline'
+                              order.status === 'roasted' ? 'secondary' :
+                                order.status === 'dispatched' ? 'default' :
+                                  order.status === 'delivered' ? 'default' : 'outline'
                           }>
                             {order.status}
                           </Badge>
@@ -787,9 +800,9 @@ export default function Dashboard() {
                       <TableCell className="text-left">
                         <Badge variant={
                           order.status === 'pending' ? 'outline' :
-                          order.status === 'roasted' ? 'secondary' :
-                          order.status === 'dispatched' ? 'default' :
-                          'success'
+                            order.status === 'roasted' ? 'secondary' :
+                              order.status === 'dispatched' ? 'default' :
+                                'success'
                         }>
                           {order.status}
                         </Badge>
