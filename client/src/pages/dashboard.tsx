@@ -132,15 +132,15 @@ export default function Dashboard() {
     enabled: !!selectedShopId && (user?.role === "shopManager" || user?.role === "barista"),
   });
 
-  // Add the discrepancies query near the other queries
+  // Update the discrepancies query
   const { data: discrepancies, isLoading: loadingDiscrepancies } = useQuery({
     queryKey: ["/api/inventory-discrepancies"],
     enabled: !!user && (user.role === "roaster" || user.role === "roasteryOwner"),
     queryFn: async () => {
+      console.log("Fetching discrepancies for role:", user?.role);
       const res = await apiRequest("GET", "/api/inventory-discrepancies");
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Failed to fetch discrepancies");
+        throw new Error("Failed to fetch discrepancies");
       }
       return res.json();
     }
@@ -162,7 +162,9 @@ export default function Dashboard() {
     Number(coffee.currentStock) <= Number(coffee.minThreshold)
   ) || [];
 
+  // Update the InventoryDiscrepancyView component
   const InventoryDiscrepancyView = () => {
+    console.log("Rendering InventoryDiscrepancyView with discrepancies:", discrepancies);
     return (
       <Card>
         <CardHeader>
@@ -180,33 +182,48 @@ export default function Dashboard() {
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableHead>Coffee</TableHead>
-                  <TableHead>Expected</TableHead>
-                  <TableHead>Actual</TableHead>
-                  <TableHead>Difference</TableHead>
                   <TableHead>Date</TableHead>
+                  <TableHead>Shop</TableHead>
+                  <TableHead>Coffee</TableHead>
+                  <TableHead>Small Bags</TableHead>
+                  <TableHead>Large Bags</TableHead>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {discrepancies.map((discrepancy: any) => {
-                  const coffee = coffees?.find(c => c.id === discrepancy.greenCoffeeId);
+                  console.log("Processing discrepancy:", discrepancy);
                   return (
                     <TableRow key={discrepancy.id}>
-                      <TableCell>{coffee?.name || 'Unknown Coffee'}</TableCell>
-                      <TableCell>{discrepancy.expectedQuantity}</TableCell>
-                      <TableCell>{discrepancy.actualQuantity}</TableCell>
-                      <TableCell className={
-                        discrepancy.actualQuantity < discrepancy.expectedQuantity
-                          ? "text-destructive"
-                          : "text-muted-foreground"
-                      }>
-                        {discrepancy.actualQuantity - discrepancy.expectedQuantity}
+                      <TableCell>{formatDate(new Date(discrepancy.createdAt), 'MMM d, yyyy')}</TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{discrepancy.confirmation?.shop?.name}</p>
+                          <p className="text-sm text-muted-foreground">{discrepancy.confirmation?.shop?.location}</p>
+                        </div>
                       </TableCell>
                       <TableCell>
-                        {discrepancy.createdAt
-                          ? formatDate(new Date(discrepancy.createdAt), 'MMM d, yyyy')
-                          : 'N/A'
-                        }
+                        <div>
+                          <p className="font-medium">{discrepancy.confirmation?.greenCoffee?.name}</p>
+                          <p className="text-sm text-muted-foreground">{discrepancy.confirmation?.greenCoffee?.producer}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <p>Expected: {discrepancy.confirmation?.dispatchedSmallBags}</p>
+                          <p>Received: {discrepancy.confirmation?.receivedSmallBags}</p>
+                          <p className={discrepancy.smallBagsDifference < 0 ? "text-destructive font-medium" : "text-muted-foreground"}>
+                            Difference: {discrepancy.smallBagsDifference}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <p>Expected: {discrepancy.confirmation?.dispatchedLargeBags}</p>
+                          <p>Received: {discrepancy.confirmation?.receivedLargeBags}</p>
+                          <p className={discrepancy.largeBagsDifference < 0 ? "text-destructive font-medium" : "text-muted-foreground"}>
+                            Difference: {discrepancy.largeBagsDifference}
+                          </p>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -632,7 +649,6 @@ export default function Dashboard() {
       </div>
     );
   }
-
   if (user?.role === "roasteryOwner") {
     const totalOrders = allOrders?.length || 0;
     const completedOrders = allOrders?.filter(o => o.status === 'delivered').length || 0;
@@ -850,7 +866,7 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Recent Activities</CardTitle>
+<CardTitle>Recent Activities</CardTitle>
             <CardDescription>Latest updates and changes</CardDescription>
           </CardHeader>
           <CardContent>
@@ -1183,7 +1199,6 @@ export default function Dashboard() {
       </div>
     );
   }
-
   if (user?.role === "roasteryOwner") {
     const totalOrders = allOrders?.length || 0;
     const completedOrders = allOrders?.filter(o => o.status === 'delivered').length || 0;
