@@ -66,11 +66,8 @@ async function createServer() {
     log('Setting up routes...');
     const httpServer = await registerRoutes(app);
 
-    // Set up Vite in development mode
-    if (process.env.NODE_ENV !== "production") {
-      log('Setting up Vite in development mode...');
-      await setupVite(app, httpServer);
-    }
+    log('Setting up Vite in development mode...');
+    await setupVite(app, httpServer);
 
     // Global error handler
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
