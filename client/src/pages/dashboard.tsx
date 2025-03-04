@@ -2,7 +2,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import type { GreenCoffee, RetailInventory, Shop, Order } from "@shared/schema";
-import { format } from 'date-fns';
+import { format as formatDate } from 'date-fns';
 import { useEffect, useState } from 'react';
 import { RestockDialog } from "@/components/coffee/restock-dialog";
 
@@ -146,8 +146,8 @@ export default function Dashboard() {
     }
   });
 
-  const isLoading = loadingShops || loadingShop || loadingCoffees || loadingInventory || 
-    loadingAllInventory || loadingOrders || loadingRoasteryOwnerShops || 
+  const isLoading = loadingShops || loadingShop || loadingCoffees || loadingInventory ||
+    loadingAllInventory || loadingOrders || loadingRoasteryOwnerShops ||
     loadingAllOrders || loadingShopOrders || loadingDiscrepancies;
 
   if (isLoading) {
@@ -161,6 +161,64 @@ export default function Dashboard() {
   const lowStockCoffees = coffees?.filter(coffee =>
     Number(coffee.currentStock) <= Number(coffee.minThreshold)
   ) || [];
+
+  const InventoryDiscrepancyView = () => {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Inventory Discrepancies</CardTitle>
+          <CardDescription>Recent inventory adjustments</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loadingDiscrepancies ? (
+            <div className="flex items-center justify-center p-4">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+          ) : !discrepancies?.length ? (
+            <p className="text-center text-muted-foreground">No recent discrepancies found</p>
+          ) : (
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableHead>Coffee</TableHead>
+                  <TableHead>Expected</TableHead>
+                  <TableHead>Actual</TableHead>
+                  <TableHead>Difference</TableHead>
+                  <TableHead>Date</TableHead>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {discrepancies.map((discrepancy: any) => {
+                  const coffee = coffees?.find(c => c.id === discrepancy.greenCoffeeId);
+                  return (
+                    <TableRow key={discrepancy.id}>
+                      <TableCell>{coffee?.name || 'Unknown Coffee'}</TableCell>
+                      <TableCell>{discrepancy.expectedQuantity}</TableCell>
+                      <TableCell>{discrepancy.actualQuantity}</TableCell>
+                      <TableCell className={
+                        discrepancy.actualQuantity < discrepancy.expectedQuantity
+                          ? "text-destructive"
+                          : "text-muted-foreground"
+                      }>
+                        {discrepancy.actualQuantity - discrepancy.expectedQuantity}
+                      </TableCell>
+                      <TableCell>
+                        {discrepancy.createdAt
+                          ? formatDate(new Date(discrepancy.createdAt), 'MMM d, yyyy')
+                          : 'N/A'
+                        }
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
 
   if (user?.role === "roaster") {
     return (
@@ -202,101 +260,50 @@ export default function Dashboard() {
           />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Green Coffee Inventory</CardTitle>
-              <CardDescription>Available coffee for roasting</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {!coffees?.length ? (
-                <p className="text-center text-muted-foreground">No coffee inventory available</p>
-              ) : (
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableHead>Coffee</TableHead>
-                      <TableHead>Producer</TableHead>
-                      <TableHead>Origin</TableHead>
-                      <TableHead className="text-right">Stock</TableHead>
-                      <TableHead>Status</TableHead>
+        {/* Green Coffee Inventory section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Green Coffee Inventory</CardTitle>
+            <CardDescription>Available coffee for roasting</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!coffees?.length ? (
+              <p className="text-center text-muted-foreground">No coffee inventory available</p>
+            ) : (
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableHead>Coffee</TableHead>
+                    <TableHead>Producer</TableHead>
+                    <TableHead>Origin</TableHead>
+                    <TableHead className="text-right">Stock</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {coffees.map(coffee => (
+                    <TableRow key={coffee.id}>
+                      <TableCell className="font-medium">{coffee.name}</TableCell>
+                      <TableCell>{coffee.producer}</TableCell>
+                      <TableCell>{coffee.country}</TableCell>
+                      <TableCell className="text-right">{coffee.currentStock}kg</TableCell>
+                      <TableCell>
+                        {Number(coffee.currentStock) <= Number(coffee.minThreshold) ? (
+                          <Badge variant="destructive">Low Stock</Badge>
+                        ) : (
+                          <Badge variant="outline">In Stock</Badge>
+                        )}
+                      </TableCell>
                     </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {coffees.map(coffee => (
-                      <TableRow key={coffee.id}>
-                        <TableCell className="font-medium">{coffee.name}</TableCell>
-                        <TableCell>{coffee.producer}</TableCell>
-                        <TableCell>{coffee.country}</TableCell>
-                        <TableCell className="text-right">{coffee.currentStock}kg</TableCell>
-                        <TableCell>
-                          {Number(coffee.currentStock) <= Number(coffee.minThreshold) ? (
-                            <Badge variant="destructive">Low Stock</Badge>
-                          ) : (
-                            <Badge variant="outline">In Stock</Badge>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Inventory Discrepancies</CardTitle>
-              <CardDescription>Recent inventory adjustments</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loadingDiscrepancies ? (
-                <div className="flex items-center justify-center p-4">
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                </div>
-              ) : !discrepancies?.length ? (
-                <p className="text-center text-muted-foreground">No recent discrepancies found</p>
-              ) : (
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableHead>Coffee</TableHead>
-                      <TableHead>Expected</TableHead>
-                      <TableHead>Actual</TableHead>
-                      <TableHead>Difference</TableHead>
-                      <TableHead>Date</TableHead>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {discrepancies.map((discrepancy: any) => {
-                      const coffee = coffees?.find(c => c.id === discrepancy.greenCoffeeId);
-                      return (
-                        <TableRow key={discrepancy.id}>
-                          <TableCell>{coffee?.name || 'Unknown Coffee'}</TableCell>
-                          <TableCell>{discrepancy.expectedQuantity}</TableCell>
-                          <TableCell>{discrepancy.actualQuantity}</TableCell>
-                          <TableCell className={
-                            discrepancy.actualQuantity < discrepancy.expectedQuantity 
-                              ? "text-destructive" 
-                              : "text-muted-foreground"
-                          }>
-                            {discrepancy.actualQuantity - discrepancy.expectedQuantity}
-                          </TableCell>
-                          <TableCell>
-                            {discrepancy.createdAt 
-                              ? format(new Date(discrepancy.createdAt), 'MMM d, yyyy')
-                              : 'N/A'
-                            }
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        {/* Move Inventory Discrepancies section here */}
+        <InventoryDiscrepancyView />
 
         {/* Recent Roasting Batches section */}
         <Card>
@@ -327,7 +334,7 @@ export default function Dashboard() {
                     const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
                     return (
                       <TableRow key={order.id}>
-                        <TableCell>{order.createdAt ? format(new Date(order.createdAt), 'MMM d, yyyy') : 'N/A'}</TableCell>
+                        <TableCell>{formatDate(new Date(order.createdAt), 'MMM d, yyyy')}</TableCell>
                         <TableCell>{coffee?.name}</TableCell>
                         <TableCell>{order.greenCoffeeAmount} kg</TableCell>
                         <TableCell>{order.roastedAmount} kg</TableCell>
@@ -352,7 +359,7 @@ export default function Dashboard() {
       </div>
     );
   }
-
+  //rest of the code remains the same
   if (user?.role === "shopManager" || user?.role === "barista") {
     const totalItems = shopInventory?.length || 0;
     const lowStockItems = shopInventory?.filter(item =>
@@ -547,15 +554,15 @@ export default function Dashboard() {
                         <TableCell>
                           <Badge variant={
                             order.status === 'pending' ? 'outline' :
-                            order.status === 'roasted' ? 'secondary' :
-                            order.status === 'dispatched' ? 'default' :
-                            order.status === 'delivered' ? 'default' : 'outline'
+                              order.status === 'roasted' ? 'secondary' :
+                                order.status === 'dispatched' ? 'default' :
+                                  order.status === 'delivered' ? 'default' : 'outline'
                           }>
                             {order.status}
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          {order.createdAt ? format(new Date(order.createdAt), 'MMM d, yyyy') : 'N/A'}
+                          {order.createdAt ? formatDate(new Date(order.createdAt), 'MMM d, yyyy') : 'N/A'}
                         </TableCell>
                       </TableRow>
                     );
@@ -760,14 +767,14 @@ export default function Dashboard() {
                       <TableCell>
                         <Badge variant={
                           order.status === 'pending' ? 'outline' :
-                          order.status === 'roasted' ? 'secondary' :
-                          order.status === 'dispatched' ? 'default' :
-                          'success'
+                            order.status === 'roasted' ? 'secondary' :
+                              order.status === 'dispatched' ? 'default' :
+                                'success'
                         }>
                           {order.status}
                         </Badge>
                       </TableCell>
-                      <TableCell>{format(new Date(order.createdAt), 'MMM d, yyyy')}</TableCell>
+                      <TableCell>{formatDate(new Date(order.createdAt), 'MMM d, yyyy')}</TableCell>
                     </TableRow>
                   );
                 })}
@@ -867,7 +874,7 @@ export default function Dashboard() {
                         {updatedBy && ` by ${updatedBy.username}`}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {format(new Date(order.updatedAt || order.createdAt), 'MMM d, yyyy HH:mm')}
+                        {formatDate(new Date(order.updatedAt || order.createdAt), 'MMM d, yyyy HH:mm')}
                       </p>
                     </div>
                   </div>
@@ -1098,15 +1105,15 @@ export default function Dashboard() {
                         <TableCell>
                           <Badge variant={
                             order.status === 'pending' ? 'outline' :
-                            order.status === 'roasted' ? 'secondary' :
-                            order.status === 'dispatched' ? 'default' :
-                            order.status === 'delivered' ? 'default' : 'outline'
+                              order.status === 'roasted' ? 'secondary' :
+                                order.status === 'dispatched' ? 'default' :
+                                  order.status === 'delivered' ? 'default' : 'outline'
                           }>
                             {order.status}
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          {order.createdAt ? format(new Date(order.createdAt), 'MMM d, yyyy') : 'N/A'}
+                          {order.createdAt ? formatDate(new Date(order.createdAt), 'MMM d, yyyy') : 'N/A'}
                         </TableCell>
                       </TableRow>
                     );
@@ -1311,14 +1318,14 @@ export default function Dashboard() {
                       <TableCell>
                         <Badge variant={
                           order.status === 'pending' ? 'outline' :
-                          order.status === 'roasted' ? 'secondary' :
-                          order.status === 'dispatched' ? 'default' :
-                          'success'
+                            order.status === 'roasted' ? 'secondary' :
+                              order.status === 'dispatched' ? 'default' :
+                                'success'
                         }>
                           {order.status}
                         </Badge>
                       </TableCell>
-                      <TableCell>{format(new Date(order.createdAt), 'MMM d, yyyy')}</TableCell>
+                      <TableCell>{formatDate(new Date(order.createdAt), 'MMM d, yyyy')}</TableCell>
                     </TableRow>
                   );
                 })}
@@ -1418,7 +1425,7 @@ export default function Dashboard() {
                         {updatedBy && ` by ${updatedBy.username}`}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {format(new Date(order.updatedAt || order.createdAt), 'MMM d, yyyy HH:mm')}
+                        {formatDate(new Date(order.updatedAt || order.createdAt), 'MMM d, yyyy HH:mm')}
                       </p>
                     </div>
                   </div>

@@ -9,16 +9,16 @@ export function AlertBanner() {
   // Fetch all green coffee
   const { data: coffees } = useQuery<any[]>({
     queryKey: ["/api/green-coffee"],
-    enabled: user?.role === "roasteryOwner",
+    enabled: ["roasteryOwner", "shopManager", "barista"].includes(user?.role || ""),
   });
 
   // Fetch all orders
   const { data: orders } = useQuery<any[]>({
     queryKey: ["/api/orders"],
-    enabled: user?.role === "roasteryOwner",
+    enabled: ["roasteryOwner", "shopManager", "barista"].includes(user?.role || ""),
   });
 
-  if (!coffees || !orders || user?.role !== "roasteryOwner") {
+  if (!coffees || !orders || !["roasteryOwner", "shopManager", "barista"].includes(user?.role || "")) {
     return null;
   }
 

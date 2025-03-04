@@ -21,16 +21,18 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 
+type DiscrepancyWithDetails = InventoryDiscrepancy & {
+  confirmation: {
+    greenCoffee: { name: string; producer: string };
+    shop: { name: string; location: string };
+  };
+};
+
 export function InventoryDiscrepancyView() {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const { data: discrepancies, isLoading, error } = useQuery<(InventoryDiscrepancy & {
-    confirmation: {
-      greenCoffee: { name: string; producer: string };
-      shop: { name: string; location: string };
-    };
-  })[]>({
+  const { data: discrepancies, isLoading } = useQuery<DiscrepancyWithDetails[]>({
     queryKey: ["/api/inventory-discrepancies"],
     queryFn: async () => {
       console.log("Fetching discrepancies for role:", user?.role);
@@ -43,8 +45,8 @@ export function InventoryDiscrepancyView() {
       return data;
     },
     enabled: user?.role === "roaster" || user?.role === "roasteryOwner" || user?.role === "shopManager",
-    onError: (err) => {
-      console.error("Error fetching discrepancies:", err);
+    onError: (error) => {
+      console.error("Error fetching discrepancies:", error);
       toast({
         title: "Error",
         description: "Failed to load discrepancy reports",
@@ -58,19 +60,6 @@ export function InventoryDiscrepancyView() {
       <div className="flex items-center justify-center p-8">
         <Loader2 className="h-8 w-8 animate-spin" />
       </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Error</CardTitle>
-          <CardDescription>
-            Failed to load discrepancy reports. Please try again later.
-          </CardDescription>
-        </CardHeader>
-      </Card>
     );
   }
 
@@ -110,7 +99,7 @@ export function InventoryDiscrepancyView() {
           <TableBody>
             {discrepancies.map((discrepancy) => (
               <TableRow key={discrepancy.id}>
-                <TableCell>{formatDate(discrepancy.createdAt)}</TableCell>
+                <TableCell>{formatDate(new Date(discrepancy.createdAt))}</TableCell>
                 <TableCell>
                   <div>
                     <p className="font-medium">{discrepancy.confirmation.shop.name}</p>
