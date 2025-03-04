@@ -68,52 +68,44 @@ export default function Dashboard() {
   const [isRestockOpen, setIsRestockOpen] = useState(false);
   const [, navigate] = useLocation();
 
-  // Get user's shops
   const { data: userShops } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
     enabled: !!user && (user.role === "shopManager" || user.role === "barista"),
   });
 
-  // Get all shops for roasteryOwner
   const { data: allShops } = useQuery<Shop[]>({
     queryKey: ["/api/shops"],
     enabled: !!user && user.role === "roasteryOwner",
   });
 
-  // Get selected shop details
   const { data: shop, isLoading: loadingShop } = useQuery<Shop>({
     queryKey: ["/api/shops", selectedShopId],
     enabled: !!selectedShopId,
   });
 
-  // Fetch retail inventory based on role and selected shop
   const { data: shopInventory, isLoading: loadingInventory } = useQuery<RetailInventory[]>({
     queryKey: ["/api/retail-inventory", selectedShopId],
     enabled: !!selectedShopId,
   });
 
-  // Fetch all retail inventory for roasteryOwner
-  const { data: allInventory } = useQuery<RetailInventory[]>({
-    queryKey: ["/api/retail-inventory"],
-    enabled: user?.role === "roasteryOwner",
-  });
-
-  // Fetch coffee data for all users
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
     enabled: !!user,
   });
 
-  // Fetch all orders for roasteryOwner and roaster
   const { data: allOrders, isLoading: loadingAllOrders } = useQuery<Order[]>({
     queryKey: ["/api/orders"],
     enabled: !!user && (user.role === "roasteryOwner" || user.role === "roaster"),
   });
 
-  // Fetch orders based on role and selected shop
   const { data: shopOrders, isLoading: loadingShopOrders } = useQuery<Order[]>({
     queryKey: ["/api/orders", selectedShopId],
     enabled: !!selectedShopId,
+  });
+
+  const { data: allInventory } = useQuery<RetailInventory[]>({
+    queryKey: ["/api/retail-inventory"],
+    enabled: user?.role === "roasteryOwner",
   });
 
   const isLoading = loadingShop || loadingInventory || loadingCoffees || loadingAllOrders || loadingShopOrders;
@@ -126,11 +118,11 @@ export default function Dashboard() {
     );
   }
 
-  if (user?.role === "roaster") {
-    const lowStockCoffees = coffees?.filter(coffee =>
-      Number(coffee.currentStock) <= Number(coffee.minThreshold)
-    ) || [];
+  const lowStockCoffees = coffees?.filter(coffee =>
+    Number(coffee.currentStock) <= Number(coffee.minThreshold)
+  ) || [];
 
+  if (user?.role === "roaster") {
     return (
       <div className="container mx-auto py-8 space-y-8">
         <div className="flex justify-between items-center">
