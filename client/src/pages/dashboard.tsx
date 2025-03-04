@@ -120,7 +120,6 @@ export default function Dashboard() {
     enabled: !!user && (user.role === "roasteryOwner" || user?.role === "roaster"),
   });
 
-  // Update the orders query for managers to include shop-specific filtering
   const { data: shopOrders, isLoading: loadingShopOrders } = useQuery<Order[]>({
     queryKey: ["/api/orders", selectedShopId],
     queryFn: async () => {
@@ -132,7 +131,6 @@ export default function Dashboard() {
     enabled: !!selectedShopId && (user?.role === "shopManager" || user?.role === "barista"),
   });
 
-  // Update the discrepancies query
   const { data: discrepancies, isLoading: loadingDiscrepancies } = useQuery({
     queryKey: ["/api/inventory-discrepancies"],
     enabled: !!user && (user.role === "roaster" || user.role === "roasteryOwner"),
@@ -162,7 +160,6 @@ export default function Dashboard() {
     Number(coffee.currentStock) <= Number(coffee.minThreshold)
   ) || [];
 
-  // Update the InventoryDiscrepancyView component
   const InventoryDiscrepancyView = () => {
     console.log("Rendering InventoryDiscrepancyView with discrepancies:", discrepancies);
     return (
@@ -185,8 +182,8 @@ export default function Dashboard() {
                   <TableHead>Date</TableHead>
                   <TableHead>Shop</TableHead>
                   <TableHead>Coffee</TableHead>
-                  <TableHead>Small Bags</TableHead>
-                  <TableHead>Large Bags</TableHead>
+                  <TableHead className="text-right">Small Bags</TableHead>
+                  <TableHead className="text-right">Large Bags</TableHead>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -207,7 +204,7 @@ export default function Dashboard() {
                           <p className="text-sm text-muted-foreground">{discrepancy.confirmation?.greenCoffee?.producer}</p>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-right">
                         <div className="space-y-1">
                           <p>Expected: {discrepancy.confirmation?.dispatchedSmallBags}</p>
                           <p>Received: {discrepancy.confirmation?.receivedSmallBags}</p>
@@ -216,7 +213,7 @@ export default function Dashboard() {
                           </p>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-right">
                         <div className="space-y-1">
                           <p>Expected: {discrepancy.confirmation?.dispatchedLargeBags}</p>
                           <p>Received: {discrepancy.confirmation?.receivedLargeBags}</p>
@@ -295,9 +292,7 @@ export default function Dashboard() {
                     <TableHead className="text-left">Origin</TableHead>
                     <TableHead className="text-right">Current Stock</TableHead>
                     <TableHead className="text-left">Status</TableHead>
-                    {user?.role === "roasteryOwner" && (
-                      <TableHead className="text-left">Actions</TableHead>
-                    )}
+                    
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -309,13 +304,7 @@ export default function Dashboard() {
                       <TableCell className="text-right">
                         <div className="flex flex-col items-end">
                           <span className="font-medium">{coffee.currentStock}kg</span>
-                          {user?.role === "roasteryOwner" && (
-                            <StockProgress
-                              current={Number(coffee.currentStock)}
-                              desired={Number(coffee.minThreshold) * 2}
-                              label="Stock Level"
-                            />
-                          )}
+                         
                         </div>
                       </TableCell>
                       <TableCell className="text-left">
@@ -325,17 +314,7 @@ export default function Dashboard() {
                           <Badge variant="outline">In Stock</Badge>
                         )}
                       </TableCell>
-                      {user?.role === "roasteryOwner" && (
-                        <TableCell className="text-left">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => navigate(`/coffee/${coffee.id}`)}
-                          >
-                            View Details
-                          </Button>
-                        </TableCell>
-                      )}
+                     
                     </TableRow>
                   ))}
                 </TableBody>
@@ -343,9 +322,6 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
-
-        {/* Move Inventory Discrepancies section here */}
-        <InventoryDiscrepancyView />
 
         {/* Recent Roasting Batches section */}
         <Card>
@@ -357,11 +333,11 @@ export default function Dashboard() {
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Coffee</TableHead>
-                  <TableHead>Green Coffee Used</TableHead>
-                  <TableHead>Roasted Amount</TableHead>
-                  <TableHead>Bags Produced</TableHead>
+                  <TableHead className="text-left">Date</TableHead>
+                  <TableHead className="text-left">Coffee</TableHead>
+                  <TableHead className="text-right">Green Coffee Used</TableHead>
+                  <TableHead className="text-right">Roasted Amount</TableHead>
+                  <TableHead className="text-left">Bags Produced</TableHead>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -376,11 +352,11 @@ export default function Dashboard() {
                     const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
                     return (
                       <TableRow key={order.id}>
-                        <TableCell>{formatDate(new Date(order.createdAt), 'MMM d, yyyy')}</TableCell>
-                        <TableCell>{coffee?.name}</TableCell>
-                        <TableCell>{order.greenCoffeeAmount} kg</TableCell>
-                        <TableCell>{order.roastedAmount} kg</TableCell>
-                        <TableCell>
+                        <TableCell className="text-left">{formatDate(new Date(order.createdAt), 'MMM d, yyyy')}</TableCell>
+                        <TableCell className="text-left">{coffee?.name}</TableCell>
+                        <TableCell className="text-right">{order.greenCoffeeAmount} kg</TableCell>
+                        <TableCell className="text-right">{order.roastedAmount} kg</TableCell>
+                        <TableCell className="text-left">
                           {order.smallBags > 0 && `${order.smallBags} small`}
                           {order.smallBags > 0 && order.largeBags > 0 && ', '}
                           {order.largeBags > 0 && `${order.largeBags} large`}
@@ -398,6 +374,7 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
+        <InventoryDiscrepancyView />
       </div>
     );
   }
@@ -784,11 +761,11 @@ export default function Dashboard() {
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableHead>Shop</TableHead>
-                  <TableHead>Coffee</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Date</TableHead>
+                  <TableHead className="text-left">Shop</TableHead>
+                  <TableHead className="text-left">Coffee</TableHead>
+                  <TableHead className="text-left">Amount</TableHead>
+                  <TableHead className="text-left">Status</TableHead>
+                  <TableHead className="text-left">Date</TableHead>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -796,14 +773,14 @@ export default function Dashboard() {
                   const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
                   return (
                     <TableRow key={order.id}>
-                      <TableCell>{order.shop?.name}</TableCell>
-                      <TableCell>{coffee?.name}</TableCell>
-                      <TableCell>
+                      <TableCell className="text-left">{order.shop?.name}</TableCell>
+                      <TableCell className="text-left">{coffee?.name}</TableCell>
+                      <TableCell className="text-left">
                         {order.smallBags > 0 && `${order.smallBags} small`}
                         {order.smallBags > 0 && order.largeBags > 0 && ', '}
                         {order.largeBags > 0 && `${order.largeBags} large`}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-left">
                         <Badge variant={
                           order.status === 'pending' ? 'outline' :
                           order.status === 'roasted' ? 'secondary' :
@@ -813,7 +790,7 @@ export default function Dashboard() {
                           {order.status}
                         </Badge>
                       </TableCell>
-                      <TableCell>{formatDate(new Date(order.createdAt), 'MMM d, yyyy')}</TableCell>
+                      <TableCell className="text-left">{formatDate(new Date(order.createdAt), 'MMM d, yyyy')}</TableCell>
                     </TableRow>
                   );
                 })}
