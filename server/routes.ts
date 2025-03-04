@@ -299,7 +299,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           details: error instanceof Error ? error.stack : undefined
         });
       }
-    }
+    },
   );
 
   // Update endpoint for green coffee with proper roaster permissions

@@ -59,24 +59,30 @@ export function GreenCoffeeForm({
 
   const mutation = useMutation({
     mutationFn: async (data: FormValues) => {
-      console.log("Submitting form data:", data);
-      if (isEditing) {
-        const response = await apiRequest("PATCH", `/api/green-coffee/${coffee.id}`, data);
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || "Failed to update coffee");
+      console.log("Starting mutation with data:", data);
+      try {
+        if (isEditing) {
+          const response = await apiRequest("PATCH", `/api/green-coffee/${coffee.id}`, data);
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || "Failed to update coffee");
+          }
+          return response.json();
+        } else {
+          const response = await apiRequest("POST", "/api/green-coffee", data);
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || "Failed to create coffee");
+          }
+          return response.json();
         }
-        return response.json();
-      } else {
-        const response = await apiRequest("POST", "/api/green-coffee", data);
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || "Failed to create coffee");
-        }
-        return response.json();
+      } catch (error) {
+        console.error("Mutation error:", error);
+        throw error;
       }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("Mutation succeeded:", data);
       queryClient.invalidateQueries({ queryKey: ["/api/green-coffee"] });
       toast({
         title: isEditing ? "Coffee Updated" : "Coffee Created",
@@ -85,7 +91,7 @@ export function GreenCoffeeForm({
       if (onSuccess) onSuccess();
     },
     onError: (error: Error) => {
-      console.error("Form submission error:", error);
+      console.error("Mutation error:", error);
       toast({
         title: "Error",
         description: error.message,
@@ -94,9 +100,13 @@ export function GreenCoffeeForm({
     },
   });
 
-  const onSubmit = (data: FormValues) => {
+  const onSubmit = async (data: FormValues) => {
     console.log("Form submission initiated:", data);
-    mutation.mutate(data);
+    try {
+      await mutation.mutateAsync(data);
+    } catch (error) {
+      console.error("Form submission error:", error);
+    }
   };
 
   return (
@@ -164,7 +174,7 @@ export function GreenCoffeeForm({
                   <FormItem>
                     <FormLabel>Altitude</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., 1800-2200m" {...field} />
+                      <Input placeholder="e.g., 1800-2200m" {...field} value={field.value || ''} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -182,6 +192,7 @@ export function GreenCoffeeForm({
                     <Textarea
                       placeholder="e.g., Floral, citrus, bergamot with a bright acidity"
                       {...field}
+                      value={field.value || ''}
                     />
                   </FormControl>
                   <FormMessage />
