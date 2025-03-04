@@ -611,29 +611,53 @@ export default function Dashboard() {
               <p className="text-center text-muted-foreground">No inventory data available</p>
             ) : (
               <div className="space-y-4">
-                {allInventory.map(inv => {
-                  const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
-                  const shopData = allShops?.find(s => s.id === inv.shopId);
+                {(() => {
+                  const shopData = allShops?.find(s => s.id === selectedShopId);
+                  const shopInventory = allInventory.filter(inv => inv.shopId === selectedShopId);
+                  const totalItems = shopInventory.length;
+                  const healthyItems = shopInventory.filter(item =>
+                    (item.smallBags || 0) >= (shopData?.desiredSmallBags || 20) / 2 &&
+                    (item.largeBags || 0) >= (shopData?.desiredLargeBags || 10) / 2
+                  ).length;
+
                   return (
-                    <div key={`${inv.shopId}-${inv.greenCoffeeId}`} className="p-4 border rounded-lg">
+                    <>
                       <div className="flex items-center justify-between mb-4">
-                        <div className="text-sm font-medium">{coffee?.name} - {shopData?.name}</div>
+                        <h3 className="font-medium">{shopData?.name}</h3>
+                        <Badge variant={healthyItems < totalItems ? "destructive" : "outline"}>
+                          {healthyItems < totalItems ? `${totalItems - healthyItems} Low Stock` : "Stock OK"}
+                        </Badge>
                       </div>
-                      <div className="space-y-2">
-                        <StockProgress
-                          current={inv.smallBags || 0}
-                          desired={shopData?.desiredSmallBags || 20}
-                          label="Small Bags (200g)"
-                        />
-                        <StockProgress
-                          current={inv.largeBags || 0}
-                          desired={shopData?.desiredLargeBags || 10}
-                          label="Large Bags (1kg)"
-                        />
+                      <StockProgress
+                        current={healthyItems}
+                        desired={totalItems}
+                        label="Stock Health"
+                      />
+                      <div className="mt-4 space-y-2">
+                        {shopInventory.map(inv => {
+                          const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
+                          return (
+                            <div key={`${selectedShopId}-${inv.greenCoffeeId}`} className="p-2 bg-muted rounded">
+                              <div className="text-sm font-medium mb-2">{coffee?.name}</div>
+                              <div className="space-y-2">
+                                <StockProgress
+                                  current={inv.smallBags || 0}
+                                  desired={shopData?.desiredSmallBags || 20}
+                                  label="Small Bags (200g)"
+                                />
+                                <StockProgress
+                                  current={inv.largeBags || 0}
+                                  desired={shopData?.desiredLargeBags || 10}
+                                  label="Large Bags (1kg)"
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    </div>
+                    </>
                   );
-                })}
+                })()}
               </div>
             )}
           </CardContent>
@@ -811,29 +835,53 @@ export default function Dashboard() {
             <p className="text-center text-muted-foreground">No inventory data available</p>
           ) : (
             <div className="space-y-4">
-              {allInventory.map(inv => {
-                const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
-                const shopData = allShops?.find(s => s.id === inv.shopId);
+              {(() => {
+                const shopData = allShops?.find(s => s.id === selectedShopId);
+                const shopInventory = allInventory.filter(inv => inv.shopId === selectedShopId);
+                const totalItems = shopInventory.length;
+                const healthyItems = shopInventory.filter(item =>
+                  (item.smallBags || 0) >= (shopData?.desiredSmallBags || 20) / 2 &&
+                  (item.largeBags || 0) >= (shopData?.desiredLargeBags || 10) / 2
+                ).length;
+
                 return (
-                  <div key={`${inv.shopId}-${inv.greenCoffeeId}`} className="p-4 border rounded-lg">
+                  <>
                     <div className="flex items-center justify-between mb-4">
-                      <div className="text-sm font-medium">{coffee?.name} - {shopData?.name}</div>
+                      <h3 className="font-medium">{shopData?.name}</h3>
+                      <Badge variant={healthyItems < totalItems ? "destructive" : "outline"}>
+                        {healthyItems < totalItems ? `${totalItems - healthyItems} Low Stock` : "Stock OK"}
+                      </Badge>
                     </div>
-                    <div className="space-y-2">
-                      <StockProgress
-                        current={inv.smallBags || 0}
-                        desired={shopData?.desiredSmallBags || 20}
-                        label="Small Bags (200g)"
-                      />
-                      <StockProgress
-                        current={inv.largeBags || 0}
-                        desired={shopData?.desiredLargeBags || 10}
-                        label="Large Bags (1kg)"
-                      />
+                    <StockProgress
+                      current={healthyItems}
+                      desired={totalItems}
+                      label="Stock Health"
+                    />
+                    <div className="mt-4 space-y-2">
+                      {shopInventory.map(inv => {
+                        const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
+                        return (
+                          <div key={`${selectedShopId}-${inv.greenCoffeeId}`} className="p-2 bg-muted rounded">
+                            <div className="text-sm font-medium mb-2">{coffee?.name}</div>
+                            <div className="space-y-2">
+                              <StockProgress
+                                current={inv.smallBags || 0}
+                                desired={shopData?.desiredSmallBags || 20}
+                                label="Small Bags (200g)"
+                              />
+                              <StockProgress
+                                current={inv.largeBags || 0}
+                                desired={shopData?.desiredLargeBags || 10}
+                                label="Large Bags (1kg)"
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  </div>
+                  </>
                 );
-              })}
+              })()}
             </div>
           )}
         </CardContent>
