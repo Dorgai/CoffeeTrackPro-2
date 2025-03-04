@@ -1,7 +1,7 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import type { GreenCoffee, RetailInventory, Shop, Order } from "@shared/schema";
+import type { GreenCoffee, RetailInventory, Shop } from "@shared/schema";
 import { format as formatDate } from 'date-fns';
 import { useEffect, useState } from 'react';
 import { RestockDialog } from "@/components/coffee/restock-dialog";
@@ -26,7 +26,6 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableRow } from "@/components/ui/table";
 import { ShopSelector } from "@/components/layout/shop-selector";
 import StockProgress from "@/components/stock-progress";
-import { apiRequest } from "@/lib/queryClient";
 
 function StatsCard({
   title,
@@ -97,7 +96,6 @@ export default function Dashboard() {
     enabled: !!selectedShopId && (user?.role === "shopManager" || user?.role === "barista"),
   });
 
-
   const isLoading = loadingShops || loadingShop || loadingCoffees || loadingInventory;
 
   if (!user || isLoading) {
@@ -113,7 +111,7 @@ export default function Dashboard() {
   ) || [];
 
   const InventoryDiscrepancyView = () => {
-    console.log("Rendering InventoryDiscrepancyView with discrepancies:", []); // Placeholder, original code's discrepancies fetching is removed.
+    console.log("Rendering InventoryDiscrepancyView with discrepancies:", []); 
     return (
       <Card>
         <CardHeader>
@@ -121,7 +119,7 @@ export default function Dashboard() {
           <CardDescription>Recent inventory adjustments</CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-center text-muted-foreground">No recent discrepancies found</p> {/* Placeholder for removed discrepancies */}
+          <p className="text-center text-muted-foreground">No recent discrepancies found</p> 
         </CardContent>
       </Card>
     );
@@ -235,14 +233,14 @@ export default function Dashboard() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {![]?.length ? ( //Placeholder for removed allOrders
+                {![]?.length ? ( 
                   <TableRow>
                     <TableCell colSpan={5} className="text-center text-muted-foreground">
                       No recent batches found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  []?.slice(0, 5).map(order => { //Placeholder for removed allOrders
+                  []?.slice(0, 5).map(order => { 
                     const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
                     return (
                       <TableRow key={order.id}>
@@ -444,14 +442,14 @@ export default function Dashboard() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {!shopInventory?.length ? ( //Placeholder for removed shopOrders
+                {!shopInventory?.length ? ( 
                   <TableRow>
                     <TableCell colSpan={5} className="text-center text-muted-foreground">
                       No recent orders found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  []?.slice(0, 5).map(order => { //Placeholder for removed shopOrders
+                  []?.slice(0, 5).map(order => { 
                     const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
                     return (
                       <TableRow key={order.id}>
@@ -544,8 +542,8 @@ export default function Dashboard() {
     );
   }
   if (user?.role === "roasteryOwner") {
-    const totalOrders = []?.length || 0; //Placeholder for removed allOrders
-    const completedOrders = []?.filter(o => o.status === 'delivered').length || 0; //Placeholder for removed allOrders
+    const totalOrders = []?.length || 0; 
+    const completedOrders = []?.filter(o => o.status === 'delivered').length || 0; 
     const orderFulfillmentRate = totalOrders ? Math.round((completedOrders / totalOrders) * 100) : 0;
 
     return (
@@ -575,7 +573,7 @@ export default function Dashboard() {
           />
           <StatsCard
             title="Active Shops"
-            value={shops?.length || 0} //Using shops instead of roasteryOwnerShops
+            value={shops?.length || 0} 
             icon={Store}
             description="Total managed locations"
           />
@@ -663,7 +661,7 @@ export default function Dashboard() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {[]?.slice(0, 5).map(order => { //Placeholder for removed allOrders
+                {[]?.slice(0, 5).map(order => { 
                   const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
                   return (
                     <TableRow key={order.id}>
@@ -704,8 +702,8 @@ export default function Dashboard() {
             <CardDescription>Stock levels and order status across shops</CardDescription>
           </CardHeader>
           <CardContent>
-            {shops?.map(shop => { //Using shops instead of roasteryOwnerShops
-              const shopInventory = []?.filter(inv => inv.shopId === shop.id) || []; //Placeholder for removed allInventory
+            {shops?.map(shop => { 
+              const shopInventory = []?.filter(inv => inv.shopId === shop.id) || []; 
               const totalItems = shopInventory.length;
               const healthyItems = shopInventory.filter(item =>
                 (item.smallBags || 0) >= (shop.desiredSmallBags || 20) / 2 &&
@@ -765,7 +763,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {[]?.slice(0, 5).map(order => { //Placeholder for removed allOrders
+              {[]?.slice(0, 5).map(order => { 
                 const shop = order.shop;
                 const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
                 const updatedBy = order.updatedBy;

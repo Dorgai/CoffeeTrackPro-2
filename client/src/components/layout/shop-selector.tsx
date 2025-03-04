@@ -18,27 +18,17 @@ interface ShopSelectorProps {
   className?: string;
 }
 
-interface UserShopResponse {
-  user_shops: {
-    userId: number;
-    shopId: number;
-  };
-  shop: Shop;
-}
-
 export function ShopSelector({ value, onChange, className }: ShopSelectorProps) {
   const { activeShop, setActiveShop } = useActiveShop();
   const { user } = useAuth();
 
-  const { data: userShops, isLoading } = useQuery<UserShopResponse[]>({
+  const { data: shops, isLoading } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
     enabled: !!user && (user.role === "shopManager" || user.role === "barista"),
   });
 
-  const shops = userShops?.map(item => item.shop).filter(Boolean) || [];
-
   useEffect(() => {
-    if (shops.length > 0 && !activeShop) {
+    if (shops?.length > 0 && !activeShop) {
       const defaultShop = shops.find(s => s.id === user?.defaultShopId) || shops[0];
       if (defaultShop) {
         setActiveShop(defaultShop);
@@ -49,7 +39,7 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
 
   const handleChange = (value: string) => {
     const shopId = value ? parseInt(value, 10) : null;
-    const shop = shops.find((s) => s.id === shopId);
+    const shop = shops?.find((s) => s.id === shopId);
 
     onChange?.(shopId);
     setActiveShop(shop || null);
@@ -78,7 +68,7 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
           )}
         </SelectTrigger>
         <SelectContent>
-          {!isLoading && shops.map((shop) => (
+          {!isLoading && shops?.map((shop) => (
             <SelectItem 
               key={shop.id} 
               value={String(shop.id)}
@@ -86,7 +76,7 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
               {shop.name}
             </SelectItem>
           ))}
-          {!isLoading && shops.length === 0 && (
+          {!isLoading && (!shops || shops.length === 0) && (
             <div className="relative flex items-center justify-center py-2 text-sm text-muted-foreground">
               No shops available
             </div>
