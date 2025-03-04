@@ -120,6 +120,13 @@ export default function Dashboard() {
   ) || [];
 
   if (user?.role === "shopManager" || user?.role === "barista") {
+    const totalItems = shopInventory?.length || 0;
+    const lowStockItems = shopInventory?.filter(item =>
+      (item.smallBags || 0) < (shop?.desiredSmallBags || 20) / 2 ||
+      (item.largeBags || 0) < (shop?.desiredLargeBags || 10) / 2
+    ).length || 0;
+    const stockHealth = totalItems ? Math.round(((totalItems - lowStockItems) / totalItems) * 100) : 0;
+
     return (
       <div className="container mx-auto py-8 space-y-8">
         <div className="flex justify-between items-center">
@@ -143,77 +150,90 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="flex justify-end">
-          <Button
-            variant="default"
+        <div className="grid gap-4 md:grid-cols-3">
+          <StatsCard
+            title="Total Coffee Types"
+            value={totalItems}
+            icon={Coffee}
+            description="Available varieties"
+          />
+          <StatsCard
+            title="Low Stock Items"
+            value={lowStockItems}
+            icon={AlertTriangle}
             onClick={() => setIsRestockOpen(true)}
-            disabled={!selectedShopId}
-            className="whitespace-nowrap"
-          >
-            <Package className="h-4 w-4 mr-2" />
-            Restock Inventory
-          </Button>
+            description="View Restock Options"
+          />
+          <StatsCard
+            title="Stock Health"
+            value={`${stockHealth}%`}
+            icon={Package}
+            description="Items meeting target levels"
+          />
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Orders Overview</CardTitle>
-            <CardDescription>Recent order status and activities</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableHead>Coffee</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Date</TableHead>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {!shopOrders?.length ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground">
-                      No recent orders found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  shopOrders.slice(0, 5).map(order => {
-                    const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
-                    return (
-                      <TableRow key={order.id}>
-                        <TableCell>{coffee?.name}</TableCell>
-                        <TableCell>
-                          {order.smallBags > 0 && `${order.smallBags} small`}
-                          {order.smallBags > 0 && order.largeBags > 0 && ', '}
-                          {order.largeBags > 0 && `${order.largeBags} large`}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={
-                            order.status === 'pending' ? 'outline' :
-                            order.status === 'roasted' ? 'secondary' :
-                            order.status === 'dispatched' ? 'default' :
-                            'default'
-                          }>
-                            {order.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{formatDate(order.createdAt)}</TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-            <div className="mt-4 flex justify-end">
-              <Button asChild variant="outline" size="sm">
-                <Link href="/retail/orders">View All Orders</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <RestockDialog open={isRestockOpen} onOpenChange={setIsRestockOpen} shopId={selectedShopId} />
 
-        <Card>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Orders Overview</CardTitle>
+              <CardDescription>Recent order status and activities</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableHead>Coffee</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Date</TableHead>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {!shopOrders?.length ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground">
+                        No recent orders found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    shopOrders.slice(0, 5).map(order => {
+                      const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
+                      return (
+                        <TableRow key={order.id}>
+                          <TableCell>{coffee?.name}</TableCell>
+                          <TableCell>
+                            {order.smallBags > 0 && `${order.smallBags} small`}
+                            {order.smallBags > 0 && order.largeBags > 0 && ', '}
+                            {order.largeBags > 0 && `${order.largeBags} large`}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={
+                              order.status === 'pending' ? 'outline' :
+                              order.status === 'roasted' ? 'secondary' :
+                              order.status === 'dispatched' ? 'default' :
+                              'default'
+                            }>
+                              {order.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{formatDate(order.createdAt)}</TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+              <div className="mt-4 flex justify-end">
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/retail/orders">View All Orders</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
             <CardHeader>
               <CardTitle>Shop Performance</CardTitle>
               <CardDescription>Stock levels and status</CardDescription>
@@ -224,27 +244,21 @@ export default function Dashboard() {
               ) : !shopInventory?.length ? (
                 <p className="text-center text-muted-foreground">No inventory data available</p>
               ) : (
-                <div className="space-y-4">
+                <div className="p-4 border rounded-lg">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-medium">{shop?.name}</h3>
                     <Badge variant={
-                      shopInventory.some(item =>
-                        (item.smallBags || 0) < (shop?.desiredSmallBags || 20) / 2 ||
-                        (item.largeBags || 0) < (shop?.desiredLargeBags || 10) / 2
-                      ) ? "destructive" : "outline"
+                      lowStockItems > 0 ? "destructive" : "outline"
                     }>
-                      {shopInventory.filter(item =>
-                        (item.smallBags || 0) < (shop?.desiredSmallBags || 20) / 2 ||
-                        (item.largeBags || 0) < (shop?.desiredLargeBags || 10) / 2
-                      ).length > 0 ? "Low Stock Items" : "Stock OK"}
+                      {lowStockItems > 0 ? `${lowStockItems} Low Stock Items` : "Stock OK"}
                     </Badge>
                   </div>
-                  {shopInventory.map(inv => {
-                    const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
-                    return (
-                      <div key={`${shop?.id}-${inv.greenCoffeeId}`} className="p-4 border rounded-lg">
-                        <div className="text-sm font-medium mb-2">{coffee?.name}</div>
-                        <div className="space-y-2">
+                  <div className="space-y-4">
+                    {shopInventory.map(inv => {
+                      const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
+                      return (
+                        <div key={`${shop?.id}-${inv.greenCoffeeId}`} className="space-y-2">
+                          <div className="text-sm font-medium">{coffee?.name}</div>
                           <StockProgress
                             current={inv.smallBags || 0}
                             desired={shop?.desiredSmallBags || 20}
@@ -256,19 +270,14 @@ export default function Dashboard() {
                             label="Large Bags (1kg)"
                           />
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </CardContent>
           </Card>
-
-        <RestockDialog 
-          open={isRestockOpen} 
-          onOpenChange={setIsRestockOpen}
-          shopId={selectedShopId}
-        />
+        </div>
       </div>
     );
   }
@@ -570,11 +579,45 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-
       <Card>
-        {/* Shop Performance card replaced here */}
+        <CardHeader>
+          <CardTitle>Shop Performance</CardTitle>
+          <CardDescription>Overall performance data</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!selectedShopId ? (
+            <p className="text-center text-muted-foreground">Please select a shop to view performance</p>
+          ) : !allInventory?.length ? (
+            <p className="text-center text-muted-foreground">No inventory data available</p>
+          ) : (
+            <div className="space-y-4">
+              {allInventory.map(inv => {
+                const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
+                const shopData = allShops?.find(s => s.id === inv.shopId);
+                return (
+                  <div key={`${inv.shopId}-${inv.greenCoffeeId}`} className="p-4 border rounded-lg">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="text-sm font-medium">{coffee?.name} - {shopData?.name}</div>
+                    </div>
+                    <div className="space-y-2">
+                      <StockProgress
+                        current={inv.smallBags || 0}
+                        desired={shopData?.desiredSmallBags || 20}
+                        label="Small Bags (200g)"
+                      />
+                      <StockProgress
+                        current={inv.largeBags || 0}
+                        desired={shopData?.desiredLargeBags || 10}
+                        label="Large Bags (1kg)"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
       </Card>
-
     </div>
   );
 }
