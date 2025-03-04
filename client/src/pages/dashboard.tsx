@@ -460,8 +460,8 @@ export default function Dashboard() {
   }
 
   if (user?.role === "roasteryOwner") {
-    const totalOrders = orders?.length || 0;
-    const completedOrders = orders?.filter(o => o.status === 'delivered').length || 0;
+    const totalOrders = allOrders?.length || 0;
+    const completedOrders = allOrders?.filter(o => o.status === 'delivered').length || 0;
     const orderFulfillmentRate = totalOrders ? Math.round((completedOrders / totalOrders) * 100) : 0;
 
     return (
