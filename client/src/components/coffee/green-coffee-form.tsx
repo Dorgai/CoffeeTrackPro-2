@@ -18,15 +18,23 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // Create schema for form validation
 const formSchema = insertGreenCoffeeSchema.extend({
   // Convert string to number for decimal fields
-  currentStock: z.coerce.number().min(0),
-  minThreshold: z.coerce.number().min(0),
+  currentStock: z.coerce.number().min(0, "Current stock must be 0 or greater"),
+  minThreshold: z.coerce.number().min(0, "Minimum threshold must be 0 or greater"),
+  // Explicitly validate grade
+  grade: z.enum(["Specialty", "Premium", "Rarity"]),
 });
 
 type FormValues = z.infer<typeof formSchema>;
+
+type MutationData = Omit<FormValues, 'currentStock' | 'minThreshold'> & {
+  currentStock: string;
+  minThreshold: string;
+};
 
 export function GreenCoffeeForm({
   coffee,
@@ -54,6 +62,7 @@ export function GreenCoffeeForm({
           details: {},
           currentStock: 0,
           minThreshold: 0,
+          grade: "Premium" // Set a default grade
         },
   });
 
@@ -61,15 +70,24 @@ export function GreenCoffeeForm({
     mutationFn: async (data: FormValues) => {
       console.log("Starting mutation with data:", data);
       try {
+        // Convert number fields to strings to match schema expectations
+        const processedData: MutationData = {
+          ...data,
+          currentStock: String(data.currentStock),
+          minThreshold: String(data.minThreshold)
+        };
+
+        console.log("Processed form data:", processedData);
+
         if (isEditing) {
-          const response = await apiRequest("PATCH", `/api/green-coffee/${coffee.id}`, data);
+          const response = await apiRequest("PATCH", `/api/green-coffee/${coffee.id}`, processedData);
           if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.message || "Failed to update coffee");
           }
           return response.json();
         } else {
-          const response = await apiRequest("POST", "/api/green-coffee", data);
+          const response = await apiRequest("POST", "/api/green-coffee", processedData);
           if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.message || "Failed to create coffee");
@@ -97,6 +115,8 @@ export function GreenCoffeeForm({
         description: error.message,
         variant: "destructive",
       });
+      // Log form state on error
+      console.log("Form state on error:", form.formState);
     },
   });
 
@@ -106,6 +126,10 @@ export function GreenCoffeeForm({
       await mutation.mutateAsync(data);
     } catch (error) {
       console.error("Form submission error:", error);
+      // Log validation errors if any
+      if (form.formState.errors) {
+        console.log("Form validation errors:", form.formState.errors);
+      }
     }
   };
 
@@ -200,7 +224,30 @@ export function GreenCoffeeForm({
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="grade"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Grade</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select grade" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Specialty">Specialty</SelectItem>
+                        <SelectItem value="Premium">Premium</SelectItem>
+                        <SelectItem value="Rarity">Rarity</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <FormField
                 control={form.control}
                 name="currentStock"
@@ -225,9 +272,6 @@ export function GreenCoffeeForm({
                       <Input type="number" step="0.01" {...field} />
                     </FormControl>
                     <FormMessage />
-                    <p className="text-sm text-muted-foreground">
-                      Set your desired stock level. The system will alert when stock falls below this amount.
-                    </p>
                   </FormItem>
                 )}
               />

@@ -281,13 +281,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireRole(["roasteryOwner", "roaster"]),
     async (req, res) => {
       try {
-        console.log("Creating new green coffee:", {
-          createdBy: req.user?.username,
-          role: req.user?.role,
-          data: req.body
-        });
+        console.log("Creating new green coffee request received by:", req.user?.username, "with role:", req.user?.role);
+        console.log("Request body:", req.body);
 
-        const data = insertGreenCoffeeSchema.parse(req.body);
+        // Convert string fields to numbers for numeric fields
+        const processedData = {
+          ...req.body,
+          currentStock: String(req.body.currentStock),
+          minThreshold: String(req.body.minThreshold)
+        };
+
+        console.log("Processed data:", processedData);
+        const data = insertGreenCoffeeSchema.parse(processedData);
         const coffee = await storage.createGreenCoffee(data);
 
         console.log("Successfully created green coffee:", coffee);
@@ -797,16 +802,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Returning all discrepancies for roasteryOwner");
       res.json(discrepancies);
     } catch (error) {
-      console.error("Error fetching inventory discrepancies:", error);
-      res.status(500).json({
+      console.error("Error fetching inventory discrepancies:", error);      res.status(500).json({
         message: "Failed to fetch discrepancies",
         details: error instanceof Error ? error.message : undefined
       });
     }
   });
 
-  // Add route for getting coffee-specific large bag targets
-  app.get("/api/shops/:id/coffee-targets", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
+  // Add route for getting coffee-specific large bag targets  app.get("/api/shops/:id/coffee-targets", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
     try {
       const shopId = parseInt(req.params.id);
 
