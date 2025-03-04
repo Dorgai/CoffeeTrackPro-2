@@ -68,50 +68,57 @@ export default function Dashboard() {
   const [isRestockOpen, setIsRestockOpen] = useState(false);
   const [, navigate] = useLocation();
 
-  // Common data fetching
+  // Fetch coffee data for all users
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
     enabled: !!user,
   });
 
-  const { data: allOrders, isLoading: loadingAllOrders } = useQuery<Order[]>({
-    queryKey: ["/api/orders"],
-    enabled: !!user && (user.role === "roasteryOwner" || user?.role === "roaster"),
-  });
-
-  // Shop manager and barista specific queries
+  // Get user's shops
   const { data: userShops } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
     enabled: !!user && (user.role === "shopManager" || user.role === "barista"),
   });
 
-  const { data: shop } = useQuery<Shop>({
+  // Get all shops for roasteryOwner
+  const { data: allShops } = useQuery<Shop[]>({
+    queryKey: ["/api/shops"],
+    enabled: !!user && user.role === "roasteryOwner",
+  });
+
+  // Get selected shop details
+  const { data: shop, isLoading: loadingShop } = useQuery<Shop>({
     queryKey: ["/api/shops", selectedShopId],
     enabled: !!selectedShopId,
   });
 
-  const { data: shopInventory } = useQuery<RetailInventory[]>({
+  // Fetch retail inventory based on role and selected shop
+  const { data: shopInventory, isLoading: loadingInventory } = useQuery<RetailInventory[]>({
     queryKey: ["/api/retail-inventory", selectedShopId],
     enabled: !!selectedShopId,
   });
 
-  const { data: shopOrders } = useQuery<Order[]>({
-    queryKey: ["/api/orders", selectedShopId],
-    enabled: !!selectedShopId,
-  });
-
-  // Roastery owner specific queries
-  const { data: shops } = useQuery<Shop[]>({
-    queryKey: ["/api/shops"],
-    enabled: user?.role === "roasteryOwner",
-  });
-
+  // Fetch all retail inventory for roasteryOwner
   const { data: allInventory } = useQuery<RetailInventory[]>({
     queryKey: ["/api/retail-inventory"],
     enabled: user?.role === "roasteryOwner",
   });
 
-  if (loadingCoffees || loadingAllOrders) {
+  // Fetch orders based on role and selected shop
+  const { data: shopOrders, isLoading: loadingShopOrders } = useQuery<Order[]>({
+    queryKey: ["/api/orders", selectedShopId],
+    enabled: !!selectedShopId,
+  });
+
+  // Fetch all orders for roasteryOwner and roaster
+  const { data: allOrders, isLoading: loadingAllOrders } = useQuery<Order[]>({
+    queryKey: ["/api/orders"],
+    enabled: !!user && (user.role === "roasteryOwner" || user.role === "roaster"),
+  });
+
+  const isLoading = loadingCoffees || loadingShop || loadingInventory || loadingShopOrders || loadingAllOrders;
+
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -441,9 +448,7 @@ export default function Dashboard() {
                             {order.status}
                           </Badge>
                         </TableCell>
-                        <TableCell>
-                          {formatDate(order.createdAt)}
-                        </TableCell>
+                        <TableCell>{formatDate(order.createdAt)}</TableCell>
                       </TableRow>
                     );
                   })
@@ -493,7 +498,7 @@ export default function Dashboard() {
           />
           <StatsCard
             title="Active Shops"
-            value={shops?.length || 0}
+            value={allShops?.length || 0}
             icon={Store}
             description="Total managed locations"
           />
@@ -583,9 +588,10 @@ export default function Dashboard() {
               <TableBody>
                 {allOrders?.slice(0, 5).map(order => {
                   const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
+                  const orderShop = allShops?.find(s => s.id === order.shopId);
                   return (
                     <TableRow key={order.id}>
-                      <TableCell>{order.shop?.name}</TableCell>
+                      <TableCell>{orderShop?.name}</TableCell>
                       <TableCell>{coffee?.name}</TableCell>
                       <TableCell>
                         {order.smallBags > 0 && `${order.smallBags} small`}
@@ -622,7 +628,7 @@ export default function Dashboard() {
             <CardDescription>Stock levels and order status across shops</CardDescription>
           </CardHeader>
           <CardContent>
-            {shops?.map(shop => {
+            {allShops?.map(shop => {
               const shopInventory = allInventory?.filter(inv => inv.shopId === shop.id) || [];
               const totalItems = shopInventory.length;
               const healthyItems = shopInventory.filter(item =>
