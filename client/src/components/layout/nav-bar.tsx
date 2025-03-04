@@ -51,6 +51,21 @@ export function NavBar() {
           {user?.role === "roasteryOwner" && (
             <>
               <MenubarMenu>
+                <MenubarTrigger>Reports</MenubarTrigger>
+                <MenubarContent>
+                  <MenubarItem>
+                    <Link href="/analytics" className="flex w-full">
+                      Analytics
+                    </Link>
+                  </MenubarItem>
+                  <MenubarItem>
+                    <Link href="/reports" className="flex w-full">
+                      Reports
+                    </Link>
+                  </MenubarItem>
+                </MenubarContent>
+              </MenubarMenu>
+              <MenubarMenu>
                 <MenubarTrigger>Green Coffee</MenubarTrigger>
                 <MenubarContent>
                   <MenubarItem>

@@ -22,7 +22,7 @@ import Profile from "@/pages/profile";
 import NotFound from "@/pages/not-found";
 import { ProtectedRoute } from "@/lib/protected-route";
 import RetailNewArrivals from "@/pages/retail-new-arrivals";
-import Billing from "@/pages/billing"; // Added import statement
+import Billing from "@/pages/billing";
 
 export default function App() {
   return (
@@ -83,7 +83,6 @@ export default function App() {
             <Route path="/profile">
               {() => <ProtectedRoute path="/profile" component={Profile} />}
             </Route>
-            {/* Add Billing route with roasteryOwner-only access */}
             <Route path="/billing">
               {() => <ProtectedRoute path="/billing" component={Billing} roles={["roasteryOwner"]} />}
             </Route>
