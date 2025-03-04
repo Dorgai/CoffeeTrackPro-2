@@ -134,11 +134,20 @@ export default function Dashboard() {
             <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user.username}</h1>
             <p className="text-muted-foreground">Manage your coffee shop inventory</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-4">
             <ShopSelector
               value={selectedShopId}
               onChange={setSelectedShopId}
             />
+            <Button
+              variant="default"
+              onClick={() => setIsRestockOpen(true)}
+              disabled={!selectedShopId}
+              className="whitespace-nowrap"
+            >
+              <Package className="h-4 w-4 mr-2" />
+              Restock Inventory
+            </Button>
             <Button
               variant="outline"
               onClick={() => logoutMutation.mutate()}
@@ -148,6 +157,27 @@ export default function Dashboard() {
               Logout
             </Button>
           </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <StatsCard
+            title="Total Coffee Types"
+            value={totalItems}
+            icon={Coffee}
+            description="Available varieties"
+          />
+          <StatsCard
+            title="Low Stock Items"
+            value={lowStockItems}
+            icon={AlertTriangle}
+            description="Items requiring attention"
+          />
+          <StatsCard
+            title="Stock Health"
+            value={`${stockHealth}%`}
+            icon={Package}
+            description="Items meeting target levels"
+          />
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
@@ -263,7 +293,6 @@ export default function Dashboard() {
           </Card>
         </div>
         <RestockDialog open={isRestockOpen} onOpenChange={setIsRestockOpen} shopId={selectedShopId} />
-
       </div>
     );
   }
