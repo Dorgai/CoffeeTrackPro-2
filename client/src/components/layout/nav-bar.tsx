@@ -33,12 +33,13 @@ export function NavBar() {
           </Link>
         </div>
         <Menubar className="border-none">
+          {/* Dashboard menu - available for all authenticated users */}
           <MenubarMenu>
             <MenubarTrigger>Dashboard</MenubarTrigger>
             <MenubarContent>
               <MenubarItem>
                 <Link href="/" className="flex w-full">
-                  Home
+                  Overview
                 </Link>
               </MenubarItem>
               <MenubarItem>
@@ -48,47 +49,43 @@ export function NavBar() {
               </MenubarItem>
             </MenubarContent>
           </MenubarMenu>
+
+          {/* Analytics menu - for roasteryOwner and shopManager */}
           {(user?.role === "roasteryOwner" || user?.role === "shopManager") && (
-            <>
-              <MenubarMenu>
-                <MenubarTrigger>Analytics</MenubarTrigger>
-                <MenubarContent>
-                  <MenubarItem>
-                    <Link href="/analytics" className="flex w-full">
-                      Overview
-                    </Link>
-                  </MenubarItem>
-                  <MenubarItem>
-                    <Link href="/reports" className="flex w-full">
-                      Reports
-                    </Link>
-                  </MenubarItem>
-                </MenubarContent>
-              </MenubarMenu>
-              <MenubarMenu>
-                <MenubarTrigger>Finance</MenubarTrigger>
-                <MenubarContent>
-                  <MenubarItem>
-                    <Link href="/billing" className="flex w-full">
-                      Billing Events
-                    </Link>
-                  </MenubarItem>
-                </MenubarContent>
-              </MenubarMenu>
-            </>
+            <MenubarMenu>
+              <MenubarTrigger>Analytics</MenubarTrigger>
+              <MenubarContent>
+                <MenubarItem>
+                  <Link href="/analytics" className="flex w-full">
+                    Overview
+                  </Link>
+                </MenubarItem>
+                <MenubarItem>
+                  <Link href="/reports" className="flex w-full">
+                    Reports
+                  </Link>
+                </MenubarItem>
+              </MenubarContent>
+            </MenubarMenu>
           )}
+
+          {/* Finance menu - for roasteryOwner and shopManager */}
+          {(user?.role === "roasteryOwner" || user?.role === "shopManager") && (
+            <MenubarMenu>
+              <MenubarTrigger>Finance</MenubarTrigger>
+              <MenubarContent>
+                <MenubarItem>
+                  <Link href="/billing" className="flex w-full">
+                    Billing Events
+                  </Link>
+                </MenubarItem>
+              </MenubarContent>
+            </MenubarMenu>
+          )}
+
+          {/* Roastery management menus - for roasteryOwner only */}
           {user?.role === "roasteryOwner" && (
             <>
-              <MenubarMenu>
-                <MenubarTrigger>Green Coffee</MenubarTrigger>
-                <MenubarContent>
-                  <MenubarItem>
-                    <Link href="/inventory" className="flex w-full">
-                      Inventory
-                    </Link>
-                  </MenubarItem>
-                </MenubarContent>
-              </MenubarMenu>
               <MenubarMenu>
                 <MenubarTrigger>Management</MenubarTrigger>
                 <MenubarContent>
@@ -104,23 +101,10 @@ export function NavBar() {
                   </MenubarItem>
                 </MenubarContent>
               </MenubarMenu>
-              <MenubarMenu>
-                <MenubarTrigger>Retail</MenubarTrigger>
-                <MenubarContent>
-                  <MenubarItem>
-                    <Link href="/retail" className="flex w-full">
-                      Inventory
-                    </Link>
-                  </MenubarItem>
-                  <MenubarItem>
-                    <Link href="/retail/orders" className="flex w-full">
-                      Orders
-                    </Link>
-                  </MenubarItem>
-                </MenubarContent>
-              </MenubarMenu>
             </>
           )}
+
+          {/* Roasting menu - for roaster only */}
           {user?.role === "roaster" && (
             <MenubarMenu>
               <MenubarTrigger>Roasting</MenubarTrigger>
@@ -135,14 +119,11 @@ export function NavBar() {
                     Batches
                   </Link>
                 </MenubarItem>
-                <MenubarItem>
-                  <Link href="/inventory" className="flex w-full">
-                    Inventory
-                  </Link>
-                </MenubarItem>
               </MenubarContent>
             </MenubarMenu>
           )}
+
+          {/* Retail menu - for shopManager and barista */}
           {(user?.role === "shopManager" || user?.role === "barista") && (
             <>
               <MenubarMenu>
@@ -161,11 +142,11 @@ export function NavBar() {
                 </MenubarContent>
               </MenubarMenu>
               <MenubarMenu>
-                <MenubarTrigger>New Arrivals</MenubarTrigger>
+                <MenubarTrigger>Stock</MenubarTrigger>
                 <MenubarContent>
                   <MenubarItem>
                     <Link href="/retail/new-arrivals" className="flex w-full">
-                      Pending Confirmations
+                      New Arrivals
                     </Link>
                   </MenubarItem>
                 </MenubarContent>
@@ -173,6 +154,7 @@ export function NavBar() {
             </>
           )}
         </Menubar>
+
         <div className="ml-auto flex items-center space-x-4">
           {user ? (
             <div className="flex items-center space-x-4">

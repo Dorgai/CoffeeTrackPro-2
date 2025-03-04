@@ -284,38 +284,34 @@ export default function Dashboard() {
             <CardDescription>Available coffee for roasting</CardDescription>
           </CardHeader>
           <CardContent>
-            {!coffees?.length ? (
-              <p className="text-center text-muted-foreground">No coffee inventory available</p>
-            ) : (
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableHead className="text-left">Coffee</TableHead>
-                    <TableHead className="text-left">Producer</TableHead>
-                    <TableHead className="text-left">Origin</TableHead>
-                    <TableHead className="text-right">Stock</TableHead>
-                    <TableHead className="text-left">Status</TableHead>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableHead className="text-left">Coffee</TableHead>
+                  <TableHead className="text-left">Producer</TableHead>
+                  <TableHead className="text-left">Origin</TableHead>
+                  <TableHead className="text-right">Stock</TableHead>
+                  <TableHead className="text-left">Status</TableHead>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {coffees.map(coffee => (
+                  <TableRow key={coffee.id}>
+                    <TableCell className="text-left font-medium">{coffee.name}</TableCell>
+                    <TableCell className="text-left">{coffee.producer}</TableCell>
+                    <TableCell className="text-left">{coffee.country}</TableCell>
+                    <TableCell className="text-right font-medium">{coffee.currentStock}kg</TableCell>
+                    <TableCell className="text-left">
+                      {Number(coffee.currentStock) <= Number(coffee.minThreshold) ? (
+                        <Badge variant="destructive">Low Stock</Badge>
+                      ) : (
+                        <Badge variant="outline">In Stock</Badge>
+                      )}
+                    </TableCell>
                   </TableRow>
-                </TableHead>
-                <TableBody>
-                  {coffees.map(coffee => (
-                    <TableRow key={coffee.id}>
-                      <TableCell className="text-left font-medium">{coffee.name}</TableCell>
-                      <TableCell className="text-left">{coffee.producer}</TableCell>
-                      <TableCell className="text-left">{coffee.country}</TableCell>
-                      <TableCell className="text-right">{coffee.currentStock}kg</TableCell>
-                      <TableCell className="text-left">
-                        {Number(coffee.currentStock) <= Number(coffee.minThreshold) ? (
-                          <Badge variant="destructive">Low Stock</Badge>
-                        ) : (
-                          <Badge variant="outline">In Stock</Badge>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
+                ))}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
 
@@ -705,21 +701,21 @@ export default function Dashboard() {
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Producer</TableHead>
-                  <TableHead>Country</TableHead>
-                  <TableHead>Current Stock</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead className="text-left">Name</TableHead>
+                  <TableHead className="text-left">Producer</TableHead>
+                  <TableHead className="text-left">Country</TableHead>
+                  <TableHead className="text-right">Current Stock</TableHead>
+                  <TableHead className="text-left">Status</TableHead>
+                  <TableHead className="text-left">Actions</TableHead>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {coffees?.map(coffee => (
                   <TableRow key={coffee.id}>
-                    <TableCell className="font-medium">{coffee.name}</TableCell>
-                    <TableCell>{coffee.producer}</TableCell>
-                    <TableCell>{coffee.country}</TableCell>
-                    <TableCell>
+                    <TableCell className="text-left font-medium">{coffee.name}</TableCell>
+                    <TableCell className="text-left">{coffee.producer}</TableCell>
+                    <TableCell className="text-left">{coffee.country}</TableCell>
+                    <TableCell className="text-right">
                       <div>
                         <div className="font-medium">{coffee.currentStock}kg</div>
                         <StockProgress
@@ -729,14 +725,14 @@ export default function Dashboard() {
                         />
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-left">
                       {Number(coffee.currentStock) <= Number(coffee.minThreshold) ? (
                         <Badge variant="destructive">Low Stock</Badge>
                       ) : (
                         <Badge variant="outline">In Stock</Badge>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-left">
                       <Button
                         variant="outline"
                         size="sm"
@@ -1254,21 +1250,21 @@ export default function Dashboard() {
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Producer</TableHead>
-                  <TableHead>Country</TableHead>
-                  <TableHead>Current Stock</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead className="text-left">Name</TableHead>
+                  <TableHead className="text-left">Producer</TableHead>
+                  <TableHead className="text-left">Country</TableHead>
+                  <TableHead className="text-right">Current Stock</TableHead>
+                  <TableHead className="text-left">Status</TableHead>
+                  <TableHead className="text-left">Actions</TableHead>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {coffees?.map(coffee => (
                   <TableRow key={coffee.id}>
-                    <TableCell className="font-medium">{coffee.name}</TableCell>
-                    <TableCell>{coffee.producer}</TableCell>
-                    <TableCell>{coffee.country}</TableCell>
-                    <TableCell>
+                    <TableCell className="text-left font-medium">{coffee.name}</TableCell>
+                    <TableCell className="text-left">{coffee.producer}</TableCell>
+                    <TableCell className="text-left">{coffee.country}</TableCell>
+                    <TableCell className="text-right">
                       <div>
                         <div className="font-medium">{coffee.currentStock}kg</div>
                         <StockProgress
@@ -1278,14 +1274,14 @@ export default function Dashboard() {
                         />
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-left">
                       {Number(coffee.currentStock) <= Number(coffee.minThreshold) ? (
                         <Badge variant="destructive">Low Stock</Badge>
                       ) : (
                         <Badge variant="outline">In Stock</Badge>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-left">
                       <Button
                         variant="outline"
                         size="sm"
@@ -1475,6 +1471,5 @@ export default function Dashboard() {
       </div>
     );
   }
-
   return null;
 }
