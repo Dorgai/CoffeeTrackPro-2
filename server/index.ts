@@ -61,7 +61,8 @@ async function createServer() {
     log('Setting up routes...');
     const httpServer = await registerRoutes(app);
 
-    if (app.get("env") === "development") {
+    // Set up Vite in development mode
+    if (process.env.NODE_ENV !== "production") {
       log('Setting up Vite in development mode...');
       await setupVite(app, httpServer);
     }
@@ -92,6 +93,8 @@ async function createServer() {
       }
     });
 
+    // Start the server
+    log(`Attempting to start server on port ${port}...`);
     await new Promise<void>((resolve) => {
       httpServer.listen(port, "0.0.0.0", () => {
         log(`Server is running on port ${port}`);
