@@ -30,7 +30,7 @@ import { formatDate } from "@/lib/utils";
 import { Link } from "wouter";
 
 export default function Dashboard() {
-  const { user, logoutMutation } = useAuth(); //Bringing back logoutMutation
+  const { user, logoutMutation } = useAuth();
   const [selectedShopId, setSelectedShopId] = useState<number | null>(null);
   const [isRestockOpen, setIsRestockOpen] = useState(false);
   const [, navigate] = useLocation();
