@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
 
 // Create schema for form validation
 const formSchema = insertGreenCoffeeSchema.extend({
@@ -25,6 +26,8 @@ const formSchema = insertGreenCoffeeSchema.extend({
   minThreshold: z.coerce.number().min(0),
 });
 
+type FormValues = z.infer<typeof formSchema>;
+
 export function GreenCoffeeForm({
   coffee,
   onSuccess,
@@ -32,9 +35,10 @@ export function GreenCoffeeForm({
   coffee?: GreenCoffee;
   onSuccess?: () => void;
 }) {
+  const { toast } = useToast();
   const isEditing = !!coffee;
 
-  const form = useForm({
+  const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: coffee
       ? {
@@ -54,24 +58,42 @@ export function GreenCoffeeForm({
   });
 
   const mutation = useMutation({
-    mutationFn: async (data: z.infer<typeof formSchema>) => {
+    mutationFn: async (data: FormValues) => {
       if (isEditing) {
         const response = await apiRequest("PATCH", `/api/green-coffee/${coffee.id}`, data);
-        if (!response.ok) throw new Error("Failed to update coffee");
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || "Failed to update coffee");
+        }
         return response.json();
       } else {
         const response = await apiRequest("POST", "/api/green-coffee", data);
-        if (!response.ok) throw new Error("Failed to create coffee");
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || "Failed to create coffee");
+        }
         return response.json();
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/green-coffee"] });
       if (onSuccess) onSuccess();
+      toast({
+        title: isEditing ? "Coffee Updated" : "Coffee Created",
+        description: isEditing ? "Green coffee has been updated" : "New green coffee has been added",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 
-  const onSubmit = (data: z.infer<typeof formSchema>) => {
+  const onSubmit = (data: FormValues) => {
+    console.log("Submitting form data:", data);
     mutation.mutate(data);
   };
 

@@ -803,8 +803,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { desiredLargeBags } = req.body;
 
       // Validate inputs
-      if (typeof desiredLargeBags !== 'number' || desiredLargeBags < 0) {
-        return res.status(400).json({ message: "Invalid desired large bags value" });
+      if (typeof desiredLargeBags !== 'number' || desiredLargeBags < 0) {        return res.status(400).json({ message: "Invalid desired large bags value" });
       }
 
       // For non-roasteryOwner users, verify shop access
