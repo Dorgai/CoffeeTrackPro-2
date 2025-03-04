@@ -321,9 +321,11 @@ export default function Dashboard() {
 
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
-            <CardHeader>
-              <CardTitle>Current Inventory</CardTitle>
-              <CardDescription>Stock levels for selected shop</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Current Inventory</CardTitle>
+                <CardDescription>Stock levels for selected shop</CardDescription>
+              </div>
             </CardHeader>
             <CardContent>
               {!selectedShopId ? (
@@ -440,7 +442,7 @@ export default function Dashboard() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          {order.createdAt ? format(new Date(order.createdAt), 'MMM d, yyyy') : 'N/A'}
+                          {formatDate(order.createdAt)}
                         </TableCell>
                       </TableRow>
                     );
@@ -600,7 +602,7 @@ export default function Dashboard() {
                           {order.status}
                         </Badge>
                       </TableCell>
-                      <TableCell>{format(new Date(order.createdAt), 'MMM d, yyyy')}</TableCell>
+                      <TableCell>{formatDate(order.createdAt)}</TableCell>
                     </TableRow>
                   );
                 })}
