@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableRow } from "@/components/ui/table";
 import { ShopSelector } from "@/components/layout/shop-selector";
 import StockProgress from "@/components/stock-progress";
 import { apiRequest } from "@/lib/queryClient";
@@ -68,7 +68,7 @@ export default function Dashboard() {
   const [isRestockOpen, setIsRestockOpen] = useState(false);
   const [, navigate] = useLocation();
 
-  const { data: userShops } = useQuery<Shop[]>({
+  const { data: userShops, isLoading: loadingShops } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
     enabled: !!user && (user.role === "shopManager" || user.role === "barista"),
   });
@@ -88,27 +88,33 @@ export default function Dashboard() {
     enabled: !!selectedShopId,
   });
 
+  const { data: allInventory, isLoading: loadingAllInventory } = useQuery<RetailInventory[]>({
+    queryKey: ["/api/retail-inventory"],
+    enabled: user?.role === "roasteryOwner" || user?.role === "roaster",
+  });
+
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
     enabled: !!user,
   });
 
+  const { data: orders, isLoading: loadingOrders } = useQuery<Order[]>({
+    queryKey: ["/api/orders"],
+    enabled: user?.role === "roasteryOwner",
+  });
+
   const { data: allOrders, isLoading: loadingAllOrders } = useQuery<Order[]>({
     queryKey: ["/api/orders"],
-    enabled: !!user && (user.role === "roasteryOwner" || user.role === "roaster"),
+    enabled: !!user && (user.role === "roasteryOwner" || user?.role === "roaster"),
   });
 
   const { data: shopOrders, isLoading: loadingShopOrders } = useQuery<Order[]>({
     queryKey: ["/api/orders", selectedShopId],
-    enabled: !!selectedShopId,
+    enabled: !!selectedShopId && (user?.role === "shopManager" || user?.role === "barista"),
   });
 
-  const { data: allInventory } = useQuery<RetailInventory[]>({
-    queryKey: ["/api/retail-inventory"],
-    enabled: user?.role === "roasteryOwner",
-  });
-
-  const isLoading = loadingShop || loadingInventory || loadingCoffees || loadingAllOrders || loadingShopOrders;
+  const isLoading = loadingShops || loadingShop || loadingCoffees || loadingInventory || 
+    loadingAllInventory || loadingOrders || loadingAllOrders || loadingShopOrders;
 
   if (isLoading) {
     return (
@@ -172,7 +178,7 @@ export default function Dashboard() {
               <p className="text-center text-muted-foreground">No coffee inventory available</p>
             ) : (
               <Table>
-                <TableHeader>
+                <TableHead>
                   <TableRow>
                     <TableHead>Coffee</TableHead>
                     <TableHead>Producer</TableHead>
@@ -180,7 +186,7 @@ export default function Dashboard() {
                     <TableHead className="text-right">Stock</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
-                </TableHeader>
+                </TableHead>
                 <TableBody>
                   {coffees.map(coffee => (
                     <TableRow key={coffee.id}>
@@ -203,62 +209,117 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Recent Roasting Batches section */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Roasting Batches</CardTitle>
-            <CardDescription>Latest roasting activities</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Coffee</TableHead>
-                  <TableHead>Small Bags</TableHead>
-                  <TableHead>Large Bags</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {!allOrders?.length ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground">
-                      No recent batches found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  allOrders.slice(0, 5).map(order => {
-                    const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
-                    return (
-                      <TableRow key={order.id}>
-                        <TableCell>{formatDate(order.createdAt)}</TableCell>
-                        <TableCell>{coffee?.name}</TableCell>
-                        <TableCell>{order.smallBags}</TableCell>
-                        <TableCell>{order.largeBags}</TableCell>
-                        <TableCell>
-                          <Badge variant={
-                            order.status === 'pending' ? 'outline' :
-                            order.status === 'roasted' ? 'secondary' :
-                            order.status === 'dispatched' ? 'default' :
-                            'default'
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Inventory Discrepancies</CardTitle>
+              <CardDescription>Recent inventory adjustments</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingInventory ? (
+                <div className="flex items-center justify-center p-4">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+              ) : !allInventory?.length ? (
+                <p className="text-center text-muted-foreground">No recent discrepancies found</p>
+              ) : (
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableHead>Coffee</TableHead>
+                      <TableHead>Expected</TableHead>
+                      <TableHead>Actual</TableHead>
+                      <TableHead>Difference</TableHead>
+                      <TableHead>Date</TableHead>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {allInventory.slice(0, 5).map((inv: any) => {
+                      const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
+                      return (
+                        <TableRow key={inv.id}>
+                          <TableCell>{coffee?.name || 'Unknown Coffee'}</TableCell>
+                          <TableCell>{inv.expectedQuantity}</TableCell>
+                          <TableCell>{inv.actualQuantity}</TableCell>
+                          <TableCell className={
+                            inv.actualQuantity < inv.expectedQuantity 
+                              ? "text-destructive" 
+                              : "text-muted-foreground"
                           }>
-                            {order.status}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-            <div className="mt-4 flex justify-end">
-              <Button asChild variant="outline" size="sm">
-                <Link href="/roasting/orders">View All Batches</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+                            {inv.actualQuantity - inv.expectedQuantity}
+                          </TableCell>
+                          <TableCell>
+                            {inv.createdAt 
+                              ? format(new Date(inv.createdAt), 'MMM d, yyyy')
+                              : 'N/A'
+                            }
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Recent Roasting Batches section */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Roasting Batches</CardTitle>
+              <CardDescription>Latest roasting activities</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Coffee</TableHead>
+                    <TableHead>Small Bags</TableHead>
+                    <TableHead>Large Bags</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {!allOrders?.length ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground">
+                        No recent batches found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    allOrders.slice(0, 5).map(order => {
+                      const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
+                      return (
+                        <TableRow key={order.id}>
+                          <TableCell>{formatDate(order.createdAt)}</TableCell>
+                          <TableCell>{coffee?.name}</TableCell>
+                          <TableCell>{order.smallBags}</TableCell>
+                          <TableCell>{order.largeBags}</TableCell>
+                          <TableCell>
+                            <Badge variant={
+                              order.status === 'pending' ? 'outline' :
+                              order.status === 'roasted' ? 'secondary' :
+                              order.status === 'dispatched' ? 'default' :
+                              'default'
+                            }>
+                              {order.status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+              <div className="mt-4 flex justify-end">
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/roasting/orders">View All Batches</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -402,7 +463,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <Table>
-              <TableHeader>
+              <TableHead>
                 <TableRow>
                   <TableHead>Coffee</TableHead>
                   <TableHead>Amount</TableHead>
@@ -410,7 +471,7 @@ export default function Dashboard() {
                   <TableHead>Status</TableHead>
                   <TableHead>Date</TableHead>
                 </TableRow>
-              </TableHeader>
+              </TableHead>
               <TableBody>
                 {!shopOrders?.length ? (
                   <TableRow>
@@ -512,7 +573,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <Table>
-              <TableHeader>
+              <TableHead>
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Producer</TableHead>
@@ -521,7 +582,7 @@ export default function Dashboard() {
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
-              </TableHeader>
+              </TableHead>
               <TableBody>
                 {coffees?.map(coffee => (
                   <TableRow key={coffee.id}>
@@ -568,7 +629,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <Table>
-              <TableHeader>
+              <TableHead>
                 <TableRow>
                   <TableHead>Shop</TableHead>
                   <TableHead>Coffee</TableHead>
@@ -576,7 +637,7 @@ export default function Dashboard() {
                   <TableHead>Status</TableHead>
                   <TableHead>Date</TableHead>
                 </TableRow>
-              </TableHeader>
+              </TableHead>
               <TableBody>
                 {allOrders?.slice(0, 5).map(order => {
                   const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
