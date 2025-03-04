@@ -104,7 +104,7 @@ export default function Dashboard() {
     enabled: !!selectedShopId && (user?.role === "shopManager" || user?.role === "barista"),
   });
 
-  const isLoading = loadingCoffees || loadingAllShops || loadingShop || loadingInventory || 
+  const isLoading = loadingCoffees || loadingAllShops || loadingShop || loadingInventory ||
     loadingAllInventory || loadingAllOrders || loadingShopOrders;
 
   if (isLoading) {
@@ -142,6 +142,137 @@ export default function Dashboard() {
             </Button>
           </div>
         </div>
+
+        <div className="flex justify-end">
+          <Button 
+            variant="default"
+            onClick={() => setIsRestockOpen(true)}
+            disabled={!selectedShopId}
+            className="whitespace-nowrap"
+          >
+            <Package className="h-4 w-4 mr-2" />
+            Restock Inventory
+          </Button>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Orders Overview</CardTitle>
+            <CardDescription>Recent order status and activities</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableHead>Coffee</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Date</TableHead>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {!shopOrders?.length ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center text-muted-foreground">
+                      No recent orders found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  shopOrders.slice(0, 5).map(order => {
+                    const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
+                    return (
+                      <TableRow key={order.id}>
+                        <TableCell>{coffee?.name}</TableCell>
+                        <TableCell>
+                          {order.smallBags > 0 && `${order.smallBags} small`}
+                          {order.smallBags > 0 && order.largeBags > 0 && ', '}
+                          {order.largeBags > 0 && `${order.largeBags} large`}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={
+                            order.status === 'pending' ? 'outline' :
+                            order.status === 'roasted' ? 'secondary' :
+                            order.status === 'dispatched' ? 'default' :
+                            'default'
+                          }>
+                            {order.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{formatDate(order.createdAt)}</TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+            <div className="mt-4 flex justify-end">
+              <Button asChild variant="outline" size="sm">
+                <Link href="/retail/orders">View All Orders</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Shop Performance</CardTitle>
+            <CardDescription>Stock levels and status</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!selectedShopId ? (
+              <p className="text-center text-muted-foreground">Please select a shop to view performance</p>
+            ) : (
+              <>
+                {shopInventory && shop && (
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="font-medium">{shop.name}</h3>
+                      <Badge variant={
+                        shopInventory.some(item =>
+                          (item.smallBags || 0) < (shop.desiredSmallBags || 20) / 2 ||
+                          (item.largeBags || 0) < (shop.desiredLargeBags || 10) / 2
+                        ) ? "destructive" : "outline"
+                      }>
+                        {shopInventory.filter(item =>
+                          (item.smallBags || 0) < (shop.desiredSmallBags || 20) / 2 ||
+                          (item.largeBags || 0) < (shop.desiredLargeBags || 10) / 2
+                        ).length > 0 ? "Low Stock Items" : "Stock OK"}
+                      </Badge>
+                    </div>
+                    <div className="mt-4 space-y-2">
+                      {shopInventory.map(inv => {
+                        const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
+                        return (
+                          <div key={`${shop.id}-${inv.greenCoffeeId}`} className="p-2 bg-muted rounded">
+                            <div className="text-sm font-medium mb-2">{coffee?.name}</div>
+                            <div className="space-y-2">
+                              <StockProgress
+                                current={inv.smallBags || 0}
+                                desired={shop.desiredSmallBags || 20}
+                                label="Small Bags (200g)"
+                              />
+                              <StockProgress
+                                current={inv.largeBags || 0}
+                                desired={shop.desiredLargeBags || 10}
+                                label="Large Bags (1kg)"
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <RestockDialog 
+          open={isRestockOpen} 
+          onOpenChange={setIsRestockOpen}
+          shopId={selectedShopId}
+        />
       </div>
     );
   }
