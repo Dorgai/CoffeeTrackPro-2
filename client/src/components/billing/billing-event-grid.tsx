@@ -11,15 +11,6 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useAuth } from "@/hooks/use-auth";
 
-type BillingQuantityResponse = {
-  fromDate: string;
-  quantities: {
-    grade: string;
-    smallBagsQuantity: number;
-    largeBagsQuantity: number;
-  }[];
-};
-
 export function BillingEventGrid() {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -39,9 +30,25 @@ export function BillingEventGrid() {
   });
 
   // Fetch billing details for selected event
-  const { data: selectedEventDetails, isLoading: detailsLoading } = useQuery({
+  const { data: selectedEventDetails, isLoading: detailsLoading } = useQuery<BillingEventDetail[]>({
     queryKey: ["/api/billing/details", selectedEventId],
+    queryFn: async () => {
+      if (!selectedEventId) return null;
+      const response = await fetch(`/api/billing/details/${selectedEventId}`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch billing details");
+      }
+      return response.json();
+    },
     enabled: selectedEventId !== null,
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+      setSelectedEventId(null); // Reset selection on error
+    },
   });
 
   // Create billing event mutation
@@ -303,3 +310,12 @@ export function BillingEventGrid() {
     </div>
   );
 }
+
+type BillingQuantityResponse = {
+  fromDate: string;
+  quantities: {
+    grade: string;
+    smallBagsQuantity: number;
+    largeBagsQuantity: number;
+  }[];
+};
