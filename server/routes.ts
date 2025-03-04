@@ -747,17 +747,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Fetching discrepancies for user:", req.user?.username, "with role:", req.user?.role);
       const discrepancies = await storage.getInventoryDiscrepancies();
       console.log("Found discrepancies:", discrepancies.length);
+      console.log("Sample discrepancy:", discrepancies[0]);
 
-      // For shop managers, filter discrepancies to only show their shops
+      // Filter discrepancies based on user role
       if (req.user?.role === "shopManager") {
+        // For shop managers, filter discrepancies to only show their shops
         const userShops = await storage.getUserShops(req.user.id);
         const shopIds = userShops.map(shop => shop.id);
+        console.log("Shop manager shops:", shopIds);
         const filteredDiscrepancies = discrepancies.filter(
           d => shopIds.includes(d.confirmation.shopId)
         );
+        console.log("Filtered discrepancies for shop manager:", filteredDiscrepancies.length);
         return res.json(filteredDiscrepancies);
+      } else if (req.user?.role === "roaster") {
+        // For roasters, show all discrepancies as they need to handle all roasting-related issues
+        console.log("Returning all discrepancies for roaster");
+        return res.json(discrepancies);
       }
 
+      // For roasteryOwner, show all discrepancies (no filtering needed)
+      console.log("Returning all discrepancies for roasteryOwner");
       res.json(discrepancies);
     } catch (error) {
       console.error("Error fetching inventory discrepancies:", error);
@@ -785,7 +795,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Add route for updating coffee-specific large bag target
+  // Fix the incorrect syntax in the coffee target update route
   app.patch("/api/shops/:shopId/coffee/:coffeeId/target", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
     try {
       const shopId = parseInt(req.params.shopId);
@@ -806,7 +816,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const target = await storage.updateCoffeeLargeBagTarget(
-        shopId        ,
+        shopId,
         coffeeId,
         desiredLargeBags
       );

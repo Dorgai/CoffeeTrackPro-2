@@ -19,11 +19,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
 
 export function InventoryDiscrepancyView() {
   const { user } = useAuth();
+  const { toast } = useToast();
 
-  const { data: discrepancies, isLoading } = useQuery<(InventoryDiscrepancy & {
+  const { data: discrepancies, isLoading, error } = useQuery<(InventoryDiscrepancy & {
     confirmation: {
       greenCoffee: { name: string; producer: string };
       shop: { name: string; location: string };
@@ -31,13 +33,24 @@ export function InventoryDiscrepancyView() {
   })[]>({
     queryKey: ["/api/inventory-discrepancies"],
     queryFn: async () => {
+      console.log("Fetching discrepancies for role:", user?.role);
       const res = await apiRequest("GET", "/api/inventory-discrepancies");
       if (!res.ok) {
         throw new Error("Failed to fetch discrepancy reports");
       }
-      return res.json();
+      const data = await res.json();
+      console.log("Received discrepancies:", data);
+      return data;
     },
-    enabled: user?.role === "roaster",
+    enabled: user?.role === "roaster" || user?.role === "roasteryOwner" || user?.role === "shopManager",
+    onError: (err) => {
+      console.error("Error fetching discrepancies:", err);
+      toast({
+        title: "Error",
+        description: "Failed to load discrepancy reports",
+        variant: "destructive",
+      });
+    }
   });
 
   if (isLoading) {
@@ -45,6 +58,19 @@ export function InventoryDiscrepancyView() {
       <div className="flex items-center justify-center p-8">
         <Loader2 className="h-8 w-8 animate-spin" />
       </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Error</CardTitle>
+          <CardDescription>
+            Failed to load discrepancy reports. Please try again later.
+          </CardDescription>
+        </CardHeader>
+      </Card>
     );
   }
 
