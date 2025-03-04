@@ -63,6 +63,10 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   // Use controlled value if provided, otherwise use context
   const currentValue = value !== undefined ? value : activeShop?.id;
 
+  if (!user || (user.role !== "shopManager" && user.role !== "barista")) {
+    return null;
+  }
+
   return (
     <div className={`flex items-center gap-2 ${className || ''}`}>
       <Store className="h-4 w-4 text-muted-foreground" />
