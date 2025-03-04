@@ -16,6 +16,7 @@ import {
   TableBody,
   TableCell,
   TableHead,
+  TableHeader,
   TableRow,
 } from "@/components/ui/table";
 import { useAuth } from "@/hooks/use-auth";
@@ -33,24 +34,14 @@ export function InventoryDiscrepancyView() {
   })[]>({
     queryKey: ["/api/inventory-discrepancies"],
     queryFn: async () => {
-      console.log("Fetching discrepancies for role:", user?.role);
       const res = await apiRequest("GET", "/api/inventory-discrepancies");
       if (!res.ok) {
         throw new Error("Failed to fetch discrepancy reports");
       }
       const data = await res.json();
-      console.log("Received discrepancies:", data);
       return data;
     },
     enabled: user?.role === "roaster" || user?.role === "roasteryOwner" || user?.role === "shopManager",
-    onError: (err) => {
-      console.error("Error fetching discrepancies:", err);
-      toast({
-        title: "Error",
-        description: "Failed to load discrepancy reports",
-        variant: "destructive",
-      });
-    }
   });
 
   if (isLoading) {
@@ -80,7 +71,7 @@ export function InventoryDiscrepancyView() {
         <CardHeader>
           <CardTitle>No Discrepancies Found</CardTitle>
           <CardDescription>
-            Currently there are no inventory discrepancies to review. This means all received quantities match the dispatched amounts.
+            Currently there are no inventory discrepancies to review.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -92,12 +83,12 @@ export function InventoryDiscrepancyView() {
       <CardHeader>
         <CardTitle>Inventory Discrepancies</CardTitle>
         <CardDescription>
-          Review and manage differences between dispatched and received coffee quantities
+          Review differences between dispatched and received coffee quantities
         </CardDescription>
       </CardHeader>
       <CardContent>
         <Table>
-          <thead>
+          <TableHeader>
             <TableRow>
               <TableHead>Date</TableHead>
               <TableHead>Shop</TableHead>
@@ -106,25 +97,21 @@ export function InventoryDiscrepancyView() {
               <TableHead>Large Bags Difference</TableHead>
               <TableHead>Status</TableHead>
             </TableRow>
-          </thead>
+          </TableHeader>
           <TableBody>
-            {discrepancies.map((discrepancy) => (
+            {discrepancies?.map((discrepancy) => (
               <TableRow key={discrepancy.id}>
                 <TableCell>{formatDate(discrepancy.createdAt)}</TableCell>
                 <TableCell>
                   <div>
                     <p className="font-medium">{discrepancy.confirmation.shop.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {discrepancy.confirmation.shop.location}
-                    </p>
+                    <p className="text-sm text-muted-foreground">{discrepancy.confirmation.shop.location}</p>
                   </div>
                 </TableCell>
                 <TableCell>
                   <div>
                     <p className="font-medium">{discrepancy.confirmation.greenCoffee.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {discrepancy.confirmation.greenCoffee.producer}
-                    </p>
+                    <p className="text-sm text-muted-foreground">{discrepancy.confirmation.greenCoffee.producer}</p>
                   </div>
                 </TableCell>
                 <TableCell>

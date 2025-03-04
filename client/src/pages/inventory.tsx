@@ -5,15 +5,14 @@ import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 import { InventoryGrid } from "@/components/coffee/inventory-grid";
 import { GreenCoffeeForm } from "@/components/coffee/green-coffee-form";
+import { InventoryDiscrepancyView } from "@/components/coffee/inventory-discrepancy-view";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useState } from "react";
-import { ShopSelector } from "@/components/layout/shop-selector";
 
 export default function Inventory() {
   const { user } = useAuth();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [selectedShopId, setSelectedShopId] = useState<number | null>(null);
 
   const { data: coffees, isLoading, error } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
@@ -27,12 +26,7 @@ export default function Inventory() {
     },
   });
 
-  const { data: retailInventory, isLoading: loadingInventory } = useQuery({
-    queryKey: ["/api/retail-inventory", selectedShopId],
-    enabled: user?.role === "roasteryOwner" && !!selectedShopId,
-  });
-
-  if (isLoading || loadingInventory) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -62,36 +56,31 @@ export default function Inventory() {
           </p>
         </div>
 
-        <div className="flex items-center gap-4">
-          {user?.role === "roasteryOwner" && (
-            <ShopSelector
-              value={selectedShopId}
-              onChange={setSelectedShopId}
-            />
-          )}
-
-          {user?.role === "roasteryOwner" && (
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>Add New Coffee</Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[600px]">
-                <GreenCoffeeForm 
-                  onSuccess={() => {
-                    setIsAddDialogOpen(false);
-                  }}
-                />
-              </DialogContent>
-            </Dialog>
-          )}
-        </div>
+        {user?.role === "roasteryOwner" && (
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>Add New Coffee</Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[600px]">
+              <GreenCoffeeForm 
+                onSuccess={() => {
+                  setIsAddDialogOpen(false);
+                }}
+              />
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <InventoryGrid
         coffees={coffees || []}
-        shopId={selectedShopId}
-        retailInventory={retailInventory}
       />
+
+      {user?.role === "roaster" && (
+        <div className="mt-8">
+          <InventoryDiscrepancyView />
+        </div>
+      )}
     </div>
   );
 }
