@@ -113,7 +113,7 @@ export default function Dashboard() {
     enabled: !!selectedShopId && (user?.role === "shopManager" || user?.role === "barista"),
   });
 
-  const isLoading = loadingShops || loadingShop || loadingCoffees || loadingInventory ||
+  const isLoading = loadingShops || loadingShop || loadingCoffees || loadingInventory || 
     loadingAllInventory || loadingOrders || loadingAllOrders || loadingShopOrders;
 
   if (isLoading) {
@@ -172,122 +172,66 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Roaster's View */}
       {user?.role === "roaster" && (
-        <div className="grid gap-4 md:grid-cols-3">
-          <StatsCard
-            title="Coffee Types"
-            value={coffees?.length || 0}
-            icon={Coffee}
-            description="Available coffee varieties"
-          />
-          <StatsCard
-            title="Low Stock Items"
-            value={lowStockCoffees.length}
-            icon={AlertTriangle}
-            description="Items Below Threshold"
-          />
-          <StatsCard
-            title="Available Stock"
-            value={`${coffees?.reduce((total, coffee) => total + Number(coffee.currentStock), 0) || 0}kg`}
-            icon={Package}
-            onClick={() => navigate("/inventory")}
-            description="View Inventory"
-          />
-        </div>
-      )}
+        <>
+          <div className="grid gap-4 md:grid-cols-3">
+            <StatsCard
+              title="Coffee Types"
+              value={coffees?.length || 0}
+              icon={Coffee}
+              description="Available coffee varieties"
+            />
+            <StatsCard
+              title="Low Stock Items"
+              value={lowStockCoffees.length}
+              icon={AlertTriangle}
+              description="Items Below Threshold"
+            />
+            <StatsCard
+              title="Available Stock"
+              value={`${coffees?.reduce((total, coffee) => total + Number(coffee.currentStock), 0) || 0}kg`}
+              icon={Package}
+              onClick={() => navigate("/inventory")}
+              description="View Inventory"
+            />
+          </div>
 
-      {user?.role === "roaster" && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Green Coffee Inventory</CardTitle>
-            <CardDescription>Available coffee for roasting</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!coffees?.length ? (
-              <p className="text-center text-muted-foreground">No coffee inventory available</p>
-            ) : (
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableHead>Coffee</TableHead>
-                    <TableHead>Producer</TableHead>
-                    <TableHead>Origin</TableHead>
-                    <TableHead className="text-right">Stock</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {coffees.map(coffee => (
-                    <TableRow key={coffee.id}>
-                      <TableCell className="font-medium">{coffee.name}</TableCell>
-                      <TableCell>{coffee.producer}</TableCell>
-                      <TableCell>{coffee.country}</TableCell>
-                      <TableCell className="text-right">{coffee.currentStock}kg</TableCell>
-                      <TableCell>
-                        {Number(coffee.currentStock) <= Number(coffee.minThreshold) ? (
-                          <Badge variant="destructive">Low Stock</Badge>
-                        ) : (
-                          <Badge variant="outline">In Stock</Badge>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {user?.role === "roaster" && (
-        <div className="grid gap-4 md:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle>Inventory Discrepancies</CardTitle>
-              <CardDescription>Recent inventory adjustments</CardDescription>
+              <CardTitle>Green Coffee Inventory</CardTitle>
+              <CardDescription>Available coffee for roasting</CardDescription>
             </CardHeader>
             <CardContent>
-              {loadingInventory ? (
-                <div className="flex items-center justify-center p-4">
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                </div>
-              ) : !allInventory?.length ? (
-                <p className="text-center text-muted-foreground">No recent discrepancies found</p>
+              {!coffees?.length ? (
+                <p className="text-center text-muted-foreground">No coffee inventory available</p>
               ) : (
                 <Table>
                   <TableHead>
                     <TableRow>
                       <TableHead>Coffee</TableHead>
-                      <TableHead>Expected</TableHead>
-                      <TableHead>Actual</TableHead>
-                      <TableHead>Difference</TableHead>
-                      <TableHead>Date</TableHead>
+                      <TableHead>Producer</TableHead>
+                      <TableHead>Origin</TableHead>
+                      <TableHead className="text-right">Stock</TableHead>
+                      <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {allInventory.slice(0, 5).map((inv: any) => {
-                      const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
-                      return (
-                        <TableRow key={inv.id}>
-                          <TableCell>{coffee?.name || 'Unknown Coffee'}</TableCell>
-                          <TableCell>{inv.expectedQuantity}</TableCell>
-                          <TableCell>{inv.actualQuantity}</TableCell>
-                          <TableCell className={
-                            inv.actualQuantity < inv.expectedQuantity
-                              ? "text-destructive"
-                              : "text-muted-foreground"
-                          }>
-                            {inv.actualQuantity - inv.expectedQuantity}
-                          </TableCell>
-                          <TableCell>
-                            {inv.createdAt
-                              ? format(new Date(inv.createdAt), 'MMM d, yyyy')
-                              : 'N/A'
-                            }
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
+                    {coffees.map(coffee => (
+                      <TableRow key={coffee.id}>
+                        <TableCell className="font-medium">{coffee.name}</TableCell>
+                        <TableCell>{coffee.producer}</TableCell>
+                        <TableCell>{coffee.country}</TableCell>
+                        <TableCell className="text-right">{coffee.currentStock}kg</TableCell>
+                        <TableCell>
+                          {Number(coffee.currentStock) <= Number(coffee.minThreshold) ? (
+                            <Badge variant="destructive">Low Stock</Badge>
+                          ) : (
+                            <Badge variant="outline">In Stock</Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               )}
@@ -349,9 +293,10 @@ export default function Dashboard() {
               </div>
             </CardContent>
           </Card>
-        </div>
+        </>
       )}
 
+      {/* Owner's and Manager's View */}
       {(user?.role === "shopManager" || user?.role === "barista" || user?.role === "roasteryOwner") && (
         <>
           <div className="grid gap-4 md:grid-cols-3">
@@ -537,16 +482,12 @@ export default function Dashboard() {
                   </div>
                 );
               })}
-              <div className="mt-4 flex justify-end">
-                <Button asChild variant="outline" size="sm">
-                  <Link href="/shops">Manage Shops</Link>
-                </Button>
-              </div>
             </CardContent>
           </Card>
         </>
       )}
 
+      {/* Restock Dialog */}
       {showRestock && (
         <RestockDialog 
           open={isRestockOpen} 
