@@ -25,6 +25,7 @@ export function BillingEventGrid() {
   const { user } = useAuth();
   const [primarySplit, setPrimarySplit] = useState(70);
   const [secondarySplit, setSecondarySplit] = useState(30);
+  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const isManager = user?.role === "shopManager";
 
   // Fetch quantities since last billing event
@@ -35,6 +36,12 @@ export function BillingEventGrid() {
   // Fetch billing history
   const { data: billingHistory, isLoading: historyLoading } = useQuery<BillingEvent[]>({
     queryKey: ["/api/billing/history"],
+  });
+
+  // Fetch billing details for selected event
+  const { data: selectedEventDetails, isLoading: detailsLoading } = useQuery({
+    queryKey: ["/api/billing/details", selectedEventId],
+    enabled: selectedEventId !== null,
   });
 
   // Create billing event mutation
@@ -70,7 +77,7 @@ export function BillingEventGrid() {
     },
   });
 
-  if (quantitiesLoading || historyLoading) {
+  if (quantitiesLoading || historyLoading || detailsLoading) {
     return (
       <div className="flex items-center justify-center min-h-[200px]">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -100,6 +107,7 @@ export function BillingEventGrid() {
                 <TableHead>Cycle End</TableHead>
                 <TableHead>Primary Split (%)</TableHead>
                 <TableHead>Secondary Split (%)</TableHead>
+                <TableHead>Details</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -109,12 +117,57 @@ export function BillingEventGrid() {
                   <TableCell>{format(new Date(event.cycleEndDate), 'PPP')}</TableCell>
                   <TableCell>{Number(event.primarySplitPercentage).toFixed(2)}%</TableCell>
                   <TableCell>{Number(event.secondarySplitPercentage).toFixed(2)}%</TableCell>
+                  <TableCell>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedEventId(event.id)}
+                    >
+                      View Details
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+
+      {/* Billing Details for Selected Event */}
+      {selectedEventId && selectedEventDetails && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Billing Event Details</CardTitle>
+            <CardDescription>
+              Detailed quantities for billing event
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Grade</TableHead>
+                  <TableHead>Small Bags</TableHead>
+                  <TableHead>Large Bags</TableHead>
+                  <TableHead>Total Bags</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {selectedEventDetails.map((detail) => (
+                  <TableRow key={detail.id}>
+                    <TableCell className="font-medium">{detail.grade}</TableCell>
+                    <TableCell>{detail.smallBagsQuantity}</TableCell>
+                    <TableCell>{detail.largeBagsQuantity}</TableCell>
+                    <TableCell>
+                      {detail.smallBagsQuantity + detail.largeBagsQuantity}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Current Billing Cycle Information */}
       <Card>

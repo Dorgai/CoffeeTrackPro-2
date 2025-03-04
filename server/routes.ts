@@ -173,7 +173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.user?.role === "roasteryOwner") {
         shops = await storage.getShops();
         shops = shops.filter(shop => shop.isActive);
-      } 
+      }
       // For shopManager, return only their assigned shops
       else {
         shops = await storage.getUserShops(req.user!.id);
@@ -303,7 +303,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json(updatedCoffee);
       } catch (error) {
         console.error("Error updating green coffee:", error);
-        res.status(500).json({ 
+        res.status(500).json({
           message: error instanceof Error ? error.message : "Failed to update green coffee",
           details: error instanceof Error ? error.stack : undefined
         });
@@ -374,7 +374,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(201).json(batch);
       } catch (error) {
         console.error("Error creating roasting batch:", error);
-        res.status(400).json({ 
+        res.status(400).json({
           message: error instanceof Error ? error.message : "Failed to create roasting batch",
           details: error instanceof Error ? error.stack : undefined
         });
@@ -441,7 +441,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(inventory);
     } catch (error) {
       console.error("Error updating retail inventory:", error);
-      res.status(400).json({ 
+      res.status(400).json({
         message: error instanceof Error ? error.message : "Failed to update inventory",
         details: error instanceof Error ? error.stack : undefined
       });
@@ -532,8 +532,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (req.user?.role === "roasteryOwner") {
           // Only validate quantities
           if (smallBags > order.smallBags || largeBags > order.largeBags) {
-            return res.status(400).json({ 
-              message: "Updated quantities cannot exceed original order quantities" 
+            return res.status(400).json({
+              message: "Updated quantities cannot exceed original order quantities"
             });
           }
         } else {
@@ -553,8 +553,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Validate quantities
           if (smallBags > order.smallBags || largeBags > order.largeBags) {
-            return res.status(400).json({ 
-              message: "Updated quantities cannot exceed original order quantities" 
+            return res.status(400).json({
+              message: "Updated quantities cannot exceed original order quantities"
             });
           }
         }
@@ -606,8 +606,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json(updatedOrder);
       } catch (error) {
         console.error("Error updating order status:", error);
-        res.status(500).json({ 
-          message: error instanceof Error ? error.message : "Failed to update order" 
+        res.status(500).json({
+          message: error instanceof Error ? error.message : "Failed to update order"
         });
       }
     }
@@ -636,8 +636,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(order);
     } catch (error) {
       console.error("Error creating order:", error);
-      res.status(400).json({ 
-        message: error instanceof Error ? error.message : "Failed to create order" 
+      res.status(400).json({
+        message: error instanceof Error ? error.message : "Failed to create order"
       });
     }
   });
@@ -734,7 +734,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(confirmation);
     } catch (error) {
       console.error("Error confirming dispatched coffee:", error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: error instanceof Error ? error.message : "Failed to confirm dispatch",
         details: error instanceof Error ? error.stack : undefined
       });
@@ -761,7 +761,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(discrepancies);
     } catch (error) {
       console.error("Error fetching inventory discrepancies:", error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: "Failed to fetch discrepancies",
         details: error instanceof Error ? error.message : undefined
       });
@@ -801,20 +801,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.user?.role !== "roasteryOwner") {
         const hasAccess = await checkShopAccess(req.user!.id, shopId);
         if (!hasAccess) {
-          return res.status(403).json({ message: "User does not have access to thisshop" });
+          return res.status(403).json({ message: "User does not have access to this shop" });
         }
       }
 
       const target = await storage.updateCoffeeLargeBagTarget(
-        shopId,        coffeeId,
-                desiredLargeBags
+        shopId        ,
+        coffeeId,
+        desiredLargeBags
       );
 
       console.log("Updated coffee target for shop:", shopId, "coffee:", coffeeId, "to:", desiredLargeBags);
       res.json(target);
-    } catch(error) {
+    } catch (error) {
       console.error("Error updating coffee target:", error);
-      res.status(500).json({ message: "Failed to update coffee target" });    }
+      res.status(500).json({ message: "Failed to update coffee target" });
+    }
   });
 
   //  // Add new billing routes after theexisting ones
@@ -849,7 +851,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error in /api/billing/quantities:", error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: "Failed to fetch billing quantities",
         details: error instanceof Error ? error.message : "Unknown error"
       });
@@ -892,12 +894,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/billing/history", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
     try {
       console.log("Fetching billing history for user:", req.user?.username, "role:", req.user?.role);
-      const history = await storage.getBillingHistory();
+      const history = await storage.getBillingEvents();
       console.log("Retrieved billing history:", history.length, "events");
       res.json(history);
     } catch (error) {
       console.error("Error fetching billing history:", error);
       res.status(500).json({ message: "Failed to fetch billing history" });
+    }
+  });
+
+  // Add billing details route
+  app.get("/api/billing/details/:eventId", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
+    try {
+      const eventId = parseInt(req.params.eventId);
+      if (isNaN(eventId)) {
+        return res.status(400).json({ message: "Invalid event ID" });
+      }
+
+      console.log("Fetching billing details for event:", eventId, "user:", req.user?.username);
+      const details = await storage.getBillingEventDetails(eventId);
+      console.log("Retrieved billing details:", details);
+      res.json(details);
+    } catch (error) {
+      console.error("Error fetching billing details:", error);
+      res.status(500).json({ message: "Failed to fetch billing details" });
     }
   });
 
@@ -912,7 +932,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(inventoryHistory);
     } catch (error) {
       console.error("Error fetching inventory analytics:", error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: "Failed to fetch inventory analytics",
         details: error instanceof Error ? error.message : undefined
       });
@@ -929,7 +949,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(orderAnalytics);
     } catch (error) {
       console.error("Error fetching order analytics:", error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: "Failed to fetch order analytics",
         details: error instanceof Error ? error.message : undefined
       });
@@ -946,7 +966,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(roastingAnalytics);
     } catch (error) {
       console.error("Error fetching roasting analytics:", error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: "Failed to fetch roasting analytics",
         details: error instanceof Error ? error.message : undefined
       });
@@ -961,7 +981,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(report);
     } catch (error) {
       console.error("Error generating inventory status report:", error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: "Failed to generate inventory status report",
         details: error instanceof Error ? error.message : undefined
       });
@@ -975,7 +995,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(report);
     } catch (error) {
       console.error("Error generating shop performance report:", error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: "Failed to generate shop performance report",
         details: error instanceof Error ? error.message : undefined
       });
@@ -989,7 +1009,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(report);
     } catch (error) {
       console.error("Error generating coffee consumption report:", error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: "Failed to generate coffee consumption report",
         details: error instanceof Error ? error.message : undefined
       });
