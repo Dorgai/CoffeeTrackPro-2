@@ -12,8 +12,6 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
-import { ShopSelector } from "./shop-selector";
-import { RestockDialog } from "../coffee/restock-dialog";
 import { GreenBeansStockIndicator } from "./green-beans-stock-indicator";
 import { Coffee } from "lucide-react";
 
@@ -176,18 +174,16 @@ export function NavBar() {
         <div className="ml-auto flex items-center space-x-4">
           {user ? (
             <div className="flex items-center space-x-4">
-              {(user.role === "shopManager" || user.role === "barista") && <ShopSelector />}
               {(user.role === "roasteryOwner" || user.role === "roaster") && (
-                <GreenBeansStockIndicator />
-              )}
-              {(user.role === "roasteryOwner" || user.role === "shopManager" || user.role === "barista") && <RestockDialog />}
-              {(user.role === "roasteryOwner" || user.role === "roaster") && (
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/inventory" className="flex items-center">
-                    <Coffee className="h-4 w-4 mr-2" />
-                    Update Green Coffee
-                  </Link>
-                </Button>
+                <>
+                  <GreenBeansStockIndicator />
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href="/inventory" className="flex items-center">
+                      <Coffee className="h-4 w-4 mr-2" />
+                      Update Green Coffee
+                    </Link>
+                  </Button>
+                </>
               )}
               <Avatar>
                 <AvatarFallback>
