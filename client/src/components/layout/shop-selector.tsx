@@ -22,17 +22,19 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   const { activeShop, setActiveShop } = useActiveShop();
   const { user } = useAuth();
 
-  // For all roles except roaster, fetch all shops
-  const { data: shops, isLoading } = useQuery<Shop[]>({
+  const { data: shopData, isLoading } = useQuery<any[]>({
     queryKey: ["/api/user/shops"],
     enabled: !!user && (user.role === "shopManager" || user.role === "barista" || user.role === "roasteryOwner"),
   });
 
-  // Set default shop when shops are loaded
+  // Transform nested shop data into a flat array of shops
+  const shops = shopData?.map(item => item.shop).filter(Boolean) || [];
+
   useEffect(() => {
-    if (shops && shops.length > 0 && !activeShop) {
+    if (shops.length > 0 && !activeShop) {
       const defaultShop = shops.find(s => s.id === user?.defaultShopId) || shops[0];
       if (defaultShop) {
+        console.log('Setting default shop:', defaultShop);
         setActiveShop(defaultShop);
         if (onChange) {
           onChange(defaultShop.id);
@@ -43,9 +45,9 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
 
   const handleChange = (value: string) => {
     const shopId = value ? parseInt(value, 10) : null;
-    const shop = shops?.find((s) => s.id === shopId);
+    const shop = shops.find((s) => s.id === shopId);
+    console.log('Selected shop:', shop);
 
-    // Call both the controlled and context handlers
     if (onChange) {
       onChange(shopId);
     }
@@ -54,6 +56,8 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
 
   // Use controlled value if provided, otherwise use context
   const currentValue = value !== undefined ? value : activeShop?.id;
+  console.log('Current value:', currentValue);
+  console.log('Available shops:', shops);
 
   return (
     <div className={`flex items-center gap-2 ${className || ''}`}>
@@ -74,7 +78,7 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
           )}
         </SelectTrigger>
         <SelectContent>
-          {shops?.filter(shop => shop && shop.id).map((shop) => (
+          {shops.map((shop) => (
             <SelectItem 
               key={shop.id} 
               value={String(shop.id)}
