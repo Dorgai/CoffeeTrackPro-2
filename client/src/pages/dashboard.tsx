@@ -1,6 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import type { GreenCoffee, RetailInventory, Shop, Order } from "@shared/schema";
 import { format } from 'date-fns';
 import { useState } from 'react';
@@ -27,6 +27,8 @@ import { ShopSelector } from "@/components/layout/shop-selector";
 import StockProgress from "@/components/stock-progress";
 import { apiRequest } from "@/lib/queryClient";
 import { formatDate } from "@/lib/utils";
+import { Link } from "wouter";
+
 
 function StatsCard({
   title,
@@ -129,7 +131,8 @@ export default function Dashboard() {
   ) || [];
 
   const showShopSelector = user?.role === "shopManager" || user?.role === "barista" || user?.role === "roasteryOwner";
-  const showRestock = user?.role === "shopManager" || user?.role === "barista" || user?.role === "roasteryOwner";
+  const showTopRestock = user?.role === "roasteryOwner";
+  const showManagerRestock = user?.role === "shopManager" || user?.role === "barista";
 
   return (
     <div className="container mx-auto py-8 space-y-8">
@@ -151,7 +154,7 @@ export default function Dashboard() {
               onChange={setSelectedShopId}
             />
           )}
-          {showRestock && selectedShopId && (
+          {showTopRestock && selectedShopId && (
             <Button 
               variant="outline"
               onClick={() => setIsRestockOpen(true)}
@@ -172,7 +175,19 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Roaster's View */}
+      {showManagerRestock && selectedShopId && (
+        <div className="flex justify-end">
+          <Button 
+            variant="default"
+            onClick={() => setIsRestockOpen(true)}
+            className="whitespace-nowrap"
+          >
+            <Package className="h-4 w-4 mr-2" />
+            Restock Shop Inventory
+          </Button>
+        </div>
+      )}
+
       {user?.role === "roaster" && (
         <>
           <div className="grid gap-4 md:grid-cols-3">
@@ -296,7 +311,6 @@ export default function Dashboard() {
         </>
       )}
 
-      {/* Owner's and Manager's View */}
       {(user?.role === "shopManager" || user?.role === "barista" || user?.role === "roasteryOwner") && (
         <>
           <div className="grid gap-4 md:grid-cols-3">
@@ -321,61 +335,63 @@ export default function Dashboard() {
             />
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Green Coffee Inventory</CardTitle>
-              <CardDescription>Current stock levels and details</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Producer</TableHead>
-                    <TableHead>Country</TableHead>
-                    <TableHead>Current Stock</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {coffees?.map(coffee => (
-                    <TableRow key={coffee.id}>
-                      <TableCell className="font-medium">{coffee.name}</TableCell>
-                      <TableCell>{coffee.producer}</TableCell>
-                      <TableCell>{coffee.country}</TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{coffee.currentStock}kg</div>
-                          <StockProgress
-                            current={Number(coffee.currentStock)}
-                            desired={Number(coffee.minThreshold) * 2}
-                            label="Stock Level"
-                          />
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {Number(coffee.currentStock) <= Number(coffee.minThreshold) ? (
-                          <Badge variant="destructive">Low Stock</Badge>
-                        ) : (
-                          <Badge variant="outline">In Stock</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => navigate(`/coffee/${coffee.id}`)}
-                        >
-                          View Details
-                        </Button>
-                      </TableCell>
+          {user?.role === "roasteryOwner" && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Green Coffee Inventory</CardTitle>
+                <CardDescription>Current stock levels and details</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Producer</TableHead>
+                      <TableHead>Country</TableHead>
+                      <TableHead>Current Stock</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                  </TableHead>
+                  <TableBody>
+                    {coffees?.map(coffee => (
+                      <TableRow key={coffee.id}>
+                        <TableCell className="font-medium">{coffee.name}</TableCell>
+                        <TableCell>{coffee.producer}</TableCell>
+                        <TableCell>{coffee.country}</TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{coffee.currentStock}kg</div>
+                            <StockProgress
+                              current={Number(coffee.currentStock)}
+                              desired={Number(coffee.minThreshold) * 2}
+                              label="Stock Level"
+                            />
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {Number(coffee.currentStock) <= Number(coffee.minThreshold) ? (
+                            <Badge variant="destructive">Low Stock</Badge>
+                          ) : (
+                            <Badge variant="outline">In Stock</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => navigate(`/coffee/${coffee.id}`)}
+                          >
+                            View Details
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>
@@ -487,8 +503,7 @@ export default function Dashboard() {
         </>
       )}
 
-      {/* Restock Dialog */}
-      {showRestock && (
+      {(showTopRestock || showManagerRestock) && (
         <RestockDialog 
           open={isRestockOpen} 
           onOpenChange={setIsRestockOpen}
