@@ -159,27 +159,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <StatsCard
-            title="Total Coffee Types"
-            value={totalItems}
-            icon={Coffee}
-            description="Available varieties"
-          />
-          <StatsCard
-            title="Low Stock Items"
-            value={lowStockItems}
-            icon={AlertTriangle}
-            description="Items requiring attention"
-          />
-          <StatsCard
-            title="Stock Health"
-            value={`${stockHealth}%`}
-            icon={Package}
-            description="Items meeting target levels"
-          />
-        </div>
-
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
             <CardHeader>
@@ -598,7 +577,7 @@ export default function Dashboard() {
         <Card>
           <CardHeader>
             <CardTitle>Shop Performance</CardTitle>
-            <CardDescription>Stock levels and order status across shops</CardDescription>
+            <CardDescription>Overall performance data</CardDescription>
           </CardHeader>
           <CardContent>
             {allShops?.map(shop => {
