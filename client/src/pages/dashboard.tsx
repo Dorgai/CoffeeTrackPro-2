@@ -292,7 +292,7 @@ export default function Dashboard() {
                     <TableHead className="text-left">Origin</TableHead>
                     <TableHead className="text-right">Current Stock</TableHead>
                     <TableHead className="text-left">Status</TableHead>
-                    
+
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -304,7 +304,7 @@ export default function Dashboard() {
                       <TableCell className="text-right">
                         <div className="flex flex-col items-end">
                           <span className="font-medium">{coffee.currentStock}kg</span>
-                         
+
                         </div>
                       </TableCell>
                       <TableCell className="text-left">
@@ -314,7 +314,7 @@ export default function Dashboard() {
                           <Badge variant="outline">In Stock</Badge>
                         )}
                       </TableCell>
-                     
+
                     </TableRow>
                   ))}
                 </TableBody>
