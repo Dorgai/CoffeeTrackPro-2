@@ -802,14 +802,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Returning all discrepancies for roasteryOwner");
       res.json(discrepancies);
     } catch (error) {
-      console.error("Error fetching inventory discrepancies:", error);      res.status(500).json({
+      console.error("Error fetching inventory discrepancies:", error);
+      res.status(500).json({
         message: "Failed to fetch discrepancies",
         details: error instanceof Error ? error.message : undefined
       });
     }
   });
 
-  // Add route for getting coffee-specific large bag targets  app.get("/api/shops/:id/coffee-targets", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
+  // Add route for getting coffee-specific large bagtargets
+  app.get("/api/shops/:id/coffee-targets", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
     try {
       const shopId = parseInt(req.params.id);
 
