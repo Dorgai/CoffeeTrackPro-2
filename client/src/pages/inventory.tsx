@@ -7,9 +7,11 @@ import { InventoryGrid } from "@/components/coffee/inventory-grid";
 import { GreenCoffeeForm } from "@/components/coffee/green-coffee-form";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { useState } from "react";
 
 export default function Inventory() {
   const { user } = useAuth();
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
 
   const { data: coffees, isLoading, error } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
@@ -54,12 +56,16 @@ export default function Inventory() {
         </div>
 
         {user?.role === "roasteryOwner" && (
-          <Dialog>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button>Add New Coffee</Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[600px]">
-              <GreenCoffeeForm />
+              <GreenCoffeeForm 
+                onSuccess={() => {
+                  setIsAddDialogOpen(false);
+                }}
+              />
             </DialogContent>
           </Dialog>
         )}
