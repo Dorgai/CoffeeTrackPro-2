@@ -53,7 +53,7 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
     <div className={`flex items-center gap-2 ${className || ''}`}>
       <Store className="h-4 w-4 text-muted-foreground" />
       <Select
-        value={currentValue ? String(currentValue) : undefined}
+        value={currentValue ? `${currentValue}` : undefined}
         onValueChange={handleChange}
         disabled={isLoading}
       >
@@ -69,7 +69,7 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
         </SelectTrigger>
         <SelectContent>
           {shops?.map((shop) => (
-            <SelectItem key={shop.id} value={String(shop.id)}>
+            <SelectItem key={shop.id} value={`${shop.id}`}>
               {shop.name}
             </SelectItem>
           ))}
