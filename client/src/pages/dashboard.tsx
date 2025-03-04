@@ -68,12 +68,6 @@ export default function Dashboard() {
   const [isRestockOpen, setIsRestockOpen] = useState(false);
   const [, navigate] = useLocation();
 
-  // Fetch coffee data for all users
-  const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
-    queryKey: ["/api/green-coffee"],
-    enabled: !!user,
-  });
-
   // Get user's shops
   const { data: userShops } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
@@ -104,10 +98,10 @@ export default function Dashboard() {
     enabled: user?.role === "roasteryOwner",
   });
 
-  // Fetch orders based on role and selected shop
-  const { data: shopOrders, isLoading: loadingShopOrders } = useQuery<Order[]>({
-    queryKey: ["/api/orders", selectedShopId],
-    enabled: !!selectedShopId,
+  // Fetch coffee data for all users
+  const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
+    queryKey: ["/api/green-coffee"],
+    enabled: !!user,
   });
 
   // Fetch all orders for roasteryOwner and roaster
@@ -116,7 +110,13 @@ export default function Dashboard() {
     enabled: !!user && (user.role === "roasteryOwner" || user.role === "roaster"),
   });
 
-  const isLoading = loadingCoffees || loadingShop || loadingInventory || loadingShopOrders || loadingAllOrders;
+  // Fetch orders based on role and selected shop
+  const { data: shopOrders, isLoading: loadingShopOrders } = useQuery<Order[]>({
+    queryKey: ["/api/orders", selectedShopId],
+    enabled: !!selectedShopId,
+  });
+
+  const isLoading = loadingShop || loadingInventory || loadingCoffees || loadingAllOrders || loadingShopOrders;
 
   if (isLoading) {
     return (
@@ -126,11 +126,11 @@ export default function Dashboard() {
     );
   }
 
-  const lowStockCoffees = coffees?.filter(coffee =>
-    Number(coffee.currentStock) <= Number(coffee.minThreshold)
-  ) || [];
-
   if (user?.role === "roaster") {
+    const lowStockCoffees = coffees?.filter(coffee =>
+      Number(coffee.currentStock) <= Number(coffee.minThreshold)
+    ) || [];
+
     return (
       <div className="container mx-auto py-8 space-y-8">
         <div className="flex justify-between items-center">
