@@ -33,7 +33,6 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   const { data: userShops, isLoading } = useQuery<UserShopResponse[]>({
     queryKey: ["/api/user/shops"],
     enabled: !!user && (user.role === "shopManager" || user.role === "barista"),
-    retry: 1,
   });
 
   const shops = userShops?.map(item => item.shop).filter(Boolean) || [];
