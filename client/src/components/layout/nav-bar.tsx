@@ -46,30 +46,16 @@ export function NavBar() {
                   Inventory
                 </Link>
               </MenubarItem>
-              {(user?.role === "roasteryOwner" || user?.role === "shopManager") && (
-                <>
-                  <MenubarItem>
-                    <Link href="/analytics" className="flex w-full">
-                      Analytics
-                    </Link>
-                  </MenubarItem>
-                  <MenubarItem>
-                    <Link href="/reports" className="flex w-full">
-                      Reports
-                    </Link>
-                  </MenubarItem>
-                </>
-              )}
             </MenubarContent>
           </MenubarMenu>
-          {user?.role === "roasteryOwner" && (
+          {(user?.role === "roasteryOwner" || user?.role === "shopManager") && (
             <>
               <MenubarMenu>
-                <MenubarTrigger>Reports</MenubarTrigger>
+                <MenubarTrigger>Analytics</MenubarTrigger>
                 <MenubarContent>
                   <MenubarItem>
                     <Link href="/analytics" className="flex w-full">
-                      Analytics
+                      Overview
                     </Link>
                   </MenubarItem>
                   <MenubarItem>
@@ -79,6 +65,20 @@ export function NavBar() {
                   </MenubarItem>
                 </MenubarContent>
               </MenubarMenu>
+              <MenubarMenu>
+                <MenubarTrigger>Finance</MenubarTrigger>
+                <MenubarContent>
+                  <MenubarItem>
+                    <Link href="/billing" className="flex w-full">
+                      Billing Events
+                    </Link>
+                  </MenubarItem>
+                </MenubarContent>
+              </MenubarMenu>
+            </>
+          )}
+          {user?.role === "roasteryOwner" && (
+            <>
               <MenubarMenu>
                 <MenubarTrigger>Green Coffee</MenubarTrigger>
                 <MenubarContent>
@@ -119,18 +119,6 @@ export function NavBar() {
                   </MenubarItem>
                 </MenubarContent>
               </MenubarMenu>
-              {(user?.role === "roasteryOwner" || user?.role === "shopManager") && (
-                <MenubarMenu>
-                  <MenubarTrigger>Finance</MenubarTrigger>
-                  <MenubarContent>
-                    <MenubarItem>
-                      <Link href="/billing" className="flex w-full">
-                        Billing Events
-                      </Link>
-                    </MenubarItem>
-                  </MenubarContent>
-                </MenubarMenu>
-              )}
             </>
           )}
           {user?.role === "roaster" && (

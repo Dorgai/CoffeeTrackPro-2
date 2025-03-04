@@ -894,7 +894,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/billing/history", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
     try {
       console.log("Fetching billing history for user:", req.user?.username, "role:", req.user?.role);
-      const history = await storage.getBillingEvents();
+      const history = await storage.getBillingHistory();
       console.log("Retrieved billing history:", history.length, "events");
       res.json(history);
     } catch (error) {
@@ -903,7 +903,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Add billing details route
   app.get("/api/billing/details/:eventId", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
     try {
       const eventId = parseInt(req.params.eventId);

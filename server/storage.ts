@@ -155,10 +155,12 @@ export interface IStorage {
   generateShopPerformanceReport(): Promise<any>;
   generateCoffeeConsumptionReport(): Promise<any>;
   
+
   // Add billing history method
   getBillingHistory(): Promise<(BillingEvent & {
     details: BillingEventDetail[];
   })[]>;
+  getBillingEventDetails(eventId: number): Promise<BillingEventDetail[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -996,7 +998,7 @@ export class DatabaseStorage implements IStorage {
         throw new Error("Failed to update shop");
       }
 
-      return updatedShop;
+            return updatedShop;
     } catch (error) {
       console.error("Error updating shop:", error);
       throw error;
@@ -1307,7 +1309,6 @@ export class DatabaseStorage implements IStorage {
 
   async getBillingHistory(): Promise<(BillingEvent & { details: BillingEventDetail[] })[]> {
     try {
-      // Get all billing events
       const events = await db
         .select({
           id: billingEvents.id,
@@ -1315,30 +1316,23 @@ export class DatabaseStorage implements IStorage {
           cycleEndDate: billingEvents.cycleEndDate,
           primarySplitPercentage: billingEvents.primarySplitPercentage,
           secondarySplitPercentage: billingEvents.secondarySplitPercentage,
-          createdById: billingEvents.createdById,
-          createdAt: billingEvents.createdAt
+          createdAt: billingEvents.createdAt,
+          createdById: billingEvents.createdById
         })
         .from(billingEvents)
         .orderBy(desc(billingEvents.cycleEndDate));
 
-      // For each event, get its details
       const eventsWithDetails = await Promise.all(
         events.map(async (event) => {
           const details = await db
-            .select({
-              id: billingEventDetails.id,
-              billingEventId: billingEventDetails.billingEventId,
-              grade: billingEventDetails.grade,
-              smallBagsQuantity: billingEventDetails.smallBagsQuantity,
-              largeBagsQuantity: billingEventDetails.largeBagsQuantity
-            })
+            .select()
             .from(billingEventDetails)
             .where(eq(billingEventDetails.billingEventId, event.id))
             .orderBy(billingEventDetails.grade);
 
           return {
             ...event,
-            details
+            details: details
           };
         })
       );
@@ -1346,6 +1340,21 @@ export class DatabaseStorage implements IStorage {
       return eventsWithDetails;
     } catch (error) {
       console.error("Error fetching billing history:", error);
+      throw error;
+    }
+  }
+
+  async getBillingEventDetails(eventId: number): Promise<BillingEventDetail[]> {
+    try {
+      const details = await db
+        .select()
+        .from(billingEventDetails)
+        .where(eq(billingEventDetails.billingEventId, eventId))
+        .orderBy(billingEventDetails.grade);
+
+      return details;
+    } catch (error) {
+      console.error("Error fetching billing event details:", error);
       throw error;
     }
   }
