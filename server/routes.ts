@@ -275,6 +275,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Add new green coffee route
+  app.post(
+    "/api/green-coffee",
+    requireRole(["roasteryOwner", "roaster"]),
+    async (req, res) => {
+      try {
+        console.log("Creating new green coffee:", {
+          createdBy: req.user?.username,
+          role: req.user?.role,
+          data: req.body
+        });
+
+        const data = insertGreenCoffeeSchema.parse(req.body);
+        const coffee = await storage.createGreenCoffee(data);
+
+        console.log("Successfully created green coffee:", coffee);
+        res.status(201).json(coffee);
+      } catch (error) {
+        console.error("Error creating green coffee:", error);
+        res.status(400).json({
+          message: error instanceof Error ? error.message : "Failed to create green coffee",
+          details: error instanceof Error ? error.stack : undefined
+        });
+      }
+    }
+  );
+
   // Update endpoint for green coffee with proper roaster permissions
   app.patch(
     "/api/green-coffee/:id",
@@ -803,7 +830,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { desiredLargeBags } = req.body;
 
       // Validate inputs
-      if (typeof desiredLargeBags !== 'number' || desiredLargeBags < 0) {        return res.status(400).json({ message: "Invalid desired large bags value" });
+      if (typeof desiredLargeBags !== 'number' || desiredLargeBags < 0) {
+        return res.status(400).json({ message: "Invalid desired large bags value" });
       }
 
       // For non-roasteryOwner users, verify shop access

@@ -59,6 +59,7 @@ export function GreenCoffeeForm({
 
   const mutation = useMutation({
     mutationFn: async (data: FormValues) => {
+      console.log("Submitting form data:", data);
       if (isEditing) {
         const response = await apiRequest("PATCH", `/api/green-coffee/${coffee.id}`, data);
         if (!response.ok) {
@@ -77,13 +78,14 @@ export function GreenCoffeeForm({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/green-coffee"] });
-      if (onSuccess) onSuccess();
       toast({
         title: isEditing ? "Coffee Updated" : "Coffee Created",
         description: isEditing ? "Green coffee has been updated" : "New green coffee has been added",
       });
+      if (onSuccess) onSuccess();
     },
     onError: (error: Error) => {
+      console.error("Form submission error:", error);
       toast({
         title: "Error",
         description: error.message,
@@ -93,7 +95,7 @@ export function GreenCoffeeForm({
   });
 
   const onSubmit = (data: FormValues) => {
-    console.log("Submitting form data:", data);
+    console.log("Form submission initiated:", data);
     mutation.mutate(data);
   };
 
