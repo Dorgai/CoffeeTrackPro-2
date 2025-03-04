@@ -290,21 +290,21 @@ export default function Dashboard() {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableHead>Coffee</TableHead>
-                    <TableHead>Producer</TableHead>
-                    <TableHead>Origin</TableHead>
+                    <TableHead className="text-left">Coffee</TableHead>
+                    <TableHead className="text-left">Producer</TableHead>
+                    <TableHead className="text-left">Origin</TableHead>
                     <TableHead className="text-right">Stock</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead className="text-left">Status</TableHead>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {coffees.map(coffee => (
                     <TableRow key={coffee.id}>
-                      <TableCell className="font-medium">{coffee.name}</TableCell>
-                      <TableCell>{coffee.producer}</TableCell>
-                      <TableCell>{coffee.country}</TableCell>
+                      <TableCell className="text-left font-medium">{coffee.name}</TableCell>
+                      <TableCell className="text-left">{coffee.producer}</TableCell>
+                      <TableCell className="text-left">{coffee.country}</TableCell>
                       <TableCell className="text-right">{coffee.currentStock}kg</TableCell>
-                      <TableCell>
+                      <TableCell className="text-left">
                         {Number(coffee.currentStock) <= Number(coffee.minThreshold) ? (
                           <Badge variant="destructive">Low Stock</Badge>
                         ) : (
@@ -866,7 +866,7 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader>
-<CardTitle>Recent Activities</CardTitle>
+            <CardTitle>Recent Activities</CardTitle>
             <CardDescription>Latest updates and changes</CardDescription>
           </CardHeader>
           <CardContent>
@@ -926,7 +926,6 @@ export default function Dashboard() {
       </div>
     );
   }
-
   if (user?.role === "shopManager" || user?.role === "barista") {
     const totalItems = shopInventory?.length || 0;
     const lowStockItems = shopInventory?.filter(item =>
