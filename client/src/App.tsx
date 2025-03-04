@@ -84,7 +84,7 @@ export default function App() {
               {() => <ProtectedRoute path="/profile" component={Profile} />}
             </Route>
             <Route path="/billing">
-              {() => <ProtectedRoute path="/billing" component={Billing} roles={["roasteryOwner"]} />}
+              {() => <ProtectedRoute path="/billing" component={Billing} roles={["roasteryOwner", "shopManager"]} />}
             </Route>
 
             {/* 404 route */}

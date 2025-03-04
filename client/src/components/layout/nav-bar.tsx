@@ -46,6 +46,20 @@ export function NavBar() {
                   Inventory
                 </Link>
               </MenubarItem>
+              {(user?.role === "roasteryOwner" || user?.role === "shopManager") && (
+                <>
+                  <MenubarItem>
+                    <Link href="/analytics" className="flex w-full">
+                      Analytics
+                    </Link>
+                  </MenubarItem>
+                  <MenubarItem>
+                    <Link href="/reports" className="flex w-full">
+                      Reports
+                    </Link>
+                  </MenubarItem>
+                </>
+              )}
             </MenubarContent>
           </MenubarMenu>
           {user?.role === "roasteryOwner" && (
@@ -105,16 +119,18 @@ export function NavBar() {
                   </MenubarItem>
                 </MenubarContent>
               </MenubarMenu>
-              <MenubarMenu>
-                <MenubarTrigger>Finance</MenubarTrigger>
-                <MenubarContent>
-                  <MenubarItem>
-                    <Link href="/billing" className="flex w-full">
-                      Billing Events
-                    </Link>
-                  </MenubarItem>
-                </MenubarContent>
-              </MenubarMenu>
+              {(user?.role === "roasteryOwner" || user?.role === "shopManager") && (
+                <MenubarMenu>
+                  <MenubarTrigger>Finance</MenubarTrigger>
+                  <MenubarContent>
+                    <MenubarItem>
+                      <Link href="/billing" className="flex w-full">
+                        Billing Events
+                      </Link>
+                    </MenubarItem>
+                  </MenubarContent>
+                </MenubarMenu>
+              )}
             </>
           )}
           {user?.role === "roaster" && (

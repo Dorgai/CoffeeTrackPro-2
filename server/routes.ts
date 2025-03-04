@@ -805,9 +805,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const target = awaitstorage.updateCoffeeLargeBagTarget(
-        shopId,
-        coffeeId,
+      const target = await storage.updateCoffeeLargeBagTarget(
+        shopId,        coffeeId,
         desiredLargeBags
       );
 
@@ -890,21 +889,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Add billing history route
-  app.get("/api/billing/history", requireRole(["roasteryOwner"]), async (req, res) => {
+  app.get("/api/billing/history", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
     try {
-      console.log("Fetching billing history...");
-
-      // Get all billing events with their details
-      const billingHistory = await storage.getBillingHistory();
-      console.log("Retrieved billing history events:", billingHistory.length);
-
-      res.json(billingHistory);
+      console.log("Fetching billing history for user:", req.user?.username, "role:", req.user?.role);
+      const history = await storage.getBillingHistory();
+      console.log("Retrieved billing history:", history.length, "events");
+      res.json(history);
     } catch (error) {
-      console.error("Error in /api/billing/history:", error);
-      res.status(500).json({ 
-        message: "Failed to fetch billing history",
-        details: error instanceof Error ? error.message : "Unknown error"
-      });
+      console.error("Error fetching billing history:", error);
+      res.status(500).json({ message: "Failed to fetch billing history" });
     }
   });
 
@@ -1000,6 +993,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: "Failed to generate coffee consumption report",
         details: error instanceof Error ? error.message : undefined
       });
+    }
+  });
+
+  // Reports and Analytics Routes
+  app.get("/api/reports/monthly", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
+    try {
+      console.log("Fetching monthly reports for user:", req.user?.username, "role:", req.user?.role);
+      const reports = await storage.getMonthlyReports();
+      res.json(reports);
+    } catch (error) {
+      console.error("Error fetching monthly reports:", error);
+      res.status(500).json({ message: "Failed to fetch monthly reports" });
+    }
+  });
+
+  app.get("/api/analytics/data", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
+    try {
+      console.log("Fetching analytics data for user:", req.user?.username, "role:", req.user?.role);
+      const data = await storage.getAnalyticsData();
+      res.json(data);
+    } catch (error) {
+      console.error("Error fetching analytics data:", error);
+      res.status(500).json({ message: "Failed to fetch analytics data" });
     }
   });
 

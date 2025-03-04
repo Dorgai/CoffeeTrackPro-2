@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { useAuth } from "@/hooks/use-auth";
 
 type BillingQuantityResponse = {
   fromDate: string;
@@ -21,8 +22,10 @@ type BillingQuantityResponse = {
 
 export function BillingEventGrid() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [primarySplit, setPrimarySplit] = useState(70);
   const [secondarySplit, setSecondarySplit] = useState(30);
+  const isManager = user?.role === "shopManager";
 
   // Fetch quantities since last billing event
   const { data: billingData, isLoading, error } = useQuery<BillingQuantityResponse>({
@@ -131,87 +134,89 @@ export function BillingEventGrid() {
         </CardContent>
       </Card>
 
-      {/* Split View */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Revenue Split View</CardTitle>
-          <CardDescription>
-            Adjust split percentages and view quantity distribution
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-4 mb-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Primary Split (%)</label>
-              <Input
-                type="number"
-                min="0"
-                max="100"
-                value={primarySplit}
-                onChange={(e) => {
-                  const newValue = Number(e.target.value);
-                  setPrimarySplit(newValue);
-                  setSecondarySplit(100 - newValue);
-                }}
-              />
+      {/* Split View - Only show for roasteryOwner */}
+      {!isManager && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Revenue Split View</CardTitle>
+            <CardDescription>
+              Adjust split percentages and view quantity distribution
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-4 mb-6">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Primary Split (%)</label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={primarySplit}
+                  onChange={(e) => {
+                    const newValue = Number(e.target.value);
+                    setPrimarySplit(newValue);
+                    setSecondarySplit(100 - newValue);
+                  }}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Secondary Split (%)</label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={secondarySplit}
+                  onChange={(e) => {
+                    const newValue = Number(e.target.value);
+                    setSecondarySplit(newValue);
+                    setPrimarySplit(100 - newValue);
+                  }}
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Secondary Split (%)</label>
-              <Input
-                type="number"
-                min="0"
-                max="100"
-                value={secondarySplit}
-                onChange={(e) => {
-                  const newValue = Number(e.target.value);
-                  setSecondarySplit(newValue);
-                  setPrimarySplit(100 - newValue);
-                }}
-              />
+
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Grade</TableHead>
+                  <TableHead>Primary Split Bags</TableHead>
+                  <TableHead>Secondary Split Bags</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {coffeeGrades.map((grade) => {
+                  const gradeData = billingData?.quantities.find(q => q.grade === grade) || 
+                    { smallBagsQuantity: 0, largeBagsQuantity: 0 };
+                  const totalBags = gradeData.smallBagsQuantity + gradeData.largeBagsQuantity;
+                  return (
+                    <TableRow key={grade}>
+                      <TableCell className="font-medium">{grade}</TableCell>
+                      <TableCell>
+                        {calculateSplitQuantities(totalBags, primarySplit)}
+                      </TableCell>
+                      <TableCell>
+                        {calculateSplitQuantities(totalBags, secondarySplit)}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+
+            <div className="mt-6">
+              <Button
+                onClick={() => createBillingEventMutation.mutate()}
+                disabled={createBillingEventMutation.isPending || !billingData?.quantities}
+              >
+                {createBillingEventMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : null}
+                Generate Billing Event
+              </Button>
             </div>
-          </div>
-
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Grade</TableHead>
-                <TableHead>Primary Split Bags</TableHead>
-                <TableHead>Secondary Split Bags</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {coffeeGrades.map((grade) => {
-                const gradeData = billingData?.quantities.find(q => q.grade === grade) || 
-                  { smallBagsQuantity: 0, largeBagsQuantity: 0 };
-                const totalBags = gradeData.smallBagsQuantity + gradeData.largeBagsQuantity;
-                return (
-                  <TableRow key={grade}>
-                    <TableCell className="font-medium">{grade}</TableCell>
-                    <TableCell>
-                      {calculateSplitQuantities(totalBags, primarySplit)}
-                    </TableCell>
-                    <TableCell>
-                      {calculateSplitQuantities(totalBags, secondarySplit)}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-
-          <div className="mt-6">
-            <Button
-              onClick={() => createBillingEventMutation.mutate()}
-              disabled={createBillingEventMutation.isPending || !billingData?.quantities}
-            >
-              {createBillingEventMutation.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : null}
-              Generate Billing Event
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
