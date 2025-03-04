@@ -28,8 +28,13 @@ export function BillingEventGrid() {
   const isManager = user?.role === "shopManager";
 
   // Fetch quantities since last billing event
-  const { data: billingData, isLoading, error } = useQuery<BillingQuantityResponse>({
+  const { data: billingData, isLoading: quantitiesLoading } = useQuery<BillingQuantityResponse>({
     queryKey: ["/api/billing/quantities"],
+  });
+
+  // Fetch billing history
+  const { data: billingHistory, isLoading: historyLoading } = useQuery<BillingEvent[]>({
+    queryKey: ["/api/billing/history"],
   });
 
   // Create billing event mutation
@@ -50,6 +55,7 @@ export function BillingEventGrid() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/billing/quantities"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/billing/history"] });
       toast({
         title: "Success",
         description: "Billing event created successfully",
@@ -64,18 +70,10 @@ export function BillingEventGrid() {
     },
   });
 
-  if (isLoading) {
+  if (quantitiesLoading || historyLoading) {
     return (
       <div className="flex items-center justify-center min-h-[200px]">
         <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-center text-destructive">
-        Error loading billing data: {error.message}
       </div>
     );
   }
@@ -86,7 +84,39 @@ export function BillingEventGrid() {
 
   return (
     <div className="space-y-8">
-      {/* Billing Interval Information */}
+      {/* Billing History */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Billing History</CardTitle>
+          <CardDescription>
+            Past billing events and their details
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Cycle Start</TableHead>
+                <TableHead>Cycle End</TableHead>
+                <TableHead>Primary Split (%)</TableHead>
+                <TableHead>Secondary Split (%)</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {billingHistory?.map((event) => (
+                <TableRow key={event.id}>
+                  <TableCell>{format(new Date(event.cycleStartDate), 'PPP')}</TableCell>
+                  <TableCell>{format(new Date(event.cycleEndDate), 'PPP')}</TableCell>
+                  <TableCell>{Number(event.primarySplitPercentage).toFixed(2)}%</TableCell>
+                  <TableCell>{Number(event.secondarySplitPercentage).toFixed(2)}%</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Current Billing Cycle Information */}
       <Card>
         <CardHeader>
           <CardTitle>Current Billing Cycle</CardTitle>

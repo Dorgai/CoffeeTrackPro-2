@@ -801,13 +801,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.user?.role !== "roasteryOwner") {
         const hasAccess = await checkShopAccess(req.user!.id, shopId);
         if (!hasAccess) {
-          return res.status(403).json({ message: "User does not have access to this shop" });
+          return res.status(403).json({ message: "User does not have access to thisshop" });
         }
       }
 
       const target = await storage.updateCoffeeLargeBagTarget(
         shopId,        coffeeId,
-        desiredLargeBags
+                desiredLargeBags
       );
 
       console.log("Updated coffee target for shop:", shopId, "coffee:", coffeeId, "to:", desiredLargeBags);
