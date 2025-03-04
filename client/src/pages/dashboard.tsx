@@ -29,42 +29,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { formatDate } from "@/lib/utils";
 import { Link } from "wouter";
 
-function StatsCard({
-  title,
-  value,
-  icon: Icon,
-  onClick,
-  description,
-}: {
-  title: string;
-  value: string | number;
-  icon: React.ElementType;
-  onClick?: () => void;
-  description?: string;
-}) {
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        {description && (
-          <button
-            onClick={onClick}
-            className={`text-xs ${onClick ? 'text-primary hover:underline cursor-pointer' : 'text-muted-foreground'} mt-1`}
-          >
-            {description}
-          </button>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
 export default function Dashboard() {
-  const { user, logoutMutation } = useAuth();
+  const { user, logoutMutation } = useAuth(); //Bringing back logoutMutation
   const [selectedShopId, setSelectedShopId] = useState<number | null>(null);
   const [isRestockOpen, setIsRestockOpen] = useState(false);
   const [, navigate] = useLocation();
@@ -844,5 +810,39 @@ export default function Dashboard() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function StatsCard({
+  title,
+  value,
+  icon: Icon,
+  onClick,
+  description,
+}: {
+  title: string;
+  value: string | number;
+  icon: React.ElementType;
+  onClick?: () => void;
+  description?: string;
+}) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        <Icon className="h-4 w-4 text-muted-foreground" />
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold">{value}</div>
+        {description && (
+          <button
+            onClick={onClick}
+            className={`text-xs ${onClick ? 'text-primary hover:underline cursor-pointer' : 'text-muted-foreground'} mt-1`}
+          >
+            {description}
+          </button>
+        )}
+      </CardContent>
+    </Card>
   );
 }
