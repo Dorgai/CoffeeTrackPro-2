@@ -22,6 +22,11 @@ async function createServer() {
     app.use(express.json());
     app.use(express.urlencoded({ extended: false }));
 
+    // Health check endpoint
+    app.get('/health', (_req, res) => {
+      res.status(200).json({ status: 'ok' });
+    });
+
     // Add request logging middleware
     app.use((req, res, next) => {
       const start = Date.now();
@@ -82,27 +87,30 @@ async function createServer() {
       });
     });
 
-    // Handle server errors
-    httpServer.on('error', (error: any) => {
-      if (error.code === 'EADDRINUSE') {
-        log(`Port ${port} is already in use`);
-        process.exit(1);
-      } else {
-        log(`Server error: ${error.message}`);
-        process.exit(1);
-      }
-    });
-
     // Start the server
     log(`Attempting to start server on port ${port}...`);
-    await new Promise<void>((resolve) => {
-      httpServer.listen(port, "0.0.0.0", () => {
-        log(`Server is running on port ${port}`);
-        resolve();
-      });
-    });
 
-    return httpServer;
+    return new Promise((resolve, reject) => {
+      try {
+        const server = httpServer.listen(port, "0.0.0.0", () => {
+          log(`Server is running at http://0.0.0.0:${port}`);
+          resolve(httpServer);
+        });
+
+        server.on('error', (error: any) => {
+          if (error.code === 'EADDRINUSE') {
+            log(`Port ${port} is already in use`);
+            reject(error);
+          } else {
+            log(`Server error: ${error.message}`);
+            reject(error);
+          }
+        });
+      } catch (err) {
+        log(`Failed to start server: ${err instanceof Error ? err.message : String(err)}`);
+        reject(err);
+      }
+    });
   } catch (error) {
     log(`Failed to start server: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
