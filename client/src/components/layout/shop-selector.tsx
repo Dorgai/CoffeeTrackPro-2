@@ -22,13 +22,11 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   const { activeShop, setActiveShop } = useActiveShop();
   const { user } = useAuth();
 
-  // For all roles except roaster, fetch all shops
   const { data: shops, isLoading } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
     enabled: !!user && (user.role === "shopManager" || user.role === "barista" || user.role === "roasteryOwner"),
   });
 
-  // Set default shop when shops are loaded
   useEffect(() => {
     if (shops && shops.length > 0 && !activeShop) {
       const defaultShop = shops.find(s => s.id === user?.defaultShopId) || shops[0];
@@ -43,14 +41,12 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
     const shopId = value ? parseInt(value, 10) : null;
     const shop = shops?.find((s) => s.id === shopId);
 
-    // Call both the controlled and context handlers
     if (onChange) {
       onChange(shopId);
     }
     setActiveShop(shop || null);
   };
 
-  // Use controlled value if provided, otherwise use context
   const currentValue = value !== undefined ? value : activeShop?.id;
 
   return (
