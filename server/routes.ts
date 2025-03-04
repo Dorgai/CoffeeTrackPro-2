@@ -809,7 +809,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Add route for getting coffee-specific large bag targets  app.get("/api/shops/:id/coffee-targets", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
+  // Add route for getting coffee-specific large bag targets
+  app.get("/api/shops/:id/coffee-targets", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
     try {
       const shopId = parseInt(req.params.id);
 
