@@ -68,6 +68,7 @@ export default function Dashboard() {
   const [isRestockOpen, setIsRestockOpen] = useState(false);
   const [, navigate] = useLocation();
 
+  // Common data fetching
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
     enabled: !!user,
@@ -76,6 +77,38 @@ export default function Dashboard() {
   const { data: allOrders, isLoading: loadingAllOrders } = useQuery<Order[]>({
     queryKey: ["/api/orders"],
     enabled: !!user && (user.role === "roasteryOwner" || user?.role === "roaster"),
+  });
+
+  // Shop manager and barista specific queries
+  const { data: userShops } = useQuery<Shop[]>({
+    queryKey: ["/api/user/shops"],
+    enabled: !!user && (user.role === "shopManager" || user.role === "barista"),
+  });
+
+  const { data: shop } = useQuery<Shop>({
+    queryKey: ["/api/shops", selectedShopId],
+    enabled: !!selectedShopId,
+  });
+
+  const { data: shopInventory } = useQuery<RetailInventory[]>({
+    queryKey: ["/api/retail-inventory", selectedShopId],
+    enabled: !!selectedShopId,
+  });
+
+  const { data: shopOrders } = useQuery<Order[]>({
+    queryKey: ["/api/orders", selectedShopId],
+    enabled: !!selectedShopId,
+  });
+
+  // Roastery owner specific queries
+  const { data: shops } = useQuery<Shop[]>({
+    queryKey: ["/api/shops"],
+    enabled: user?.role === "roasteryOwner",
+  });
+
+  const { data: allInventory } = useQuery<RetailInventory[]>({
+    queryKey: ["/api/retail-inventory"],
+    enabled: user?.role === "roasteryOwner",
   });
 
   if (loadingCoffees || loadingAllOrders) {
@@ -209,7 +242,7 @@ export default function Dashboard() {
                             order.status === 'pending' ? 'outline' :
                             order.status === 'roasted' ? 'secondary' :
                             order.status === 'dispatched' ? 'default' :
-                            'success'
+                            'default'
                           }>
                             {order.status}
                           </Badge>
@@ -231,28 +264,7 @@ export default function Dashboard() {
     );
   }
 
-  // Keep existing code for other roles
   if (user?.role === "shopManager" || user?.role === "barista") {
-    const { data: userShops } = useQuery<Shop[]>({
-      queryKey: ["/api/user/shops"],
-      enabled: !!user,
-    });
-
-    const { data: shop } = useQuery<Shop>({
-      queryKey: ["/api/shops", selectedShopId],
-      enabled: !!selectedShopId,
-    });
-
-    const { data: shopInventory } = useQuery<RetailInventory[]>({
-      queryKey: ["/api/retail-inventory", selectedShopId],
-      enabled: !!selectedShopId,
-    });
-
-    const { data: shopOrders } = useQuery<Order[]>({
-      queryKey: ["/api/orders", selectedShopId],
-      enabled: !!selectedShopId,
-    });
-
     const totalItems = shopInventory?.length || 0;
     const lowStockItems = shopInventory?.filter(item =>
       (item.smallBags || 0) < (shop?.desiredSmallBags || 20) / 2 ||
@@ -448,18 +460,6 @@ export default function Dashboard() {
   }
 
   if (user?.role === "roasteryOwner") {
-    const { data: shops } = useQuery<Shop[]>({
-      queryKey: ["/api/shops"],
-    });
-
-    const { data: orders } = useQuery<Order[]>({
-      queryKey: ["/api/orders"],
-    });
-
-    const { data: allInventory } = useQuery<RetailInventory[]>({
-      queryKey: ["/api/retail-inventory"],
-    });
-
     const totalOrders = orders?.length || 0;
     const completedOrders = orders?.filter(o => o.status === 'delivered').length || 0;
     const orderFulfillmentRate = totalOrders ? Math.round((completedOrders / totalOrders) * 100) : 0;
@@ -595,7 +595,7 @@ export default function Dashboard() {
                           order.status === 'pending' ? 'outline' :
                           order.status === 'roasted' ? 'secondary' :
                           order.status === 'dispatched' ? 'default' :
-                          'success'
+                          'default'
                         }>
                           {order.status}
                         </Badge>
