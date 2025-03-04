@@ -18,23 +18,30 @@ interface ShopSelectorProps {
   className?: string;
 }
 
+interface UserShopResponse {
+  user_shops: {
+    userId: number;
+    shopId: number;
+  };
+  shop: Shop;
+}
+
 export function ShopSelector({ value, onChange, className }: ShopSelectorProps) {
   const { activeShop, setActiveShop } = useActiveShop();
   const { user } = useAuth();
 
-  const { data: shopData, isLoading } = useQuery<any[]>({
+  const { data: userShops, isLoading } = useQuery<UserShopResponse[]>({
     queryKey: ["/api/user/shops"],
-    enabled: !!user && (user.role === "shopManager" || user.role === "barista" || user.role === "roasteryOwner"),
+    enabled: !!user && (user.role === "shopManager" || user.role === "barista"),
   });
 
   // Transform nested shop data into a flat array of shops
-  const shops = shopData?.map(item => item.shop).filter(Boolean) || [];
+  const shops = userShops?.map(item => item.shop).filter(Boolean) || [];
 
   useEffect(() => {
     if (shops.length > 0 && !activeShop) {
       const defaultShop = shops.find(s => s.id === user?.defaultShopId) || shops[0];
       if (defaultShop) {
-        console.log('Setting default shop:', defaultShop);
         setActiveShop(defaultShop);
         if (onChange) {
           onChange(defaultShop.id);
@@ -46,7 +53,6 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   const handleChange = (value: string) => {
     const shopId = value ? parseInt(value, 10) : null;
     const shop = shops.find((s) => s.id === shopId);
-    console.log('Selected shop:', shop);
 
     if (onChange) {
       onChange(shopId);
@@ -56,8 +62,6 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
 
   // Use controlled value if provided, otherwise use context
   const currentValue = value !== undefined ? value : activeShop?.id;
-  console.log('Current value:', currentValue);
-  console.log('Available shops:', shops);
 
   return (
     <div className={`flex items-center gap-2 ${className || ''}`}>

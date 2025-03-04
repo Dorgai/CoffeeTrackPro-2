@@ -68,17 +68,21 @@ export default function Dashboard() {
   const [isRestockOpen, setIsRestockOpen] = useState(false);
   const [, navigate] = useLocation();
 
-  const { data: userShops, isLoading: loadingShops } = useQuery<Shop[]>({
+  const { data: userShops, isLoading: loadingShops } = useQuery<{ user_shops: any, shop: Shop }[]>({
     queryKey: ["/api/user/shops"],
     enabled: !!user && (user.role === "shopManager" || user.role === "barista"),
   });
 
+  const shops = userShops?.map(item => item.shop).filter(Boolean) || [];
+
   useEffect(() => {
-    if ((user?.role === "shopManager" || user?.role === "barista") && userShops?.length && !selectedShopId) {
-      const defaultShop = userShops.find(s => s.id === user.defaultShopId) || userShops[0];
-      setSelectedShopId(defaultShop.id);
+    if ((user?.role === "shopManager" || user?.role === "barista") && shops.length && !selectedShopId) {
+      const defaultShop = shops.find(s => s.id === user.defaultShopId) || shops[0];
+      if (defaultShop) {
+        setSelectedShopId(defaultShop.id);
+      }
     }
-  }, [user, userShops, selectedShopId]);
+  }, [user, shops, selectedShopId]);
 
   const { data: shop, isLoading: loadingShop } = useQuery<Shop>({
     queryKey: ["/api/shops", selectedShopId],
