@@ -1,5 +1,4 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useForm } from "react-hook-form";
 import { useState } from 'react';
 import { useLocation } from "wouter";
 import type { GreenCoffee, RetailInventory, Shop, Order } from "@shared/schema";
@@ -12,20 +11,12 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import {
-  Coffee,
-  Package,
-  Store,
-  Loader2,
-  AlertTriangle,
-  LogOut,
-} from "lucide-react";
+import { LogOut, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableRow } from "@/components/ui/table";
 import { ShopSelector } from "@/components/layout/shop-selector";
 import StockProgress from "@/components/stock-progress";
-import { apiRequest } from "@/lib/queryClient";
 import { formatDate } from "@/lib/utils";
 import { Link } from "wouter";
 
@@ -106,15 +97,6 @@ export default function Dashboard() {
               onChange={setSelectedShopId}
             />
             <Button
-              variant="default"
-              onClick={() => setIsRestockOpen(true)}
-              disabled={!selectedShopId}
-              className="whitespace-nowrap"
-            >
-              <Package className="h-4 w-4 mr-2" />
-              Restock
-            </Button>
-            <Button
               variant="outline"
               onClick={() => logoutMutation.mutate()}
               disabled={logoutMutation.isPending}
@@ -186,8 +168,21 @@ export default function Dashboard() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Shop Performance</CardTitle>
-              <CardDescription>Stock levels and status</CardDescription>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle>Shop Performance</CardTitle>
+                  <CardDescription>Stock levels and status</CardDescription>
+                </div>
+                <Button
+                  variant="default"
+                  onClick={() => setIsRestockOpen(true)}
+                  disabled={!selectedShopId}
+                  size="sm"
+                >
+                  <Package className="h-4 w-4 mr-2" />
+                  Restock
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {!selectedShopId ? (
