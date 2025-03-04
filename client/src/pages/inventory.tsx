@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { GreenCoffee } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
+import { GreenCoffee } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 import { InventoryGrid } from "@/components/coffee/inventory-grid";
 import { GreenCoffeeForm } from "@/components/coffee/green-coffee-form";
+import { InventoryDiscrepancyView } from "@/components/coffee/inventory-discrepancy-view";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useState } from "react";
@@ -74,6 +75,12 @@ export default function Inventory() {
       <InventoryGrid
         coffees={coffees || []}
       />
+
+      {user?.role === "roaster" && (
+        <div className="mt-8">
+          <InventoryDiscrepancyView />
+        </div>
+      )}
     </div>
   );
 }
