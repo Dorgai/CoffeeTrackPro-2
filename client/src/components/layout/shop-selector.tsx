@@ -19,7 +19,6 @@ export function ShopSelector() {
     queryKey: ["/api/user/shops"],
   });
 
-  // Loading state
   if (isLoading) {
     return (
       <div className="flex items-center gap-2">
@@ -32,8 +31,7 @@ export function ShopSelector() {
     );
   }
 
-  // No shops available
-  if (!shops || !Array.isArray(shops) || shops.length === 0) {
+  if (!shops || shops.length === 0) {
     return (
       <div className="flex items-center gap-2">
         <Store className="h-4 w-4 text-muted-foreground" />
@@ -55,7 +53,7 @@ export function ShopSelector() {
     <div className="flex items-center gap-2">
       <Store className="h-4 w-4 text-muted-foreground" />
       <Select
-        value={activeShop?.id?.toString()}
+        value={activeShop ? String(activeShop.id) : shops[0]?.id.toString()}
         onValueChange={(value) => {
           const shop = shops.find((s) => s.id === parseInt(value));
           if (shop) {
@@ -66,12 +64,12 @@ export function ShopSelector() {
       >
         <SelectTrigger className="w-[200px]">
           <SelectValue>
-            {activeShop?.name || "Select a shop"}
+            {activeShop?.name || shops[0]?.name || "Select a shop"}
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {shops.map((shop) => (
-            <SelectItem key={shop.id} value={shop.id?.toString() || ""}>
+            <SelectItem key={shop.id} value={String(shop.id)}>
               {shop.name}
             </SelectItem>
           ))}
