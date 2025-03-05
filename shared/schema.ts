@@ -28,3 +28,10 @@ export type User = typeof users.$inferSelect;
 export type Shop = typeof shops.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertShop = z.infer<typeof insertShopSchema>;
+
+// Add placeholder schema for green coffee to prevent import errors
+export const insertGreenCoffeeSchema = z.object({
+  name: z.string(),
+  origin: z.string(),
+  quantity: z.number(),
+});

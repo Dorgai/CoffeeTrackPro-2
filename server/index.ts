@@ -1,9 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
-import { registerRoutes } from "./routes";
-import session from "express-session";
-import { storage } from "./storage";
-import { setupAuth } from "./auth";
+import { setupVite } from "./vite";
 
 async function createServer() {
   const app = express();
@@ -17,29 +14,10 @@ async function createServer() {
   app.use(express.json());
   app.use(express.urlencoded({ extended: false }));
 
-  // Set up session before auth
-  app.use(session({
-    secret: process.env.SESSION_SECRET || 'development_secret',
-    resave: false,
-    saveUninitialized: false,
-    store: storage.sessionStore,
-    cookie: {
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours
-    }
-  }));
-
-  // Set up authentication after session
-  setupAuth(app);
-
   // Basic health check endpoint
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok' });
   });
-
-  const httpServer = await registerRoutes(app);
-
 
   // Global error handler
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -56,10 +34,15 @@ async function createServer() {
     });
   });
 
-  // Bind to all network interfaces (0.0.0.0)
-  httpServer.listen(port, "0.0.0.0", () => {
+  // Create HTTP server
+  const httpServer = app.listen(port, "0.0.0.0", () => {
     console.log(`Server is running on http://0.0.0.0:${port}`);
   });
+
+  // Set up Vite in development mode
+  if (app.get("env") === "development") {
+    await setupVite(app, httpServer);
+  }
 
   return httpServer;
 }
