@@ -18,12 +18,15 @@ import { GreenBeansStockIndicator } from "./green-beans-stock-indicator";
 export function NavBar() {
   const { user, logoutMutation } = useAuth();
 
-  const isRetailUser = user?.role === "retailOwner" || user?.role === "shopManager" || user?.role === "barista";
+  // Role-based access control flags
   const isRoasteryUser = user?.role === "roasteryOwner" || user?.role === "roaster";
+  const isRetailUser = user?.role === "retailOwner" || user?.role === "shopManager" || user?.role === "barista";
   const canManageShops = user?.role === "roasteryOwner";
   const canManageUsers = user?.role === "roasteryOwner";
   const canAccessGreenCoffee = user?.role === "roasteryOwner" || user?.role === "roaster";
+  const canAccessBilling = user?.role === "roasteryOwner";
   const canAccessAnalytics = user?.role === "roasteryOwner" || user?.role === "retailOwner" || user?.role === "shopManager";
+  const canAccessRetail = user?.role === "roasteryOwner" || user?.role === "retailOwner" || user?.role === "shopManager" || user?.role === "barista";
 
   return (
     <div className="border-b">
@@ -67,8 +70,7 @@ export function NavBar() {
             </MenubarMenu>
           )}
 
-          {/* Only show Finance menu for roastery owner */}
-          {user?.role === "roasteryOwner" && (
+          {canAccessBilling && (
             <MenubarMenu>
               <MenubarTrigger>Finance</MenubarTrigger>
               <MenubarContent>
@@ -114,7 +116,7 @@ export function NavBar() {
             </MenubarMenu>
           )}
 
-          {isRetailUser && (
+          {canAccessRetail && (
             <>
               <MenubarMenu>
                 <MenubarTrigger>Retail</MenubarTrigger>
