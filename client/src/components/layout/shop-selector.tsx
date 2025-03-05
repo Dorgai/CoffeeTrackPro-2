@@ -42,33 +42,24 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   useEffect(() => {
     const shops = user?.role === "roasteryOwner" ? allShops : userShops;
 
-    // Only proceed if we have shops data
     if (!shops?.length) {
-      console.log("[ShopSelector] No shops available yet");
       return;
     }
 
     // If no active shop or current shop is not in available shops
-    const currentShopIsValid = activeShop && shops.find(s => s.id === activeShop.id);
-    if (!currentShopIsValid) {
-      console.log("[ShopSelector] Setting default shop");
-      console.log("[ShopSelector] Available shops:", shops);
-
+    if (!activeShop || !shops.find(s => s.id === activeShop.id)) {
       const defaultShop = shops[0];
-      console.log("[ShopSelector] Selected default shop:", defaultShop);
-
       setActiveShop(defaultShop);
       if (onChange) {
         onChange(defaultShop.id);
       }
     }
-  }, [userShops, allShops, user?.role, activeShop, setActiveShop, onChange]);
+  }, [userShops, allShops, activeShop, setActiveShop, onChange, user?.role]);
 
   const handleChange = (value: string) => {
     const shopId = value ? parseInt(value, 10) : null;
     const shops = user?.role === "roasteryOwner" ? allShops : userShops;
     const shop = shops?.find((s) => s.id === shopId);
-    console.log("[ShopSelector] Changing shop to:", shop);
 
     if (onChange) {
       onChange(shopId);
