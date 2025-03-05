@@ -277,7 +277,7 @@ export class DatabaseStorage implements IStorage {
         throw new Error("User not found");
       }
 
-      // Roastery owners and roasters can see all active shops
+      // Roastery owners, roasters and retail owners can see all active shops
       if (user.role === "roasteryOwner" || user.role === "roaster" || user.role === "retailOwner") {
         const allShops = await db
           .select()
@@ -288,7 +288,7 @@ export class DatabaseStorage implements IStorage {
         return allShops;
       }
 
-      // Only shop managers can see their assigned shops (barista temporarily disabled)
+      // Only shop managers can see their assigned shops
       if (user.role === "shopManager") {
         const assignedShops = await db
           .select({
@@ -297,8 +297,7 @@ export class DatabaseStorage implements IStorage {
             location: shops.location,
             isActive: shops.isActive,
             defaultOrderQuantity: shops.defaultOrderQuantity,
-            desiredSmallBags: shops.desiredSmallBags,
-            desiredLargeBags: shops.desiredLargeBags
+            desiredSmallBags: shops.desiredSmallBags
           })
           .from(shops)
           .innerJoin(userShops, eq(shops.id, userShops.shopId))
@@ -313,7 +312,7 @@ export class DatabaseStorage implements IStorage {
         return assignedShops;
       }
 
-      // All other roles (including barista) see no shops
+      // Barista role and all other roles see no shops
       return [];
 
     } catch (error) {
