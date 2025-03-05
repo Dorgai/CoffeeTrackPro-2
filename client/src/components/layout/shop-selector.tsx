@@ -19,7 +19,7 @@ interface ShopSelectorProps {
 export function ShopSelector({ value, onChange }: ShopSelectorProps) {
   const { activeShop, setActiveShop } = useActiveShop();
 
-  // Fetch user's authorized shops - this endpoint handles role-specific logic
+  // Fetch user's authorized shops
   const { data: shops, isLoading } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
   });
@@ -45,7 +45,7 @@ export function ShopSelector({ value, onChange }: ShopSelectorProps) {
     );
   }
 
-  if (!shops || shops.length === 0) {
+  if (!shops?.length) {
     return (
       <div className="flex items-center gap-2">
         <Store className="h-4 w-4 text-muted-foreground" />

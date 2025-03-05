@@ -6,9 +6,7 @@ import { apiRequest } from "@/lib/queryClient";
 
 interface ActiveShopState {
   activeShop: Shop | null;
-  userShops: Shop[];
   setActiveShop: (shop: Shop | null) => void;
-  setUserShops: (shops: Shop[]) => void;
 }
 
 // Create store with persistence
@@ -16,21 +14,17 @@ export const useActiveShop = create<ActiveShopState>()(
   persist(
     (set) => ({
       activeShop: null,
-      userShops: [],
       setActiveShop: (shop) => set({ activeShop: shop }),
-      setUserShops: (shops) => set({ userShops: shops }),
     }),
     {
       name: 'active-shop-storage',
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({ activeShop: state.activeShop }),
     }
   )
 );
 
-// Hook to fetch user shops
+// Hook to fetch user shops and manage active shop
 export function useUserShops() {
-  const setUserShops = useActiveShop(state => state.setUserShops);
   const setActiveShop = useActiveShop(state => state.setActiveShop);
   const activeShop = useActiveShop(state => state.activeShop);
 
@@ -39,24 +33,18 @@ export function useUserShops() {
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/user/shops");
       if (!res.ok) {
-        const error = await res.text();
-        throw new Error(`Failed to fetch user shops: ${error}`);
+        throw new Error("Failed to fetch user shops");
       }
       const data = await res.json();
 
-      // Update shops in store
-      setUserShops(data);
-
       // Set default shop if needed
-      if (data && data.length > 0 && (!activeShop || !data.find(s => s.id === activeShop.id))) {
+      if (data?.length > 0 && (!activeShop || !data.find(s => s.id === activeShop.id))) {
         setActiveShop(data[0]);
       }
 
       return data;
     },
-    staleTime: 30000,
-    retry: 3,
   });
 
-  return { shops, isLoading, error, setUserShops, setActiveShop, activeShop };
+  return { shops, isLoading, error, setActiveShop, activeShop };
 }
