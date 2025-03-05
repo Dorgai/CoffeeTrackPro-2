@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Shop } from "@shared/schema";
 import {
@@ -36,6 +37,21 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
     staleTime: 30000,
     retry: 3,
   });
+
+  // Set default shop on mount and when shops data changes
+  useEffect(() => {
+    const shops = user?.role === "roasteryOwner" ? allShops : userShops;
+    if (shops && shops.length > 0 && (!activeShop || !shops.find(s => s.id === activeShop.id))) {
+      console.log("Setting default shop. Available shops:", shops);
+      console.log("Current user role:", user?.role);
+      const defaultShop = shops.find(s => s.id === user?.defaultShopId) || shops[0];
+      console.log("Selected default shop:", defaultShop);
+      setActiveShop(defaultShop);
+      if (onChange) {
+        onChange(defaultShop.id);
+      }
+    }
+  }, [userShops, allShops, user?.defaultShopId, activeShop, setActiveShop, onChange, user?.role]);
 
   const handleChange = (value: string) => {
     const shopId = value ? parseInt(value, 10) : null;
