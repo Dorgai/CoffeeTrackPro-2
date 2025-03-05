@@ -180,16 +180,8 @@ export default function Dashboard() {
                 <div key={selectedShopId} className="space-y-4">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="font-medium">{shop?.name}</h3>
-                    <Badge variant={
-                      shopInventory.some(item =>
-                        (item.smallBags || 0) < (shop?.desiredSmallBags || 20) / 2 ||
-                        (item.largeBags || 0) < (shop?.desiredLargeBags || 10) / 2
-                      ) ? "destructive" : "outline"
-                    }>
-                      {shopInventory.filter(item =>
-                        (item.smallBags || 0) < (shop?.desiredSmallBags || 20) / 2 ||
-                        (item.largeBags || 0) < (shop?.desiredLargeBags || 10) / 2
-                      ).length > 0 ? "Low Stock Items" : "Stock OK"}
+                    <Badge variant={lowStockItems > 0 ? "destructive" : "outline"}>
+                      {lowStockItems > 0 ? `${lowStockItems} Low Stock` : "Stock OK"}
                     </Badge>
                   </div>
                   <div className="mt-4 space-y-2">
