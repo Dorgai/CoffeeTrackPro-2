@@ -22,23 +22,19 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   const { activeShop, setActiveShop } = useActiveShop();
   const { user } = useAuth();
 
-  // Fetch user's authorized shops for both barista and manager
+  // Fetch user's authorized shops
   const { data: userShops, isLoading: loadingUserShops } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
     enabled: !!user && user.role !== "roasteryOwner",
-    staleTime: 30000,
-    retry: 3,
   });
 
   // Fetch all shops for roasteryOwner
   const { data: allShops, isLoading: loadingAllShops } = useQuery<Shop[]>({
     queryKey: ["/api/shops"],
     enabled: !!user && user.role === "roasteryOwner",
-    staleTime: 30000,
-    retry: 3,
   });
 
-  // Set default shop on mount and when shops data changes
+  // Set default shop when shops data changes
   useEffect(() => {
     const shops = user?.role === "roasteryOwner" ? allShops : userShops;
     if (!shops?.length) return;

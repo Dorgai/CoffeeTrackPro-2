@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { useQuery } from '@tanstack/react-query';
 import { Shop } from '@shared/schema';
 import { apiRequest } from "@/lib/queryClient";
@@ -22,6 +22,8 @@ export const useActiveShop = create<ActiveShopState>()(
     }),
     {
       name: 'active-shop-storage',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({ activeShop: state.activeShop }),
     }
   )
 );
