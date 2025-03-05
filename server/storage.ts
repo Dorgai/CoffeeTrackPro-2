@@ -277,27 +277,12 @@ export class DatabaseStorage implements IStorage {
         throw new Error("User not found");
       }
 
-      // For retail owners and roastery owners, return all active shops
-      if (user.role === "retailOwner" || user.role === "roasteryOwner") {
+      // For retail owners, roastery owners, and shop managers return all active shops
+      if (user.role === "retailOwner" || user.role === "roasteryOwner" || user.role === "shopManager") {
         return await db
           .select()
           .from(shops)
           .where(eq(shops.isActive, true))
-          .orderBy(shops.name);
-      }
-
-      // For shop managers, return only their assigned shops
-      if (user.role === "shopManager") {
-        return await db
-          .select()
-          .from(shops)
-          .innerJoin(userShops, eq(shops.id, userShops.shopId))
-          .where(
-            and(
-              eq(userShops.userId, userId),
-              eq(shops.isActive, true)
-            )
-          )
           .orderBy(shops.name);
       }
 
