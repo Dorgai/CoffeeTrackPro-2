@@ -52,6 +52,8 @@ export function useUserShops() {
 
       return data;
     },
+    staleTime: 30000,
+    retry: 3,
   });
 
   return { shops, isLoading, error, setUserShops, setActiveShop, activeShop };
