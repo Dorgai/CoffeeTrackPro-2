@@ -15,11 +15,11 @@ import { useToast } from "@/hooks/use-toast";
 
 export function ShopSelector() {
   const { activeShop, setActiveShop } = useActiveShop();
-  const [initialized, setInitialized] = useState(false);
   const { toast } = useToast();
 
   const { data: shops, isLoading, error } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
+    retry: 2,
     onError: (error: Error) => {
       toast({
         title: "Error loading shops",
@@ -30,13 +30,11 @@ export function ShopSelector() {
   });
 
   useEffect(() => {
-    if (!initialized && shops && shops.length > 0 && !activeShop) {
+    if (shops?.length && !activeShop) {
       setActiveShop(shops[0]);
-      setInitialized(true);
-      // Invalidate queries for initial shop
       queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shops[0].id] });
     }
-  }, [shops, activeShop, initialized, setActiveShop]);
+  }, [shops, activeShop, setActiveShop]);
 
   if (isLoading) {
     return (
@@ -61,7 +59,7 @@ export function ShopSelector() {
     );
   }
 
-  if (!shops || shops.length === 0) {
+  if (!shops?.length) {
     return (
       <div className="flex items-center gap-2">
         <Store className="h-4 w-4" />
@@ -76,9 +74,9 @@ export function ShopSelector() {
     <div className="flex items-center gap-2">
       <Store className="h-4 w-4" />
       <Select
-        value={activeShop?.id.toString()}
+        value={activeShop?.id?.toString()}
         onValueChange={(value) => {
-          const shop = shops.find((s) => s.id === Number(value));
+          const shop = shops.find((s) => s.id === parseInt(value));
           if (shop) {
             setActiveShop(shop);
             queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shop.id] });

@@ -277,35 +277,29 @@ export class DatabaseStorage implements IStorage {
         throw new Error("User not found");
       }
 
+      const shopFields = {
+        id: shops.id,
+        name: shops.name,
+        location: shops.location,
+        isActive: shops.isActive,
+        defaultOrderQuantity: shops.defaultOrderQuantity,
+        desiredSmallBags: shops.desiredSmallBags,
+        desiredLargeBags: shops.desiredLargeBags,
+      };
+
       // Roastery owners and retail owners can see all active shops
       if (user.role === "roasteryOwner" || user.role === "retailOwner") {
         return await db
-          .select({
-            id: shops.id,
-            name: shops.name,
-            location: shops.location,
-            isActive: shops.isActive,
-            defaultOrderQuantity: shops.defaultOrderQuantity,
-            desiredSmallBags: shops.desiredSmallBags,
-            desiredLargeBags: shops.desiredLargeBags,
-          })
+          .select(shopFields)
           .from(shops)
           .where(eq(shops.isActive, true))
           .orderBy(shops.name);
       }
 
-      // Shop managers and baristas can only access their assigned shops
+      // Shop managers and baristas can only see their assigned shops
       if (user.role === "shopManager" || user.role === "barista") {
         return await db
-          .select({
-            id: shops.id,
-            name: shops.name,
-            location: shops.location,
-            isActive: shops.isActive,
-            defaultOrderQuantity: shops.defaultOrderQuantity,
-            desiredSmallBags: shops.desiredSmallBags,
-            desiredLargeBags: shops.desiredLargeBags,
-          })
+          .select(shopFields)
           .from(userShops)
           .innerJoin(shops, eq(userShops.shopId, shops.id))
           .where(
@@ -317,18 +311,10 @@ export class DatabaseStorage implements IStorage {
           .orderBy(shops.name);
       }
 
-      // Roasters can see all active shops for order management
+      // Roasters can see all active shops
       if (user.role === "roaster") {
         return await db
-          .select({
-            id: shops.id,
-            name: shops.name,
-            location: shops.location,
-            isActive: shops.isActive,
-            defaultOrderQuantity: shops.defaultOrderQuantity,
-            desiredSmallBags: shops.desiredSmallBags,
-            desiredLargeBags: shops.desiredLargeBags,
-          })
+          .select(shopFields)
           .from(shops)
           .where(eq(shops.isActive, true))
           .orderBy(shops.name);
@@ -336,7 +322,7 @@ export class DatabaseStorage implements IStorage {
 
       return [];
     } catch (error) {
-      console.error("Error fetching user shops:", error);
+      console.error("Error in getUserShops:", error);
       throw error;
     }
   }
