@@ -41,23 +41,30 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   // Set default shop on mount and when shops data changes
   useEffect(() => {
     const shops = user?.role === "roasteryOwner" ? allShops : userShops;
-    if (shops && shops.length > 0 && (!activeShop || !shops.find(s => s.id === activeShop.id))) {
-      console.log("Setting default shop. Available shops:", shops);
-      console.log("Current user role:", user?.role);
-      const defaultShop = shops.find(s => s.id === user?.defaultShopId) || shops[0];
-      console.log("Selected default shop:", defaultShop);
+    if (!shops?.length) return;
+
+    // Check if current activeShop is still valid
+    const currentShopIsValid = activeShop && shops.find(s => s.id === activeShop.id);
+    if (!currentShopIsValid) {
+      console.log("[ShopSelector] Setting default shop for", user?.role);
+      console.log("[ShopSelector] Available shops:", shops);
+
+      // For barista/manager, use their first available shop
+      const defaultShop = shops[0];
+      console.log("[ShopSelector] Selected default shop:", defaultShop);
+
       setActiveShop(defaultShop);
       if (onChange) {
         onChange(defaultShop.id);
       }
     }
-  }, [userShops, allShops, user?.defaultShopId, activeShop, setActiveShop, onChange, user?.role]);
+  }, [userShops, allShops, user?.role, activeShop, setActiveShop, onChange]);
 
   const handleChange = (value: string) => {
     const shopId = value ? parseInt(value, 10) : null;
     const shops = user?.role === "roasteryOwner" ? allShops : userShops;
     const shop = shops?.find((s) => s.id === shopId);
-    console.log("Changing shop to:", shop);
+    console.log("[ShopSelector] Changing shop to:", shop);
 
     if (onChange) {
       onChange(shopId);
