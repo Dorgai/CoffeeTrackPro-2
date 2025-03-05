@@ -278,20 +278,14 @@ export class DatabaseStorage implements IStorage {
       }
 
       // Roastery owners and roasters can see all active shops
-      if (user.role === "roasteryOwner" || user.role === "roaster") {
-        return await db
-          .select({
-            id: shops.id,
-            name: shops.name,
-            location: shops.location,
-            isActive: shops.isActive,
-            defaultOrderQuantity: shops.defaultOrderQuantity,
-            desiredSmallBags: shops.desiredSmallBags,
-            desiredLargeBags: shops.desiredLargeBags
-          })
+      if (user.role === "roasteryOwner" || user.role === "roaster" || user.role === "retailOwner") {
+        const allShops = await db
+          .select()
           .from(shops)
           .where(eq(shops.isActive, true))
           .orderBy(shops.name);
+
+        return allShops;
       }
 
       // Shop managers and baristas can only see their assigned shops
@@ -1018,7 +1012,7 @@ export class DatabaseStorage implements IStorage {
       }
 
       return updatedShop;
-    } catch (error) {
+    } catch(error) {
       console.error("Error updating shop:", error);
       throw error;
     }

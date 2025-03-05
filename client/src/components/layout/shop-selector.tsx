@@ -16,48 +16,25 @@ export function ShopSelector() {
   const { activeShop, setActiveShop } = useActiveShop();
   const { data: shops = [], isLoading } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
-    refetchOnMount: true,
+    refetchOnMount: "always",
     staleTime: 0,
   });
 
-  // Handle initial shop selection and data prefetching
+  // Initialize shop selection
   useEffect(() => {
-    if (!activeShop && shops.length > 0) {
+    if (shops.length > 0 && !activeShop) {
       const initialShop = shops[0];
       setActiveShop(initialShop);
 
-      // Prefetch initial data
-      prefetchShopData(initialShop.id);
+      // Initial data fetch
+      queryClient.prefetchQuery({ 
+        queryKey: ["/api/retail-inventory", initialShop.id] 
+      });
+      queryClient.prefetchQuery({ 
+        queryKey: ["/api/orders", initialShop.id] 
+      });
     }
   }, [shops, activeShop, setActiveShop]);
-
-  // Utility function to prefetch shop-related data
-  const prefetchShopData = (shopId: number) => {
-    queryClient.prefetchQuery({ 
-      queryKey: ["/api/retail-inventory", shopId] 
-    });
-    queryClient.prefetchQuery({ 
-      queryKey: ["/api/orders", shopId] 
-    });
-  };
-
-  const handleShopChange = (shopId: string) => {
-    const selectedShop = shops.find((s) => s.id === parseInt(shopId));
-    if (selectedShop) {
-      setActiveShop(selectedShop);
-
-      // Invalidate existing data
-      queryClient.invalidateQueries({ 
-        queryKey: ["/api/retail-inventory", selectedShop.id] 
-      });
-      queryClient.invalidateQueries({ 
-        queryKey: ["/api/orders", selectedShop.id] 
-      });
-
-      // Prefetch new data
-      prefetchShopData(selectedShop.id);
-    }
-  };
 
   if (isLoading) {
     return (
@@ -86,12 +63,25 @@ export function ShopSelector() {
     <div className="flex items-center gap-2">
       <Store className="h-4 w-4" />
       <Select
-        value={activeShop?.id?.toString() || ""}
-        onValueChange={handleShopChange}
+        value={activeShop?.id?.toString() || shops[0]?.id?.toString()}
+        onValueChange={(value) => {
+          const selectedShop = shops.find((s) => s.id === parseInt(value));
+          if (selectedShop) {
+            setActiveShop(selectedShop);
+
+            // Invalidate and refetch data for the selected shop
+            queryClient.invalidateQueries({
+              queryKey: ["/api/retail-inventory", selectedShop.id]
+            });
+            queryClient.invalidateQueries({
+              queryKey: ["/api/orders", selectedShop.id]
+            });
+          }
+        }}
       >
         <SelectTrigger className="w-[200px]">
-          <SelectValue placeholder="Select a shop">
-            {activeShop?.name || "Select a shop"}
+          <SelectValue>
+            {activeShop?.name || shops[0]?.name || "Select a shop"}
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
