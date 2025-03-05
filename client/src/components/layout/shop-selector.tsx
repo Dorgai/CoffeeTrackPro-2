@@ -9,8 +9,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useActiveShop } from "@/hooks/use-active-shop";
-import { Store, Loader2 } from "lucide-react";
+import { Store, Loader2, RefreshCw } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 interface ShopSelectorProps {
   value?: number | null;
@@ -21,6 +24,7 @@ interface ShopSelectorProps {
 export function ShopSelector({ value, onChange, className }: ShopSelectorProps) {
   const { activeShop, setActiveShop } = useActiveShop();
   const { user } = useAuth();
+  const { toast } = useToast();
 
   // Fetch user's authorized shops
   const { data: userShops, isLoading: loadingUserShops } = useQuery<Shop[]>({
@@ -58,6 +62,31 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
       onChange(shopId);
     }
     setActiveShop(shop || null);
+  };
+
+  const handleRestock = async () => {
+    if (!activeShop?.id) return;
+
+    try {
+      const res = await apiRequest("POST", `/api/retail-inventory/${activeShop.id}/restock`);
+      if (!res.ok) {
+        throw new Error("Failed to restock inventory");
+      }
+
+      // Invalidate the inventory queries to refresh the data
+      queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory"] });
+
+      toast({
+        title: "Success",
+        description: "Inventory has been restocked",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to restock inventory",
+        variant: "destructive",
+      });
+    }
   };
 
   const isLoading = loadingUserShops || loadingAllShops;
@@ -99,6 +128,18 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
           )}
         </SelectContent>
       </Select>
+      {user?.role === "barista" && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRestock}
+          disabled={!activeShop}
+          className="gap-2"
+        >
+          <RefreshCw className="h-4 w-4" />
+          Restock
+        </Button>
+      )}
     </div>
   );
 }
