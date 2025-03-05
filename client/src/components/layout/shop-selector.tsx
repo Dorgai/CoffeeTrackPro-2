@@ -14,16 +14,14 @@ import { Store, Loader2 } from "lucide-react";
 export function ShopSelector() {
   const { activeShop, setActiveShop } = useActiveShop();
 
-  // Fetch user's authorized shops - backend handles role-specific logic
+  // Fetch user's authorized shops
   const { data: shops, isLoading } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
   });
 
   useEffect(() => {
-    if (!shops?.length) return;
-
-    // Set first shop as active if no active shop or current active shop not in list
-    if (!activeShop || !shops.find(s => s.id === activeShop.id)) {
+    // Only set default shop if we have shops and no active shop
+    if (shops && shops.length > 0 && !activeShop) {
       setActiveShop(shops[0]);
     }
   }, [shops, activeShop, setActiveShop]);
@@ -40,7 +38,7 @@ export function ShopSelector() {
     );
   }
 
-  if (!shops?.length) {
+  if (!shops || shops.length === 0) {
     return (
       <div className="flex items-center gap-2">
         <Store className="h-4 w-4 text-muted-foreground" />
@@ -55,11 +53,11 @@ export function ShopSelector() {
     <div className="flex items-center gap-2">
       <Store className="h-4 w-4 text-muted-foreground" />
       <Select
-        value={String(activeShop?.id || '')}
+        value={activeShop?.id?.toString() || ''}
         onValueChange={(val) => {
-          const selectedShop = shops.find(s => s.id === Number(val));
-          if (selectedShop) {
-            setActiveShop(selectedShop);
+          const shop = shops.find(s => s.id === Number(val));
+          if (shop) {
+            setActiveShop(shop);
           }
         }}
       >
