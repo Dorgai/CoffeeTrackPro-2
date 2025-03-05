@@ -1382,43 +1382,38 @@ export class DatabaseStorage implements IStorage {
       const role = user.role;
 
       switch (permission) {
-        // Green Coffee Management - roastery owner and roaster only
+        // Roasting and Green Coffee - roastery owner and roaster only
+        case "roasting.read":
+        case "roasting.write":
         case "greencoffee.read":
         case "greencoffee.write":
           return role === "roasteryOwner" || role === "roaster";
 
-        // Roasting Operations - roastery owner and roaster only
-        case "roasting.read":
-        case "roasting.write":
-          return role === "roasteryOwner" || role === "roaster";
-
-        // Shop Management - roastery owner only
+        // Shop and User Management - roastery owner only
         case "shop.manage":
-          return role === "roasteryOwner";
-
-        // User Management - roastery owner only
         case "user.manage":
           return role === "roasteryOwner";
 
-        // Orders - all users except roaster can read and write orders
+        // Finance and Billing - roastery owner only
+        case "finance.read":
+        case "finance.write":
+        case "billing.read":
+        case "billing.write":
+          return role === "roasteryOwner";
+
+        // Orders and Retail - all users can access except roaster
         case "orders.read":
         case "orders.write":
-          return role !== "roaster";
-
-        // Retail Operations - all users except roaster
         case "retail.read":
         case "retail.write":
+        case "retail.orders":
+        case "retail.inventory":
           return role !== "roaster";
 
-        // Analytics & Reports - owners and managers
+        // Analytics & Reports - owners and managers only
         case "analytics.read":
         case "reports.read":
           return role === "roasteryOwner" || role === "retailOwner" || role === "shopManager";
-
-        // Finance Operations - roastery owner only
-        case "finance.read":
-        case "finance.write":
-          return role === "roasteryOwner";
 
         default:
           return false;
