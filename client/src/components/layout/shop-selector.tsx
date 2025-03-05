@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/select";
 import { Store, Loader2 } from "lucide-react";
 import { useActiveShop } from "@/hooks/use-active-shop";
-import { queryClient } from "@/lib/queryClient";
 
 export function ShopSelector() {
   const { activeShop, setActiveShop } = useActiveShop();
@@ -18,18 +17,17 @@ export function ShopSelector() {
     queryKey: ["/api/user/shops"],
     refetchOnMount: "always",
     staleTime: 0,
-    refetchInterval: 3000, // More frequent shop list updates
+    refetchInterval: 3000,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: 3,
     retryDelay: 1000,
   });
 
-  // Initialize shop selection
+  // Initialize shop selection if not already set
   useEffect(() => {
     if (shops.length > 0 && !activeShop) {
-      const initialShop = shops[0];
-      setActiveShop(initialShop);
+      setActiveShop(shops[0]);
     }
   }, [shops, activeShop, setActiveShop]);
 
