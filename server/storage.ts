@@ -281,8 +281,16 @@ export class DatabaseStorage implements IStorage {
       }
 
       if (user?.role === "shopManager" || user?.role === "barista") {
-        return await db
-          .select()
+        const userShopsResult = await db
+          .select({
+            id: shops.id,
+            name: shops.name,
+            location: shops.location,
+            isActive: shops.isActive,
+            defaultOrderQuantity: shops.defaultOrderQuantity,
+            desiredSmallBags: shops.desiredSmallBags,
+            desiredLargeBags: shops.desiredLargeBags
+          })
           .from(userShops)
           .innerJoin(shops, eq(userShops.shopId, shops.id))
           .where(
@@ -292,6 +300,8 @@ export class DatabaseStorage implements IStorage {
             )
           )
           .orderBy(shops.name);
+
+        return userShopsResult;
       }
 
       return [];
@@ -1005,10 +1015,9 @@ export class DatabaseStorage implements IStorage {
         .from(billingEvents)
         .orderBy(desc(billingEvents.createdAt))
         .limit(1);
-
-      return lastEvent;
+            return lastEvent;
     } catch (error) {
-      console.error("Error fetching last billing event:", error);
+      console.error("Error getting last billing event:", error);
       throw error;
     }
   }
