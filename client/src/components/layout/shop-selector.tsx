@@ -14,13 +14,12 @@ import { queryClient } from "@/lib/queryClient";
 
 export function ShopSelector() {
   const { activeShop, setActiveShop } = useActiveShop();
-
   const { data: shops, isLoading } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
   });
 
   useEffect(() => {
-    if (shops?.length && !activeShop) {
+    if (shops?.[0] && !activeShop) {
       setActiveShop(shops[0]);
       queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shops[0].id] });
     }
@@ -53,9 +52,10 @@ export function ShopSelector() {
     <div className="flex items-center gap-2">
       <Store className="h-4 w-4" />
       <Select
-        value={activeShop?.id?.toString()}
+        value={activeShop?.id ? String(activeShop.id) : undefined}
         onValueChange={(value) => {
-          const shop = shops.find((s) => s.id === parseInt(value));
+          const shopId = parseInt(value);
+          const shop = shops.find((s) => s?.id === shopId);
           if (shop) {
             setActiveShop(shop);
             queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shop.id] });
@@ -68,8 +68,8 @@ export function ShopSelector() {
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
-          {shops.map((shop) => (
-            <SelectItem key={shop.id} value={shop.id.toString()}>
+          {shops.filter(shop => shop?.id).map((shop) => (
+            <SelectItem key={shop.id} value={String(shop.id)}>
               {shop.name}
             </SelectItem>
           ))}
