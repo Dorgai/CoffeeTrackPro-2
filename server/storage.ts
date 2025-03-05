@@ -272,7 +272,12 @@ export class DatabaseStorage implements IStorage {
         .from(users)
         .where(eq(users.id, userId));
 
-      if (user?.role === "roasteryOwner") {
+      if (!user) {
+        throw new Error("User not found");
+      }
+
+      // Roastery owners can access all active shops
+      if (user.role === "roasteryOwner") {
         return await db
           .select()
           .from(shops)
@@ -280,8 +285,9 @@ export class DatabaseStorage implements IStorage {
           .orderBy(shops.name);
       }
 
-      if (user?.role === "shopManager" || user?.role === "barista") {
-        const userShopsResult = await db
+      // Shop managers and baristas can only access their assigned shops
+      if (user.role === "shopManager" || user.role === "barista") {
+        return await db
           .select({
             id: shops.id,
             name: shops.name,
@@ -300,8 +306,6 @@ export class DatabaseStorage implements IStorage {
             )
           )
           .orderBy(shops.name);
-
-        return userShopsResult;
       }
 
       return [];
