@@ -303,11 +303,13 @@ export class DatabaseStorage implements IStorage {
 
       // All other roles see no shops
       return [];
+
     } catch (error) {
       console.error("Error in getUserShops:", error);
       throw error;
     }
   }
+
   async deleteShop(id: number): Promise<Shop> {
     try {
       const [deletedShop] = await db
@@ -531,8 +533,8 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updatedOrder;
   }
-  async getRetailInventoryHistory(shopId: number): Promise<(RetailInventory & { 
-    greenCoffeeName: string; 
+  async getRetailInventoryHistory(shopId: number): Promise<(RetailInventory & {
+    greenCoffeeName: string;
     updatedByUsername: string;
   })[]> {
     try {
@@ -1000,13 +1002,12 @@ export class DatabaseStorage implements IStorage {
 
       return updatedShop;
     } catch (error) {
-        console.error("Error updating shop:", error);
+      console.error("Error updating shop:", error);
       throw error;
     }
   }
-  //}
-// Billing methods
-async getLastBillingEvent(): Promise<BillingEvent | undefined> {
+  // Billing methods
+  async getLastBillingEvent(): Promise<BillingEvent | undefined> {
     try {
       const [lastEvent] = await db
         .select()
