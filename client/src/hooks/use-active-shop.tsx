@@ -11,7 +11,7 @@ interface ActiveShopState {
   setUserShops: (shops: Shop[]) => void;
 }
 
-// Create persisted store
+// Create store with persistence
 export const useActiveShop = create<ActiveShopState>()(
   persist(
     (set) => ({
@@ -22,7 +22,6 @@ export const useActiveShop = create<ActiveShopState>()(
     }),
     {
       name: 'active-shop-storage',
-      partialize: (state) => ({ activeShop: state.activeShop }), // Only persist activeShop
     }
   )
 );
@@ -42,22 +41,17 @@ export function useUserShops() {
         throw new Error(`Failed to fetch user shops: ${error}`);
       }
       const data = await res.json();
-      console.log("[useUserShops] Fetched shops:", data);
 
       // Update shops in store
       setUserShops(data);
 
       // Set default shop if needed
       if (data && data.length > 0 && (!activeShop || !data.find(s => s.id === activeShop.id))) {
-        const defaultShop = data[0];
-        console.log("[useUserShops] Setting default shop:", defaultShop);
-        setActiveShop(defaultShop);
+        setActiveShop(data[0]);
       }
 
       return data;
     },
-    staleTime: 30000,
-    retry: 3,
   });
 
   return { shops, isLoading, error, setUserShops, setActiveShop, activeShop };
