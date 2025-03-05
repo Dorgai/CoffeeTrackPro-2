@@ -17,17 +17,10 @@ export function ShopSelector() {
 
   const { data: shops, isLoading } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
-    onSuccess: (data) => {
-      console.log("Received shops data:", data);
-    },
-    onError: (error) => {
-      console.error("Error fetching shops:", error);
-    }
   });
 
   useEffect(() => {
     if (shops?.length && !activeShop) {
-      console.log("Setting initial active shop:", shops[0]);
       setActiveShop(shops[0]);
       queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shops[0].id] });
     }
@@ -60,11 +53,11 @@ export function ShopSelector() {
     <div className="flex items-center gap-2">
       <Store className="h-4 w-4" />
       <Select
-        value={activeShop?.id?.toString()}
+        value={activeShop?.id ? String(activeShop.id) : undefined}
         onValueChange={(value) => {
-          const shop = shops.find((s) => s.id === parseInt(value));
+          const shopId = parseInt(value);
+          const shop = shops.find((s) => s.id === shopId);
           if (shop) {
-            console.log("Changing active shop to:", shop);
             setActiveShop(shop);
             queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shop.id] });
           }
@@ -77,7 +70,7 @@ export function ShopSelector() {
         </SelectTrigger>
         <SelectContent>
           {shops.map((shop) => (
-            <SelectItem key={shop.id} value={shop.id.toString()}>
+            <SelectItem key={shop.id} value={String(shop.id)}>
               {shop.name}
             </SelectItem>
           ))}
