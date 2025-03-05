@@ -23,11 +23,19 @@ const refreshShopData = async (shopId: number) => {
     // Prefetch the data immediately
     queryClient.prefetchQuery({ 
       queryKey: ["/api/retail-inventory", shopId],
-      staleTime: 0
+      staleTime: 0,
+      refetchInterval: 5000, // Refresh every 5 seconds
+      refetchOnMount: true,
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true
     }),
     queryClient.prefetchQuery({ 
       queryKey: ["/api/orders", shopId],
-      staleTime: 0
+      staleTime: 0,
+      refetchInterval: 5000, // Refresh every 5 seconds
+      refetchOnMount: true,
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true
     })
   ]);
 };
