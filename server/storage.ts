@@ -276,8 +276,8 @@ export class DatabaseStorage implements IStorage {
         throw new Error("User not found");
       }
 
-      // Roastery owners can access all active shops
-      if (user.role === "roasteryOwner") {
+      // Roastery owners and retail owners can access all active shops
+      if (user.role === "roasteryOwner" || user.role === "retailOwner") {
         return await db
           .select()
           .from(shops)
@@ -1013,7 +1013,7 @@ export class DatabaseStorage implements IStorage {
 
   // Billing methods
   async getLastBillingEvent(): Promise<BillingEvent | undefined> {
-    try {
+        try {
       const [lastEvent] = await db
         .select()
         .from(billingEvents)
@@ -1361,6 +1361,32 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error("Error fetching billing event details:", error);
       throw error;
+    }
+  }
+  async hasPermission(userId: number, permission: string): Promise<boolean> {
+    try {
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, userId));
+
+      if (!user) return false;
+
+      switch (permission) {
+        case 'billing.write':
+          return user.role === 'roasteryOwner';
+        case 'greenCoffee.read':
+        case 'greenCoffee.write':
+          return user.role === 'roasteryOwner' || user.role === 'roaster';
+        case 'shop.manage':
+        case 'user.manage':
+          return user.role === 'roasteryOwner';
+        default:
+          return false;
+      }
+    } catch (error) {
+      console.error("Error checking permissions:", error);
+      return false;
     }
   }
 }
