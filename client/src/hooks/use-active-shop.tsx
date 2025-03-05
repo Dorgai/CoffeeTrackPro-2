@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Shop } from '@shared/schema';
-
+import { useEffect } from 'react';
 
 interface ActiveShopState {
   activeShop: Shop | null;

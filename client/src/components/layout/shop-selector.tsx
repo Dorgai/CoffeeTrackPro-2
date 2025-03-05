@@ -13,6 +13,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useActiveShop } from "@/hooks/use-active-shop";
+import { useAuth } from "@/hooks/use-auth";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function ShopSelector() {
   const { activeShop, setActiveShop } = useActiveShop();
@@ -22,6 +32,8 @@ export function ShopSelector() {
   const { data: shops, isLoading, error } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
     enabled: !!user, // Only run the query if the user is logged in
+    staleTime: 30000,
+    retry: 3,
     onError: (error) => {
       console.error("Error loading shops:", error);
     },
