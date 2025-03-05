@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -39,47 +38,31 @@ export function ShopSelector() {
     }
   });
 
-  // Handle initial shop selection with useEffect
+  // Set the first shop as active if there's no active shop yet
   useEffect(() => {
-    if (shops && shops.length > 0 && !activeShop && !initialized) {
+    if (!initialized && shops && shops.length > 0 && !activeShop) {
       setActiveShop(shops[0]);
       setInitialized(true);
     }
-  }, [shops, activeShop, setActiveShop, initialized]);
+  }, [shops, activeShop, initialized, setActiveShop]);
 
   if (isLoading) {
-    return (
-      <Button variant="outline" className="w-[200px]" disabled>
-        <Skeleton className="h-4 w-[160px]" />
-      </Button>
-    );
+    return <Skeleton className="h-10 w-[180px]" />;
   }
 
-  if (error) {
-    return (
-      <Button variant="outline" className="w-[200px] text-red-500" disabled>
-        Error loading shops
-      </Button>
-    );
-  }
-
-  if (!shops || shops.length === 0) {
-    return (
-      <Button variant="outline" className="w-[200px]" disabled>
-        No shops available
-      </Button>
-    );
+  if (error || !shops || shops.length === 0) {
+    return null;
   }
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="w-[200px] justify-between">
-          {activeShop ? activeShop.name : "Select Shop"}
-          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        <Button variant="outline" className="w-[180px] justify-between">
+          {activeShop?.name || "Select Shop"}
+          <ChevronDown className="ml-2 h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent>
         {shops.map((shop) => (
           <DropdownMenuItem
             key={shop.id}

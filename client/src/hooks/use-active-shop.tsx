@@ -1,7 +1,7 @@
+
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Shop } from '@shared/schema';
-import { useEffect } from 'react';
 
 interface ActiveShopState {
   activeShop: Shop | null;
@@ -19,6 +19,3 @@ export const useActiveShop = create<ActiveShopState>()(
     }
   )
 );
-
-
-// Note: The ShopSelector component is now defined in src/components/layout/shop-selector.tsx
