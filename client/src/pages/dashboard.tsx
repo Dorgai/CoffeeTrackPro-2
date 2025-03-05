@@ -43,8 +43,8 @@ export default function Dashboard() {
     enabled: !!user && user.role === "roasteryOwner",
   });
 
-// Example of proper table structure to be used in dashboard component:
-{/* When rendering tables, use this structure:
+{/* 
+  Proper table structure:
   <Table>
     <TableHeader>
       <TableRow>
@@ -60,6 +60,35 @@ export default function Dashboard() {
     </TableBody>
   </Table>
 */}
+
+// Example implementation of a table with ShopSelector context:
+const ExampleDataTable = () => {
+  const { activeShop } = useActiveShop();
+  
+  if (!activeShop) return null;
+  
+  return (
+    <div className="rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Coffee</TableHead>
+            <TableHead>Quantity</TableHead>
+            <TableHead>Status</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {/* Data rows would go here */}
+          <TableRow>
+            <TableCell>Example Coffee</TableCell>
+            <TableCell>10 bags</TableCell>
+            <TableCell>In Stock</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+    </div>
+  );
+};
 
 
   const { data: shop, isLoading: loadingShop } = useQuery<Shop>({

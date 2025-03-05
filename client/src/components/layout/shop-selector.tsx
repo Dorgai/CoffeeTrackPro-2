@@ -14,8 +14,13 @@ import { queryClient } from "@/lib/queryClient";
 export function ShopSelector() {
   const { activeShop, setActiveShop } = useActiveShop();
 
-  const { data: shops, isLoading } = useQuery<Shop[]>({
+  const { data: shops, isLoading, error } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
+    staleTime: 30000,
+    retry: 2,
+    onError: (error) => {
+      console.error("Error loading shops:", error);
+    }
   });
 
   if (isLoading) {
