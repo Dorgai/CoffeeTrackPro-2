@@ -11,15 +11,10 @@ import {
 import { useActiveShop } from "@/hooks/use-active-shop";
 import { Store, Loader2 } from "lucide-react";
 
-interface ShopSelectorProps {
-  value?: number | null;
-  onChange?: (shopId: number | null) => void;
-}
-
-export function ShopSelector({ value, onChange }: ShopSelectorProps) {
+export function ShopSelector() {
   const { activeShop, setActiveShop } = useActiveShop();
 
-  // Fetch user's authorized shops
+  // Fetch user's authorized shops - backend handles role-specific logic
   const { data: shops, isLoading } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
   });
@@ -27,11 +22,11 @@ export function ShopSelector({ value, onChange }: ShopSelectorProps) {
   useEffect(() => {
     if (!shops?.length) return;
 
+    // Set first shop as active if no active shop or current active shop not in list
     if (!activeShop || !shops.find(s => s.id === activeShop.id)) {
       setActiveShop(shops[0]);
-      onChange?.(shops[0].id);
     }
-  }, [shops, activeShop, setActiveShop, onChange]);
+  }, [shops, activeShop, setActiveShop]);
 
   if (isLoading) {
     return (
@@ -60,12 +55,11 @@ export function ShopSelector({ value, onChange }: ShopSelectorProps) {
     <div className="flex items-center gap-2">
       <Store className="h-4 w-4 text-muted-foreground" />
       <Select
-        value={value?.toString() || activeShop?.id?.toString()}
+        value={String(activeShop?.id || '')}
         onValueChange={(val) => {
-          const shop = shops.find(s => s.id === parseInt(val));
-          if (shop) {
-            setActiveShop(shop);
-            onChange?.(shop.id);
+          const selectedShop = shops.find(s => s.id === Number(val));
+          if (selectedShop) {
+            setActiveShop(selectedShop);
           }
         }}
       >
@@ -76,7 +70,7 @@ export function ShopSelector({ value, onChange }: ShopSelectorProps) {
         </SelectTrigger>
         <SelectContent>
           {shops.map((shop) => (
-            <SelectItem key={shop.id} value={shop.id.toString()}>
+            <SelectItem key={shop.id} value={String(shop.id)}>
               {shop.name}
             </SelectItem>
           ))}
