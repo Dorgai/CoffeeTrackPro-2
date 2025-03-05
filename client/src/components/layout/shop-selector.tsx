@@ -38,28 +38,14 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   // Set default shop when shops data changes
   useEffect(() => {
     const shops = user?.role === "roasteryOwner" ? allShops : userShops;
-    if (!shops?.length) return;
+    if (!shops || shops.length === 0) return;
 
     // If no active shop or current shop is not in available shops
     if (!activeShop || !shops.find(s => s.id === activeShop.id)) {
-      const defaultShop = shops[0];
-      setActiveShop(defaultShop);
-      onChange?.(defaultShop.id);
+      setActiveShop(shops[0]);
+      onChange?.(shops[0].id);
     }
   }, [userShops, allShops, activeShop, setActiveShop, onChange, user?.role]);
-
-  const handleChange = (value: string) => {
-    const shopId = parseInt(value, 10);
-    const shops = user?.role === "roasteryOwner" ? allShops : userShops;
-    const shop = shops?.find((s) => s.id === shopId);
-
-    if (shop) {
-      if (onChange) {
-        onChange(shopId);
-      }
-      setActiveShop(shop);
-    }
-  };
 
   const isLoading = loadingUserShops || loadingAllShops;
   const shops = user?.role === "roasteryOwner" ? allShops : userShops;
@@ -76,28 +62,39 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
     );
   }
 
+  if (!shops || shops.length === 0) {
+    return (
+      <div className={`flex items-center gap-2 ${className || ''}`}>
+        <Store className="h-4 w-4 text-muted-foreground" />
+        <div className="flex items-center gap-2 min-w-[200px] h-9 px-3 rounded-md border">
+          <span className="text-sm text-muted-foreground">No shops available</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`flex items-center gap-2 ${className || ''}`}>
       <Store className="h-4 w-4 text-muted-foreground" />
       <Select
         value={activeShop?.id?.toString()}
-        onValueChange={handleChange}
+        onValueChange={(val) => {
+          const shop = shops.find(s => s.id.toString() === val);
+          if (shop) {
+            setActiveShop(shop);
+            onChange?.(shop.id);
+          }
+        }}
       >
         <SelectTrigger className="w-[200px]">
           <SelectValue placeholder="Select a shop" />
         </SelectTrigger>
         <SelectContent>
-          {shops && shops.length > 0 ? (
-            shops.map((shop) => (
-              <SelectItem key={shop.id} value={shop.id.toString()}>
-                {shop.name}
-              </SelectItem>
-            ))
-          ) : (
-            <div className="relative flex items-center justify-center py-2 text-sm text-muted-foreground">
-              No shops available
-            </div>
-          )}
+          {shops.map((shop) => (
+            <SelectItem key={shop.id} value={shop.id.toString()}>
+              {shop.name}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
       {user?.role === "barista" && <RestockButton />}
