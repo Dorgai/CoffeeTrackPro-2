@@ -53,13 +53,16 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   // Set default shop on mount and when shops data changes
   useEffect(() => {
     const shops = user?.role === "roasteryOwner" ? allShops : userShops;
-    if (shops && shops.length > 0 && !activeShop) {
-      console.log("Setting default shop. Available shops:", shops);
-      const defaultShop = shops.find(s => s.id === user?.defaultShopId) || shops[0];
-      console.log("Selected default shop:", defaultShop);
-      setActiveShop(defaultShop);
-      if (onChange) {
-        onChange(defaultShop.id);
+    if (shops && shops.length > 0) {
+      // Only set if no active shop or if current active shop is not in available shops
+      if (!activeShop || !shops.find(s => s.id === activeShop.id)) {
+        console.log("Setting default shop. Available shops:", shops);
+        const defaultShop = shops.find(s => s.id === user?.defaultShopId) || shops[0];
+        console.log("Selected default shop:", defaultShop);
+        setActiveShop(defaultShop);
+        if (onChange) {
+          onChange(defaultShop.id);
+        }
       }
     }
   }, [userShops, allShops, user?.defaultShopId, activeShop, setActiveShop, onChange, user?.role]);
