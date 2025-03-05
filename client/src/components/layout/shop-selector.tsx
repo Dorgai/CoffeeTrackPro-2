@@ -22,7 +22,7 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   const { activeShop, setActiveShop } = useActiveShop();
   const { user } = useAuth();
 
-  // Fetch user's authorized shops for non-owner roles (both barista and manager)
+  // Fetch user's authorized shops for both barista and manager
   const { data: userShops, isLoading: loadingUserShops } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
     enabled: !!user && user.role !== "roasteryOwner",
@@ -41,15 +41,18 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   // Set default shop on mount and when shops data changes
   useEffect(() => {
     const shops = user?.role === "roasteryOwner" ? allShops : userShops;
+
+    // Only proceed if we have shops data
     if (!shops?.length) return;
 
-    // Check if current activeShop is still valid
+    // If no active shop or current shop is not in available shops
     const currentShopIsValid = activeShop && shops.find(s => s.id === activeShop.id);
     if (!currentShopIsValid) {
-      console.log("[ShopSelector] Setting default shop for", user?.role);
+      console.log("[ShopSelector] Setting default shop");
+      console.log("[ShopSelector] User role:", user?.role);
       console.log("[ShopSelector] Available shops:", shops);
 
-      // For barista/manager, use their first available shop
+      // Use first available shop as default
       const defaultShop = shops[0];
       console.log("[ShopSelector] Selected default shop:", defaultShop);
 
@@ -76,7 +79,6 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   const shops = user?.role === "roasteryOwner" ? allShops : userShops;
   const currentValue = value !== undefined ? value : activeShop?.id;
 
-  // If no shops are loaded yet, show loading state
   if (isLoading) {
     return (
       <div className={`flex items-center gap-2 ${className || ''}`}>
