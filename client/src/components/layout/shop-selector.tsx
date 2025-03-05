@@ -11,7 +11,6 @@ import {
 import { useActiveShop } from "@/hooks/use-active-shop";
 import { Store, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { RestockButton } from "./restock-button";
 
 interface ShopSelectorProps {
   value?: number | null;
@@ -42,12 +41,11 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   useEffect(() => {
     if (!shops || shops.length === 0) return;
 
-    // If no active shop or current shop is not in available shops
     if (!activeShop || !shops.find(s => s.id === activeShop.id)) {
       setActiveShop(shops[0]);
       onChange?.(shops[0].id);
     }
-  }, [userShops, allShops, activeShop, setActiveShop, onChange, user?.role]);
+  }, [shops, activeShop, setActiveShop, onChange]);
 
   if (isLoading) {
     return (
@@ -72,17 +70,13 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
     );
   }
 
-  // Ensure we have valid data before rendering the select
-  const validShops = shops.filter(shop => shop && typeof shop.id === 'number' && typeof shop.name === 'string');
-
   return (
     <div className={`flex items-center gap-2 ${className || ''}`}>
       <Store className="h-4 w-4 text-muted-foreground" />
       <Select
-        value={activeShop?.id ? String(activeShop.id) : undefined}
+        value={activeShop?.id?.toString() || ''}
         onValueChange={(val) => {
-          if (!val) return;
-          const selectedShop = validShops.find(s => s.id === Number(val));
+          const selectedShop = shops.find(s => s.id === Number(val));
           if (selectedShop) {
             setActiveShop(selectedShop);
             onChange?.(selectedShop.id);
@@ -93,14 +87,13 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
           <SelectValue placeholder="Select a shop" />
         </SelectTrigger>
         <SelectContent>
-          {validShops.map((shop) => (
+          {shops.map((shop) => (
             <SelectItem key={shop.id} value={String(shop.id)}>
               {shop.name}
             </SelectItem>
           ))}
         </SelectContent>
       </Select>
-      {user?.role === "barista" && <RestockButton />}
     </div>
   );
 }
