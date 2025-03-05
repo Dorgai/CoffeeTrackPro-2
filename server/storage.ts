@@ -288,8 +288,16 @@ export class DatabaseStorage implements IStorage {
 
       // Shop managers and baristas can only see their assigned shops
       if (user.role === "shopManager" || user.role === "barista") {
-        return await db
-          .select()
+        const assignedShops = await db
+          .select({
+            id: shops.id,
+            name: shops.name,
+            location: shops.location,
+            isActive: shops.isActive,
+            defaultOrderQuantity: shops.defaultOrderQuantity,
+            desiredSmallBags: shops.desiredSmallBags,
+            desiredLargeBags: shops.desiredLargeBags
+          })
           .from(shops)
           .innerJoin(userShops, eq(userShops.shopId, shops.id))
           .where(
@@ -299,11 +307,12 @@ export class DatabaseStorage implements IStorage {
             )
           )
           .orderBy(shops.name);
+
+        return assignedShops;
       }
 
       // All other roles see no shops
       return [];
-
     } catch (error) {
       console.error("Error in getUserShops:", error);
       throw error;
@@ -994,7 +1003,7 @@ export class DatabaseStorage implements IStorage {
         .update(shops)
         .set(update)
         .where(eq(shops.id, id))
-        .returning();
+                .returning();
 
       if (!updatedShop) {
         throw new Error("Failed to update shop");
