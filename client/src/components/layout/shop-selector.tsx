@@ -19,7 +19,8 @@ export function ShopSelector() {
 
   const { data: shops, isLoading, error } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
-    retry: 2,
+    retry: 3,
+    staleTime: 1000 * 60 * 5, // 5 minutes
     onError: (error: Error) => {
       toast({
         title: "Error loading shops",
@@ -31,8 +32,10 @@ export function ShopSelector() {
 
   useEffect(() => {
     if (shops?.length && !activeShop) {
-      setActiveShop(shops[0]);
-      queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shops[0].id] });
+      const firstShop = shops[0];
+      console.log("Setting initial shop:", firstShop);
+      setActiveShop(firstShop);
+      queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", firstShop.id] });
     }
   }, [shops, activeShop, setActiveShop]);
 
@@ -78,6 +81,7 @@ export function ShopSelector() {
         onValueChange={(value) => {
           const shop = shops.find((s) => s.id === parseInt(value));
           if (shop) {
+            console.log("Changing active shop to:", shop);
             setActiveShop(shop);
             queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shop.id] });
           }

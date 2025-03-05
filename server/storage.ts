@@ -268,10 +268,14 @@ export class DatabaseStorage implements IStorage {
 
   async getUserShops(userId: number): Promise<Shop[]> {
     try {
+      console.log("Fetching shops for user:", userId);
+
       const [user] = await db
         .select()
         .from(users)
         .where(eq(users.id, userId));
+
+      console.log("User role:", user?.role);
 
       if (!user) {
         throw new Error("User not found");
@@ -287,18 +291,18 @@ export class DatabaseStorage implements IStorage {
         desiredLargeBags: shops.desiredLargeBags,
       };
 
-      // Roastery owners and retail owners can see all active shops
-      if (user.role === "roasteryOwner" || user.role === "retailOwner") {
-        return await db
+      let query;
+
+      // Roastery owners, retail owners and roasters can see all active shops
+      if (["roasteryOwner", "retailOwner", "roaster"].includes(user.role)) {
+        query = db
           .select(shopFields)
           .from(shops)
-          .where(eq(shops.isActive, true))
-          .orderBy(shops.name);
+          .where(eq(shops.isActive, true));
       }
-
       // Shop managers and baristas can only see their assigned shops
-      if (user.role === "shopManager" || user.role === "barista") {
-        return await db
+      else if (["shopManager", "barista"].includes(user.role)) {
+        query = db
           .select(shopFields)
           .from(userShops)
           .innerJoin(shops, eq(userShops.shopId, shops.id))
@@ -307,20 +311,15 @@ export class DatabaseStorage implements IStorage {
               eq(userShops.userId, userId),
               eq(shops.isActive, true)
             )
-          )
-          .orderBy(shops.name);
+          );
+      } else {
+        return [];
       }
 
-      // Roasters can see all active shops
-      if (user.role === "roaster") {
-        return await db
-          .select(shopFields)
-          .from(shops)
-          .where(eq(shops.isActive, true))
-          .orderBy(shops.name);
-      }
+      const results = await query.orderBy(shops.name);
+      console.log("Found shops:", results.length);
+      return results;
 
-      return [];
     } catch (error) {
       console.error("Error in getUserShops:", error);
       throw error;
