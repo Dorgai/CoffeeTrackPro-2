@@ -20,14 +20,13 @@ export function NavBar() {
 
   // Role-based access control flags
   const isRoasteryUser = user?.role === "roasteryOwner" || user?.role === "roaster";
-  const isRetailUser = user?.role === "shopManager" || user?.role === "barista";
+  const isRetailUser = user?.role === "retailOwner" || user?.role === "shopManager" || user?.role === "barista";
   const canManageShops = user?.role === "roasteryOwner";
   const canManageUsers = user?.role === "roasteryOwner";
   const canAccessGreenCoffee = user?.role === "roasteryOwner" || user?.role === "roaster";
   const canAccessBilling = user?.role === "roasteryOwner";
-  const canAccessAnalytics = user?.role === "roasteryOwner" || user?.role === "shopManager";
-  const canAccessRetail = user?.role === "roasteryOwner" || user?.role === "shopManager" || user?.role === "barista" || user?.role === "retailOwner";
-
+  const canAccessAnalytics = user?.role === "roasteryOwner" || user?.role === "retailOwner" || user?.role === "shopManager";
+  const canAccessRetail = user?.role === "roasteryOwner" || user?.role === "retailOwner" || user?.role === "shopManager" || user?.role === "barista";
 
   return (
     <div className="border-b">

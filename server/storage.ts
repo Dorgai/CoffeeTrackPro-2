@@ -603,20 +603,17 @@ export class DatabaseStorage implements IStorage {
             id: shops.id,
             name: shops.name,
             location: shops.location,
-            isActive: shops.isActive,
-            defaultOrderQuantity: shops.defaultOrderQuantity,
-            desiredSmallBags: shops.desiredSmallBags
           },
           greenCoffee: {
             id: greenCoffee.id,
             name: greenCoffee.name,
-            producer: greenCoffee.producer
+            producer: greenCoffee.producer,
           },
           user: {
             id: users.id,
             username: users.username,
-            role: users.role
-          }
+            role: users.role,
+          },
         })
         .from(orders)
         .innerJoin(shops, eq(orders.shopId, shops.id))
@@ -1376,6 +1373,7 @@ export class DatabaseStorage implements IStorage {
       if (!user) return false;
 
       switch (permission) {
+        // Restricted permissions
         case 'billing.write':
           return user.role === 'roasteryOwner';
         case 'greenCoffee.read':
@@ -1384,11 +1382,21 @@ export class DatabaseStorage implements IStorage {
         case 'shop.manage':
         case 'user.manage':
           return user.role === 'roasteryOwner';
+
+        // Retail owner permissions
         case 'retail.read':
         case 'retail.write':
+        case 'orders.read':
+        case 'orders.write':
         case 'analytics.read':
         case 'reports.read':
-          return user.role === 'roasteryOwner' || user.role === 'retailOwner' || user.role === 'shopManager';
+        case 'inventory.read':
+        case 'inventory.write':
+          return ['roasteryOwner', 'retailOwner', 'shopManager'].includes(user.role);
+
+        case 'retail.basic':
+          return ['roasteryOwner', 'retailOwner', 'shopManager', 'barista'].includes(user.role);
+
         default:
           return false;
       }
