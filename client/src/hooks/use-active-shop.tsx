@@ -11,11 +11,11 @@ interface ActiveShopState {
 
 // Helper function to refresh shop data
 const refreshShopData = async (shopId: number) => {
-  // Aggressive data fetching strategy
+  // Define queries with retry logic
   const queries = [
     {
       queryKey: ["/api/retail-inventory", shopId],
-      refetchInterval: 3000, // More frequent updates
+      refetchInterval: 3000,
       staleTime: 0,
       refetchOnMount: "always",
       refetchOnWindowFocus: true,
@@ -25,7 +25,7 @@ const refreshShopData = async (shopId: number) => {
     },
     {
       queryKey: ["/api/orders", shopId],
-      refetchInterval: 3000, // More frequent updates
+      refetchInterval: 3000,
       staleTime: 0,
       refetchOnMount: "always",
       refetchOnWindowFocus: true,

@@ -3,11 +3,13 @@ import {
   type Shop,
   type RetailInventory,
   type Order,
+  type GreenCoffee,
   users,
   shops,
   retailInventory,
   orders,
   userShops,
+  greenCoffee,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
@@ -92,8 +94,8 @@ export class DatabaseStorage {
         return [];
       }
 
-      // Return all active shops for retail owners, roastery owners, and shop managers
-      if (["retailOwner", "roasteryOwner", "shopManager"].includes(user.role)) {
+      // Return all active shops for all roles except barista
+      if (user.role !== "barista") {
         return await db
           .select()
           .from(shops)
@@ -101,24 +103,72 @@ export class DatabaseStorage {
           .orderBy(shops.name);
       }
 
-      // Return assigned shops for baristas and roasters
-      if (user.role === "barista" || user.role === "roaster") {
-        return await db
-          .select()
-          .from(shops)
-          .innerJoin(userShops, eq(shops.id, userShops.shopId))
-          .where(
-            and(
-              eq(userShops.userId, userId),
-              eq(shops.isActive, true)
-            )
+      // Baristas only get their assigned shops
+      return await db
+        .select()
+        .from(shops)
+        .innerJoin(userShops, eq(shops.id, userShops.shopId))
+        .where(
+          and(
+            eq(userShops.userId, userId),
+            eq(shops.isActive, true)
           )
-          .orderBy(shops.name);
-      }
-
-      return [];
+        )
+        .orderBy(shops.name);
     } catch (error) {
       console.error("Error getting user shops:", error);
+      throw error;
+    }
+  }
+
+  // Order operations
+  async getOrdersByShop(shopId: number): Promise<Order[]> {
+    try {
+      return await db
+        .select({
+          id: orders.id,
+          shopId: orders.shopId,
+          greenCoffeeId: orders.greenCoffeeId,
+          smallBags: orders.smallBags,
+          largeBags: orders.largeBags,
+          status: orders.status,
+          createdAt: orders.createdAt,
+          createdById: orders.createdById,
+          updatedAt: orders.updatedAt,
+          updatedById: orders.updatedById,
+        })
+        .from(orders)
+        .where(eq(orders.shopId, shopId))
+        .orderBy(desc(orders.createdAt));
+    } catch (error) {
+      console.error("Error getting orders:", error);
+      throw error;
+    }
+  }
+
+  async getAllOrders(): Promise<(Order & { shop: Shop; coffee: GreenCoffee })[]> {
+    try {
+      return await db
+        .select({
+          id: orders.id,
+          shopId: orders.shopId,
+          greenCoffeeId: orders.greenCoffeeId,
+          smallBags: orders.smallBags,
+          largeBags: orders.largeBags,
+          status: orders.status,
+          createdAt: orders.createdAt,
+          createdById: orders.createdById,
+          updatedAt: orders.updatedAt,
+          updatedById: orders.updatedById,
+          shop: shops,
+          coffee: greenCoffee,
+        })
+        .from(orders)
+        .innerJoin(shops, eq(orders.shopId, shops.id))
+        .innerJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
+        .orderBy(desc(orders.createdAt));
+    } catch (error) {
+      console.error("Error getting all orders:", error);
       throw error;
     }
   }
@@ -127,7 +177,15 @@ export class DatabaseStorage {
   async getRetailInventoriesByShop(shopId: number): Promise<RetailInventory[]> {
     try {
       return await db
-        .select()
+        .select({
+          id: retailInventory.id,
+          shopId: retailInventory.shopId,
+          greenCoffeeId: retailInventory.greenCoffeeId,
+          smallBags: retailInventory.smallBags,
+          largeBags: retailInventory.largeBags,
+          updatedAt: retailInventory.updatedAt,
+          updatedById: retailInventory.updatedById,
+        })
         .from(retailInventory)
         .where(eq(retailInventory.shopId, shopId))
         .orderBy(desc(retailInventory.updatedAt));
@@ -137,16 +195,24 @@ export class DatabaseStorage {
     }
   }
 
-  // Order operations
-  async getOrdersByShop(shopId: number): Promise<Order[]> {
+  async getAllRetailInventories(): Promise<(RetailInventory & { coffee: GreenCoffee })[]> {
     try {
       return await db
-        .select()
-        .from(orders)
-        .where(eq(orders.shopId, shopId))
-        .orderBy(desc(orders.createdAt));
+        .select({
+          id: retailInventory.id,
+          shopId: retailInventory.shopId,
+          greenCoffeeId: retailInventory.greenCoffeeId,
+          smallBags: retailInventory.smallBags,
+          largeBags: retailInventory.largeBags,
+          updatedAt: retailInventory.updatedAt,
+          updatedById: retailInventory.updatedById,
+          coffee: greenCoffee,
+        })
+        .from(retailInventory)
+        .innerJoin(greenCoffee, eq(retailInventory.greenCoffeeId, greenCoffee.id))
+        .orderBy(desc(retailInventory.updatedAt));
     } catch (error) {
-      console.error("Error getting orders:", error);
+      console.error("Error getting all retail inventories:", error);
       throw error;
     }
   }
@@ -159,17 +225,17 @@ export class DatabaseStorage {
         .from(users)
         .where(eq(users.id, userId));
 
-      if (!user || !user.isActive) {
-        return false;
-      }
+      if (!user || !user.isActive) return false;
 
-      // Full access for roastery owners
-      if (user.role === "roasteryOwner") {
+      const role = user.role;
+
+      // Roastery owners have full access
+      if (role === "roasteryOwner") {
         return true;
       }
 
-      // Full retail access for retail owners
-      if (user.role === "retailOwner") {
+      // Retail owners have full access to retail operations
+      if (role === "retailOwner") {
         const retailPermissions = [
           "retail.read",
           "retail.write",
@@ -185,8 +251,8 @@ export class DatabaseStorage {
         return retailPermissions.includes(permission);
       }
 
-      // Retail operations access for shop managers
-      if (user.role === "shopManager") {
+      // Shop managers get retail operations access
+      if (role === "shopManager") {
         const managerPermissions = [
           "retail.read",
           "retail.write",
@@ -200,8 +266,8 @@ export class DatabaseStorage {
         return managerPermissions.includes(permission);
       }
 
-      // Roasting operations access for roasters
-      if (user.role === "roaster") {
+      // Roasters get roasting operations access
+      if (role === "roaster") {
         const roasterPermissions = [
           "roasting.read",
           "roasting.write",
@@ -211,8 +277,8 @@ export class DatabaseStorage {
         return roasterPermissions.includes(permission);
       }
 
-      // Limited retail access for baristas
-      if (user.role === "barista") {
+      // Baristas get limited retail access
+      if (role === "barista") {
         const baristaPermissions = [
           "retail.read",
           "orders.read"
