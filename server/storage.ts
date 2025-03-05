@@ -277,10 +277,17 @@ export class DatabaseStorage implements IStorage {
         throw new Error("User not found");
       }
 
-      // Roastery owners, roasters and retail owners can see all active shops
-      if (user.role === "roasteryOwner" || user.role === "roaster" || user.role === "retailOwner") {
+      // For retail owners and roastery owners, return all active shops
+      if (user.role === "retailOwner" || user.role === "roasteryOwner") {
         const allShops = await db
-          .select()
+          .select({
+            id: shops.id,
+            name: shops.name,
+            location: shops.location,
+            isActive: shops.isActive,
+            defaultOrderQuantity: shops.defaultOrderQuantity,
+            desiredSmallBags: shops.desiredSmallBags
+          })
           .from(shops)
           .where(eq(shops.isActive, true))
           .orderBy(shops.name);
@@ -288,7 +295,25 @@ export class DatabaseStorage implements IStorage {
         return allShops;
       }
 
-      // Only shop managers can see their assigned shops
+      // For roasters, return all active shops for roasting purposes
+      if (user.role === "roaster") {
+        const allShops = await db
+          .select({
+            id: shops.id,
+            name: shops.name,
+            location: shops.location,
+            isActive: shops.isActive,
+            defaultOrderQuantity: shops.defaultOrderQuantity,
+            desiredSmallBags: shops.desiredSmallBags
+          })
+          .from(shops)
+          .where(eq(shops.isActive, true))
+          .orderBy(shops.name);
+
+        return allShops;
+      }
+
+      // For shop managers, return only their assigned shops
       if (user.role === "shopManager") {
         const assignedShops = await db
           .select({
@@ -312,7 +337,7 @@ export class DatabaseStorage implements IStorage {
         return assignedShops;
       }
 
-      // Barista role and all other roles see no shops
+      // All other roles see no shops
       return [];
 
     } catch (error) {
@@ -1401,16 +1426,16 @@ export class DatabaseStorage implements IStorage {
         case "billing.write":
           return role === "roasteryOwner";
 
-        // Orders and Retail - all users can access except roaster
+        // Orders, Retail, and Inventory - retail owner has full access
         case "orders.read":
         case "orders.write":
         case "retail.read":
         case "retail.write":
         case "retail.orders":
         case "retail.inventory":
-          return role !== "roaster";
+          return role === "roasteryOwner" || role === "retailOwner" || role === "shopManager";
 
-        // Analytics & Reports - owners and managers only
+        // Analytics & Reports - owners and managers
         case "analytics.read":
         case "reports.read":
           return role === "roasteryOwner" || role === "retailOwner" || role === "shopManager";
@@ -1419,7 +1444,7 @@ export class DatabaseStorage implements IStorage {
           return false;
       }
     } catch (error) {
-      console.error("Error checking permissions:", error);
+      console.error("Error checking permission:", error);
       return false;
     }
   }
