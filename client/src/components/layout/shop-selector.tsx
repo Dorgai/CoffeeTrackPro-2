@@ -10,8 +10,14 @@ import {
 } from "@/components/ui/select";
 import { useActiveShop } from "@/hooks/use-active-shop";
 import { Store, Loader2 } from "lucide-react";
+import { queryClient } from "@/lib/queryClient";
 
-export function ShopSelector() {
+interface ShopSelectorProps {
+  value?: number | null;
+  onChange?: (shopId: number | null) => void;
+}
+
+export function ShopSelector({ value, onChange }: ShopSelectorProps) {
   const { activeShop, setActiveShop } = useActiveShop();
 
   // Fetch user's authorized shops
@@ -22,9 +28,11 @@ export function ShopSelector() {
   useEffect(() => {
     // Only set default shop if we have shops and no active shop
     if (shops && shops.length > 0 && !activeShop) {
-      setActiveShop(shops[0]);
+      const defaultShop = shops[0];
+      setActiveShop(defaultShop);
+      onChange?.(defaultShop.id);
     }
-  }, [shops, activeShop, setActiveShop]);
+  }, [shops, activeShop, setActiveShop, onChange]);
 
   if (isLoading) {
     return (
@@ -53,11 +61,16 @@ export function ShopSelector() {
     <div className="flex items-center gap-2">
       <Store className="h-4 w-4 text-muted-foreground" />
       <Select
-        value={activeShop?.id?.toString() || ''}
+        value={value?.toString() || activeShop?.id?.toString() || ''}
         onValueChange={(val) => {
           const shop = shops.find(s => s.id === Number(val));
           if (shop) {
             setActiveShop(shop);
+            onChange?.(shop.id);
+
+            // Invalidate queries that depend on shop ID
+            queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shop.id] });
+            queryClient.invalidateQueries({ queryKey: ["/api/orders", shop.id] });
           }
         }}
       >
