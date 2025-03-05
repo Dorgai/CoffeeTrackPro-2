@@ -44,40 +44,34 @@ export function ShopSelector() {
     );
   }
 
-  // Filter out any invalid shop entries
-  const validShops = shops.filter((shop): shop is Shop => 
-    shop !== null && 
-    shop !== undefined && 
-    typeof shop.id === 'number' && 
-    typeof shop.name === 'string'
-  );
-
-  // If no active shop is set and we have valid shops, set the first one
-  if (!activeShop && validShops.length > 0) {
-    setActiveShop(validShops[0]);
-    queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", validShops[0].id] });
+  // Set default shop if none is selected
+  if (!activeShop && shops.length > 0) {
+    const firstShop = shops[0];
+    setActiveShop(firstShop);
+    queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", firstShop.id] });
   }
 
   return (
     <div className="flex items-center gap-2">
       <Store className="h-4 w-4 text-muted-foreground" />
       <Select
-        value={activeShop?.id ? String(activeShop.id) : undefined}
+        value={activeShop?.id?.toString()}
         onValueChange={(value) => {
-          const shopId = parseInt(value, 10);
-          const shop = validShops.find(s => s.id === shopId);
+          const shop = shops.find((s) => s.id === parseInt(value));
           if (shop) {
             setActiveShop(shop);
-            queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shopId] });
+            queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shop.id] });
           }
         }}
       >
         <SelectTrigger className="w-[200px]">
-          <SelectValue placeholder="Select a shop" />
+          <SelectValue>
+            {activeShop?.name || "Select a shop"}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
-          {validShops.map((shop) => (
-            <SelectItem key={shop.id} value={String(shop.id)}>
+          {shops.map((shop) => (
+            <SelectItem key={shop.id} value={shop.id?.toString() || ""}>
               {shop.name}
             </SelectItem>
           ))}
