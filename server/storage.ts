@@ -90,12 +90,12 @@ export class DatabaseStorage {
         .from(users)
         .where(eq(users.id, userId));
 
-      if (!user || !user.isActive) {
-        return [];
+      if (!user) {
+        throw new Error("User not found");
       }
 
-      // Return all active shops for all roles except barista
-      if (user.role !== "barista") {
+      // Return all active shops for these roles
+      if (["retailOwner", "roasteryOwner", "shopManager"].includes(user.role)) {
         return await db
           .select()
           .from(shops)
@@ -103,26 +103,37 @@ export class DatabaseStorage {
           .orderBy(shops.name);
       }
 
-      // Baristas only get their assigned shops
-      return await db
-        .select()
-        .from(shops)
-        .innerJoin(userShops, eq(shops.id, userShops.shopId))
-        .where(
-          and(
-            eq(userShops.userId, userId),
-            eq(shops.isActive, true)
+      // Baristas and roasters get shops based on assignments
+      if (user.role === "barista" || user.role === "roaster") {
+        return await db
+          .select({
+            id: shops.id,
+            name: shops.name,
+            location: shops.location,
+            isActive: shops.isActive,
+            defaultOrderQuantity: shops.defaultOrderQuantity,
+            desiredSmallBags: shops.desiredSmallBags,
+          })
+          .from(shops)
+          .innerJoin(userShops, eq(shops.id, userShops.shopId))
+          .where(
+            and(
+              eq(userShops.userId, userId),
+              eq(shops.isActive, true)
+            )
           )
-        )
-        .orderBy(shops.name);
+          .orderBy(shops.name);
+      }
+
+      return [];
     } catch (error) {
-      console.error("Error getting user shops:", error);
+      console.error("Error in getUserShops:", error);
       throw error;
     }
   }
 
   // Order operations
-  async getOrdersByShop(shopId: number): Promise<Order[]> {
+  async getOrdersByShop(shopId: number): Promise<(Order & { coffee: GreenCoffee; user: User })[]> {
     try {
       return await db
         .select({
@@ -136,8 +147,22 @@ export class DatabaseStorage {
           createdById: orders.createdById,
           updatedAt: orders.updatedAt,
           updatedById: orders.updatedById,
+          coffee: {
+            id: greenCoffee.id,
+            name: greenCoffee.name,
+            producer: greenCoffee.producer,
+            country: greenCoffee.country,
+            grade: greenCoffee.grade
+          },
+          user: {
+            id: users.id,
+            username: users.username,
+            role: users.role
+          }
         })
         .from(orders)
+        .innerJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
+        .innerJoin(users, eq(orders.createdById, users.id))
         .where(eq(orders.shopId, shopId))
         .orderBy(desc(orders.createdAt));
     } catch (error) {
@@ -174,7 +199,7 @@ export class DatabaseStorage {
   }
 
   // Retail inventory operations
-  async getRetailInventoriesByShop(shopId: number): Promise<RetailInventory[]> {
+  async getRetailInventoriesByShop(shopId: number): Promise<(RetailInventory & { coffee: GreenCoffee })[]> {
     try {
       return await db
         .select({
@@ -185,12 +210,20 @@ export class DatabaseStorage {
           largeBags: retailInventory.largeBags,
           updatedAt: retailInventory.updatedAt,
           updatedById: retailInventory.updatedById,
+          coffee: {
+            id: greenCoffee.id,
+            name: greenCoffee.name,
+            producer: greenCoffee.producer,
+            country: greenCoffee.country,
+            grade: greenCoffee.grade
+          }
         })
         .from(retailInventory)
+        .innerJoin(greenCoffee, eq(retailInventory.greenCoffeeId, greenCoffee.id))
         .where(eq(retailInventory.shopId, shopId))
         .orderBy(desc(retailInventory.updatedAt));
     } catch (error) {
-      console.error("Error getting retail inventories:", error);
+      console.error("Error in getRetailInventoriesByShop:", error);
       throw error;
     }
   }
@@ -218,155 +251,6 @@ export class DatabaseStorage {
   }
 
   // Permission checking
-  async hasPermission(userId: number, permission: string): Promise<boolean> {
-    try {
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, userId));
-
-      if (!user || !user.isActive) return false;
-
-      const role = user.role;
-
-      // Roastery owners have full access
-      if (role === "roasteryOwner") {
-        return true;
-      }
-
-      // Retail owners have full access to retail operations
-      if (role === "retailOwner") {
-        const retailPermissions = [
-          "retail.read",
-          "retail.write",
-          "retail.orders",
-          "retail.inventory",
-          "orders.read",
-          "orders.write",
-          "inventory.read",
-          "inventory.write",
-          "analytics.read",
-          "reports.read"
-        ];
-        return retailPermissions.includes(permission);
-      }
-
-      // Shop managers get retail operations access
-      if (role === "shopManager") {
-        const managerPermissions = [
-          "retail.read",
-          "retail.write",
-          "retail.orders",
-          "retail.inventory",
-          "orders.read",
-          "orders.write",
-          "analytics.read",
-          "reports.read"
-        ];
-        return managerPermissions.includes(permission);
-      }
-
-      // Roasters get roasting operations access
-      if (role === "roaster") {
-        const roasterPermissions = [
-          "roasting.read",
-          "roasting.write",
-          "greencoffee.read",
-          "greencoffee.write"
-        ];
-        return roasterPermissions.includes(permission);
-      }
-
-      // Baristas get limited retail access
-      if (role === "barista") {
-        const baristaPermissions = [
-          "retail.read",
-          "orders.read"
-        ];
-        return baristaPermissions.includes(permission);
-      }
-
-      return false;
-    } catch (error) {
-      console.error("Error checking permissions:", error);
-      return false;
-    }
-  }
-  // Retail inventory operations with transaction support
-  async updateRetailInventory(inventory: RetailInventory): Promise<RetailInventory> {
-    return await db.transaction(async (tx) => {
-      // First get current inventory with row lock
-      const [current] = await tx
-        .select()
-        .from(retailInventory)
-        .where(
-          and(
-            eq(retailInventory.shopId, inventory.shopId),
-            eq(retailInventory.greenCoffeeId, inventory.greenCoffeeId)
-          )
-        )
-        .forUpdate();
-
-      if (current) {
-        // Update existing inventory
-        const [updated] = await tx
-          .update(retailInventory)
-          .set({
-            smallBags: inventory.smallBags,
-            largeBags: inventory.largeBags,
-            updatedById: inventory.updatedById,
-            updatedAt: new Date()
-          })
-          .where(eq(retailInventory.id, current.id))
-          .returning();
-        return updated;
-      } else {
-        // Create new inventory
-        const [created] = await tx
-          .insert(retailInventory)
-          .values({
-            ...inventory,
-            updatedAt: new Date()
-          })
-          .returning();
-        return created;
-      }
-    });
-  }
-
-  // Get retail inventories with proper locking
-  async getRetailInventoriesByShop(shopId: number): Promise<RetailInventory[]> {
-    try {
-      const result = await db
-        .select()
-        .from(retailInventory)
-        .where(eq(retailInventory.shopId, shopId))
-        .orderBy(desc(retailInventory.updatedAt));
-
-      return result;
-    } catch (error) {
-      console.error("Error in getRetailInventoriesByShop:", error);
-      throw error;
-    }
-  }
-
-  // Get orders with proper locking
-  async getOrdersByShop(shopId: number): Promise<Order[]> {
-    try {
-      const result = await db
-        .select()
-        .from(orders)
-        .where(eq(orders.shopId, shopId))
-        .orderBy(desc(orders.createdAt));
-
-      return result;
-    } catch (error) {
-      console.error("Error getting orders:", error);
-      throw error;
-    }
-  }
-
-  // Permission checking with proper role validation
   async hasPermission(userId: number, permission: string): Promise<boolean> {
     try {
       const [user] = await db
@@ -441,56 +325,56 @@ export class DatabaseStorage {
       return false;
     }
   }
+  // Retail inventory operations with transaction support
+  async updateRetailInventory(inventory: RetailInventory): Promise<RetailInventory> {
+    return await db.transaction(async (tx) => {
+      // First get current inventory with row lock
+      const [current] = await tx
+        .select()
+        .from(retailInventory)
+        .where(
+          and(
+            eq(retailInventory.shopId, inventory.shopId),
+            eq(retailInventory.greenCoffeeId, inventory.greenCoffeeId)
+          )
+        )
+        .forUpdate();
+
+      if (current) {
+        // Update existing inventory
+        const [updated] = await tx
+          .update(retailInventory)
+          .set({
+            smallBags: inventory.smallBags,
+            largeBags: inventory.largeBags,
+            updatedById: inventory.updatedById,
+            updatedAt: new Date()
+          })
+          .where(eq(retailInventory.id, current.id))
+          .returning();
+        return updated;
+      } else {
+        // Create new inventory
+        const [created] = await tx
+          .insert(retailInventory)
+          .values({
+            ...inventory,
+            updatedAt: new Date()
+          })
+          .returning();
+        return created;
+      }
+    });
+  }
+
+  // Get retail inventories with proper locking
+
+  // Get orders with proper locking
+
+  // Permission checking with proper role validation
 
   // Get user's shops with proper concurrency handling
-  async getUserShops(userId: number): Promise<Shop[]> {
-    try {
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, userId));
 
-      if (!user) {
-        throw new Error("User not found");
-      }
-
-      // Return all active shops for these roles
-      if (["retailOwner", "roasteryOwner", "shopManager"].includes(user.role)) {
-        return await db
-          .select()
-          .from(shops)
-          .where(eq(shops.isActive, true))
-          .orderBy(shops.name);
-      }
-
-      // Baristas and roasters get shops based on assignments
-      if (user.role === "barista" || user.role === "roaster") {
-        return await db
-          .select({
-            id: shops.id,
-            name: shops.name,
-            location: shops.location,
-            isActive: shops.isActive,
-            defaultOrderQuantity: shops.defaultOrderQuantity,
-            desiredSmallBags: shops.desiredSmallBags,
-          })
-          .from(shops)
-          .innerJoin(userShops, eq(shops.id, userShops.shopId))
-          .where(
-            and(
-              eq(userShops.userId, userId),
-              eq(shops.isActive, true)
-            )
-          )
-          .orderBy(shops.name);
-      }
-
-      return [];
-    } catch (error) {
-      console.error("Error in getUserShops:", error);
-      throw error;
-    }
-  }
   // Order operations with transaction support
   async createOrder(order: Order): Promise<Order> {
     return await db.transaction(async (tx) => {

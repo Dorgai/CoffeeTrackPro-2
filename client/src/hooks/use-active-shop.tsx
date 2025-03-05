@@ -32,6 +32,16 @@ const refreshShopData = async (shopId: number) => {
       refetchOnReconnect: true,
       retry: 3,
       retryDelay: 1000,
+    },
+    {
+      queryKey: ["/api/green-coffee"],
+      refetchInterval: 3000,
+      staleTime: 0,
+      refetchOnMount: "always",
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+      retry: 3,
+      retryDelay: 1000,
     }
   ];
 
