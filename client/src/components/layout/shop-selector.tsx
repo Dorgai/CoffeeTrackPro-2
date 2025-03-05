@@ -44,26 +44,25 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
     if (!activeShop || !shops.find(s => s.id === activeShop.id)) {
       const defaultShop = shops[0];
       setActiveShop(defaultShop);
-      if (onChange) {
-        onChange(defaultShop.id);
-      }
+      onChange?.(defaultShop.id);
     }
   }, [userShops, allShops, activeShop, setActiveShop, onChange, user?.role]);
 
   const handleChange = (value: string) => {
-    const shopId = value ? parseInt(value, 10) : null;
+    const shopId = parseInt(value, 10);
     const shops = user?.role === "roasteryOwner" ? allShops : userShops;
     const shop = shops?.find((s) => s.id === shopId);
 
-    if (onChange) {
-      onChange(shopId);
+    if (shop) {
+      if (onChange) {
+        onChange(shopId);
+      }
+      setActiveShop(shop);
     }
-    setActiveShop(shop || null);
   };
 
   const isLoading = loadingUserShops || loadingAllShops;
   const shops = user?.role === "roasteryOwner" ? allShops : userShops;
-  const currentValue = value !== undefined ? value : activeShop?.id;
 
   if (isLoading) {
     return (
@@ -81,7 +80,7 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
     <div className={`flex items-center gap-2 ${className || ''}`}>
       <Store className="h-4 w-4 text-muted-foreground" />
       <Select
-        value={currentValue?.toString()}
+        value={activeShop?.id?.toString()}
         onValueChange={handleChange}
       >
         <SelectTrigger className="w-[200px]">
