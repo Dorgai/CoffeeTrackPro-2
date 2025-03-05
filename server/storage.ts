@@ -268,44 +268,28 @@ export class DatabaseStorage implements IStorage {
 
   async getUserShops(userId: number): Promise<Shop[]> {
     try {
-      console.log("Fetching shops for user:", userId);
-
       const [user] = await db
         .select()
         .from(users)
         .where(eq(users.id, userId));
 
-      console.log("User role:", user?.role);
-
       if (!user) {
         throw new Error("User not found");
       }
 
-      let query = db
-        .select({
-          id: shops.id,
-          name: shops.name,
-          location: shops.location,
-          isActive: shops.isActive,
-          defaultOrderQuantity: shops.defaultOrderQuantity,
-          desiredSmallBags: shops.desiredSmallBags,
-          desiredLargeBags: shops.desiredLargeBags,
-        })
-        .from(shops)
-        .where(eq(shops.isActive, true));
+      // Roastery owners and retail owners can see all active shops
+      if (user.role === "roasteryOwner" || user.role === "retailOwner") {
+        return await db
+          .select()
+          .from(shops)
+          .where(eq(shops.isActive, true))
+          .orderBy(shops.name);
+      }
 
       // Shop managers and baristas can only see their assigned shops
       if (user.role === "shopManager" || user.role === "barista") {
-        query = db
-          .select({
-            id: shops.id,
-            name: shops.name,
-            location: shops.location,
-            isActive: shops.isActive,
-            defaultOrderQuantity: shops.defaultOrderQuantity,
-            desiredSmallBags: shops.desiredSmallBags,
-            desiredLargeBags: shops.desiredLargeBags,
-          })
+        return await db
+          .select()
           .from(userShops)
           .innerJoin(shops, eq(userShops.shopId, shops.id))
           .where(
@@ -313,13 +297,20 @@ export class DatabaseStorage implements IStorage {
               eq(userShops.userId, userId),
               eq(shops.isActive, true)
             )
-          );
+          )
+          .orderBy(shops.name);
       }
 
-      const results = await query.orderBy(shops.name);
-      console.log("Found shops:", results);
-      return results;
+      // Roasters can see all active shops
+      if (user.role === "roaster") {
+        return await db
+          .select()
+          .from(shops)
+          .where(eq(shops.isActive, true))
+          .orderBy(shops.name);
+      }
 
+      return [];
     } catch (error) {
       console.error("Error in getUserShops:", error);
       throw error;
@@ -1017,7 +1008,7 @@ export class DatabaseStorage implements IStorage {
 
       return updatedShop;
     } catch (error) {
-            console.error("Error updating shop:", error);
+          console.error("Error updating shop:", error);
       throw error;
     }
   }

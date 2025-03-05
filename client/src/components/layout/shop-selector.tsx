@@ -11,24 +11,18 @@ import {
 import { Store, Loader2 } from "lucide-react";
 import { useActiveShop } from "@/hooks/use-active-shop";
 import { queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
 
 export function ShopSelector() {
   const { activeShop, setActiveShop } = useActiveShop();
-  const { toast } = useToast();
 
-  const { data: shops, isLoading, error } = useQuery<Shop[]>({
+  const { data: shops, isLoading } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
-    retry: 3,
-    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
   useEffect(() => {
     if (shops?.length && !activeShop) {
-      const firstShop = shops[0];
-      console.log("Setting initial shop:", firstShop);
-      setActiveShop(firstShop);
-      queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", firstShop.id] });
+      setActiveShop(shops[0]);
+      queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shops[0].id] });
     }
   }, [shops, activeShop, setActiveShop]);
 
@@ -44,20 +38,7 @@ export function ShopSelector() {
     );
   }
 
-  if (error) {
-    console.error("Shop selector error:", error);
-    return (
-      <div className="flex items-center gap-2">
-        <Store className="h-4 w-4" />
-        <div className="flex items-center gap-2 min-w-[200px] h-9 px-3 rounded-md border border-destructive">
-          <span className="text-sm text-destructive">Error loading shops</span>
-        </div>
-      </div>
-    );
-  }
-
   if (!shops?.length) {
-    console.log("No shops available");
     return (
       <div className="flex items-center gap-2">
         <Store className="h-4 w-4" />
@@ -68,9 +49,6 @@ export function ShopSelector() {
     );
   }
 
-  console.log("Available shops:", shops);
-  console.log("Active shop:", activeShop);
-
   return (
     <div className="flex items-center gap-2">
       <Store className="h-4 w-4" />
@@ -79,7 +57,6 @@ export function ShopSelector() {
         onValueChange={(value) => {
           const shop = shops.find((s) => s.id === parseInt(value));
           if (shop) {
-            console.log("Changing active shop to:", shop);
             setActiveShop(shop);
             queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shop.id] });
           }
