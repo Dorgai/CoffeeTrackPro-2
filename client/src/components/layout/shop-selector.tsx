@@ -58,7 +58,6 @@ export function ShopSelector() {
           const selectedShop = shops.find(s => s.id === shopId);
           if (selectedShop) {
             setActiveShop(selectedShop);
-            // Invalidate queries that depend on the active shop
             queryClient.invalidateQueries({ 
               queryKey: ["/api/retail-inventory", selectedShop.id] 
             });
