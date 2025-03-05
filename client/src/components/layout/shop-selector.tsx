@@ -38,7 +38,7 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   const shops = user?.role === "roasteryOwner" ? allShops : userShops;
 
   useEffect(() => {
-    if (!shops || shops.length === 0) return;
+    if (!shops?.length) return;
 
     if (!activeShop || !shops.find(s => s.id === activeShop.id)) {
       setActiveShop(shops[0]);
@@ -73,12 +73,12 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
     <div className={`flex items-center gap-2 ${className || ''}`}>
       <Store className="h-4 w-4 text-muted-foreground" />
       <Select
-        defaultValue={activeShop?.id?.toString()}
+        value={value?.toString() || activeShop?.id?.toString()}
         onValueChange={(val) => {
-          const selectedShop = shops.find(s => s.id === Number(val));
-          if (selectedShop) {
-            setActiveShop(selectedShop);
-            onChange?.(selectedShop.id);
+          const shop = shops.find(s => s.id === Number(val));
+          if (shop) {
+            setActiveShop(shop);
+            onChange?.(shop.id);
           }
         }}
       >
@@ -89,7 +89,7 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
         </SelectTrigger>
         <SelectContent>
           {shops.map((shop) => (
-            <SelectItem key={shop.id} value={String(shop.id)}>
+            <SelectItem key={shop.id} value={shop.id.toString()}>
               {shop.name}
             </SelectItem>
           ))}
