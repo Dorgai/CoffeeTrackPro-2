@@ -16,41 +16,46 @@ export function ShopSelector() {
   const { activeShop, setActiveShop } = useActiveShop();
   const { data: shops = [], isLoading } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
+    refetchOnMount: true,
+    staleTime: 0,
   });
 
-  // Handle initial shop selection
+  // Handle initial shop selection and data prefetching
   useEffect(() => {
     if (!activeShop && shops.length > 0) {
       const initialShop = shops[0];
       setActiveShop(initialShop);
-      // Prefetch data for initial shop
-      queryClient.prefetchQuery({ 
-        queryKey: ["/api/retail-inventory", initialShop.id] 
-      });
-      queryClient.prefetchQuery({ 
-        queryKey: ["/api/orders", initialShop.id] 
-      });
+
+      // Prefetch initial data
+      prefetchShopData(initialShop.id);
     }
   }, [shops, activeShop, setActiveShop]);
+
+  // Utility function to prefetch shop-related data
+  const prefetchShopData = (shopId: number) => {
+    queryClient.prefetchQuery({ 
+      queryKey: ["/api/retail-inventory", shopId] 
+    });
+    queryClient.prefetchQuery({ 
+      queryKey: ["/api/orders", shopId] 
+    });
+  };
 
   const handleShopChange = (shopId: string) => {
     const selectedShop = shops.find((s) => s.id === parseInt(shopId));
     if (selectedShop) {
       setActiveShop(selectedShop);
-      // Invalidate and prefetch all shop-dependent queries
+
+      // Invalidate existing data
       queryClient.invalidateQueries({ 
         queryKey: ["/api/retail-inventory", selectedShop.id] 
       });
       queryClient.invalidateQueries({ 
         queryKey: ["/api/orders", selectedShop.id] 
       });
-      // Prefetch the data
-      queryClient.prefetchQuery({ 
-        queryKey: ["/api/retail-inventory", selectedShop.id] 
-      });
-      queryClient.prefetchQuery({ 
-        queryKey: ["/api/orders", selectedShop.id] 
-      });
+
+      // Prefetch new data
+      prefetchShopData(selectedShop.id);
     }
   };
 
@@ -81,12 +86,12 @@ export function ShopSelector() {
     <div className="flex items-center gap-2">
       <Store className="h-4 w-4" />
       <Select
-        value={activeShop?.id?.toString()}
+        value={activeShop?.id?.toString() || ""}
         onValueChange={handleShopChange}
       >
         <SelectTrigger className="w-[200px]">
           <SelectValue placeholder="Select a shop">
-            {activeShop?.name}
+            {activeShop?.name || "Select a shop"}
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
