@@ -52,20 +52,17 @@ export function ShopSelector() {
     <div className="flex items-center gap-2">
       <Store className="h-4 w-4" />
       <Select 
-        defaultValue={String(activeShop?.id || shops[0]?.id)}
+        defaultValue={String(activeShop?.id)}
         onValueChange={(value) => {
           const selectedShop = shops.find(s => s.id === parseInt(value));
           if (selectedShop) {
             setActiveShop(selectedShop);
-            queryClient.invalidateQueries({ 
-              queryKey: ["/api/retail-inventory", selectedShop.id] 
-            });
           }
         }}
       >
         <SelectTrigger className="w-[200px]">
           <SelectValue>
-            {activeShop?.name || shops[0]?.name}
+            {activeShop?.name || "Select a shop"}
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
