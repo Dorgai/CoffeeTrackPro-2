@@ -26,13 +26,17 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   // Fetch user's authorized shops for barista/manager
   const { data: userShops, isLoading: loadingUserShops } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
-    enabled: !!user && ["shopManager", "barista"].includes(user.role),
+    enabled: !!user && user.role !== "roasteryOwner",
     queryFn: async () => {
+      console.log("Fetching user shops for role:", user?.role);
       const res = await apiRequest("GET", "/api/user/shops");
       if (!res.ok) {
-        throw new Error("Failed to fetch user shops");
+        const error = await res.text();
+        throw new Error(`Failed to fetch user shops: ${error}`);
       }
-      return res.json();
+      const data = await res.json();
+      console.log("Fetched user shops:", data);
+      return data;
     },
     staleTime: 30000,
     retry: 3,
@@ -50,7 +54,9 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   useEffect(() => {
     const shops = user?.role === "roasteryOwner" ? allShops : userShops;
     if (shops && shops.length > 0 && !activeShop) {
+      console.log("Setting default shop. Available shops:", shops);
       const defaultShop = shops.find(s => s.id === user?.defaultShopId) || shops[0];
+      console.log("Selected default shop:", defaultShop);
       setActiveShop(defaultShop);
       if (onChange) {
         onChange(defaultShop.id);
@@ -62,6 +68,7 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
     const shopId = value ? parseInt(value, 10) : null;
     const shops = user?.role === "roasteryOwner" ? allShops : userShops;
     const shop = shops?.find((s) => s.id === shopId);
+    console.log("Changing shop to:", shop);
 
     if (onChange) {
       onChange(shopId);
