@@ -43,6 +43,25 @@ export default function Dashboard() {
     enabled: !!user && user.role === "roasteryOwner",
   });
 
+// Example of proper table structure to be used in dashboard component:
+{/* When rendering tables, use this structure:
+  <Table>
+    <TableHeader>
+      <TableRow>
+        <TableHead>Header 1</TableHead>
+        <TableHead>Header 2</TableHead>
+      </TableRow>
+    </TableHeader>
+    <TableBody>
+      <TableRow>
+        <TableCell>Cell content 1</TableCell>
+        <TableCell>Cell content 2</TableCell>
+      </TableRow>
+    </TableBody>
+  </Table>
+*/}
+
+
   const { data: shop, isLoading: loadingShop } = useQuery<Shop>({
     queryKey: ["/api/shops", selectedShopId],
     queryFn: async () => {
