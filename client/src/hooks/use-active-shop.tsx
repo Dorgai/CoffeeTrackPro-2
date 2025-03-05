@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import { Shop } from '@shared/schema';
-import { useAuth } from "./use-auth"; // Added import for useAuth
+import { useAuth } from "./use-auth"; 
 import { useEffect, useState } from "react";
 
 
@@ -17,8 +17,7 @@ export const useActiveShop = create<ActiveShopState>()(
       setActiveShop: (shop) => set({ activeShop: shop }),
     }),
     {
-      name: 'active-shop-storage',
-      storage: createJSONStorage(() => localStorage),
+      name: 'active-shop',
     }
   )
 );
@@ -27,7 +26,7 @@ export const useActiveShop = create<ActiveShopState>()(
 //ShopSelector Component (Illustrative - Needs further implementation based on actual code)
 export const ShopSelector = () => {
   const { activeShop, setActiveShop } = useActiveShop();
-  const { user } = useAuth(); // Access user authentication status
+  const { user } = useAuth(); 
   const [shops, setShops] = useState<Shop[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,7 +35,7 @@ export const ShopSelector = () => {
       try {
         const response = await fetch('/api/user/shops', {
           headers: {
-            Authorization: `Bearer ${user?.token}`, // Add authorization header
+            Authorization: `Bearer ${user?.token}`, 
           },
         });
         if (!response.ok) {
@@ -50,7 +49,7 @@ export const ShopSelector = () => {
       }
     };
 
-    if (user?.token) { // Only fetch shops if user is authenticated
+    if (user?.token) { 
       fetchShops();
     }
   }, [user]);

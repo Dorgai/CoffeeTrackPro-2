@@ -51,10 +51,10 @@ export const getQueryFn: <T>(options: {
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      queryFn: getQueryFn({ on401: "throw" }),
+      queryFn: getQueryFn({ on401: "returnNull" }), // Changed to returnNull on 401
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
+      staleTime: 60000, // One minute
       retry: (failureCount, error) => {
         if (error instanceof Error && (error.message.includes("403") || error.message.includes("401"))) {
           return false; // Don't retry on auth errors
