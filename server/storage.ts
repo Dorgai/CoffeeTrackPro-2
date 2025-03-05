@@ -4,7 +4,6 @@ import { eq } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
-import { log } from "./vite";
 
 const PostgresSessionStore = connectPg(session);
 
@@ -12,12 +11,10 @@ export class DatabaseStorage {
   sessionStore: session.Store;
 
   constructor() {
-    log("Initializing database storage...");
     this.sessionStore = new PostgresSessionStore({
       pool,
       createTableIfMissing: true,
     });
-    log("Database storage initialized successfully");
   }
 
   // User operations
@@ -84,35 +81,6 @@ export class DatabaseStorage {
     } catch (error) {
       console.error("Error getting user shops:", error);
       throw error;
-    }
-  }
-
-  // Permission checking
-  async hasPermission(userId: number, permission: string): Promise<boolean> {
-    try {
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, userId));
-
-      if (!user || !user.isActive) return false;
-
-      const role = user.role;
-
-      // Roastery owners have full access
-      if (role === "roasteryOwner") {
-        return true;
-      }
-
-      // Basic permissions for other roles
-      if (role === "retailOwner") {
-        return ["retail.read", "retail.write"].includes(permission);
-      }
-
-      return false;
-    } catch (error) {
-      console.error("Error checking permissions:", error);
-      return false;
     }
   }
 }
