@@ -14,17 +14,19 @@ import { queryClient } from "@/lib/queryClient";
 
 export function ShopSelector() {
   const { activeShop, setActiveShop } = useActiveShop();
+  const [initialized, setInitialized] = useState(false);
 
   const { data: shops, isLoading } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
   });
 
   useEffect(() => {
-    if (shops?.length && !activeShop) {
+    if (shops?.length && !activeShop && !initialized) {
       setActiveShop(shops[0]);
+      setInitialized(true);
       queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shops[0].id] });
     }
-  }, [shops, activeShop, setActiveShop]);
+  }, [shops, activeShop, initialized, setActiveShop]);
 
   if (isLoading) {
     return (
@@ -49,15 +51,13 @@ export function ShopSelector() {
     );
   }
 
-  const validShops = shops.filter(shop => shop && typeof shop.id === 'number');
-
   return (
     <div className="flex items-center gap-2">
       <Store className="h-4 w-4" />
       <Select
-        value={activeShop?.id?.toString() || ""}
+        value={activeShop?.id?.toString()}
         onValueChange={(value) => {
-          const shop = validShops.find((s) => s.id === parseInt(value));
+          const shop = shops.find((s) => s.id === parseInt(value));
           if (shop) {
             setActiveShop(shop);
             queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shop.id] });
@@ -70,7 +70,7 @@ export function ShopSelector() {
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
-          {validShops.map((shop) => (
+          {shops.map((shop) => (
             <SelectItem key={shop.id} value={shop.id.toString()}>
               {shop.name}
             </SelectItem>
