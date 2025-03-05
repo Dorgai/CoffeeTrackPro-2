@@ -1376,37 +1376,47 @@ export class DatabaseStorage implements IStorage {
         .from(users)
         .where(eq(users.id, userId));
 
-      if (!user) return false;
+      if (!user) {
+        return false;
+      }
 
       const role = user.role;
 
       switch (permission) {
-        // Billing - roastery owner only
-        case "billing.write":
-        case "billing.read":
-          return role === "roasteryOwner";
-
-        // Green Coffee - roastery owner and roaster
-        case "greenCoffee.read":
-        case "greenCoffee.write":
+        // Green Coffee Management - roastery owner and roaster only
+        case "greencoffee.read":
+        case "greencoffee.write":
           return role === "roasteryOwner" || role === "roaster";
 
-        // Management - roastery owner only
+        // Roasting Operations - roastery owner and roaster only
+        case "roasting.read":
+        case "roasting.write":
+          return role === "roasteryOwner" || role === "roaster";
+
+        // Shop Management - roastery owner only
         case "shop.manage":
+          return role === "roasteryOwner";
+
+        // User Management - roastery owner only
         case "user.manage":
           return role === "roasteryOwner";
 
-        // Retail Operations - all roles except barista
+        // Retail Operations - retail owner, roastery owner, shop manager (excluding barista)
         case "retail.read":
         case "retail.write":
         case "orders.read":
         case "orders.write":
-          return role !== "barista";
+          return role === "roasteryOwner" || role === "retailOwner" || role === "shopManager";
 
         // Analytics & Reports - owners and managers
         case "analytics.read":
         case "reports.read":
           return role === "roasteryOwner" || role === "retailOwner" || role === "shopManager";
+
+        // Finance Operations - roastery owner only
+        case "finance.read":
+        case "finance.write":
+          return role === "roasteryOwner";
 
         default:
           return false;
