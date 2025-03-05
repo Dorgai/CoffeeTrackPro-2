@@ -43,48 +43,34 @@ async function createServer() {
     next();
   });
 
-
   // Seed initial data before setting up routes
   await seedInitialData();
 
   const httpServer = await registerRoutes(app);
+
   if (app.get("env") === "development") {
     await setupVite(app, httpServer);
-  } else {
-    //serveStatic(app);  // Removed as it's not in the edited code and unclear how to integrate.
   }
 
-  httpServer.on('error', (error: any) => {
-    if (error.code === 'EADDRINUSE') {
-      log(`Port ${port} is already in use. Trying port ${port + 1}...`);
-      setTimeout(() => {
-        httpServer.close();
-        httpServer.listen(port + 1, "0.0.0.0");
-      }, 1000);
-    } else {
-      log(`Server error: ${error.message}`);
-    }
-  });
+  // Global error handler
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    console.error("Error:", err);
+    const status = err.status || err.statusCode || 500;
+    const message = err.message || "Internal Server Error";
 
-  httpServer.listen(port, "0.0.0.0", () => {
-    log(`Server is running on port ${port}`);
-  });
-
-    // Global error handler (from original)
-    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-      console.error("Error:", err);
-      const status = err.status || err.statusCode || 500;
-      const message = err.message || "Internal Server Error";
-
-      res.status(status).json({
-        error: {
-          message,
-          status,
-          timestamp: new Date().toISOString(),
-        }
-      });
+    res.status(status).json({
+      error: {
+        message,
+        status,
+        timestamp: new Date().toISOString(),
+      }
     });
+  });
 
+  // Bind to all network interfaces (0.0.0.0)
+  httpServer.listen(port, "0.0.0.0", () => {
+    log(`Server is running on http://0.0.0.0:${port}`);
+  });
 
   return httpServer;
 }
