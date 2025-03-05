@@ -240,7 +240,9 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </div>
-        <RestockDialog open={isRestockOpen} onOpenChange={setIsRestockOpen} shopId={selectedShopId} />
+        {user.role === "shopManager" && (
+          <RestockDialog open={isRestockOpen} onOpenChange={setIsRestockOpen} shopId={selectedShopId} />
+        )}
       </div>
     );
   }

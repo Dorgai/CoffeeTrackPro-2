@@ -23,7 +23,7 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   const { activeShop, setActiveShop } = useActiveShop();
   const { user } = useAuth();
 
-  // Fetch user's authorized shops for barista/manager
+  // Fetch user's authorized shops for non-owner roles
   const { data: userShops, isLoading: loadingUserShops } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
     enabled: !!user && user.role !== "roasteryOwner",
