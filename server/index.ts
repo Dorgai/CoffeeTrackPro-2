@@ -3,14 +3,37 @@ import cors from "cors";
 import { registerRoutes } from "./routes";
 import { setupVite, log } from "./vite";
 import { seedInitialData } from "./db";
+import session from "express-session";
+import { storage } from "./storage";
+import { setupAuth } from "./auth";
 
 async function createServer() {
   const app = express();
   const port = process.env.PORT || 5000;
 
-  app.use(cors());
+  // Basic middleware
+  app.use(cors({
+    origin: true,
+    credentials: true
+  }));
   app.use(express.json());
   app.use(express.urlencoded({ extended: false }));
+
+  // Set up session before auth
+  app.use(session({
+    secret: process.env.SESSION_SECRET || 'development_secret',
+    resave: false,
+    saveUninitialized: false,
+    store: storage.sessionStore,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
+  }));
+
+  // Set up authentication after session
+  setupAuth(app);
 
   // Add request logging middleware
   app.use((req, res, next) => {
