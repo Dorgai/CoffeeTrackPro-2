@@ -446,7 +446,10 @@ const ExampleDataTable = () => {
           <div className="flex gap-2">
             <ShopSelector
               value={selectedShopId}
-              onChange={setSelectedShopId}
+              onChange={(shopId) => {
+                console.log("Selected shop:", shopId);
+                setSelectedShopId(shopId);
+              }}
             />
             <Button
               variant="outline"
