@@ -18,9 +18,9 @@ export function ShopSelector() {
     queryKey: ["/api/user/shops"],
   });
 
-  // Initialize active shop
+  // Set initial active shop if none is selected
   useEffect(() => {
-    if (!activeShop && shops?.length > 0) {
+    if (!activeShop && shops.length > 0) {
       setActiveShop(shops[0]);
     }
   }, [shops, activeShop, setActiveShop]);
@@ -37,7 +37,7 @@ export function ShopSelector() {
     );
   }
 
-  if (!shops?.length) {
+  if (!shops.length) {
     return (
       <div className="flex items-center gap-2">
         <Store className="h-4 w-4" />
@@ -51,18 +51,19 @@ export function ShopSelector() {
   return (
     <div className="flex items-center gap-2">
       <Store className="h-4 w-4" />
-      <Select 
-        defaultValue={String(activeShop?.id)}
+      <Select
+        value={activeShop?.id?.toString()}
         onValueChange={(value) => {
-          const selectedShop = shops.find(s => s.id === parseInt(value));
+          const selectedShop = shops.find((s) => s.id === parseInt(value));
           if (selectedShop) {
             setActiveShop(selectedShop);
+            queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", selectedShop.id] });
           }
         }}
       >
         <SelectTrigger className="w-[200px]">
-          <SelectValue>
-            {activeShop?.name || "Select a shop"}
+          <SelectValue placeholder="Select a shop">
+            {activeShop?.name}
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
