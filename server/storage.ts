@@ -280,15 +280,7 @@ export class DatabaseStorage implements IStorage {
       // Roastery owners and roasters can see all active shops
       if (user.role === "roasteryOwner" || user.role === "roaster") {
         return await db
-          .select({
-            id: shops.id,
-            name: shops.name,
-            location: shops.location,
-            isActive: shops.isActive,
-            defaultOrderQuantity: shops.defaultOrderQuantity,
-            desiredSmallBags: shops.desiredSmallBags,
-            desiredLargeBags: shops.desiredLargeBags
-          })
+          .select()
           .from(shops)
           .where(eq(shops.isActive, true))
           .orderBy(shops.name);
@@ -297,15 +289,7 @@ export class DatabaseStorage implements IStorage {
       // Shop managers and baristas can only see their assigned shops
       if (user.role === "shopManager" || user.role === "barista") {
         return await db
-          .select({
-            id: shops.id,
-            name: shops.name,
-            location: shops.location,
-            isActive: shops.isActive,
-            defaultOrderQuantity: shops.defaultOrderQuantity,
-            desiredSmallBags: shops.desiredSmallBags,
-            desiredLargeBags: shops.desiredLargeBags
-          })
+          .select()
           .from(shops)
           .innerJoin(userShops, eq(userShops.shopId, shops.id))
           .where(
@@ -319,6 +303,7 @@ export class DatabaseStorage implements IStorage {
 
       // All other roles see no shops
       return [];
+
     } catch (error) {
       console.error("Error in getUserShops:", error);
       throw error;
