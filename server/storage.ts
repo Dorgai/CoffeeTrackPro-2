@@ -277,15 +277,6 @@ export class DatabaseStorage implements IStorage {
         throw new Error("User not found");
       }
 
-      // Roastery owners and retail owners can see all active shops
-      if (user.role === "roasteryOwner" || user.role === "retailOwner") {
-        return await db
-          .select()
-          .from(shops)
-          .where(eq(shops.isActive, true))
-          .orderBy(shops.name);
-      }
-
       // Shop managers and baristas can only see their assigned shops
       if (user.role === "shopManager" || user.role === "barista") {
         return await db
@@ -301,16 +292,13 @@ export class DatabaseStorage implements IStorage {
           .orderBy(shops.name);
       }
 
-      // Roasters can see all active shops
-      if (user.role === "roaster") {
-        return await db
-          .select()
-          .from(shops)
-          .where(eq(shops.isActive, true))
-          .orderBy(shops.name);
-      }
+      // All other roles can see all active shops
+      return await db
+        .select()
+        .from(shops)
+        .where(eq(shops.isActive, true))
+        .orderBy(shops.name);
 
-      return [];
     } catch (error) {
       console.error("Error in getUserShops:", error);
       throw error;
@@ -1008,7 +996,7 @@ export class DatabaseStorage implements IStorage {
 
       return updatedShop;
     } catch (error) {
-          console.error("Error updating shop:", error);
+        console.error("Error updating shop:", error);
       throw error;
     }
   }

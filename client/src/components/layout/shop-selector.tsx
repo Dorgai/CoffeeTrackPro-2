@@ -14,19 +14,17 @@ import { queryClient } from "@/lib/queryClient";
 
 export function ShopSelector() {
   const { activeShop, setActiveShop } = useActiveShop();
-  const [initialized, setInitialized] = useState(false);
 
   const { data: shops, isLoading } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
   });
 
   useEffect(() => {
-    if (shops?.length && !activeShop && !initialized) {
+    if (shops?.length && !activeShop) {
       setActiveShop(shops[0]);
-      setInitialized(true);
       queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shops[0].id] });
     }
-  }, [shops, activeShop, initialized, setActiveShop]);
+  }, [shops, activeShop, setActiveShop]);
 
   if (isLoading) {
     return (
