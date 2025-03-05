@@ -12,10 +12,11 @@ import { Store, Loader2 } from "lucide-react";
 import { useActiveShop } from "@/hooks/use-active-shop";
 import { queryClient } from "@/lib/queryClient";
 
-export function ShopSelector() {
+export function ShopSelector({ value, onChange }: { value?: number | null; onChange?: (shopId: number | null) => void } = {}) {
   const { activeShop, setActiveShop } = useActiveShop();
+
   const { data: shops, isLoading } = useQuery<Shop[]>({
-    queryKey: ["/api/user/shops"],
+    queryKey: ["/api/user/shops"]
   });
 
   useEffect(() => {
@@ -48,14 +49,38 @@ export function ShopSelector() {
     );
   }
 
+  if (onChange && value !== undefined) {
+    return (
+      <div className="flex items-center gap-2">
+        <Store className="h-4 w-4" />
+        <Select
+          value={value?.toString()}
+          onValueChange={(value) => onChange(value ? parseInt(value) : null)}
+        >
+          <SelectTrigger className="w-[200px]">
+            <SelectValue>
+              {value ? shops.find(s => s.id === value)?.name : "Select a shop"}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {shops.map((shop) => (
+              <SelectItem key={shop.id} value={shop.id.toString()}>
+                {shop.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center gap-2">
       <Store className="h-4 w-4" />
       <Select
-        value={activeShop?.id ? String(activeShop.id) : undefined}
+        value={activeShop?.id.toString()}
         onValueChange={(value) => {
-          const shopId = parseInt(value);
-          const shop = shops.find((s) => s?.id === shopId);
+          const shop = shops.find((s) => s.id === parseInt(value));
           if (shop) {
             setActiveShop(shop);
             queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shop.id] });
@@ -68,8 +93,8 @@ export function ShopSelector() {
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
-          {shops.filter(shop => shop?.id).map((shop) => (
-            <SelectItem key={shop.id} value={String(shop.id)}>
+          {shops.map((shop) => (
+            <SelectItem key={shop.id} value={shop.id.toString()}>
               {shop.name}
             </SelectItem>
           ))}

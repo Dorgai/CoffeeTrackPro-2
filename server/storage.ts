@@ -279,8 +279,16 @@ export class DatabaseStorage implements IStorage {
 
       // Shop managers and baristas can only see their assigned shops
       if (user.role === "shopManager" || user.role === "barista") {
-        return await db
-          .select()
+        const results = await db
+          .select({
+            id: shops.id,
+            name: shops.name,
+            location: shops.location,
+            isActive: shops.isActive,
+            defaultOrderQuantity: shops.defaultOrderQuantity,
+            desiredSmallBags: shops.desiredSmallBags,
+            desiredLargeBags: shops.desiredLargeBags,
+          })
           .from(userShops)
           .innerJoin(shops, eq(userShops.shopId, shops.id))
           .where(
@@ -290,14 +298,24 @@ export class DatabaseStorage implements IStorage {
             )
           )
           .orderBy(shops.name);
+        return results;
       }
 
       // All other roles can see all active shops
-      return await db
-        .select()
+      const results = await db
+        .select({
+          id: shops.id,
+          name: shops.name,
+          location: shops.location,
+          isActive: shops.isActive,
+          defaultOrderQuantity: shops.defaultOrderQuantity,
+          desiredSmallBags: shops.desiredSmallBags,
+          desiredLargeBags: shops.desiredLargeBags,
+        })
         .from(shops)
         .where(eq(shops.isActive, true))
         .orderBy(shops.name);
+      return results;
 
     } catch (error) {
       console.error("Error in getUserShops:", error);
