@@ -9,7 +9,6 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   role: text("role", { enum: userRoles }).notNull(),
-  defaultShopId: integer("default_shop_id"),
   isActive: boolean("is_active").notNull().default(true),
 });
 
