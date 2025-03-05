@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Shop } from "@shared/schema";
 import {
@@ -9,18 +9,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useActiveShop } from "@/hooks/use-active-shop";
-import { Store, Loader2, RefreshCw } from "lucide-react";
+import { Store, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import StockProgress from "@/components/stock-progress";
+import { RestockButton } from "./restock-button";
 
 interface ShopSelectorProps {
   value?: number | null;
@@ -31,8 +22,6 @@ interface ShopSelectorProps {
 export function ShopSelector({ value, onChange, className }: ShopSelectorProps) {
   const { activeShop, setActiveShop } = useActiveShop();
   const { user } = useAuth();
-  const { toast } = useToast();
-  const [showInventory, setShowInventory] = useState(false);
 
   // Fetch user's authorized shops
   const { data: userShops, isLoading: loadingUserShops } = useQuery<Shop[]>({
@@ -44,12 +33,6 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   const { data: allShops, isLoading: loadingAllShops } = useQuery<Shop[]>({
     queryKey: ["/api/shops"],
     enabled: !!user && user.role === "roasteryOwner",
-  });
-
-  // Fetch current inventory for the active shop
-  const { data: inventory } = useQuery({
-    queryKey: ["/api/retail-inventory", activeShop?.id],
-    enabled: !!activeShop?.id,
   });
 
   // Set default shop when shops data changes
@@ -78,33 +61,6 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
     setActiveShop(shop || null);
   };
 
-  const handleRestock = async () => {
-    if (!activeShop?.id) return;
-
-    try {
-      const res = await apiRequest("POST", `/api/retail-inventory/${activeShop.id}/restock`);
-      if (!res.ok) {
-        throw new Error("Failed to restock inventory");
-      }
-
-      queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory"] });
-
-      toast({
-        title: "Success",
-        description: "Inventory has been restocked",
-      });
-
-      // Show inventory dialog after successful restock
-      setShowInventory(true);
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to restock inventory",
-        variant: "destructive",
-      });
-    }
-  };
-
   const isLoading = loadingUserShops || loadingAllShops;
   const shops = user?.role === "roasteryOwner" ? allShops : userShops;
   const currentValue = value !== undefined ? value : activeShop?.id;
@@ -122,66 +78,29 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   }
 
   return (
-    <>
-      <div className={`flex items-center gap-2 ${className || ''}`}>
-        <Store className="h-4 w-4 text-muted-foreground" />
-        <Select
-          value={currentValue ? `${currentValue}` : undefined}
-          onValueChange={handleChange}
-        >
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Select a shop" />
-          </SelectTrigger>
-          <SelectContent>
-            {shops?.map((shop) => (
-              <SelectItem key={shop.id} value={`${shop.id}`}>
-                {shop.name}
-              </SelectItem>
-            ))}
-            {(!shops || shops.length === 0) && (
-              <div className="relative flex items-center justify-center py-2 text-sm text-muted-foreground">
-                No shops available
-              </div>
-            )}
-          </SelectContent>
-        </Select>
-        {user?.role === "barista" && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRestock}
-            disabled={!activeShop}
-            className="gap-2"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Restock
-          </Button>
-        )}
-      </div>
-
-      <Dialog open={showInventory} onOpenChange={setShowInventory}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Current Inventory</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {activeShop && (
-              <>
-                <StockProgress
-                  current={inventory?.smallBags || 0}
-                  desired={activeShop.desiredSmallBags || 20}
-                  label="Small Bags (200g)"
-                />
-                <StockProgress
-                  current={inventory?.largeBags || 0}
-                  desired={activeShop.desiredLargeBags || 10}
-                  label="Large Bags (1kg)"
-                />
-              </>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
+    <div className={`flex items-center gap-2 ${className || ''}`}>
+      <Store className="h-4 w-4 text-muted-foreground" />
+      <Select
+        value={currentValue ? `${currentValue}` : undefined}
+        onValueChange={handleChange}
+      >
+        <SelectTrigger className="w-[200px]">
+          <SelectValue placeholder="Select a shop" />
+        </SelectTrigger>
+        <SelectContent>
+          {shops?.map((shop) => (
+            <SelectItem key={shop.id} value={`${shop.id}`}>
+              {shop.name}
+            </SelectItem>
+          ))}
+          {(!shops || shops.length === 0) && (
+            <div className="relative flex items-center justify-center py-2 text-sm text-muted-foreground">
+              No shops available
+            </div>
+          )}
+        </SelectContent>
+      </Select>
+      {user?.role === "barista" && <RestockButton />}
+    </div>
   );
 }
