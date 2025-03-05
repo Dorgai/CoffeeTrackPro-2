@@ -10,8 +10,6 @@ import {
 import { useActiveShop } from "@/hooks/use-active-shop";
 import { Store, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { useEffect } from "react";
-import { apiRequest } from "@/lib/queryClient";
 
 interface ShopSelectorProps {
   value?: number | null;
@@ -23,20 +21,10 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   const { activeShop, setActiveShop } = useActiveShop();
   const { user } = useAuth();
 
-  // Fetch user's authorized shops for non-owner roles
+  // Fetch user's authorized shops for non-owner roles (both barista and manager)
   const { data: userShops, isLoading: loadingUserShops } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
     enabled: !!user && user.role !== "roasteryOwner",
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/user/shops");
-      if (!res.ok) {
-        const error = await res.text();
-        throw new Error(`Failed to fetch user shops: ${error}`);
-      }
-      const data = await res.json();
-      console.log("User shops for", user?.id, ":", data);
-      return data;
-    },
     staleTime: 30000,
     retry: 3,
   });
@@ -48,23 +36,6 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
     staleTime: 30000,
     retry: 3,
   });
-
-  // Set default shop on mount and when shops data changes
-  useEffect(() => {
-    const shops = user?.role === "roasteryOwner" ? allShops : userShops;
-    if (shops && shops.length > 0) {
-      // Only set if no active shop or if current active shop is not in available shops
-      if (!activeShop || !shops.find(s => s.id === activeShop.id)) {
-        console.log("Setting default shop. Available shops:", shops);
-        const defaultShop = shops.find(s => s.id === user?.defaultShopId) || shops[0];
-        console.log("Selected default shop:", defaultShop);
-        setActiveShop(defaultShop);
-        if (onChange) {
-          onChange(defaultShop.id);
-        }
-      }
-    }
-  }, [userShops, allShops, user?.defaultShopId, activeShop, setActiveShop, onChange, user?.role]);
 
   const handleChange = (value: string) => {
     const shopId = value ? parseInt(value, 10) : null;

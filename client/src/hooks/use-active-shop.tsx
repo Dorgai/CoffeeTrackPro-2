@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { useQuery } from '@tanstack/react-query';
 import { Shop } from '@shared/schema';
 import { apiRequest } from "@/lib/queryClient";
@@ -10,12 +11,21 @@ interface ActiveShopState {
   setUserShops: (shops: Shop[]) => void;
 }
 
-export const useActiveShop = create<ActiveShopState>((set) => ({
-  activeShop: null,
-  userShops: [],
-  setActiveShop: (shop) => set({ activeShop: shop }),
-  setUserShops: (shops) => set({ userShops: shops }),
-}));
+// Create persisted store
+export const useActiveShop = create<ActiveShopState>()(
+  persist(
+    (set) => ({
+      activeShop: null,
+      userShops: [],
+      setActiveShop: (shop) => set({ activeShop: shop }),
+      setUserShops: (shops) => set({ userShops: shops }),
+    }),
+    {
+      name: 'active-shop-storage',
+      partialize: (state) => ({ activeShop: state.activeShop }), // Only persist activeShop
+    }
+  )
+);
 
 // Hook to fetch user shops
 export function useUserShops() {
@@ -23,17 +33,32 @@ export function useUserShops() {
   const setActiveShop = useActiveShop(state => state.setActiveShop);
   const activeShop = useActiveShop(state => state.activeShop);
 
-  const { data, isLoading, error } = useQuery<Shop[]>({
+  const { data: shops, isLoading, error } = useQuery<Shop[]>({
     queryKey: ['/api/user/shops'],
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/user/shops");
       if (!res.ok) {
-        throw new Error("Failed to fetch user shops");
+        const error = await res.text();
+        throw new Error(`Failed to fetch user shops: ${error}`);
       }
-      const shops: Shop[] = await res.json();
-      return shops;
-    }
+      const data = await res.json();
+      console.log("Fetched shops:", data);
+
+      // Update shops in store
+      setUserShops(data);
+
+      // Set default shop if needed
+      if (data && data.length > 0 && (!activeShop || !data.find(s => s.id === activeShop.id))) {
+        const defaultShop = data[0];
+        console.log("Setting default shop:", defaultShop);
+        setActiveShop(defaultShop);
+      }
+
+      return data;
+    },
+    staleTime: 30000,
+    retry: 3,
   });
 
-  return { data, isLoading, error, setUserShops, setActiveShop, activeShop };
+  return { shops, isLoading, error, setUserShops, setActiveShop, activeShop };
 }
