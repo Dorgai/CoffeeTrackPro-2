@@ -27,6 +27,46 @@ export class DatabaseStorage {
     });
   }
 
+  // User management functions
+  async getUser(id: number): Promise<User | undefined> {
+    try {
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, id));
+      return user;
+    } catch (error) {
+      console.error("Error getting user:", error);
+      return undefined;
+    }
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    try {
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.username, username));
+      return user;
+    } catch (error) {
+      console.error("Error getting user by username:", error);
+      return undefined;
+    }
+  }
+
+  async createUser(user: User): Promise<User> {
+    try {
+      const [newUser] = await db
+        .insert(users)
+        .values(user)
+        .returning();
+      return newUser;
+    } catch (error) {
+      console.error("Error creating user:", error);
+      throw error;
+    }
+  }
+
   async generateCoffeeConsumptionReport(): Promise<CoffeeConsumptionReport> {
     try {
       const coffeeConsumption = await db
@@ -152,23 +192,6 @@ export class DatabaseStorage {
           .returning();
         return created;
       }
-    });
-  }
-
-  // Order operations with transaction support
-  async createOrder(order: Order): Promise<Order> {
-    return await db.transaction(async (tx) => {
-      // Create the order
-      const [newOrder] = await tx
-        .insert(orders)
-        .values({
-          ...order,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        })
-        .returning();
-
-      return newOrder;
     });
   }
 
@@ -307,6 +330,22 @@ export class DatabaseStorage {
       console.error("Error in getUserShops:", error);
       throw error;
     }
+  }
+  // Order operations with transaction support
+  async createOrder(order: Order): Promise<Order> {
+    return await db.transaction(async (tx) => {
+      // Create the order
+      const [newOrder] = await tx
+        .insert(orders)
+        .values({
+          ...order,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        .returning();
+
+      return newOrder;
+    });
   }
 }
 
