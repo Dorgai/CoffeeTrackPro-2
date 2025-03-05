@@ -27,22 +27,16 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   const { data: userShops, isLoading: loadingUserShops } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
     enabled: !!user && (user.role === "shopManager" || user.role === "barista"),
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/user/shops");
-      if (!res.ok) throw new Error("Failed to fetch user shops");
-      return res.json();
-    }
+    staleTime: 30000, // Cache for 30 seconds
+    retry: 3, // Retry failed requests 3 times
   });
 
   // Fetch all shops for roasteryOwner
   const { data: allShops, isLoading: loadingAllShops } = useQuery<Shop[]>({
     queryKey: ["/api/shops"],
     enabled: !!user && user.role === "roasteryOwner",
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/shops");
-      if (!res.ok) throw new Error("Failed to fetch all shops");
-      return res.json();
-    }
+    staleTime: 30000,
+    retry: 3,
   });
 
   // Set default shop on mount and when shops data changes
@@ -72,23 +66,28 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   const shops = user?.role === "roasteryOwner" ? allShops : userShops;
   const currentValue = value !== undefined ? value : activeShop?.id;
 
+  // If no shops are loaded yet, show loading state
+  if (isLoading) {
+    return (
+      <div className={`flex items-center gap-2 ${className || ''}`}>
+        <Store className="h-4 w-4 text-muted-foreground" />
+        <div className="flex items-center gap-2 min-w-[200px] h-9 px-3 rounded-md border">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span className="text-sm">Loading shops...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`flex items-center gap-2 ${className || ''}`}>
       <Store className="h-4 w-4 text-muted-foreground" />
       <Select
         value={currentValue ? `${currentValue}` : undefined}
         onValueChange={handleChange}
-        disabled={isLoading}
       >
         <SelectTrigger className="w-[200px]">
-          {isLoading ? (
-            <div className="flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Loading shops...</span>
-            </div>
-          ) : (
-            <SelectValue placeholder="Select a shop" />
-          )}
+          <SelectValue placeholder="Select a shop" />
         </SelectTrigger>
         <SelectContent>
           {shops?.map((shop) => (
@@ -96,7 +95,7 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
               {shop.name}
             </SelectItem>
           ))}
-          {!isLoading && (!shops || shops.length === 0) && (
+          {!shops || shops.length === 0 && (
             <div className="relative flex items-center justify-center py-2 text-sm text-muted-foreground">
               No shops available
             </div>

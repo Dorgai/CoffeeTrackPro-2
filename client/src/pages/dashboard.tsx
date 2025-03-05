@@ -20,6 +20,13 @@ import StockProgress from "@/components/stock-progress";
 import { formatDate } from "@/lib/utils";
 import { Link } from "wouter";
 
+// Placeholder for apiRequest function - needs to be implemented separately
+const apiRequest = async (method: string, url: string) => {
+  const response = await fetch(url, { method });
+  return response;
+};
+
+
 export default function Dashboard() {
   const { user, logoutMutation } = useAuth();
   const [selectedShopId, setSelectedShopId] = useState<number | null>(null);
@@ -38,12 +45,29 @@ export default function Dashboard() {
 
   const { data: shop, isLoading: loadingShop } = useQuery<Shop>({
     queryKey: ["/api/shops", selectedShopId],
+    queryFn: async () => {
+      if (!selectedShopId) throw new Error('No shop selected');
+      const res = await apiRequest("GET", `/api/shops/${selectedShopId}`);
+      if (!res.ok) throw new Error('Failed to fetch shop details');
+      return res.json();
+    },
     enabled: !!selectedShopId,
+    staleTime: 30000,
+    retry: 3,
   });
 
-  const { data: shopInventory, isLoading: loadingInventory } = useQuery<RetailInventory[]>({
+  const { data: shopInventory, isLoading: loadingInventory } = useQuery({
     queryKey: ["/api/retail-inventory", selectedShopId],
+    queryFn: async () => {
+      if (!selectedShopId) return [];
+      const res = await apiRequest("GET", `/api/retail-inventory?shopId=${selectedShopId}`);
+      if (!res.ok) throw new Error('Failed to fetch inventory');
+      return res.json();
+    },
     enabled: !!selectedShopId,
+    staleTime: 30000, // Cache for 30 seconds
+    retry: 3, // Retry failed requests 3 times
+    refetchOnWindowFocus: true, // Refetch when window regains focus
   });
 
   const { data: allInventory, isLoading: loadingAllInventory } = useQuery<RetailInventory[]>({
