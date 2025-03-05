@@ -33,7 +33,7 @@ export function ShopSelector() {
   }
 
   // No shops available
-  if (!shops || shops.length === 0) {
+  if (!shops || !Array.isArray(shops) || shops.length === 0) {
     return (
       <div className="flex items-center gap-2">
         <Store className="h-4 w-4 text-muted-foreground" />
@@ -44,22 +44,31 @@ export function ShopSelector() {
     );
   }
 
-  // If no active shop is set, set the first available shop
-  if (!activeShop && shops.length > 0) {
-    setActiveShop(shops[0]);
-    queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shops[0].id] });
+  // Filter out any invalid shop entries
+  const validShops = shops.filter((shop): shop is Shop => 
+    shop !== null && 
+    shop !== undefined && 
+    typeof shop.id === 'number' && 
+    typeof shop.name === 'string'
+  );
+
+  // If no active shop is set and we have valid shops, set the first one
+  if (!activeShop && validShops.length > 0) {
+    setActiveShop(validShops[0]);
+    queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", validShops[0].id] });
   }
 
   return (
     <div className="flex items-center gap-2">
       <Store className="h-4 w-4 text-muted-foreground" />
       <Select
-        value={activeShop?.id?.toString()}
-        onValueChange={(val) => {
-          const shop = shops.find(s => s.id === Number(val));
+        value={activeShop?.id ? String(activeShop.id) : undefined}
+        onValueChange={(value) => {
+          const shopId = parseInt(value, 10);
+          const shop = validShops.find(s => s.id === shopId);
           if (shop) {
             setActiveShop(shop);
-            queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shop.id] });
+            queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shopId] });
           }
         }}
       >
@@ -67,8 +76,8 @@ export function ShopSelector() {
           <SelectValue placeholder="Select a shop" />
         </SelectTrigger>
         <SelectContent>
-          {shops.map((shop) => (
-            <SelectItem key={shop.id} value={shop.id.toString()}>
+          {validShops.map((shop) => (
+            <SelectItem key={shop.id} value={String(shop.id)}>
               {shop.name}
             </SelectItem>
           ))}
