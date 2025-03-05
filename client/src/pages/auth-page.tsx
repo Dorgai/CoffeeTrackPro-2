@@ -184,6 +184,9 @@ export default function AuthPage() {
                               <SelectItem value="roasteryOwner">
                                 Roastery Owner
                               </SelectItem>
+                              <SelectItem value="retailOwner">
+                                Retail Owner
+                              </SelectItem>
                               <SelectItem value="roaster">Roaster</SelectItem>
                               <SelectItem value="shopManager">
                                 Shop Manager
