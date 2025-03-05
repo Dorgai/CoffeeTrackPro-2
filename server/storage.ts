@@ -277,7 +277,7 @@ export class DatabaseStorage implements IStorage {
         throw new Error("User not found");
       }
 
-      // Roastery owners and retail owners can access all active shops
+      // Get all active shops for roastery owners and retail owners
       if (user.role === "roasteryOwner" || user.role === "retailOwner") {
         return await db
           .select()
@@ -1008,7 +1008,7 @@ export class DatabaseStorage implements IStorage {
         .update(shops)
         .set(update)
         .where(eq(shops.id, id))
-        .returning();
+                .returning();
 
       if (!updatedShop) {
         throw new Error("Failed to update shop");
@@ -1382,23 +1382,36 @@ export class DatabaseStorage implements IStorage {
 
       if (!user) return false;
 
+      const role = user.role;
+
       switch (permission) {
+        // Billing - roastery owner only
         case 'billing.write':
-          return user.role === 'roasteryOwner';
+        case 'billing.read':
+          return role === 'roasteryOwner';
+
+        // Green Coffee - roastery owner and roaster
         case 'greenCoffee.read':
         case 'greenCoffee.write':
-          return user.role === 'roasteryOwner' || user.role === 'roaster';
+          return role === 'roasteryOwner' || role === 'roaster';
+
+        // Management - roastery owner only
         case 'shop.manage':
         case 'user.manage':
-          return user.role === 'roasteryOwner';
+          return role === 'roasteryOwner';
+
+        // Retail Operations - all roles
         case 'retail.read':
         case 'retail.write':
         case 'orders.read':
         case 'orders.write':
-          return ['roasteryOwner', 'retailOwner', 'shopManager', 'barista'].includes(user.role);
+          return true;
+
+        // Analytics & Reports - owners and managers
         case 'analytics.read':
         case 'reports.read':
-          return ['roasteryOwner', 'retailOwner', 'shopManager'].includes(user.role);
+          return role === 'roasteryOwner' || role === 'retailOwner' || role === 'shopManager';
+
         default:
           return false;
       }
