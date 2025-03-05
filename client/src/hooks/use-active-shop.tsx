@@ -42,7 +42,7 @@ export function useUserShops() {
         throw new Error(`Failed to fetch user shops: ${error}`);
       }
       const data = await res.json();
-      console.log("Fetched shops:", data);
+      console.log("[useUserShops] Fetched shops:", data);
 
       // Update shops in store
       setUserShops(data);
@@ -50,7 +50,7 @@ export function useUserShops() {
       // Set default shop if needed
       if (data && data.length > 0 && (!activeShop || !data.find(s => s.id === activeShop.id))) {
         const defaultShop = data[0];
-        console.log("Setting default shop:", defaultShop);
+        console.log("[useUserShops] Setting default shop:", defaultShop);
         setActiveShop(defaultShop);
       }
 

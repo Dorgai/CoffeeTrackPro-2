@@ -23,7 +23,7 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   const { user } = useAuth();
 
   // Fetch user's authorized shops for both barista and manager
-  const { data: userShops, isLoading: loadingUserShops } = useQuery<any[]>({
+  const { data: userShops, isLoading: loadingUserShops } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
     enabled: !!user && user.role !== "roasteryOwner",
     staleTime: 30000,
@@ -38,19 +38,9 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
     retry: 3,
   });
 
-  // Transform userShops based on role
-  const transformedShops = user?.role === "barista" && userShops
-    ? userShops.map(item => item.shops).filter(Boolean)
-    : userShops;
-
-  console.log("[ShopSelector] Role:", user?.role);
-  console.log("[ShopSelector] Raw userShops:", userShops);
-  console.log("[ShopSelector] Transformed shops:", transformedShops);
-  console.log("[ShopSelector] Active shop:", activeShop);
-
   // Set default shop on mount and when shops data changes
   useEffect(() => {
-    const shops = user?.role === "roasteryOwner" ? allShops : transformedShops;
+    const shops = user?.role === "roasteryOwner" ? allShops : userShops;
 
     // Only proceed if we have shops data
     if (!shops?.length) {
@@ -64,7 +54,6 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
       console.log("[ShopSelector] Setting default shop");
       console.log("[ShopSelector] Available shops:", shops);
 
-      // Use first available shop as default
       const defaultShop = shops[0];
       console.log("[ShopSelector] Selected default shop:", defaultShop);
 
@@ -73,11 +62,11 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
         onChange(defaultShop.id);
       }
     }
-  }, [transformedShops, allShops, user?.role, activeShop, setActiveShop, onChange]);
+  }, [userShops, allShops, user?.role, activeShop, setActiveShop, onChange]);
 
   const handleChange = (value: string) => {
     const shopId = value ? parseInt(value, 10) : null;
-    const shops = user?.role === "roasteryOwner" ? allShops : transformedShops;
+    const shops = user?.role === "roasteryOwner" ? allShops : userShops;
     const shop = shops?.find((s) => s.id === shopId);
     console.log("[ShopSelector] Changing shop to:", shop);
 
@@ -88,7 +77,7 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   };
 
   const isLoading = loadingUserShops || loadingAllShops;
-  const shops = user?.role === "roasteryOwner" ? allShops : transformedShops;
+  const shops = user?.role === "roasteryOwner" ? allShops : userShops;
   const currentValue = value !== undefined ? value : activeShop?.id;
 
   if (isLoading) {
@@ -114,7 +103,7 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
           <SelectValue placeholder="Select a shop" />
         </SelectTrigger>
         <SelectContent>
-          {shops?.map((shop) => shop && (
+          {shops?.map((shop) => (
             <SelectItem key={shop.id} value={`${shop.id}`}>
               {shop.name}
             </SelectItem>
