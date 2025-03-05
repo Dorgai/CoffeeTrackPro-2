@@ -31,6 +31,10 @@ export function ShopSelector({ value, onChange }: ShopSelectorProps) {
       const defaultShop = shops[0];
       setActiveShop(defaultShop);
       onChange?.(defaultShop.id);
+
+      // Initial data load for the default shop
+      queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", defaultShop.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders", defaultShop.id] });
     }
   }, [shops, activeShop, setActiveShop, onChange]);
 
@@ -61,16 +65,17 @@ export function ShopSelector({ value, onChange }: ShopSelectorProps) {
     <div className="flex items-center gap-2">
       <Store className="h-4 w-4 text-muted-foreground" />
       <Select
-        value={value?.toString() || activeShop?.id?.toString() || ''}
+        value={value?.toString() || activeShop?.id?.toString() || ""}
         onValueChange={(val) => {
-          const shop = shops.find(s => s.id === Number(val));
+          const shopId = Number(val);
+          const shop = shops.find(s => s.id === shopId);
           if (shop) {
             setActiveShop(shop);
-            onChange?.(shop.id);
+            onChange?.(shopId);
 
             // Invalidate queries that depend on shop ID
-            queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shop.id] });
-            queryClient.invalidateQueries({ queryKey: ["/api/orders", shop.id] });
+            queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shopId] });
+            queryClient.invalidateQueries({ queryKey: ["/api/orders", shopId] });
           }
         }}
       >
@@ -81,7 +86,7 @@ export function ShopSelector({ value, onChange }: ShopSelectorProps) {
         </SelectTrigger>
         <SelectContent>
           {shops.map((shop) => (
-            <SelectItem key={shop.id} value={String(shop.id)}>
+            <SelectItem key={shop.id} value={shop.id.toString()}>
               {shop.name}
             </SelectItem>
           ))}
