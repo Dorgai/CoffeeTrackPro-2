@@ -280,7 +280,15 @@ export class DatabaseStorage implements IStorage {
       // Roastery owners and roasters can see all active shops
       if (user.role === "roasteryOwner" || user.role === "roaster") {
         return await db
-          .select()
+          .select({
+            id: shops.id,
+            name: shops.name,
+            location: shops.location,
+            isActive: shops.isActive,
+            defaultOrderQuantity: shops.defaultOrderQuantity,
+            desiredSmallBags: shops.desiredSmallBags,
+            desiredLargeBags: shops.desiredLargeBags
+          })
           .from(shops)
           .where(eq(shops.isActive, true))
           .orderBy(shops.name);
@@ -288,7 +296,7 @@ export class DatabaseStorage implements IStorage {
 
       // Shop managers and baristas can only see their assigned shops
       if (user.role === "shopManager" || user.role === "barista") {
-        const assignedShops = await db
+        return await db
           .select({
             id: shops.id,
             name: shops.name,
@@ -307,8 +315,6 @@ export class DatabaseStorage implements IStorage {
             )
           )
           .orderBy(shops.name);
-
-        return assignedShops;
       }
 
       // All other roles see no shops
@@ -989,7 +995,7 @@ export class DatabaseStorage implements IStorage {
       throw error;
     }
   }
-  async updateShop(
+async updateShop(
     id: number,
     update: {
       desiredSmallBags?: number;
@@ -1003,7 +1009,7 @@ export class DatabaseStorage implements IStorage {
         .update(shops)
         .set(update)
         .where(eq(shops.id, id))
-                .returning();
+        .returning();
 
       if (!updatedShop) {
         throw new Error("Failed to update shop");

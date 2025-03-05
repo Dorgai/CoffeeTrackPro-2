@@ -14,14 +14,13 @@ import { queryClient } from "@/lib/queryClient";
 
 export function ShopSelector() {
   const { activeShop, setActiveShop } = useActiveShop();
-
-  const { data: shops, isLoading } = useQuery<Shop[]>({
+  const { data: shops = [], isLoading } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
   });
 
-  // Set initial active shop only if we have shops and no active shop
+  // Set initial active shop from shops when data loads
   useEffect(() => {
-    if (shops?.length && !activeShop) {
+    if (shops.length > 0 && !activeShop) {
       const initialShop = shops[0];
       setActiveShop(initialShop);
       queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", initialShop.id] });
@@ -40,7 +39,7 @@ export function ShopSelector() {
     );
   }
 
-  if (!shops?.length) {
+  if (!shops.length) {
     return (
       <div className="flex items-center gap-2">
         <Store className="h-4 w-4" />
@@ -55,18 +54,18 @@ export function ShopSelector() {
     <div className="flex items-center gap-2">
       <Store className="h-4 w-4" />
       <Select
-        value={activeShop?.id ? String(activeShop.id) : undefined}
+        value={activeShop?.id ? String(activeShop.id) : String(shops[0].id)}
         onValueChange={(value) => {
-          const shop = shops.find((s) => s.id === parseInt(value));
-          if (shop) {
-            setActiveShop(shop);
-            queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shop.id] });
+          const selectedShop = shops.find((s) => s.id === parseInt(value));
+          if (selectedShop) {
+            setActiveShop(selectedShop);
+            queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", selectedShop.id] });
           }
         }}
       >
         <SelectTrigger className="w-[200px]">
           <SelectValue>
-            {activeShop?.name || "Select a shop"}
+            {activeShop?.name || shops[0]?.name || "Select a shop"}
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
