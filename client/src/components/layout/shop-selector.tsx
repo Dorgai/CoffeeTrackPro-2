@@ -12,7 +12,7 @@ import { Store, Loader2 } from "lucide-react";
 import { useActiveShop } from "@/hooks/use-active-shop";
 import { queryClient } from "@/lib/queryClient";
 
-export function ShopSelector({ value, onChange }: { value?: number | null; onChange?: (shopId: number | null) => void } = {}) {
+export function ShopSelector() {
   const { activeShop, setActiveShop } = useActiveShop();
 
   const { data: shops, isLoading } = useQuery<Shop[]>({
@@ -45,31 +45,6 @@ export function ShopSelector({ value, onChange }: { value?: number | null; onCha
         <div className="flex items-center gap-2 min-w-[200px] h-9 px-3 rounded-md border">
           <span className="text-sm text-muted-foreground">No shops available</span>
         </div>
-      </div>
-    );
-  }
-
-  if (onChange && value !== undefined) {
-    return (
-      <div className="flex items-center gap-2">
-        <Store className="h-4 w-4" />
-        <Select
-          value={value?.toString()}
-          onValueChange={(value) => onChange(value ? parseInt(value) : null)}
-        >
-          <SelectTrigger className="w-[200px]">
-            <SelectValue>
-              {value ? shops.find(s => s.id === value)?.name : "Select a shop"}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {shops.map((shop) => (
-              <SelectItem key={shop.id} value={shop.id.toString()}>
-                {shop.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
     );
   }

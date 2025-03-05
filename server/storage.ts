@@ -279,16 +279,8 @@ export class DatabaseStorage implements IStorage {
 
       // Shop managers and baristas can only see their assigned shops
       if (user.role === "shopManager" || user.role === "barista") {
-        const results = await db
-          .select({
-            id: shops.id,
-            name: shops.name,
-            location: shops.location,
-            isActive: shops.isActive,
-            defaultOrderQuantity: shops.defaultOrderQuantity,
-            desiredSmallBags: shops.desiredSmallBags,
-            desiredLargeBags: shops.desiredLargeBags,
-          })
+        return await db
+          .select()
           .from(userShops)
           .innerJoin(shops, eq(userShops.shopId, shops.id))
           .where(
@@ -298,24 +290,14 @@ export class DatabaseStorage implements IStorage {
             )
           )
           .orderBy(shops.name);
-        return results;
       }
 
       // All other roles can see all active shops
-      const results = await db
-        .select({
-          id: shops.id,
-          name: shops.name,
-          location: shops.location,
-          isActive: shops.isActive,
-          defaultOrderQuantity: shops.defaultOrderQuantity,
-          desiredSmallBags: shops.desiredSmallBags,
-          desiredLargeBags: shops.desiredLargeBags,
-        })
+      return await db
+        .select()
         .from(shops)
         .where(eq(shops.isActive, true))
         .orderBy(shops.name);
-      return results;
 
     } catch (error) {
       console.error("Error in getUserShops:", error);
@@ -1028,396 +1010,396 @@ export class DatabaseStorage implements IStorage {
         .orderBy(desc(billingEvents.createdAt))
         .limit(1);
             return lastEvent;
-    } catch (error) {
-      console.error("Error getting last billing event:", error);
-      throw error;
-    }
-  }
-
-  async getBillingQuantities(fromDate: Date): Promise<{
-    grade: string;
-    smallBagsQuantity: number;
-    largeBagsQuantity: number;
-  }[]> {
-    try {
-      const ordersData = await db
-        .select({
-          grade: greenCoffee.grade,
-          smallBags: orders.smallBags,
-          largeBags: orders.largeBags,
-        })        .from(orders)
-        .innerJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
-        .where(
-          and(
-            eq(orders.status, "dispatched"),
-            gt(orders.createdAt, fromDate)
-          )
-        );
-
-      const initialQuantities = {
-        'Specialty': { smallBagsQuantity: 0, largeBagsQuantity: 0 },
-        'Premium': { smallBagsQuantity: 0, largeBagsQuantity: 0 },
-        'Rarity': { smallBagsQuantity: 0, largeBagsQuantity: 0 }
-      };
-
-      const aggregatedQuantities = ordersData.reduce((acc, order) => {
-        if (order.grade && acc[order.grade]) {
-          acc[order.grade].smallBagsQuantity += Number(order.smallBags) || 0;
-          acc[order.grade].largeBagsQuantity += Number(order.largeBags) || 0;
-        }
-        return acc;
-      }, initialQuantities);
-
-      return Object.entries(aggregatedQuantities).map(([grade, quantities]) => ({
-        grade,
-        smallBagsQuantity: quantities.smallBagsQuantity,
-        largeBagsQuantity: quantities.largeBagsQuantity
-      }));
-    } catch (error) {
-      console.error("Error fetching billing quantities:", error);
-      throw error;
-    }
-  }
-
-  async createBillingEvent(event: InsertBillingEvent, details: InsertBillingEventDetail[]): Promise<BillingEvent> {
-    try {
-      return await db.transaction(async (tx) => {
-        const [newEvent] = await tx
-          .insert(billingEvents)
-          .values(event)
-          .returning();
-
-        await Promise.all(
-          details.map(detail =>
-            tx
-              .insert(billingEventDetails)
-              .values({ ...detail, billingEventId: newEvent.id })
-          )
-        );
-
-        return newEvent;
-      });
-    } catch (error) {
-      console.error("Error creating billing event:", error);
-      throw error;
-    }
-  }
-    // Analytics methods
-  async getAnalyticsInventoryHistory(fromDate: Date, toDate: Date): Promise<any[]> {
-    try {
-      const result = await db
-        .select({
-          date: retailInventory.updatedAt,
-          shopId: retailInventory.shopId,
-          shopName: shops.name,
-          greenCoffeeId: retailInventory.greenCoffeeId,
-          coffeeName: greenCoffee.name,
-          coffeeGrade: greenCoffee.grade,
-          smallBags: retailInventory.smallBags,
-          largeBags: retailInventory.largeBags,
-          updatedByUsername: users.username
-        })
-        .from(retailInventory)
-        .innerJoin(shops, eq(retailInventory.shopId, shops.id))
-        .innerJoin(greenCoffee, eq(retailInventory.greenCoffeeId, greenCoffee.id))
-        .innerJoin(users, eq(retailInventory.updatedById, users.id))
-        .where(
-          and(
-            gt(retailInventory.updatedAt, fromDate),
-            lt(retailInventory.updatedAt, toDate)
-          )
-        )
-        .orderBy(desc(retailInventory.updatedAt));
-
-      return result;
-    } catch (error) {
-      console.error("Error in getAnalyticsInventoryHistory:", error);
-      throw error;
-    }
-  }
-
-  async getAnalyticsOrders(fromDate: Date, toDate: Date): Promise<any[]> {
-    try {
-      const result = await db
-        .select({
-          date: orders.createdAt,
-          shopId: orders.shopId,
-          shopName: shops.name,
-          greenCoffeeId: orders.greenCoffeeId,
-          coffeeName: greenCoffee.name,
-          coffeeGrade: greenCoffee.grade,
-          status: orders.status,
-          smallBags: orders.smallBags,
-          largeBags: orders.largeBags,
-          createdByUsername: users.username,
-          updatedAt: orders.updatedAt,
-          updatedByUsername: {
-            username: users.username
+          } catch (error) {
+            console.error("Error getting last billing event:", error);
+            throw error;
           }
-        })
-        .from(orders)
-        .innerJoin(shops, eq(orders.shopId, shops.id))
-        .innerJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
-        .innerJoin(users, eq(orders.createdById, users.id))
-        .leftJoin(users, eq(orders.updatedById, users.id))
-        .where(
-          and(
-            gt(orders.createdAt, fromDate),
-            lt(orders.createdAt, toDate)
-          )
-        )
-        .orderBy(desc(orders.createdAt));
-
-      return result;
-    } catch (error) {
-      console.error("Error in getAnalyticsOrders:", error);
-      throw error;
-    }
-  }
-  async getAnalyticsRoasting(fromDate: Date, toDate: Date): Promise<any[]> {
-    try {
-      const result = await db
-        .select({
-          date: roastingBatches.roastedAt,
-          greenCoffeeId: roastingBatches.greenCoffeeId,
-          coffeeName: greenCoffee.name,
-          roasterId: roastingBatches.roasterId,
-          roasterName: users.username,
-          greenCoffeeAmount: roastingBatches.greenCoffeeAmount,
-          roastedAmount: roastingBatches.roastedAmount,
-          roastingLoss: roastingBatches.roastingLoss,
-          smallBagsProduced: roastingBatches.smallBagsProduced,
-          largeBagsProduced: roastingBatches.largeBagsProduced,
-        })
-        .from(roastingBatches)
-        .innerJoin(greenCoffee, eq(roastingBatches.greenCoffeeId, greenCoffee.id))
-        .innerJoin(users, eq(roastingBatches.roasterId, users.id))
-        .where(
-          and(
-            gt(roastingBatches.roastedAt, fromDate),
-            lt(roastingBatches.roastedAt, toDate)
-          )
-        )
-        .orderBy(roastingBatches.roastedAt);
-
-      return result;
-    } catch (error) {
-      console.error("Error in getAnalyticsRoasting:", error);
-      throw error;
-    }
-  }
-
-  // Reports methods
-  async generateInventoryStatusReport(): Promise<any> {
-    try {
-      const greenCoffeeStatus = await db
-        .select({
-          id: greenCoffee.id,
-          name: greenCoffee.name,
-          currentStock: greenCoffee.currentStock,
-          minThreshold: greenCoffee.minThreshold,
-        })
-        .from(greenCoffee);
-
-      const shopInventories = await db
-        .select({
-          shopId: retailInventory.shopId,
-          shopName: shops.name,
-          greenCoffeeId: retailInventory.greenCoffeeId,
-          coffeeName: greenCoffee.name,
-          smallBags: retailInventory.smallBags,
-          largeBags: retailInventory.largeBags,
-        })
-        .from(retailInventory)
-        .innerJoin(shops, eq(retailInventory.shopId, shops.id))
-        .innerJoin(greenCoffee, eq(retailInventory.greenCoffeeId, greenCoffee.id));
-
-      return {
-        greenCoffeeStatus,
-        shopInventories,
-        generatedAt: new Date(),
-      };
-    } catch (error) {
-      console.error("Error generating inventory status report:", error);
-      throw error;
-    }
-  }
-
-  async generateShopPerformanceReport(): Promise<any> {
-    try {
-      const shopOrders = await db
-        .select({
-          shopId: orders.shopId,
-          shopName: shops.name,
-          ordersCount: sql`count(*)`.as('ordersCount'),
-          totalSmallBags: sql`sum(${orders.smallBags})`.as('totalSmallBags'),
-          totalLargeBags: sql`sum(${orders.largeBags})`.as('totalLargeBags'),
-        })
-        .from(orders)
-        .innerJoin(shops, eq(orders.shopId, shops.id))
-        .groupBy(orders.shopId, shops.name);
-
-      const discrepancies = await db
-        .select({
-          shopId: shops.id,
-          shopName: shops.name,
-          discrepancyCount: sql`count(*)`.as('discrepancyCount'),
-        })
-        .from(inventoryDiscrepancies)
-        .innerJoin(
-          dispatchedCoffeeConfirmations,
-          eq(inventoryDiscrepancies.confirmationId, dispatchedCoffeeConfirmations.id)
-        )
-        .innerJoin(shops, eq(dispatchedCoffeeConfirmations.shopId, shops.id))
-        .groupBy(shops.id, shops.name);
-
-      return {
-        shopOrders,
-        discrepancies,
-        generatedAt: new Date(),
-      };
-    } catch (error) {
-      console.error("Error generating shop performance report:", error);
-      throw error;
-    }
-  }
-
-  async generateCoffeeConsumptionReport(): Promise<any> {
-    try {
-      const coffeeConsumption = await db
-        .select({
-          greenCoffeeId: orders.greenCoffeeId,
-          coffeeName: greenCoffee.name,
-          totalSmallBags: sql`sum(${orders.smallBags})`.as('totalSmallBags'),
-          totalLargeBags: sql`sum(${orders.largeBags})`.as('totalLargeBags'),
-          ordersCount: sql`count(*)`.as('ordersCount'),
-        })
-        .from(orders)
-        .innerJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
-        .where(eq(orders.status, 'delivered'))
-        .groupBy(orders.greenCoffeeId, greenCoffee.name);
-
-      const roastingStats = await db
-        .select({
-          greenCoffeeId: roastingBatches.greenCoffeeId,
-          coffeeName: greenCoffee.name,
-          totalRoasted: sql`sum(${roastingBatches.roastedAmount})`.as('totalRoasted'),
-          avgRoastingLoss: sql`avg(${roastingBatches.roastingLoss})`.as('avgRoastingLoss'),
-          batchesCount: sql`count(*)`.as('batchesCount'),
-        })
-        .from(roastingBatches)
-        .innerJoin(greenCoffee, eq(roastingBatches.greenCoffeeId, greenCoffee.id))
-        .groupBy(roastingBatches.greenCoffeeId, greenCoffee.name);
-
-      return {
-        coffeeConsumption,
-        roastingStats,
-        generatedAt: new Date(),
-      };
-    } catch (error) {
-      console.error("Error generating coffee consumption report:", error);
-      throw error;
-    }
-  }
-
-  async getBillingHistory(): Promise<(BillingEvent & { details: BillingEventDetail[] })[]> {
-    try {
-      const events = await db
-        .select({
-          id: billingEvents.id,
-          cycleStartDate: billingEvents.cycleStartDate,
-          cycleEndDate: billingEvents.cycleEndDate,
-          primarySplitPercentage: billingEvents.primarySplitPercentage,
-          secondarySplitPercentage: billingEvents.secondarySplitPercentage,
-          createdAt: billingEvents.createdAt,
-          createdById: billingEvents.createdById
-        })
-        .from(billingEvents)
-        .orderBy(desc(billingEvents.cycleEndDate));
-
-      const eventsWithDetails = await Promise.all(
-        events.map(async (event) => {
-          const details = await db
-            .select()
-            .from(billingEventDetails)
-            .where(eq(billingEventDetails.billingEventId, event.id))
-            .orderBy(billingEventDetails.grade);
-
-          return {
-            ...event,
-            details: details
-          };
-        })
-      );
-
-      return eventsWithDetails;
-    } catch (error) {
-      console.error("Error fetching billing history:", error);
-      throw error;
-    }
-  }
-
-  async getBillingEventDetails(eventId: number): Promise<BillingEventDetail[]> {
-    try {
-      const details = await db
-        .select()
-        .from(billingEventDetails)
-        .where(eq(billingEventDetails.billingEventId, eventId))
-        .orderBy(billingEventDetails.grade);
-
-      return details;
-    } catch (error) {
-      console.error("Error fetching billing event details:", error);
-      throw error;
-    }
-  }
-  async hasPermission(userId: number, permission: string): Promise<boolean> {
-    try {
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, userId));
-
-      if (!user) return false;
-
-      const role = user.role;
-
-      switch (permission) {
-        // Billing - roastery owner only
-        case 'billing.write':
-        case 'billing.read':
-          return role === 'roasteryOwner';
-
-        // Green Coffee - roastery owner and roaster
-        case 'greenCoffee.read':
-        case 'greenCoffee.write':
-          return role === 'roasteryOwner' || role === 'roaster';
-
-        // Management - roastery owner only
-        case 'shop.manage':
-        case 'user.manage':
-          return role === 'roasteryOwner';
-
-        // Retail Operations - all roles
-        case 'retail.read':
-        case 'retail.write':
-        case 'orders.read':
-        case 'orders.write':
-          return true;
-
-        // Analytics & Reports - owners and managers
-        case 'analytics.read':
-        case 'reports.read':
-          return role === 'roasteryOwner' || role === 'retailOwner' || role === 'shopManager';
-
-        default:
-          return false;
+        }
+      
+        async getBillingQuantities(fromDate: Date): Promise<{
+          grade: string;
+          smallBagsQuantity: number;
+          largeBagsQuantity: number;
+        }[]> {
+          try {
+            const ordersData = await db
+              .select({
+                grade: greenCoffee.grade,
+                smallBags: orders.smallBags,
+                largeBags: orders.largeBags,
+              })        .from(orders)
+              .innerJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
+              .where(
+                and(
+                  eq(orders.status, "dispatched"),
+                  gt(orders.createdAt, fromDate)
+                )
+              );
+      
+            const initialQuantities = {
+              'Specialty': { smallBagsQuantity: 0, largeBagsQuantity: 0 },
+              'Premium': { smallBagsQuantity: 0, largeBagsQuantity: 0 },
+              'Rarity': { smallBagsQuantity: 0, largeBagsQuantity: 0 }
+            };
+      
+            const aggregatedQuantities = ordersData.reduce((acc, order) => {
+              if (order.grade && acc[order.grade]) {
+                acc[order.grade].smallBagsQuantity += Number(order.smallBags) || 0;
+                acc[order.grade].largeBagsQuantity += Number(order.largeBags) || 0;
+              }
+              return acc;
+            }, initialQuantities);
+      
+            return Object.entries(aggregatedQuantities).map(([grade, quantities]) => ({
+              grade,
+              smallBagsQuantity: quantities.smallBagsQuantity,
+              largeBagsQuantity: quantities.largeBagsQuantity
+            }));
+          } catch (error) {
+            console.error("Error fetching billing quantities:", error);
+            throw error;
+          }
+        }
+      
+        async createBillingEvent(event: InsertBillingEvent, details: InsertBillingEventDetail[]): Promise<BillingEvent> {
+          try {
+            return await db.transaction(async (tx) => {
+              const [newEvent] = await tx
+                .insert(billingEvents)
+                .values(event)
+                .returning();
+      
+              await Promise.all(
+                details.map(detail =>
+                  tx
+                    .insert(billingEventDetails)
+                    .values({ ...detail, billingEventId: newEvent.id })
+                )
+              );
+      
+              return newEvent;
+            });
+          } catch (error) {
+            console.error("Error creating billing event:", error);
+            throw error;
+          }
+        }
+        // Analytics methods
+        async getAnalyticsInventoryHistory(fromDate: Date, toDate: Date): Promise<any[]> {
+          try {
+            const result = await db
+              .select({
+                date: retailInventory.updatedAt,
+                shopId: retailInventory.shopId,
+                shopName: shops.name,
+                greenCoffeeId: retailInventory.greenCoffeeId,
+                coffeeName: greenCoffee.name,
+                coffeeGrade: greenCoffee.grade,
+                smallBags: retailInventory.smallBags,
+                largeBags: retailInventory.largeBags,
+                updatedByUsername: users.username
+              })
+              .from(retailInventory)
+              .innerJoin(shops, eq(retailInventory.shopId, shops.id))
+              .innerJoin(greenCoffee, eq(retailInventory.greenCoffeeId, greenCoffee.id))
+              .innerJoin(users, eq(retailInventory.updatedById, users.id))
+              .where(
+                and(
+                  gt(retailInventory.updatedAt, fromDate),
+                  lt(retailInventory.updatedAt, toDate)
+                )
+              )
+              .orderBy(desc(retailInventory.updatedAt));
+      
+            return result;
+          } catch (error) {
+            console.error("Error in getAnalyticsInventoryHistory:", error);
+            throw error;
+          }
+        }
+      
+        async getAnalyticsOrders(fromDate: Date, toDate: Date): Promise<any[]> {
+          try {
+            const result = await db
+              .select({
+                date: orders.createdAt,
+                shopId: orders.shopId,
+                shopName: shops.name,
+                greenCoffeeId: orders.greenCoffeeId,
+                coffeeName: greenCoffee.name,
+                coffeeGrade: greenCoffee.grade,
+                status: orders.status,
+                smallBags: orders.smallBags,
+                largeBags: orders.largeBags,
+                createdByUsername: users.username,
+                updatedAt: orders.updatedAt,
+                updatedByUsername: {
+                  username: users.username
+                }
+              })
+              .from(orders)
+              .innerJoin(shops, eq(orders.shopId, shops.id))
+              .innerJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
+              .innerJoin(users, eq(orders.createdById, users.id))
+              .leftJoin(users, eq(orders.updatedById, users.id))
+              .where(
+                and(
+                  gt(orders.createdAt, fromDate),
+                  lt(orders.createdAt, toDate)
+                )
+              )
+              .orderBy(desc(orders.createdAt));
+      
+            return result;
+          } catch (error) {
+            console.error("Error in getAnalyticsOrders:", error);
+            throw error;
+          }
+        }
+        async getAnalyticsRoasting(fromDate: Date, toDate: Date): Promise<any[]> {
+          try {
+            const result = await db
+              .select({
+                date: roastingBatches.roastedAt,
+                greenCoffeeId: roastingBatches.greenCoffeeId,
+                coffeeName: greenCoffee.name,
+                roasterId: roastingBatches.roasterId,
+                roasterName: users.username,
+                greenCoffeeAmount: roastingBatches.greenCoffeeAmount,
+                roastedAmount: roastingBatches.roastedAmount,
+                roastingLoss: roastingBatches.roastingLoss,
+                smallBagsProduced: roastingBatches.smallBagsProduced,
+                largeBagsProduced: roastingBatches.largeBagsProduced,
+              })
+              .from(roastingBatches)
+              .innerJoin(greenCoffee, eq(roastingBatches.greenCoffeeId, greenCoffee.id))
+              .innerJoin(users, eq(roastingBatches.roasterId, users.id))
+              .where(
+                and(
+                  gt(roastingBatches.roastedAt, fromDate),
+                  lt(roastingBatches.roastedAt, toDate)
+                )
+              )
+              .orderBy(roastingBatches.roastedAt);
+      
+            return result;
+          } catch (error) {
+            console.error("Error in getAnalyticsRoasting:", error);
+            throw error;
+          }
+        }
+      
+        // Reports methods
+        async generateInventoryStatusReport(): Promise<any> {
+          try {
+            const greenCoffeeStatus = await db
+              .select({
+                id: greenCoffee.id,
+                name: greenCoffee.name,
+                currentStock: greenCoffee.currentStock,
+                minThreshold: greenCoffee.minThreshold,
+              })
+              .from(greenCoffee);
+      
+            const shopInventories = await db
+              .select({
+                shopId: retailInventory.shopId,
+                shopName: shops.name,
+                greenCoffeeId: retailInventory.greenCoffeeId,
+                coffeeName: greenCoffee.name,
+                smallBags: retailInventory.smallBags,
+                largeBags: retailInventory.largeBags,
+              })
+              .from(retailInventory)
+              .innerJoin(shops, eq(retailInventory.shopId, shops.id))
+              .innerJoin(greenCoffee, eq(retailInventory.greenCoffeeId, greenCoffee.id));
+      
+            return {
+              greenCoffeeStatus,
+              shopInventories,
+              generatedAt: new Date(),
+            };
+          } catch (error) {
+            console.error("Error generating inventory status report:", error);
+            throw error;
+          }
+        }
+      
+        async generateShopPerformanceReport(): Promise<any> {
+          try {
+            const shopOrders = await db
+              .select({
+                shopId: orders.shopId,
+                shopName: shops.name,
+                ordersCount: sql`count(*)`.as('ordersCount'),
+                totalSmallBags: sql`sum(${orders.smallBags})`.as('totalSmallBags'),
+                totalLargeBags: sql`sum(${orders.largeBags})`.as('totalLargeBags'),
+              })
+              .from(orders)
+              .innerJoin(shops, eq(orders.shopId, shops.id))
+              .groupBy(orders.shopId, shops.name);
+      
+            const discrepancies = await db
+              .select({
+                shopId: shops.id,
+                shopName: shops.name,
+                discrepancyCount: sql`count(*)`.as('discrepancyCount'),
+              })
+              .from(inventoryDiscrepancies)
+              .innerJoin(
+                dispatchedCoffeeConfirmations,
+                eq(inventoryDiscrepancies.confirmationId, dispatchedCoffeeConfirmations.id)
+              )
+              .innerJoin(shops, eq(dispatchedCoffeeConfirmations.shopId, shops.id))
+              .groupBy(shops.id, shops.name);
+      
+            return {
+              shopOrders,
+              discrepancies,
+              generatedAt: new Date(),
+            };
+          } catch (error) {
+            console.error("Error generating shop performance report:", error);
+            throw error;
+          }
+        }
+      
+        async generateCoffeeConsumptionReport(): Promise<any> {
+          try {
+            const coffeeConsumption = await db
+              .select({
+                greenCoffeeId: orders.greenCoffeeId,
+                coffeeName: greenCoffee.name,
+                totalSmallBags: sql`sum(${orders.smallBags})`.as('totalSmallBags'),
+                totalLargeBags: sql`sum(${orders.largeBags})`.as('totalLargeBags'),
+                ordersCount: sql`count(*)`.as('ordersCount'),
+              })
+              .from(orders)
+              .innerJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
+              .where(eq(orders.status, 'delivered'))
+              .groupBy(orders.greenCoffeeId, greenCoffee.name);
+      
+            const roastingStats = await db
+              .select({
+                greenCoffeeId: roastingBatches.greenCoffeeId,
+                coffeeName: greenCoffee.name,
+                totalRoasted: sql`sum(${roastingBatches.roastedAmount})`.as('totalRoasted'),
+                avgRoastingLoss: sql`avg(${roastingBatches.roastingLoss})`.as('avgRoastingLoss'),
+                batchesCount: sql`count(*)`.as('batchesCount'),
+              })
+              .from(roastingBatches)
+              .innerJoin(greenCoffee, eq(roastingBatches.greenCoffeeId, greenCoffee.id))
+              .groupBy(roastingBatches.greenCoffeeId, greenCoffee.name);
+      
+            return {
+              coffeeConsumption,
+              roastingStats,
+              generatedAt: new Date(),
+            };
+          } catch (error) {
+            console.error("Error generating coffee consumption report:", error);
+            throw error;
+          }
+        }
+      
+        async getBillingHistory(): Promise<(BillingEvent & { details: BillingEventDetail[] })[]> {
+          try {
+            const events = await db
+              .select({
+                id: billingEvents.id,
+                cycleStartDate: billingEvents.cycleStartDate,
+                cycleEndDate: billingEvents.cycleEndDate,
+                primarySplitPercentage: billingEvents.primarySplitPercentage,
+                secondarySplitPercentage: billingEvents.secondarySplitPercentage,
+                createdAt: billingEvents.createdAt,
+                createdById: billingEvents.createdById
+              })
+              .from(billingEvents)
+              .orderBy(desc(billingEvents.cycleEndDate));
+      
+            const eventsWithDetails = await Promise.all(
+              events.map(async (event) => {
+                const details = await db
+                  .select()
+                  .from(billingEventDetails)
+                  .where(eq(billingEventDetails.billingEventId, event.id))
+                  .orderBy(billingEventDetails.grade);
+      
+                return {
+                  ...event,
+                  details: details
+                };
+              })
+            );
+      
+            return eventsWithDetails;
+          } catch (error) {
+            console.error("Error fetching billing history:", error);
+            throw error;
+          }
+        }
+      
+        async getBillingEventDetails(eventId: number): Promise<BillingEventDetail[]> {
+          try {
+            const details = await db
+              .select()
+              .from(billingEventDetails)
+              .where(eq(billingEventDetails.billingEventId, eventId))
+              .orderBy(billingEventDetails.grade);
+      
+            return details;
+          } catch (error) {
+            console.error("Error fetching billing event details:", error);
+            throw error;
+          }
+        }
+        async hasPermission(userId: number, permission: string): Promise<boolean> {
+          try {
+            const [user] = await db
+              .select()
+              .from(users)
+              .where(eq(users.id, userId));
+      
+            if (!user) return false;
+      
+            const role = user.role;
+      
+            switch (permission) {
+              // Billing - roastery owner only
+              case 'billing.write':
+              case 'billing.read':
+                return role === 'roasteryOwner';
+      
+              // Green Coffee - roastery owner and roaster
+              case 'greenCoffee.read':
+              case 'greenCoffee.write':
+                return role === 'roasteryOwner' || role === 'roaster';
+      
+              // Management - roastery owner only
+              case 'shop.manage':
+              case 'user.manage':
+                return role === 'roasteryOwner';
+      
+              // Retail Operations - all roles
+              case 'retail.read':
+              case 'retail.write':
+              case 'orders.read':
+              case 'orders.write':
+                return true;
+      
+              // Analytics & Reports - owners and managers
+              case 'analytics.read':
+              case 'reports.read':
+                return role === 'roasteryOwner' || role === 'retailOwner' || role === 'shopManager';
+      
+              default:
+                return false;
+            }
+          } catch (error) {
+            console.error("Error checking permissions:", error);
+            return false;
+          }
+        }
       }
-    } catch (error) {
-      console.error("Error checking permissions:", error);
-      return false;
-    }
-  }
-}
-
-export const storage = new DatabaseStorage();
+      
+      export const storage = new DatabaseStorage();
