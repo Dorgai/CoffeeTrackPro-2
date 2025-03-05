@@ -308,6 +308,15 @@ export class DatabaseStorage implements IStorage {
           .orderBy(shops.name);
       }
 
+      // Roasters can see all active shops for order management
+      if (user.role === "roaster") {
+        return await db
+          .select()
+          .from(shops)
+          .where(eq(shops.isActive, true))
+          .orderBy(shops.name);
+      }
+
       return [];
     } catch (error) {
       console.error("Error fetching user shops:", error);

@@ -18,12 +18,15 @@ import { GreenBeansStockIndicator } from "./green-beans-stock-indicator";
 export function NavBar() {
   const { user, logoutMutation } = useAuth();
 
+  // Role-based access control
   const isRetailUser = user?.role === "retailOwner" || user?.role === "shopManager" || user?.role === "barista";
   const isRoasteryUser = user?.role === "roasteryOwner" || user?.role === "roaster";
   const canManageShops = user?.role === "roasteryOwner";
   const canManageUsers = user?.role === "roasteryOwner";
   const canAccessGreenCoffee = user?.role === "roasteryOwner" || user?.role === "roaster";
   const canAccessAnalytics = user?.role === "roasteryOwner" || user?.role === "retailOwner" || user?.role === "shopManager";
+  const canAccessFinance = user?.role === "roasteryOwner";
+  const canAccessRoasting = user?.role === "roaster";
 
   return (
     <div className="border-b">
@@ -67,8 +70,7 @@ export function NavBar() {
             </MenubarMenu>
           )}
 
-          {/* Only show Finance menu for roastery owner */}
-          {user?.role === "roasteryOwner" && (
+          {canAccessFinance && (
             <MenubarMenu>
               <MenubarTrigger>Finance</MenubarTrigger>
               <MenubarContent>
@@ -114,7 +116,25 @@ export function NavBar() {
             </MenubarMenu>
           )}
 
-          {isRetailUser && (
+          {canAccessRoasting && (
+            <MenubarMenu>
+              <MenubarTrigger>Roasting</MenubarTrigger>
+              <MenubarContent>
+                <MenubarItem>
+                  <Link href="/roasting/orders" className="flex w-full">
+                    Orders
+                  </Link>
+                </MenubarItem>
+                <MenubarItem>
+                  <Link href="/roasting" className="flex w-full">
+                    Batches
+                  </Link>
+                </MenubarItem>
+              </MenubarContent>
+            </MenubarMenu>
+          )}
+
+          {(isRetailUser || user?.role === "roasteryOwner") && (
             <>
               <MenubarMenu>
                 <MenubarTrigger>Retail</MenubarTrigger>
