@@ -34,17 +34,21 @@ export function ShopSelector() {
         queryKey: ["/api/retail-inventory", initialShop.id],
         staleTime: 0,
         refetchInterval: 5000,
-        refetchOnMount: true,
+        refetchOnMount: "always",
         refetchOnWindowFocus: true,
-        refetchOnReconnect: true
+        refetchOnReconnect: true,
+        retry: 3,
+        retryDelay: 1000,
       });
       queryClient.prefetchQuery({ 
         queryKey: ["/api/orders", initialShop.id],
         staleTime: 0,
         refetchInterval: 5000,
-        refetchOnMount: true,
+        refetchOnMount: "always",
         refetchOnWindowFocus: true,
-        refetchOnReconnect: true
+        refetchOnReconnect: true,
+        retry: 3,
+        retryDelay: 1000,
       });
     }
   }, [shops, activeShop, setActiveShop]);

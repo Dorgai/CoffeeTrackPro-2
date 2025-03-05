@@ -11,33 +11,44 @@ interface ActiveShopState {
 
 // Helper function to refresh shop data
 const refreshShopData = async (shopId: number) => {
-  await Promise.all([
-    queryClient.invalidateQueries({ 
+  // Aggressive data fetching strategy
+  const queries = [
+    {
       queryKey: ["/api/retail-inventory", shopId],
-      refetchType: 'active',
-    }),
-    queryClient.invalidateQueries({ 
-      queryKey: ["/api/orders", shopId],
-      refetchType: 'active',
-    }),
-    // Prefetch the data immediately
-    queryClient.prefetchQuery({ 
-      queryKey: ["/api/retail-inventory", shopId],
+      refetchInterval: 5000,
       staleTime: 0,
-      refetchInterval: 5000, // Refresh every 5 seconds
-      refetchOnMount: true,
+      refetchOnMount: "always",
       refetchOnWindowFocus: true,
-      refetchOnReconnect: true
-    }),
-    queryClient.prefetchQuery({ 
+      refetchOnReconnect: true,
+      retry: 3,
+      retryDelay: 1000,
+    },
+    {
       queryKey: ["/api/orders", shopId],
+      refetchInterval: 5000,
       staleTime: 0,
-      refetchInterval: 5000, // Refresh every 5 seconds
-      refetchOnMount: true,
+      refetchOnMount: "always",
       refetchOnWindowFocus: true,
-      refetchOnReconnect: true
-    })
-  ]);
+      refetchOnReconnect: true,
+      retry: 3,
+      retryDelay: 1000,
+    }
+  ];
+
+  // First invalidate all queries
+  await Promise.all(
+    queries.map(query => 
+      queryClient.invalidateQueries({ 
+        queryKey: query.queryKey,
+        refetchType: 'all'
+      })
+    )
+  );
+
+  // Then set up continuous fetching
+  queries.forEach(query => {
+    queryClient.prefetchQuery(query);
+  });
 };
 
 export const useActiveShop = create<ActiveShopState>()(
