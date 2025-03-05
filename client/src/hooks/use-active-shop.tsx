@@ -15,7 +15,7 @@ const refreshShopData = async (shopId: number) => {
   const queries = [
     {
       queryKey: ["/api/retail-inventory", shopId],
-      refetchInterval: 5000,
+      refetchInterval: 3000, // More frequent updates
       staleTime: 0,
       refetchOnMount: "always",
       refetchOnWindowFocus: true,
@@ -25,7 +25,7 @@ const refreshShopData = async (shopId: number) => {
     },
     {
       queryKey: ["/api/orders", shopId],
-      refetchInterval: 5000,
+      refetchInterval: 3000, // More frequent updates
       staleTime: 0,
       refetchOnMount: "always",
       refetchOnWindowFocus: true,
@@ -35,7 +35,7 @@ const refreshShopData = async (shopId: number) => {
     }
   ];
 
-  // First invalidate all queries
+  // First invalidate all queries to force refetch
   await Promise.all(
     queries.map(query => 
       queryClient.invalidateQueries({ 

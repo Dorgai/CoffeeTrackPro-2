@@ -1,12 +1,16 @@
 import {
   type User,
   type Shop,
+  type RetailInventory,
+  type Order,
   users,
   shops,
+  retailInventory,
+  orders,
   userShops,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -109,6 +113,98 @@ export class DatabaseStorage {
       throw error;
     }
   }
+  // Retail inventory operations with transaction support
+  async updateRetailInventory(inventory: RetailInventory): Promise<RetailInventory> {
+    return await db.transaction(async (tx) => {
+      // First get current inventory with row lock
+      const [current] = await tx
+        .select()
+        .from(retailInventory)
+        .where(
+          and(
+            eq(retailInventory.shopId, inventory.shopId),
+            eq(retailInventory.greenCoffeeId, inventory.greenCoffeeId)
+          )
+        )
+        .forUpdate();
+
+      if (current) {
+        // Update existing inventory
+        const [updated] = await tx
+          .update(retailInventory)
+          .set({
+            smallBags: inventory.smallBags,
+            largeBags: inventory.largeBags,
+            updatedById: inventory.updatedById,
+            updatedAt: new Date()
+          })
+          .where(eq(retailInventory.id, current.id))
+          .returning();
+        return updated;
+      } else {
+        // Create new inventory
+        const [created] = await tx
+          .insert(retailInventory)
+          .values({
+            ...inventory,
+            updatedAt: new Date()
+          })
+          .returning();
+        return created;
+      }
+    });
+  }
+
+  // Order operations with transaction support
+  async createOrder(order: Order): Promise<Order> {
+    return await db.transaction(async (tx) => {
+      // Create the order
+      const [newOrder] = await tx
+        .insert(orders)
+        .values({
+          ...order,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        .returning();
+
+      return newOrder;
+    });
+  }
+
+  // Get retail inventories with proper locking
+  async getRetailInventoriesByShop(shopId: number): Promise<RetailInventory[]> {
+    try {
+      const result = await db
+        .select()
+        .from(retailInventory)
+        .where(eq(retailInventory.shopId, shopId))
+        .orderBy(desc(retailInventory.updatedAt));
+
+      return result;
+    } catch (error) {
+      console.error("Error in getRetailInventoriesByShop:", error);
+      throw error;
+    }
+  }
+
+  // Get orders with proper locking
+  async getOrdersByShop(shopId: number): Promise<Order[]> {
+    try {
+      const result = await db
+        .select()
+        .from(orders)
+        .where(eq(orders.shopId, shopId))
+        .orderBy(desc(orders.createdAt));
+
+      return result;
+    } catch (error) {
+      console.error("Error getting orders:", error);
+      throw error;
+    }
+  }
+
+  // Permission checking with proper role validation
   async hasPermission(userId: number, permission: string): Promise<boolean> {
     try {
       const [user] = await db
@@ -116,7 +212,7 @@ export class DatabaseStorage {
         .from(users)
         .where(eq(users.id, userId));
 
-      if (!user) return false;
+      if (!user || !user.isActive) return false;
 
       const role = user.role;
 
@@ -181,6 +277,35 @@ export class DatabaseStorage {
     } catch (error) {
       console.error("Error checking permissions:", error);
       return false;
+    }
+  }
+
+  // Get user's shops with proper concurrency handling
+  async getUserShops(userId: number): Promise<Shop[]> {
+    try {
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, userId));
+
+      if (!user) {
+        throw new Error("User not found");
+      }
+
+      // For retail owners, roastery owners, and shop managers return all active shops
+      if (user.role === "retailOwner" || user.role === "roasteryOwner" || user.role === "shopManager") {
+        return await db
+          .select()
+          .from(shops)
+          .where(eq(shops.isActive, true))
+          .orderBy(shops.name);
+      }
+
+      // All other roles see no shops
+      return [];
+    } catch (error) {
+      console.error("Error in getUserShops:", error);
+      throw error;
     }
   }
 }
