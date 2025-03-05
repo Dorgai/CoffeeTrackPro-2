@@ -26,9 +26,16 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   // Fetch user's authorized shops for barista/manager
   const { data: userShops, isLoading: loadingUserShops } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
-    enabled: !!user && (user.role === "shopManager" || user.role === "barista"),
-    staleTime: 30000, // Cache for 30 seconds
-    retry: 3, // Retry failed requests 3 times
+    enabled: !!user && ["shopManager", "barista"].includes(user.role),
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/user/shops");
+      if (!res.ok) {
+        throw new Error("Failed to fetch user shops");
+      }
+      return res.json();
+    },
+    staleTime: 30000,
+    retry: 3,
   });
 
   // Fetch all shops for roasteryOwner
@@ -95,7 +102,7 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
               {shop.name}
             </SelectItem>
           ))}
-          {!shops || shops.length === 0 && (
+          {(!shops || shops.length === 0) && (
             <div className="relative flex items-center justify-center py-2 text-sm text-muted-foreground">
               No shops available
             </div>
