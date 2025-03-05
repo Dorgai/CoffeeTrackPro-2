@@ -1372,8 +1372,8 @@ export class DatabaseStorage implements IStorage {
 
       if (!user) return false;
 
+      // Retail owners should have all permissions except the specified ones
       switch (permission) {
-        // Restricted permissions
         case 'billing.write':
           return user.role === 'roasteryOwner';
         case 'greenCoffee.read':
@@ -1382,21 +1382,11 @@ export class DatabaseStorage implements IStorage {
         case 'shop.manage':
         case 'user.manage':
           return user.role === 'roasteryOwner';
-
-        // Retail owner permissions
         case 'retail.read':
         case 'retail.write':
-        case 'orders.read':
-        case 'orders.write':
         case 'analytics.read':
         case 'reports.read':
-        case 'inventory.read':
-        case 'inventory.write':
-          return ['roasteryOwner', 'retailOwner', 'shopManager'].includes(user.role);
-
-        case 'retail.basic':
-          return ['roasteryOwner', 'retailOwner', 'shopManager', 'barista'].includes(user.role);
-
+          return user.role === 'roasteryOwner' || user.role === 'retailOwner' || user.role === 'shopManager';
         default:
           return false;
       }
