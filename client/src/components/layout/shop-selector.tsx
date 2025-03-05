@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Shop } from "@shared/schema";
 import {
@@ -21,8 +20,10 @@ export function ShopSelector() {
     queryKey: ["/api/user/shops"],
   });
 
+  // When shops data is loaded, set default shop if needed
   useEffect(() => {
-    if (!shops?.length) return;
+    if (!shops || shops.length === 0) return;
+
     if (!activeShop || !shops.find(s => s.id === activeShop.id)) {
       setActiveShop(shops[0]);
     }
@@ -40,7 +41,7 @@ export function ShopSelector() {
     );
   }
 
-  if (!shops?.length) {
+  if (!shops || shops.length === 0) {
     return (
       <div className="flex items-center gap-2">
         <Store className="h-4 w-4 text-muted-foreground" />
@@ -56,8 +57,8 @@ export function ShopSelector() {
       <Store className="h-4 w-4 text-muted-foreground" />
       <Select
         value={activeShop?.id?.toString()}
-        onValueChange={(val) => {
-          const shop = shops.find(s => s.id === Number(val));
+        onValueChange={(value) => {
+          const shop = shops.find(s => s.id === parseInt(value));
           if (shop) {
             setActiveShop(shop);
           }
