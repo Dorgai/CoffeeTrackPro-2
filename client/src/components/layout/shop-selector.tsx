@@ -18,11 +18,41 @@ export function ShopSelector() {
     queryKey: ["/api/user/shops"],
   });
 
+  // Handle initial shop selection
   useEffect(() => {
     if (!activeShop && shops.length > 0) {
-      setActiveShop(shops[0]);
+      const initialShop = shops[0];
+      setActiveShop(initialShop);
+      // Prefetch data for initial shop
+      queryClient.prefetchQuery({ 
+        queryKey: ["/api/retail-inventory", initialShop.id] 
+      });
+      queryClient.prefetchQuery({ 
+        queryKey: ["/api/orders", initialShop.id] 
+      });
     }
   }, [shops, activeShop, setActiveShop]);
+
+  const handleShopChange = (shopId: string) => {
+    const selectedShop = shops.find((s) => s.id === parseInt(shopId));
+    if (selectedShop) {
+      setActiveShop(selectedShop);
+      // Invalidate and prefetch all shop-dependent queries
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/retail-inventory", selectedShop.id] 
+      });
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/orders", selectedShop.id] 
+      });
+      // Prefetch the data
+      queryClient.prefetchQuery({ 
+        queryKey: ["/api/retail-inventory", selectedShop.id] 
+      });
+      queryClient.prefetchQuery({ 
+        queryKey: ["/api/orders", selectedShop.id] 
+      });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -51,14 +81,8 @@ export function ShopSelector() {
     <div className="flex items-center gap-2">
       <Store className="h-4 w-4" />
       <Select
-        value={activeShop?.id.toString()}
-        onValueChange={(value) => {
-          const shop = shops.find((s) => s.id === parseInt(value));
-          if (shop) {
-            setActiveShop(shop);
-            queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shop.id] });
-          }
-        }}
+        value={activeShop?.id?.toString()}
+        onValueChange={handleShopChange}
       >
         <SelectTrigger className="w-[200px]">
           <SelectValue placeholder="Select a shop">

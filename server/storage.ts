@@ -280,7 +280,15 @@ export class DatabaseStorage implements IStorage {
       // Roastery owners and roasters can see all active shops
       if (user.role === "roasteryOwner" || user.role === "roaster") {
         return await db
-          .select()
+          .select({
+            id: shops.id,
+            name: shops.name,
+            location: shops.location,
+            isActive: shops.isActive,
+            defaultOrderQuantity: shops.defaultOrderQuantity,
+            desiredSmallBags: shops.desiredSmallBags,
+            desiredLargeBags: shops.desiredLargeBags
+          })
           .from(shops)
           .where(eq(shops.isActive, true))
           .orderBy(shops.name);
@@ -288,8 +296,16 @@ export class DatabaseStorage implements IStorage {
 
       // Shop managers and baristas can only see their assigned shops
       if (user.role === "shopManager" || user.role === "barista") {
-        return await db
-          .select()
+        const assignedShops = await db
+          .select({
+            id: shops.id,
+            name: shops.name,
+            location: shops.location,
+            isActive: shops.isActive,
+            defaultOrderQuantity: shops.defaultOrderQuantity,
+            desiredSmallBags: shops.desiredSmallBags,
+            desiredLargeBags: shops.desiredLargeBags
+          })
           .from(shops)
           .innerJoin(userShops, eq(shops.id, userShops.shopId))
           .where(
@@ -299,6 +315,8 @@ export class DatabaseStorage implements IStorage {
             )
           )
           .orderBy(shops.name);
+
+        return assignedShops;
       }
 
       // All other roles see no shops
@@ -962,8 +980,7 @@ export class DatabaseStorage implements IStorage {
             updatedAt: new Date()
           })
           .where(eq(coffeeLargeBagTargets.id, existing.id))
-          .returning();
-        return updated;
+          .returning();        return updated;
       } else {
         const [created] = await db
           .insert(coffeeLargeBagTargets)
