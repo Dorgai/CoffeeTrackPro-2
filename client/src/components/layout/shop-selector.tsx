@@ -21,13 +21,6 @@ export function ShopSelector() {
     queryKey: ["/api/user/shops"],
     retry: 3,
     staleTime: 1000 * 60 * 5, // 5 minutes
-    onError: (error: Error) => {
-      toast({
-        title: "Error loading shops",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
   });
 
   useEffect(() => {
@@ -52,6 +45,7 @@ export function ShopSelector() {
   }
 
   if (error) {
+    console.error("Shop selector error:", error);
     return (
       <div className="flex items-center gap-2">
         <Store className="h-4 w-4" />
@@ -63,6 +57,7 @@ export function ShopSelector() {
   }
 
   if (!shops?.length) {
+    console.log("No shops available");
     return (
       <div className="flex items-center gap-2">
         <Store className="h-4 w-4" />
@@ -72,6 +67,9 @@ export function ShopSelector() {
       </div>
     );
   }
+
+  console.log("Available shops:", shops);
+  console.log("Active shop:", activeShop);
 
   return (
     <div className="flex items-center gap-2">

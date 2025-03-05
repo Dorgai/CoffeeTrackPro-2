@@ -281,29 +281,31 @@ export class DatabaseStorage implements IStorage {
         throw new Error("User not found");
       }
 
-      const shopFields = {
-        id: shops.id,
-        name: shops.name,
-        location: shops.location,
-        isActive: shops.isActive,
-        defaultOrderQuantity: shops.defaultOrderQuantity,
-        desiredSmallBags: shops.desiredSmallBags,
-        desiredLargeBags: shops.desiredLargeBags,
-      };
+      let query = db
+        .select({
+          id: shops.id,
+          name: shops.name,
+          location: shops.location,
+          isActive: shops.isActive,
+          defaultOrderQuantity: shops.defaultOrderQuantity,
+          desiredSmallBags: shops.desiredSmallBags,
+          desiredLargeBags: shops.desiredLargeBags,
+        })
+        .from(shops)
+        .where(eq(shops.isActive, true));
 
-      let query;
-
-      // Roastery owners, retail owners and roasters can see all active shops
-      if (["roasteryOwner", "retailOwner", "roaster"].includes(user.role)) {
-        query = db
-          .select(shopFields)
-          .from(shops)
-          .where(eq(shops.isActive, true));
-      }
       // Shop managers and baristas can only see their assigned shops
-      else if (["shopManager", "barista"].includes(user.role)) {
+      if (user.role === "shopManager" || user.role === "barista") {
         query = db
-          .select(shopFields)
+          .select({
+            id: shops.id,
+            name: shops.name,
+            location: shops.location,
+            isActive: shops.isActive,
+            defaultOrderQuantity: shops.defaultOrderQuantity,
+            desiredSmallBags: shops.desiredSmallBags,
+            desiredLargeBags: shops.desiredLargeBags,
+          })
           .from(userShops)
           .innerJoin(shops, eq(userShops.shopId, shops.id))
           .where(
@@ -312,12 +314,10 @@ export class DatabaseStorage implements IStorage {
               eq(shops.isActive, true)
             )
           );
-      } else {
-        return [];
       }
 
       const results = await query.orderBy(shops.name);
-      console.log("Found shops:", results.length);
+      console.log("Found shops:", results);
       return results;
 
     } catch (error) {
