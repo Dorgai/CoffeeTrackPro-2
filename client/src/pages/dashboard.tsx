@@ -168,21 +168,8 @@ export default function Dashboard() {
 
           <Card>
             <CardHeader>
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle>Shop Performance</CardTitle>
-                  <CardDescription>Stock levels and status</CardDescription>
-                </div>
-                <Button
-                  variant="default"
-                  onClick={() => setIsRestockOpen(true)}
-                  disabled={!selectedShopId}
-                  size="sm"
-                >
-                  <Package className="h-4 w-4 mr-2" />
-                  Restock
-                </Button>
-              </div>
+              <CardTitle>Shop Performance</CardTitle>
+              <CardDescription>Stock levels and status</CardDescription>
             </CardHeader>
             <CardContent>
               {!selectedShopId ? (
@@ -191,7 +178,7 @@ export default function Dashboard() {
                 <p className="text-center text-muted-foreground">No inventory data available</p>
               ) : (
                 <div className="space-y-4">
-                  {shopInventory.map(inv => {
+                  {shopInventory.slice(0, 5).map(inv => {
                     const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
                     return (
                       <div key={`${selectedShopId}-${inv.greenCoffeeId}`} className="p-2 bg-muted rounded">
@@ -209,6 +196,11 @@ export default function Dashboard() {
                       </div>
                     );
                   })}
+                  {shopInventory.length > 5 && (
+                    <div className="text-center text-sm text-muted-foreground pt-2">
+                      Showing 5 of {shopInventory.length} items
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
