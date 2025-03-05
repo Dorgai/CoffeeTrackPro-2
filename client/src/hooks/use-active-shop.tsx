@@ -1,8 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Shop } from '@shared/schema';
-import { useAuth } from "./use-auth"; 
-import { useEffect, useState } from "react";
 
 
 interface ActiveShopState {
