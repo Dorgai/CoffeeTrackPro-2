@@ -54,7 +54,7 @@ export function ShopSelector() {
     <div className="flex items-center gap-2">
       <Store className="h-4 w-4 text-muted-foreground" />
       <Select
-        value={activeShop?.id?.toString() || ''}
+        value={activeShop?.id?.toString()}
         onValueChange={(val) => {
           const shop = shops.find(s => s.id === Number(val));
           if (shop) {
@@ -66,12 +66,10 @@ export function ShopSelector() {
         }}
       >
         <SelectTrigger className="w-[200px]">
-          <SelectValue placeholder="Select a shop">
-            {activeShop?.name || "Select a shop"}
-          </SelectValue>
+          <SelectValue placeholder="Select a shop" />
         </SelectTrigger>
         <SelectContent>
-          {shops.map((shop) => (
+          {shops?.map((shop) => (
             <SelectItem key={shop.id} value={`${shop.id}`}>
               {shop.name}
             </SelectItem>
