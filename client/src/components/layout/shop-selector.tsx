@@ -35,9 +35,11 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
     enabled: !!user && user.role === "roasteryOwner",
   });
 
+  const isLoading = loadingUserShops || loadingAllShops;
+  const shops = user?.role === "roasteryOwner" ? allShops : userShops;
+
   // Set default shop when shops data changes
   useEffect(() => {
-    const shops = user?.role === "roasteryOwner" ? allShops : userShops;
     if (!shops || shops.length === 0) return;
 
     // If no active shop or current shop is not in available shops
@@ -46,9 +48,6 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
       onChange?.(shops[0].id);
     }
   }, [userShops, allShops, activeShop, setActiveShop, onChange, user?.role]);
-
-  const isLoading = loadingUserShops || loadingAllShops;
-  const shops = user?.role === "roasteryOwner" ? allShops : userShops;
 
   if (isLoading) {
     return (
@@ -73,16 +72,20 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
     );
   }
 
+  // Ensure we have valid data before rendering the select
+  const validShops = shops.filter(shop => shop && typeof shop.id === 'number' && typeof shop.name === 'string');
+
   return (
     <div className={`flex items-center gap-2 ${className || ''}`}>
       <Store className="h-4 w-4 text-muted-foreground" />
       <Select
-        value={activeShop?.id?.toString()}
+        value={activeShop?.id ? String(activeShop.id) : undefined}
         onValueChange={(val) => {
-          const shop = shops.find(s => s.id.toString() === val);
-          if (shop) {
-            setActiveShop(shop);
-            onChange?.(shop.id);
+          if (!val) return;
+          const selectedShop = validShops.find(s => s.id === Number(val));
+          if (selectedShop) {
+            setActiveShop(selectedShop);
+            onChange?.(selectedShop.id);
           }
         }}
       >
@@ -90,8 +93,8 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
           <SelectValue placeholder="Select a shop" />
         </SelectTrigger>
         <SelectContent>
-          {shops.map((shop) => (
-            <SelectItem key={shop.id} value={shop.id.toString()}>
+          {validShops.map((shop) => (
+            <SelectItem key={shop.id} value={String(shop.id)}>
               {shop.name}
             </SelectItem>
           ))}
