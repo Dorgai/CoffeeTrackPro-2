@@ -1,5 +1,7 @@
 import * as React from "react";
 import { Link } from "wouter";
+import { useAuth } from "@/hooks/use-auth";
+import { Store, Coffee } from "lucide-react";
 import {
   Menubar,
   MenubarContent,
@@ -11,12 +13,17 @@ import {
 } from "@/components/ui/menubar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/hooks/use-auth";
 import { GreenBeansStockIndicator } from "./green-beans-stock-indicator";
-import { Coffee } from "lucide-react";
 
 export function NavBar() {
   const { user, logoutMutation } = useAuth();
+
+  const isRetailUser = user?.role === "retailOwner" || user?.role === "shopManager" || user?.role === "barista";
+  const isRoasteryUser = user?.role === "roasteryOwner" || user?.role === "roaster";
+  const canManageShops = user?.role === "roasteryOwner";
+  const canManageUsers = user?.role === "roasteryOwner";
+  const canAccessGreenCoffee = user?.role === "roasteryOwner" || user?.role === "roaster";
+  const canAccessAnalytics = user?.role === "roasteryOwner" || user?.role === "retailOwner" || user?.role === "shopManager";
 
   return (
     <div className="border-b">
@@ -39,100 +46,45 @@ export function NavBar() {
                   Home
                 </Link>
               </MenubarItem>
-              <MenubarItem>
-                <Link href="/inventory" className="flex w-full">
-                  Inventory
-                </Link>
-              </MenubarItem>
             </MenubarContent>
           </MenubarMenu>
-          {(user?.role === "roasteryOwner" || user?.role === "shopManager") && (
-            <>
-              <MenubarMenu>
-                <MenubarTrigger>Analytics</MenubarTrigger>
-                <MenubarContent>
-                  <MenubarItem>
-                    <Link href="/analytics" className="flex w-full">
-                      Overview
-                    </Link>
-                  </MenubarItem>
-                  <MenubarItem>
-                    <Link href="/reports" className="flex w-full">
-                      Reports
-                    </Link>
-                  </MenubarItem>
-                </MenubarContent>
-              </MenubarMenu>
-              <MenubarMenu>
-                <MenubarTrigger>Finance</MenubarTrigger>
-                <MenubarContent>
-                  <MenubarItem>
-                    <Link href="/billing" className="flex w-full">
-                      Billing Events
-                    </Link>
-                  </MenubarItem>
-                </MenubarContent>
-              </MenubarMenu>
-            </>
-          )}
-          {user?.role === "roasteryOwner" && (
-            <>
-              <MenubarMenu>
-                <MenubarTrigger>Green Coffee</MenubarTrigger>
-                <MenubarContent>
-                  <MenubarItem>
-                    <Link href="/inventory" className="flex w-full">
-                      Inventory
-                    </Link>
-                  </MenubarItem>
-                </MenubarContent>
-              </MenubarMenu>
-              <MenubarMenu>
-                <MenubarTrigger>Management</MenubarTrigger>
-                <MenubarContent>
-                  <MenubarItem>
-                    <Link href="/shops" className="flex w-full">
-                      Shop Management
-                    </Link>
-                  </MenubarItem>
-                  <MenubarItem>
-                    <Link href="/user-management" className="flex w-full">
-                      User Management
-                    </Link>
-                  </MenubarItem>
-                </MenubarContent>
-              </MenubarMenu>
-              <MenubarMenu>
-                <MenubarTrigger>Retail</MenubarTrigger>
-                <MenubarContent>
-                  <MenubarItem>
-                    <Link href="/retail" className="flex w-full">
-                      Inventory
-                    </Link>
-                  </MenubarItem>
-                  <MenubarItem>
-                    <Link href="/retail/orders" className="flex w-full">
-                      Orders
-                    </Link>
-                  </MenubarItem>
-                </MenubarContent>
-              </MenubarMenu>
-            </>
-          )}
-          {user?.role === "roaster" && (
+
+          {canAccessAnalytics && (
             <MenubarMenu>
-              <MenubarTrigger>Roasting</MenubarTrigger>
+              <MenubarTrigger>Analytics</MenubarTrigger>
               <MenubarContent>
                 <MenubarItem>
-                  <Link href="/roasting/orders" className="flex w-full">
-                    Orders
+                  <Link href="/analytics" className="flex w-full">
+                    Overview
                   </Link>
                 </MenubarItem>
                 <MenubarItem>
-                  <Link href="/roasting" className="flex w-full">
-                    Batches
+                  <Link href="/reports" className="flex w-full">
+                    Reports
                   </Link>
                 </MenubarItem>
+              </MenubarContent>
+            </MenubarMenu>
+          )}
+
+          {/* Only show Finance menu for roastery owner */}
+          {user?.role === "roasteryOwner" && (
+            <MenubarMenu>
+              <MenubarTrigger>Finance</MenubarTrigger>
+              <MenubarContent>
+                <MenubarItem>
+                  <Link href="/billing" className="flex w-full">
+                    Billing Events
+                  </Link>
+                </MenubarItem>
+              </MenubarContent>
+            </MenubarMenu>
+          )}
+
+          {canAccessGreenCoffee && (
+            <MenubarMenu>
+              <MenubarTrigger>Green Coffee</MenubarTrigger>
+              <MenubarContent>
                 <MenubarItem>
                   <Link href="/inventory" className="flex w-full">
                     Inventory
@@ -141,7 +93,28 @@ export function NavBar() {
               </MenubarContent>
             </MenubarMenu>
           )}
-          {(user?.role === "shopManager" || user?.role === "barista") && (
+
+          {canManageShops && (
+            <MenubarMenu>
+              <MenubarTrigger>Management</MenubarTrigger>
+              <MenubarContent>
+                <MenubarItem>
+                  <Link href="/shops" className="flex w-full">
+                    Shop Management
+                  </Link>
+                </MenubarItem>
+                {canManageUsers && (
+                  <MenubarItem>
+                    <Link href="/user-management" className="flex w-full">
+                      User Management
+                    </Link>
+                  </MenubarItem>
+                )}
+              </MenubarContent>
+            </MenubarMenu>
+          )}
+
+          {isRetailUser && (
             <>
               <MenubarMenu>
                 <MenubarTrigger>Retail</MenubarTrigger>
@@ -171,10 +144,11 @@ export function NavBar() {
             </>
           )}
         </Menubar>
+
         <div className="ml-auto flex items-center space-x-4">
           {user ? (
             <div className="flex items-center space-x-4">
-              {(user.role === "roasteryOwner" || user.role === "roaster") && (
+              {canAccessGreenCoffee && (
                 <>
                   <GreenBeansStockIndicator />
                   <Button variant="outline" size="sm" asChild>

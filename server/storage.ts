@@ -1004,9 +1004,9 @@ export class DatabaseStorage implements IStorage {
         throw new Error("Failed to update shop");
       }
 
-            return updatedShop;
+      return updatedShop;
     } catch (error) {
-      console.error("Error updating shop:", error);
+            console.error("Error updating shop:", error);
       throw error;
     }
   }
@@ -1372,6 +1372,7 @@ export class DatabaseStorage implements IStorage {
 
       if (!user) return false;
 
+      // Retail owners should have all permissions except the specified ones
       switch (permission) {
         case 'billing.write':
           return user.role === 'roasteryOwner';
@@ -1381,6 +1382,11 @@ export class DatabaseStorage implements IStorage {
         case 'shop.manage':
         case 'user.manage':
           return user.role === 'roasteryOwner';
+        case 'retail.read':
+        case 'retail.write':
+        case 'analytics.read':
+        case 'reports.read':
+          return user.role === 'roasteryOwner' || user.role === 'retailOwner' || user.role === 'shopManager';
         default:
           return false;
       }
