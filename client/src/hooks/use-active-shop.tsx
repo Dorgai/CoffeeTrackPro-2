@@ -23,36 +23,4 @@ export const useActiveShop = create<ActiveShopState>()(
 );
 
 
-//ShopSelector Component (Illustrative - Needs further implementation based on actual code)
-export const ShopSelector = () => {
-  const { activeShop, setActiveShop } = useActiveShop();
-  const { user } = useAuth(); 
-  const [shops, setShops] = useState<Shop[]>([]);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchShops = async () => {
-      try {
-        const response = await fetch('/api/user/shops', {
-          headers: {
-            Authorization: `Bearer ${user?.token}`, 
-          },
-        });
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || response.statusText);
-        }
-        const data = await response.json();
-        setShops(data);
-      } catch (err: any) {
-        setError(err.message);
-      }
-    };
-
-    if (user?.token) { 
-      fetchShops();
-    }
-  }, [user]);
-
-  // ... rest of the shop selector component implementation ...
-};
+// Note: The ShopSelector component is now defined in src/components/layout/shop-selector.tsx

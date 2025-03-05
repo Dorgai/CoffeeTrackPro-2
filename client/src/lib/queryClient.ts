@@ -48,18 +48,23 @@ export const getQueryFn: <T>(options: {
     return await res.json();
   };
 
+import { QueryClient } from "@tanstack/react-query";
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      queryFn: getQueryFn({ on401: "returnNull" }), // Changed to returnNull on 401
-      refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: 60000, // One minute
-      retry: (failureCount, error) => {
-        if (error instanceof Error && (error.message.includes("403") || error.message.includes("401"))) {
-          return false; // Don't retry on auth errors
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      retry: false,
+      queryFn: async ({ queryKey }) => {
+        const [url, ...params] = queryKey as [string, ...any[]];
+        const response = await fetch(url, {
+          credentials: 'include' // Include cookies for session authentication
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
-        return failureCount < 3;
+        return response.json();
       },
     },
     mutations: {

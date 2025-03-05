@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 export function ShopSelector() {
   const { activeShop, setActiveShop } = useActiveShop();
   const { user } = useAuth();
+  const [initialized, setInitialized] = useState(false);
 
   const { data: shops, isLoading, error } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
@@ -24,15 +25,27 @@ export function ShopSelector() {
     enabled: !!user, // Only run the query if the user is logged in
     onError: (error) => {
       console.error("Error loading shops:", error);
+    },
+    // Add proper configuration for credentials
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const response = await fetch('/api/user/shops', {
+        credentials: 'include' // Important for session cookies
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch shops');
+      }
+      return response.json();
     }
   });
 
-  // Handle initial shop selection
-  useState(() => {
-    if (shops && shops.length > 0 && !activeShop) {
+  // Handle initial shop selection with useEffect instead of useState
+  useEffect(() => {
+    if (shops && shops.length > 0 && !activeShop && !initialized) {
       setActiveShop(shops[0]);
+      setInitialized(true);
     }
-  });
+  }, [shops, activeShop, setActiveShop, initialized]);
 
   if (isLoading) {
     return (

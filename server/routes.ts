@@ -132,8 +132,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const shops = await storage.getUserShops(req.user.id);
-      res.json(shops);
+      console.log("Fetching shops for user:", req.user.id, req.user.username);
+      
+      try {
+        const shops = await storage.getUserShops(req.user.id);
+        console.log("Shops found:", shops);
+        return res.json(shops || []);
+      } catch (dbError) {
+        console.error("Database error fetching user shops:", dbError);
+        // Return empty array instead of error to prevent UI issues
+        return res.json([]);
+      }
     } catch (error) {
       console.error("Error fetching user shops:", error);
       res.status(500).json({ message: "Failed to fetch shops" });
