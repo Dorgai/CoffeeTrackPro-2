@@ -1393,11 +1393,12 @@ export class DatabaseStorage implements IStorage {
           return user.role === 'roasteryOwner';
         case 'retail.read':
         case 'retail.write':
+        case 'orders.read':
+        case 'orders.write':
+          return ['roasteryOwner', 'retailOwner', 'shopManager', 'barista'].includes(user.role);
         case 'analytics.read':
         case 'reports.read':
-          return user.role === 'roasteryOwner' || user.role === 'retailOwner' || user.role === 'shopManager';
-        case 'retail.basic':
-          return user.role === 'roasteryOwner' || user.role === 'retailOwner' || user.role === 'shopManager' || user.role === 'barista';
+          return ['roasteryOwner', 'retailOwner', 'shopManager'].includes(user.role);
         default:
           return false;
       }
