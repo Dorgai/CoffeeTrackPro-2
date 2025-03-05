@@ -1355,45 +1355,42 @@ export class DatabaseStorage implements IStorage {
 
       const role = user.role;
 
-      // Return true for retail owners for all retail and order operations
+      // Grant all retail-related permissions to retail owners
       if (role === "retailOwner") {
-        if (permission.startsWith("retail.") || permission.startsWith("orders.")) {
+        if (permission.startsWith("retail.") || 
+            permission.startsWith("orders.") || 
+            permission.startsWith("inventory.") ||
+            permission === "analytics.read" ||
+            permission === "reports.read") {
           return true;
         }
       }
 
-      switch (permission) {
-        // Retail operations - retail owners, roastery owners, and shop managers
-        case "orders.read":
-        case "orders.write":
-        case "retail.read":
-        case "retail.write":
-        case "retail.orders":
-        case "retail.inventory":
-          return role === "retailOwner" || role === "roasteryOwner" || role === "shopManager";
-
-        // Roasting operations - roastery owners and roasters
-        case "roasting.read":
-        case "roasting.write":
-        case "greencoffee.read":
-        case "greencoffee.write":
-          return role === "roasteryOwner" || role === "roaster";
-
-        // Management operations - roastery owners only
-        case "shop.manage":
-        case "user.manage":
-        case "billing.read":
-        case "billing.write":
-          return role === "roasteryOwner";
-
-        // Analytics & Reports - owners and managers
-        case "analytics.read":
-        case "reports.read":
-          return role === "retailOwner" || role === "roasteryOwner" || role === "shopManager";
-
-        default:
-          return false;
+      // Grant all permissions to roastery owners
+      if (role === "roasteryOwner") {
+        return true;
       }
+
+      // Shop managers get retail and orders access
+      if (role === "shopManager") {
+        if (permission.startsWith("retail.") || 
+            permission.startsWith("orders.") || 
+            permission.startsWith("inventory.") ||
+            permission === "analytics.read" ||
+            permission === "reports.read") {
+          return true;
+        }
+      }
+
+      // Roasters only get roasting-related permissions
+      if (role === "roaster") {
+        if (permission.startsWith("roasting.") || 
+            permission.startsWith("greencoffee.")) {
+          return true;
+        }
+      }
+
+      return false;
     } catch (error) {
       console.error("Error checking permissions:", error);
       return false;
