@@ -73,9 +73,8 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
         throw new Error("Failed to restock inventory");
       }
 
-      // Invalidate the inventory queries to refresh the data
       queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory"] });
-
+      
       toast({
         title: "Success",
         description: "Inventory has been restocked",
