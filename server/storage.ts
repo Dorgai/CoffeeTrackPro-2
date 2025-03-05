@@ -280,15 +280,7 @@ export class DatabaseStorage implements IStorage {
           .orderBy(shops.name);
       }
 
-      if (user?.role === "shopManager") {
-        return await db
-          .select()
-          .from(shops)
-          .where(eq(shops.isActive, true))
-          .orderBy(shops.name);
-      }
-
-      if (user?.role === "barista") {
+      if (user?.role === "shopManager" || user?.role === "barista") {
         return await db
           .select()
           .from(userShops)

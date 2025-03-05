@@ -19,6 +19,7 @@ export function ShopSelector() {
     queryKey: ["/api/user/shops"],
   });
 
+  // Loading state
   if (isLoading) {
     return (
       <div className="flex items-center gap-2">
@@ -31,6 +32,7 @@ export function ShopSelector() {
     );
   }
 
+  // No shops available
   if (!shops || shops.length === 0) {
     return (
       <div className="flex items-center gap-2">
@@ -45,9 +47,7 @@ export function ShopSelector() {
   // If no active shop is set, set the first available shop
   if (!activeShop && shops.length > 0) {
     setActiveShop(shops[0]);
-    // Invalidate queries that depend on shop ID
     queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shops[0].id] });
-    queryClient.invalidateQueries({ queryKey: ["/api/orders", shops[0].id] });
   }
 
   return (
@@ -59,9 +59,7 @@ export function ShopSelector() {
           const shop = shops.find(s => s.id === Number(val));
           if (shop) {
             setActiveShop(shop);
-            // Invalidate queries that depend on shop ID
             queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shop.id] });
-            queryClient.invalidateQueries({ queryKey: ["/api/orders", shop.id] });
           }
         }}
       >
@@ -69,8 +67,8 @@ export function ShopSelector() {
           <SelectValue placeholder="Select a shop" />
         </SelectTrigger>
         <SelectContent>
-          {shops?.map((shop) => (
-            <SelectItem key={shop.id} value={`${shop.id}`}>
+          {shops.map((shop) => (
+            <SelectItem key={shop.id} value={shop.id.toString()}>
               {shop.name}
             </SelectItem>
           ))}
