@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Shop } from "@shared/schema";
 import {
@@ -16,13 +17,22 @@ export function ShopSelector() {
   const { user } = useAuth();
 
   // Fetch user's authorized shops
-  const { data: shops, isLoading } = useQuery<Shop[]>({
+  const { data: userShops, isLoading: loadingUserShops } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
+    enabled: !!user && user.role !== "roasteryOwner",
   });
 
-  // When shops data is loaded, set default shop if needed
+  // Fetch all shops for roasteryOwner
+  const { data: allShops, isLoading: loadingAllShops } = useQuery<Shop[]>({
+    queryKey: ["/api/shops"],
+    enabled: !!user && user.role === "roasteryOwner",
+  });
+
+  const isLoading = loadingUserShops || loadingAllShops;
+  const shops = user?.role === "roasteryOwner" ? allShops : userShops;
+
   useEffect(() => {
-    if (!shops || shops.length === 0) return;
+    if (!shops?.length) return;
 
     if (!activeShop || !shops.find(s => s.id === activeShop.id)) {
       setActiveShop(shops[0]);
@@ -57,8 +67,8 @@ export function ShopSelector() {
       <Store className="h-4 w-4 text-muted-foreground" />
       <Select
         value={activeShop?.id?.toString()}
-        onValueChange={(value) => {
-          const shop = shops.find(s => s.id === parseInt(value));
+        onValueChange={(val) => {
+          const shop = shops.find(s => s.id === parseInt(val));
           if (shop) {
             setActiveShop(shop);
           }
@@ -71,7 +81,7 @@ export function ShopSelector() {
         </SelectTrigger>
         <SelectContent>
           {shops.map((shop) => (
-            <SelectItem key={shop.id} value={`${shop.id}`}>
+            <SelectItem key={shop.id} value={shop.id.toString()}>
               {shop.name}
             </SelectItem>
           ))}
