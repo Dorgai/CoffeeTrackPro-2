@@ -49,13 +49,15 @@ export function ShopSelector() {
     );
   }
 
+  const validShops = shops.filter(shop => shop && typeof shop.id === 'number');
+
   return (
     <div className="flex items-center gap-2">
       <Store className="h-4 w-4" />
       <Select
-        value={activeShop?.id?.toString()}
+        value={activeShop?.id?.toString() || ""}
         onValueChange={(value) => {
-          const shop = shops.find((s) => s.id === parseInt(value));
+          const shop = validShops.find((s) => s.id === parseInt(value));
           if (shop) {
             setActiveShop(shop);
             queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shop.id] });
@@ -68,7 +70,7 @@ export function ShopSelector() {
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
-          {shops.map((shop) => (
+          {validShops.map((shop) => (
             <SelectItem key={shop.id} value={shop.id.toString()}>
               {shop.name}
             </SelectItem>
