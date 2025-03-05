@@ -315,8 +315,8 @@ export class DatabaseStorage {
         throw new Error("User not found");
       }
 
-      // For retail owners, roastery owners, and shop managers return all active shops
-      if (user.role === "retailOwner" || user.role === "roasteryOwner" || user.role === "shopManager") {
+      // Return all active shops for these roles
+      if (["retailOwner", "roasteryOwner", "shopManager"].includes(user.role)) {
         return await db
           .select()
           .from(shops)
@@ -324,7 +324,28 @@ export class DatabaseStorage {
           .orderBy(shops.name);
       }
 
-      // All other roles see no shops
+      // Baristas and roasters get shops based on assignments
+      if (user.role === "barista" || user.role === "roaster") {
+        return await db
+          .select({
+            id: shops.id,
+            name: shops.name,
+            location: shops.location,
+            isActive: shops.isActive,
+            defaultOrderQuantity: shops.defaultOrderQuantity,
+            desiredSmallBags: shops.desiredSmallBags,
+          })
+          .from(shops)
+          .innerJoin(userShops, eq(shops.id, userShops.shopId))
+          .where(
+            and(
+              eq(userShops.userId, userId),
+              eq(shops.isActive, true)
+            )
+          )
+          .orderBy(shops.name);
+      }
+
       return [];
     } catch (error) {
       console.error("Error in getUserShops:", error);

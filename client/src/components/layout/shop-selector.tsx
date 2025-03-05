@@ -18,9 +18,11 @@ export function ShopSelector() {
     queryKey: ["/api/user/shops"],
     refetchOnMount: "always",
     staleTime: 0,
-    refetchInterval: 5000, // Refresh shop list every 5 seconds
+    refetchInterval: 3000, // More frequent shop list updates
     refetchOnWindowFocus: true,
-    refetchOnReconnect: true
+    refetchOnReconnect: true,
+    retry: 3,
+    retryDelay: 1000,
   });
 
   // Initialize shop selection
@@ -28,28 +30,6 @@ export function ShopSelector() {
     if (shops.length > 0 && !activeShop) {
       const initialShop = shops[0];
       setActiveShop(initialShop);
-
-      // Prefetch initial data immediately
-      queryClient.prefetchQuery({ 
-        queryKey: ["/api/retail-inventory", initialShop.id],
-        staleTime: 0,
-        refetchInterval: 5000,
-        refetchOnMount: "always",
-        refetchOnWindowFocus: true,
-        refetchOnReconnect: true,
-        retry: 3,
-        retryDelay: 1000,
-      });
-      queryClient.prefetchQuery({ 
-        queryKey: ["/api/orders", initialShop.id],
-        staleTime: 0,
-        refetchInterval: 5000,
-        refetchOnMount: "always",
-        refetchOnWindowFocus: true,
-        refetchOnReconnect: true,
-        retry: 3,
-        retryDelay: 1000,
-      });
     }
   }, [shops, activeShop, setActiveShop]);
 
@@ -84,7 +64,6 @@ export function ShopSelector() {
         onValueChange={(value) => {
           const selectedShop = shops.find((s) => s.id === parseInt(value));
           if (selectedShop) {
-            // This will trigger the refreshShopData internally
             setActiveShop(selectedShop);
           }
         }}
