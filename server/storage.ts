@@ -1003,8 +1003,7 @@ export class DatabaseStorage implements IStorage {
       const [updatedShop] = await db
         .update(shops)
         .set(update)
-        .where(eq(shops.id, id))
-        .returning();
+        .where(eq(shops.id, id))        .returning();
 
       if (!updatedShop) {
         throw new Error("Failed to update shop");
@@ -1401,12 +1400,15 @@ export class DatabaseStorage implements IStorage {
         case "user.manage":
           return role === "roasteryOwner";
 
-        // Retail Operations - retail owner, roastery owner, shop manager (excluding barista)
-        case "retail.read":
-        case "retail.write":
+        // Orders - all users except roaster can read and write orders
         case "orders.read":
         case "orders.write":
-          return role === "roasteryOwner" || role === "retailOwner" || role === "shopManager";
+          return role !== "roaster";
+
+        // Retail Operations - all users except roaster
+        case "retail.read":
+        case "retail.write":
+          return role !== "roaster";
 
         // Analytics & Reports - owners and managers
         case "analytics.read":
