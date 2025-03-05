@@ -1355,39 +1355,40 @@ export class DatabaseStorage implements IStorage {
 
       const role = user.role;
 
-      // Grant all retail-related permissions to retail owners
+      // Basic permissions for retail owners
       if (role === "retailOwner") {
-        if (permission.startsWith("retail.") || 
-            permission.startsWith("orders.") || 
-            permission.startsWith("inventory.") ||
-            permission === "analytics.read" ||
-            permission === "reports.read") {
-          return true;
-        }
+        return true; // Give full access to retail owners for now
       }
 
-      // Grant all permissions to roastery owners
+      // Full access for roastery owners
       if (role === "roasteryOwner") {
         return true;
       }
 
-      // Shop managers get retail and orders access
+      // Shop managers get retail operations access
       if (role === "shopManager") {
-        if (permission.startsWith("retail.") || 
-            permission.startsWith("orders.") || 
-            permission.startsWith("inventory.") ||
-            permission === "analytics.read" ||
-            permission === "reports.read") {
-          return true;
-        }
+        const retailOperations = [
+          "retail.read",
+          "retail.write",
+          "retail.orders",
+          "retail.inventory",
+          "orders.read",
+          "orders.write",
+          "analytics.read",
+          "reports.read"
+        ];
+        return retailOperations.includes(permission);
       }
 
-      // Roasters only get roasting-related permissions
+      // Roasters get roasting-related permissions
       if (role === "roaster") {
-        if (permission.startsWith("roasting.") || 
-            permission.startsWith("greencoffee.")) {
-          return true;
-        }
+        const roastingOperations = [
+          "roasting.read",
+          "roasting.write",
+          "greencoffee.read",
+          "greencoffee.write"
+        ];
+        return roastingOperations.includes(permission);
       }
 
       return false;
