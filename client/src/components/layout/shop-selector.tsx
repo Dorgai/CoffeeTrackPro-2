@@ -40,21 +40,28 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
 
   // Transform userShops based on role
   const transformedShops = user?.role === "barista" && userShops
-    ? userShops.map(item => item.shops)
+    ? userShops.map(item => item.shops).filter(Boolean)
     : userShops;
+
+  console.log("[ShopSelector] Role:", user?.role);
+  console.log("[ShopSelector] Raw userShops:", userShops);
+  console.log("[ShopSelector] Transformed shops:", transformedShops);
+  console.log("[ShopSelector] Active shop:", activeShop);
 
   // Set default shop on mount and when shops data changes
   useEffect(() => {
     const shops = user?.role === "roasteryOwner" ? allShops : transformedShops;
 
     // Only proceed if we have shops data
-    if (!shops?.length) return;
+    if (!shops?.length) {
+      console.log("[ShopSelector] No shops available yet");
+      return;
+    }
 
     // If no active shop or current shop is not in available shops
     const currentShopIsValid = activeShop && shops.find(s => s.id === activeShop.id);
     if (!currentShopIsValid) {
       console.log("[ShopSelector] Setting default shop");
-      console.log("[ShopSelector] User role:", user?.role);
       console.log("[ShopSelector] Available shops:", shops);
 
       // Use first available shop as default
@@ -107,7 +114,7 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
           <SelectValue placeholder="Select a shop" />
         </SelectTrigger>
         <SelectContent>
-          {shops?.map((shop) => (
+          {shops?.map((shop) => shop && (
             <SelectItem key={shop.id} value={`${shop.id}`}>
               {shop.name}
             </SelectItem>
