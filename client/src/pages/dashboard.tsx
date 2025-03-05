@@ -177,30 +177,48 @@ export default function Dashboard() {
               ) : !shopInventory?.length ? (
                 <p className="text-center text-muted-foreground">No inventory data available</p>
               ) : (
-                <div className="space-y-4">
-                  {shopInventory.slice(0, 5).map(inv => {
-                    const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
-                    return (
-                      <div key={`${selectedShopId}-${inv.greenCoffeeId}`} className="p-2 bg-muted rounded">
-                        <div className="text-sm font-medium mb-2">{coffee?.name}</div>
-                        <StockProgress
-                          current={inv.smallBags || 0}
-                          desired={shop?.desiredSmallBags || 20}
-                          label="Small Bags (200g)"
-                        />
-                        <StockProgress
-                          current={inv.largeBags || 0}
-                          desired={shop?.desiredLargeBags || 10}
-                          label="Large Bags (1kg)"
-                        />
+                <div key={selectedShopId} className="space-y-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-medium">{shop?.name}</h3>
+                    <Badge variant={
+                      shopInventory.some(item =>
+                        (item.smallBags || 0) < (shop?.desiredSmallBags || 20) / 2 ||
+                        (item.largeBags || 0) < (shop?.desiredLargeBags || 10) / 2
+                      ) ? "destructive" : "outline"
+                    }>
+                      {shopInventory.filter(item =>
+                        (item.smallBags || 0) < (shop?.desiredSmallBags || 20) / 2 ||
+                        (item.largeBags || 0) < (shop?.desiredLargeBags || 10) / 2
+                      ).length > 0 ? "Low Stock Items" : "Stock OK"}
+                    </Badge>
+                  </div>
+                  <div className="mt-4 space-y-2">
+                    {shopInventory.slice(0, 5).map(inv => {
+                      const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
+                      return (
+                        <div key={`${selectedShopId}-${inv.greenCoffeeId}`} className="p-2 bg-muted rounded">
+                          <div className="text-sm font-medium mb-2">{coffee?.name}</div>
+                          <div className="space-y-2">
+                            <StockProgress
+                              current={inv.smallBags || 0}
+                              desired={shop?.desiredSmallBags || 20}
+                              label="Small Bags (200g)"
+                            />
+                            <StockProgress
+                              current={inv.largeBags || 0}
+                              desired={shop?.desiredLargeBags || 10}
+                              label="Large Bags (1kg)"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {shopInventory.length > 5 && (
+                      <div className="text-center text-sm text-muted-foreground pt-2">
+                        Showing 5 of {shopInventory.length} items
                       </div>
-                    );
-                  })}
-                  {shopInventory.length > 5 && (
-                    <div className="text-center text-sm text-muted-foreground pt-2">
-                      Showing 5 of {shopInventory.length} items
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               )}
             </CardContent>
