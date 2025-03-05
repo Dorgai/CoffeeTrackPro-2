@@ -23,7 +23,7 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   const { user } = useAuth();
 
   // Fetch user's authorized shops for both barista and manager
-  const { data: userShops, isLoading: loadingUserShops } = useQuery<Shop[]>({
+  const { data: userShops, isLoading: loadingUserShops } = useQuery<any[]>({
     queryKey: ["/api/user/shops"],
     enabled: !!user && user.role !== "roasteryOwner",
     staleTime: 30000,
@@ -38,9 +38,14 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
     retry: 3,
   });
 
+  // Transform userShops based on role
+  const transformedShops = user?.role === "barista" && userShops
+    ? userShops.map(item => item.shops)
+    : userShops;
+
   // Set default shop on mount and when shops data changes
   useEffect(() => {
-    const shops = user?.role === "roasteryOwner" ? allShops : userShops;
+    const shops = user?.role === "roasteryOwner" ? allShops : transformedShops;
 
     // Only proceed if we have shops data
     if (!shops?.length) return;
@@ -61,11 +66,11 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
         onChange(defaultShop.id);
       }
     }
-  }, [userShops, allShops, user?.role, activeShop, setActiveShop, onChange]);
+  }, [transformedShops, allShops, user?.role, activeShop, setActiveShop, onChange]);
 
   const handleChange = (value: string) => {
     const shopId = value ? parseInt(value, 10) : null;
-    const shops = user?.role === "roasteryOwner" ? allShops : userShops;
+    const shops = user?.role === "roasteryOwner" ? allShops : transformedShops;
     const shop = shops?.find((s) => s.id === shopId);
     console.log("[ShopSelector] Changing shop to:", shop);
 
@@ -76,7 +81,7 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
   };
 
   const isLoading = loadingUserShops || loadingAllShops;
-  const shops = user?.role === "roasteryOwner" ? allShops : userShops;
+  const shops = user?.role === "roasteryOwner" ? allShops : transformedShops;
   const currentValue = value !== undefined ? value : activeShop?.id;
 
   if (isLoading) {
