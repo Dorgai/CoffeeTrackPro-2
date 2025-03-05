@@ -10,34 +10,28 @@ import {
 } from "@/components/ui/select";
 import { useActiveShop } from "@/hooks/use-active-shop";
 import { Store, Loader2 } from "lucide-react";
-import { useAuth } from "@/hooks/use-auth";
 
-export function ShopSelector() {
+interface ShopSelectorProps {
+  value?: number | null;
+  onChange?: (shopId: number | null) => void;
+}
+
+export function ShopSelector({ value, onChange }: ShopSelectorProps) {
   const { activeShop, setActiveShop } = useActiveShop();
-  const { user } = useAuth();
 
-  // Fetch user's authorized shops
-  const { data: userShops, isLoading: loadingUserShops } = useQuery<Shop[]>({
+  // Fetch user's authorized shops - this endpoint handles role-specific logic
+  const { data: shops, isLoading } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
-    enabled: !!user && user.role !== "roasteryOwner",
   });
-
-  // Fetch all shops for roasteryOwner
-  const { data: allShops, isLoading: loadingAllShops } = useQuery<Shop[]>({
-    queryKey: ["/api/shops"],
-    enabled: !!user && user.role === "roasteryOwner",
-  });
-
-  const isLoading = loadingUserShops || loadingAllShops;
-  const shops = user?.role === "roasteryOwner" ? allShops : userShops;
 
   useEffect(() => {
     if (!shops?.length) return;
 
     if (!activeShop || !shops.find(s => s.id === activeShop.id)) {
       setActiveShop(shops[0]);
+      onChange?.(shops[0].id);
     }
-  }, [shops, activeShop, setActiveShop]);
+  }, [shops, activeShop, setActiveShop, onChange]);
 
   if (isLoading) {
     return (
@@ -66,11 +60,12 @@ export function ShopSelector() {
     <div className="flex items-center gap-2">
       <Store className="h-4 w-4 text-muted-foreground" />
       <Select
-        value={activeShop?.id?.toString()}
+        value={value?.toString() || activeShop?.id?.toString()}
         onValueChange={(val) => {
           const shop = shops.find(s => s.id === parseInt(val));
           if (shop) {
             setActiveShop(shop);
+            onChange?.(shop.id);
           }
         }}
       >
