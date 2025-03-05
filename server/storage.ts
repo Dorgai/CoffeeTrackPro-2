@@ -288,8 +288,8 @@ export class DatabaseStorage implements IStorage {
         return allShops;
       }
 
-      // Shop managers and baristas can only see their assigned shops
-      if (user.role === "shopManager" || user.role === "barista") {
+      // Only shop managers can see their assigned shops (barista temporarily disabled)
+      if (user.role === "shopManager") {
         const assignedShops = await db
           .select({
             id: shops.id,
@@ -313,7 +313,7 @@ export class DatabaseStorage implements IStorage {
         return assignedShops;
       }
 
-      // All other roles see no shops
+      // All other roles (including barista) see no shops
       return [];
 
     } catch (error) {
@@ -1397,12 +1397,12 @@ export class DatabaseStorage implements IStorage {
         case "user.manage":
           return role === "roasteryOwner";
 
-        // Retail Operations - all roles
+        // Retail Operations - all roles except barista
         case "retail.read":
         case "retail.write":
         case "orders.read":
         case "orders.write":
-          return true;
+          return role !== "barista";
 
         // Analytics & Reports - owners and managers
         case "analytics.read":
