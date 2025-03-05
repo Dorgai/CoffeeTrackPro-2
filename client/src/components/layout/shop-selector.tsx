@@ -13,16 +13,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useActiveShop } from "@/hooks/use-active-shop";
-import { useAuth } from "@/hooks/use-auth";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Skeleton } from "@/components/ui/skeleton";
 
 export function ShopSelector() {
   const { activeShop, setActiveShop } = useActiveShop();
