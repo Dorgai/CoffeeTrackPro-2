@@ -27,6 +27,7 @@ export function NavBar() {
   const canAccessAnalytics = user?.role === "roasteryOwner" || user?.role === "retailOwner" || user?.role === "shopManager";
   const canAccessFinance = user?.role === "roasteryOwner";
   const canAccessRoasting = user?.role === "roaster";
+  const canAccessRetail = user?.role === "roasteryOwner" || user?.role === "retailOwner" || user?.role === "shopManager" || user?.role === "barista";
 
   return (
     <div className="border-b">
@@ -134,7 +135,7 @@ export function NavBar() {
             </MenubarMenu>
           )}
 
-          {(isRetailUser || user?.role === "roasteryOwner") && (
+          {canAccessRetail && (
             <>
               <MenubarMenu>
                 <MenubarTrigger>Retail</MenubarTrigger>
