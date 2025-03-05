@@ -268,21 +268,26 @@ export class DatabaseStorage implements IStorage {
 
   async getUserShops(userId: number): Promise<Shop[]> {
     try {
+      console.log("Fetching shops for user:", userId);
+
       const [user] = await db
         .select()
         .from(users)
         .where(eq(users.id, userId));
 
+      console.log("User role:", user?.role);
+
       if (!user) {
         throw new Error("User not found");
       }
 
-      // Shop managers and baristas can only see their assigned shops
+      // Only shopManager and barista can see their assigned shops
       if (user.role === "shopManager" || user.role === "barista") {
-        return await db
+        console.log("User is shopManager/barista, fetching assigned shops");
+        const result = await db
           .select()
-          .from(userShops)
-          .innerJoin(shops, eq(userShops.shopId, shops.id))
+          .from(shops)
+          .innerJoin(userShops, eq(userShops.shopId, shops.id))
           .where(
             and(
               eq(userShops.userId, userId),
@@ -290,15 +295,24 @@ export class DatabaseStorage implements IStorage {
             )
           )
           .orderBy(shops.name);
+        console.log("Found assigned shops:", result);
+        return result;
       }
 
-      // All other roles can see all active shops
-      return await db
-        .select()
-        .from(shops)
-        .where(eq(shops.isActive, true))
-        .orderBy(shops.name);
+      // Only roasteryOwner and roaster can see all shops
+      if (user.role === "roasteryOwner" || user.role === "roaster") {
+        console.log("User is roasteryOwner/roaster, fetching all shops");
+        const result = await db
+          .select()
+          .from(shops)
+          .where(eq(shops.isActive, true))
+          .orderBy(shops.name);
+        console.log("Found all shops:", result);
+        return result;
+      }
 
+      console.log("User role not authorized to view shops:", user.role);
+      return [];
     } catch (error) {
       console.error("Error in getUserShops:", error);
       throw error;
@@ -999,11 +1013,10 @@ export class DatabaseStorage implements IStorage {
         console.error("Error updating shop:", error);
       throw error;
     }
-  }
+  }  }
 
   // Billing methods
-  async getLastBillingEvent(): Promise<BillingEvent | undefined> {
-        try {
+  async getLastBillingEvent(): Promise<BillingEvent | undefined> {        try {
       const [lastEvent] = await db
         .select()
         .from(billingEvents)

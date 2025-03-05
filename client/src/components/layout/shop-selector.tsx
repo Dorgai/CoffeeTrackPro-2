@@ -16,11 +16,18 @@ export function ShopSelector() {
   const { activeShop, setActiveShop } = useActiveShop();
 
   const { data: shops, isLoading } = useQuery<Shop[]>({
-    queryKey: ["/api/user/shops"]
+    queryKey: ["/api/user/shops"],
+    onSuccess: (data) => {
+      console.log("Received shops data:", data);
+    },
+    onError: (error) => {
+      console.error("Error fetching shops:", error);
+    }
   });
 
   useEffect(() => {
-    if (shops?.[0] && !activeShop) {
+    if (shops?.length && !activeShop) {
+      console.log("Setting initial active shop:", shops[0]);
       setActiveShop(shops[0]);
       queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shops[0].id] });
     }
@@ -53,10 +60,11 @@ export function ShopSelector() {
     <div className="flex items-center gap-2">
       <Store className="h-4 w-4" />
       <Select
-        value={activeShop?.id.toString()}
+        value={activeShop?.id?.toString()}
         onValueChange={(value) => {
           const shop = shops.find((s) => s.id === parseInt(value));
           if (shop) {
+            console.log("Changing active shop to:", shop);
             setActiveShop(shop);
             queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shop.id] });
           }

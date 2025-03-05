@@ -2,7 +2,7 @@ import { pgTable, text, serial, integer, boolean, decimal, timestamp, json } fro
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const userRoles = ["roasteryOwner", "retailOwner", "roaster", "shopManager", "barista"] as const;
+export const userRoles = ["roasteryOwner", "roaster", "shopManager", "barista"] as const;
 export const coffeeGrades = ["Specialty", "Premium", "Rarity"] as const;
 
 export const users = pgTable("users", {
