@@ -28,14 +28,13 @@ export function ShopSelector({ value, onChange, className }: ShopSelectorProps) 
     queryKey: ["/api/user/shops"],
     enabled: !!user && user.role !== "roasteryOwner",
     queryFn: async () => {
-      console.log("Fetching user shops for role:", user?.role);
       const res = await apiRequest("GET", "/api/user/shops");
       if (!res.ok) {
         const error = await res.text();
         throw new Error(`Failed to fetch user shops: ${error}`);
       }
       const data = await res.json();
-      console.log("Fetched user shops:", data);
+      console.log("User shops for", user?.id, ":", data);
       return data;
     },
     staleTime: 30000,
