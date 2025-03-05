@@ -279,51 +279,17 @@ export class DatabaseStorage implements IStorage {
 
       // For retail owners and roastery owners, return all active shops
       if (user.role === "retailOwner" || user.role === "roasteryOwner") {
-        const allShops = await db
-          .select({
-            id: shops.id,
-            name: shops.name,
-            location: shops.location,
-            isActive: shops.isActive,
-            defaultOrderQuantity: shops.defaultOrderQuantity,
-            desiredSmallBags: shops.desiredSmallBags
-          })
+        return await db
+          .select()
           .from(shops)
           .where(eq(shops.isActive, true))
           .orderBy(shops.name);
-
-        return allShops;
-      }
-
-      // For roasters, return all active shops for roasting purposes
-      if (user.role === "roaster") {
-        const allShops = await db
-          .select({
-            id: shops.id,
-            name: shops.name,
-            location: shops.location,
-            isActive: shops.isActive,
-            defaultOrderQuantity: shops.defaultOrderQuantity,
-            desiredSmallBags: shops.desiredSmallBags
-          })
-          .from(shops)
-          .where(eq(shops.isActive, true))
-          .orderBy(shops.name);
-
-        return allShops;
       }
 
       // For shop managers, return only their assigned shops
       if (user.role === "shopManager") {
-        const assignedShops = await db
-          .select({
-            id: shops.id,
-            name: shops.name,
-            location: shops.location,
-            isActive: shops.isActive,
-            defaultOrderQuantity: shops.defaultOrderQuantity,
-            desiredSmallBags: shops.desiredSmallBags
-          })
+        return await db
+          .select()
           .from(shops)
           .innerJoin(userShops, eq(shops.id, userShops.shopId))
           .where(
@@ -333,8 +299,6 @@ export class DatabaseStorage implements IStorage {
             )
           )
           .orderBy(shops.name);
-
-        return assignedShops;
       }
 
       // All other roles see no shops
@@ -998,7 +962,8 @@ export class DatabaseStorage implements IStorage {
             updatedAt: new Date()
           })
           .where(eq(coffeeLargeBagTargets.id, existing.id))
-          .returning();        return updated;
+          .returning();
+        return updated;
       } else {
         const [created] = await db
           .insert(coffeeLargeBagTargets)
@@ -1028,14 +993,15 @@ export class DatabaseStorage implements IStorage {
       const [updatedShop] = await db
         .update(shops)
         .set(update)
-        .where(eq(shops.id, id))        .returning();
+        .where(eq(shops.id, id))
+        .returning();
 
       if (!updatedShop) {
         throw new Error("Failed to update shop");
       }
 
       return updatedShop;
-    } catch(error) {
+    } catch (error) {
       console.error("Error updating shop:", error);
       throw error;
     }
@@ -1400,51 +1366,51 @@ export class DatabaseStorage implements IStorage {
         .from(users)
         .where(eq(users.id, userId));
 
-      if (!user) {
-        return false;
-      }
+      if (!user) return false;
 
       const role = user.role;
 
+      // Return true for retail owners for all retail and order operations
+      if (role === "retailOwner") {
+        if (permission.startsWith("retail.") || permission.startsWith("orders.")) {
+          return true;
+        }
+      }
+
       switch (permission) {
-        // Roasting and Green Coffee - roastery owner and roaster only
-        case "roasting.read":
-        case "roasting.write":
-        case "greencoffee.read":
-        case "greencoffee.write":
-          return role === "roasteryOwner" || role === "roaster";
-
-        // Shop and User Management - roastery owner only
-        case "shop.manage":
-        case "user.manage":
-          return role === "roasteryOwner";
-
-        // Finance and Billing - roastery owner only
-        case "finance.read":
-        case "finance.write":
-        case "billing.read":
-        case "billing.write":
-          return role === "roasteryOwner";
-
-        // Orders, Retail, and Inventory - retail owner has full access
+        // Retail operations - retail owners, roastery owners, and shop managers
         case "orders.read":
         case "orders.write":
         case "retail.read":
         case "retail.write":
         case "retail.orders":
         case "retail.inventory":
-          return role === "roasteryOwner" || role === "retailOwner" || role === "shopManager";
+          return role === "retailOwner" || role === "roasteryOwner" || role === "shopManager";
+
+        // Roasting operations - roastery owners and roasters
+        case "roasting.read":
+        case "roasting.write":
+        case "greencoffee.read":
+        case "greencoffee.write":
+          return role === "roasteryOwner" || role === "roaster";
+
+        // Management operations - roastery owners only
+        case "shop.manage":
+        case "user.manage":
+        case "billing.read":
+        case "billing.write":
+          return role === "roasteryOwner";
 
         // Analytics & Reports - owners and managers
         case "analytics.read":
         case "reports.read":
-          return role === "roasteryOwner" || role === "retailOwner" || role === "shopManager";
+          return role === "retailOwner" || role === "roasteryOwner" || role === "shopManager";
 
         default:
           return false;
       }
     } catch (error) {
-      console.error("Error checking permission:", error);
+      console.error("Error checking permissions:", error);
       return false;
     }
   }
