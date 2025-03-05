@@ -36,7 +36,13 @@ export default function App() {
 
             {/* Protected routes */}
             <Route path="/">
-              {() => <ProtectedRoute path="/" component={Dashboard} />}
+              {() => (
+                <ProtectedRoute
+                  path="/"
+                  component={Dashboard}
+                  roles={["roasteryOwner", "retailOwner", "roaster", "shopManager", "barista"]}
+                />
+              )}
             </Route>
             <Route path="/inventory">
               {() => <ProtectedRoute path="/inventory" component={Inventory} roles={["roasteryOwner", "roaster"]} />}
@@ -49,9 +55,6 @@ export default function App() {
             </Route>
             <Route path="/roasting/orders">
               {() => <ProtectedRoute path="/roasting/orders" component={RoastingOrders} roles={["roaster"]} />}
-            </Route>
-            <Route path="/roasting/orders/:id">
-              {() => <ProtectedRoute path="/roasting/orders/:id" component={RoastingOrders} roles={["roaster"]} />}
             </Route>
             <Route path="/roasting/discrepancies">
               {() => <ProtectedRoute path="/roasting/discrepancies" component={RoastingDiscrepancies} roles={["roaster"]} />}

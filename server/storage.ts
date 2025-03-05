@@ -161,6 +161,7 @@ export interface IStorage {
     details: BillingEventDetail[];
   })[]>;
   getBillingEventDetails(eventId: number): Promise<BillingEventDetail[]>;
+  hasPermission(userId: number, permission: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1381,7 +1382,6 @@ export class DatabaseStorage implements IStorage {
 
       if (!user) return false;
 
-      // Retail owners should have all permissions except the specified ones
       switch (permission) {
         case 'billing.write':
           return user.role === 'roasteryOwner';
@@ -1396,6 +1396,8 @@ export class DatabaseStorage implements IStorage {
         case 'analytics.read':
         case 'reports.read':
           return user.role === 'roasteryOwner' || user.role === 'retailOwner' || user.role === 'shopManager';
+        case 'retail.basic':
+          return user.role === 'roasteryOwner' || user.role === 'retailOwner' || user.role === 'shopManager' || user.role === 'barista';
         default:
           return false;
       }
