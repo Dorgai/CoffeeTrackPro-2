@@ -11,13 +11,22 @@ import {
 import { Store, Loader2 } from "lucide-react";
 import { useActiveShop } from "@/hooks/use-active-shop";
 import { queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export function ShopSelector() {
   const { activeShop, setActiveShop } = useActiveShop();
   const [initialized, setInitialized] = useState(false);
+  const { toast } = useToast();
 
-  const { data: shops, isLoading } = useQuery<Shop[]>({
+  const { data: shops, isLoading, error } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
+    onError: (error: Error) => {
+      toast({
+        title: "Error loading shops",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   useEffect(() => {
@@ -36,6 +45,17 @@ export function ShopSelector() {
         <div className="flex items-center gap-2 min-w-[200px] h-9 px-3 rounded-md border">
           <Loader2 className="h-4 w-4 animate-spin" />
           <span className="text-sm">Loading shops...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center gap-2">
+        <Store className="h-4 w-4" />
+        <div className="flex items-center gap-2 min-w-[200px] h-9 px-3 rounded-md border border-destructive">
+          <span className="text-sm text-destructive">Error loading shops</span>
         </div>
       </div>
     );

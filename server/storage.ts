@@ -277,10 +277,18 @@ export class DatabaseStorage implements IStorage {
         throw new Error("User not found");
       }
 
-      // Get all active shops for roastery owners and retail owners
+      // Roastery owners and retail owners can see all active shops
       if (user.role === "roasteryOwner" || user.role === "retailOwner") {
         return await db
-          .select()
+          .select({
+            id: shops.id,
+            name: shops.name,
+            location: shops.location,
+            isActive: shops.isActive,
+            defaultOrderQuantity: shops.defaultOrderQuantity,
+            desiredSmallBags: shops.desiredSmallBags,
+            desiredLargeBags: shops.desiredLargeBags,
+          })
           .from(shops)
           .where(eq(shops.isActive, true))
           .orderBy(shops.name);
@@ -296,7 +304,7 @@ export class DatabaseStorage implements IStorage {
             isActive: shops.isActive,
             defaultOrderQuantity: shops.defaultOrderQuantity,
             desiredSmallBags: shops.desiredSmallBags,
-            desiredLargeBags: shops.desiredLargeBags
+            desiredLargeBags: shops.desiredLargeBags,
           })
           .from(userShops)
           .innerJoin(shops, eq(userShops.shopId, shops.id))
@@ -312,7 +320,15 @@ export class DatabaseStorage implements IStorage {
       // Roasters can see all active shops for order management
       if (user.role === "roaster") {
         return await db
-          .select()
+          .select({
+            id: shops.id,
+            name: shops.name,
+            location: shops.location,
+            isActive: shops.isActive,
+            defaultOrderQuantity: shops.defaultOrderQuantity,
+            desiredSmallBags: shops.desiredSmallBags,
+            desiredLargeBags: shops.desiredLargeBags,
+          })
           .from(shops)
           .where(eq(shops.isActive, true))
           .orderBy(shops.name);
@@ -1008,7 +1024,7 @@ export class DatabaseStorage implements IStorage {
         .update(shops)
         .set(update)
         .where(eq(shops.id, id))
-                .returning();
+        .returning();
 
       if (!updatedShop) {
         throw new Error("Failed to update shop");
