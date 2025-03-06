@@ -433,13 +433,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
-  // Retail Inventory Routes - accessible by shop manager and barista
+  // Retail Inventory Routes - accessible by shop manager, barista and retail owner
   app.get("/api/retail-inventory", requireRole(["owner", "roasteryOwner", "roaster", "shopManager", "barista", "retailOwner"]), async (req, res) => {
     try {
       let shopId = req.query.shopId ? Number(req.query.shopId) : undefined;
       console.log("Fetching retail inventory for user:", req.user?.username, "role:", req.user?.role, "shopId:", shopId);
 
-      // For roasteryOwner, owner, and roaster, return all inventories if no shopId provided
+      // For roasteryOwner, owner, roaster and retailOwner, return all inventories if no shopId provided
       if (["roaster", "roasteryOwner", "owner", "retailOwner"].includes(req.user?.role || "")) {
         console.log("Fetching all retail inventories");
         const allInventory = await storage.getAllRetailInventories();
