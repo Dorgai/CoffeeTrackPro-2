@@ -221,18 +221,24 @@ export default function RoastingOrders() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <div>
-                                <div>Small Bags: {order.small_bags}</div>
-                                <div>Large Bags: {order.large_bags}</div>
+                              <div className="space-y-1">
+                                {order.small_bags > 0 && (
+                                  <div>Small Bags (200g): {order.small_bags}</div>
+                                )}
+                                {order.large_bags > 0 && (
+                                  <div>Large Bags (1kg): {order.large_bags}</div>
+                                )}
                               </div>
                             </TableCell>
                             <TableCell>
-                              <Badge
-                                variant={order.status === "pending" ? "destructive" : "outline"}
-                                className="capitalize"
-                              >
-                                {order.status}
-                              </Badge>
+                              <div className="space-y-1">
+                                <Badge
+                                  variant={order.status === "pending" ? "destructive" : "outline"}
+                                  className="capitalize"
+                                >
+                                  {order.status}
+                                </Badge>
+                              </div>
                             </TableCell>
                             <TableCell>
                               <div className="space-y-1 text-sm">
