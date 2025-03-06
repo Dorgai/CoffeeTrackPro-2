@@ -112,10 +112,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/users/:id/shops", requireRole(["roasteryOwner"]), async (req, res) => {
     try {
       const userId = parseInt(req.params.id);
-      const { shopId } = req.body;
+      const { shopId, shopIds } = req.body;
 
-      if (!shopId) {
-        return res.status(400).json({ message: "Shop ID is required" });
+      // Validate input
+      if (!shopId && !shopIds) {
+        return res.status(400).json({ message: "Either shopId or shopIds must be provided" });
       }
 
       const user = await storage.getUser(userId);
@@ -123,13 +124,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
-      const shop = await storage.getShop(shopId);
-      if (!shop || !shop.isActive) {
-        return res.status(404).json({ message: "Shop not found or inactive" });
+      // Handle single shop assignment
+      if (shopId) {
+        const shop = await storage.getShop(shopId);
+        if (!shop || !shop.isActive) {
+          return res.status(404).json({ message: "Shop not found or inactive" });
+        }
+
+        await storage.assignUserToShop(userId, shopId);
+        return res.json({ message: "User assigned to shop successfully" });
       }
 
-      await storage.assignUserToShop(userId, shopId);
-      res.json({ message: "User assigned to shop successfully" });
+      // Handle multiple shop assignments
+      if (Array.isArray(shopIds)) {
+        // Verify all shops exist and are active
+        for (const id of shopIds) {
+          const shop = await storage.getShop(id);
+          if (!shop || !shop.isActive) {
+            return res.status(404).json({ message: `Shop ${id} not found or inactive` });
+          }
+        }
+
+        // Remove all existing assignments and add new ones
+        await storage.removeAllUserShops(userId);
+        for (const id of shopIds) {
+          await storage.assignUserToShop(userId, id);
+        }
+
+        const updatedShops = await storage.getUserShops(userId);
+        return res.json(updatedShops);
+      }
+
+      return res.status(400).json({ message: "Invalid request format" });
     } catch (error) {
       console.error("Error assigning user to shop:", error);
       res.status(500).json({ message: "Failed to assign user to shop" });
@@ -162,48 +188,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/users/:id/shops", requireRole(["roasteryOwner"]), async (req, res) => {
-    try {
-      const userId = parseInt(req.params.id);
-      const { shopIds } = req.body;
-
-      if (!Array.isArray(shopIds)) {
-        return res.status(400).json({ message: "Shop IDs must be an array" });
-      }
-
-      const user = await storage.getUser(userId);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      // Only allow assigning shops to baristas
-      if (user.role !== "barista") {
-        return res.status(400).json({ message: "Shop assignments are only allowed for barista users" });
-      }
-
-      // Verify all shops exist and are active
-      for (const shopId of shopIds) {
-        const shop = await storage.getShop(shopId);
-        if (!shop || !shop.isActive) {
-          return res.status(404).json({ message: `Shop ${shopId} not found or inactive` });
-        }
-      }
-
-      // Remove all existing assignments
-      await storage.removeAllUserShops(userId);
-
-      // Add new assignments
-      for (const shopId of shopIds) {
-        await storage.assignUserToShop(userId, shopId);
-      }
-
-      const updatedShops = await storage.getUserShops(userId);
-      res.json(updatedShops);
-    } catch (error) {
-      console.error("Error updating user's shops:", error);
-      res.status(500).json({ message: "Failed to update user's shop assignments" });
-    }
-  });
 
   // User's Shops Route
   app.get("/api/user/shops", async (req, res) => {
@@ -495,7 +479,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let shopId = req.query.shopId ? Number(req.query.shopId) : undefined;
       console.log("Fetching retail inventory for user:", req.user?.username, "role:", req.user?.role, "shopId:", shopId);
 
-      // For roasteryOwner, owner, roaster and retailOwner, return all inventories if no shopId provided
+      // For all roles, if shopId is provided, return inventory for that shop
+      if (shopId) {
+        // Verify shop access for non-admin roles
+        if (!["roasteryOwner", "retailOwner", "roaster"].includes(req.user?.role || "")) {
+          if (!await checkShopAccess(req.user!.id, shopId)) {
+            return res.status(403).json({ message: "User does not have access to this shop" });
+          }
+        }
+
+        const inventory = await storage.getRetailInventoriesByShop(shopId);
+        console.log("Found shop inventory:", inventory.length, "items for shop:", shopId);
+        return res.json(inventory);
+      }
+
+      // If no shopId provided, for admin roles return all inventories
       if (["roaster", "roasteryOwner", "owner", "retailOwner"].includes(req.user?.role || "")) {
         console.log("Fetching all retail inventories");
         const allInventory = await storage.getAllRetailInventories();
@@ -503,19 +501,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json(allInventory);
       }
 
-      // For shop manager and barista, require shopId
-      if (!shopId) {
-        return res.status(400).json({ message: "Shop ID is required" });
-      }
-
-      // Verify shop access
-      if (!await checkShopAccess(req.user!.id, shopId)) {
-        return res.status(403).json({ message: "User does not have access to this shop" });
-      }
-
-      const inventory = await storage.getRetailInventoriesByShop(shopId);
-      console.log("Found shop inventory:", inventory.length, "items for shop:", shopId);
-      return res.json(inventory);
+      // For other roles without shopId, return error
+      return res.status(400).json({ message: "Shop ID is required" });
     } catch (error) {
       console.error("Error fetching retail inventory:", error);
       res.status(500).json({ message: "Failed to fetch retail inventory" });
@@ -814,8 +801,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const confirmation = await storage.confirmDispatchedCoffee(confirmationId, {
         receivedSmallBags: Number(receivedSmallBags),
-        receivedLargeBags: Number(receivedLargeBags),
-        confirmedById: req.user!.id,
+        receivedLargeBags: Number(receivedLargeBags),        confirmedById: req.user!.id,
       });
 
       console.log("Confirmation processed successfully:", confirmation);
@@ -852,7 +838,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // For roasteryOwner and roaster, show all discrepancies
-        console.log("Returning all discrepancies forroasteryOwner/roaster");
+        console.log("Returning all discrepancies for roasteryOwner/roaster");
         res.json(discrepancies);
       } catch (error){
         console.error("Error fetching inventory discrepancies:", error);
@@ -869,7 +855,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {      const shopId = parseInt(req.params.id);
 
       if (!await checkShopAccess(req.user!.id, shopId)) {
-        return res.status(403).json({ message: "User doesnot have access to this shop" });
+        return res.status(403).json({ message: "User does not have access to this shop" });
       }
 
       const targets = await storage.getCoffeeLargeBagTargets(shopId);
