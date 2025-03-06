@@ -15,6 +15,48 @@ export class DatabaseStorage {
       pool,
       createTableIfMissing: true,
     });
+    this.initializeTestData();
+  }
+
+  private async initializeTestData() {
+    try {
+      // Check if we have any active shops
+      const existingShops = await db.select().from(shops).where(eq(shops.isActive, true));
+
+      if (existingShops.length === 0) {
+        console.log("Creating test shops...");
+        const testShops = [
+          {
+            name: "Main Roastery",
+            location: "123 Coffee Street",
+            isActive: true,
+            desiredSmallBags: 20,
+            desiredLargeBags: 10,
+          },
+          {
+            name: "Downtown Cafe",
+            location: "456 Main Street",
+            isActive: true,
+            desiredSmallBags: 15,
+            desiredLargeBags: 8,
+          },
+          {
+            name: "Airport Location",
+            location: "789 Terminal Ave",
+            isActive: true,
+            desiredSmallBags: 25,
+            desiredLargeBags: 12,
+          }
+        ];
+
+        for (const shop of testShops) {
+          await this.createShop(shop);
+          console.log(`Created shop: ${shop.name}`);
+        }
+      }
+    } catch (error) {
+      console.error("Error initializing test data:", error);
+    }
   }
 
   // User operations
