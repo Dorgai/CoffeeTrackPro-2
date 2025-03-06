@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useEffect } from 'react';
 import { Shop } from "@shared/schema";
 import {
   Select,
@@ -27,7 +28,7 @@ export function ShopSelector() {
   });
 
   // Set initial shop if none selected
-  React.useEffect(() => {
+  useEffect(() => {
     if (shops.length > 0 && !activeShop) {
       setActiveShop(shops[0]);
     }
