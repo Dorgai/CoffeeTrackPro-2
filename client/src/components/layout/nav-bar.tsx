@@ -14,6 +14,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { GreenBeansStockIndicator } from "./green-beans-stock-indicator";
+import { ShopSelector } from "./shop-selector";
 
 export function NavBar() {
   const { user, logoutMutation } = useAuth();
@@ -41,6 +42,7 @@ export function NavBar() {
             />
           </Link>
         </div>
+        {user && <ShopSelector />}
         <Menubar className="border-none">
           <MenubarMenu>
             <MenubarTrigger>Dashboard</MenubarTrigger>
