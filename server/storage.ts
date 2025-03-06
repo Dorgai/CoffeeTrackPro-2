@@ -786,6 +786,21 @@ export class DatabaseStorage {
       return [];
     }
   }
+  async getUsersByRole(role: string): Promise<User[]> {
+    try {
+      console.log("Fetching users with role:", role);
+      const foundUsers = await db
+        .select()
+        .from(users)
+        .where(eq(users.role, role))
+        .orderBy(users.username);
+      console.log(`Found ${foundUsers.length} users with role ${role}`);
+      return foundUsers;
+    } catch (error) {
+      console.error("Error getting users by role:", error);
+      return [];
+    }
+  }
 }
 
 export const storage = new DatabaseStorage();

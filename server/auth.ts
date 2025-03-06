@@ -57,7 +57,16 @@ export function setupAuth(app: Express) {
           return done(null, false, { message: "Invalid username or password" });
         }
 
-        // Check if user is pending approval
+        // Always allow roastery owners to log in if credentials are correct
+        if (user.role === "roasteryOwner") {
+          const isValid = await comparePasswords(password, user.password);
+          if (!isValid) {
+            return done(null, false, { message: "Invalid username or password" });
+          }
+          return done(null, user);
+        }
+
+        // For non-roasteryOwner users, check approval status
         if (user.isPendingApproval) {
           return done(null, false, { message: "Your account is pending approval from a roastery owner" });
         }
@@ -103,19 +112,29 @@ export function setupAuth(app: Express) {
         return res.status(400).json({ message: "Username already exists" });
       }
 
+      // If trying to register as roasteryOwner, check if we already have 2 roastery owners
+      if (req.body.role === "roasteryOwner") {
+        const roasteryOwners = await storage.getUsersByRole("roasteryOwner");
+        if (roasteryOwners.length >= 2) {
+          return res.status(400).json({ message: "Maximum number of roastery owners (2) has been reached" });
+        }
+      }
+
       const hashedPassword = await hashPassword(req.body.password);
       const user = await storage.createUser({
         ...req.body,
         password: hashedPassword,
-        isPendingApproval: true, // Set all new users to pending approval
-        isActive: false // Set all new users to inactive by default
+        isPendingApproval: req.body.role !== "roasteryOwner", // Roastery owners don't need approval
+        isActive: req.body.role === "roasteryOwner" // Roastery owners are active by default
       });
 
-      // Don't automatically log in new users since they need approval
+      // Don't automatically log in new users since they need approval (except roasteryOwner)
       const { password, ...userWithoutPassword } = user;
       res.status(201).json({
         ...userWithoutPassword,
-        message: "Registration successful. Please wait for approval from a roastery owner."
+        message: user.role === "roasteryOwner" 
+          ? "Registration successful. You can now log in."
+          : "Registration successful. Please wait for approval from a roastery owner."
       });
     } catch (error) {
       next(error);
