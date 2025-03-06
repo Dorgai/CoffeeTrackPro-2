@@ -526,11 +526,40 @@ export class DatabaseStorage {
   ): Promise<Order> {
     try {
       console.log("Updating order status:", id, "with data:", data);
+
+      // Get the current user's role
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, data.updatedById));
+
+      // Check permissions based on role and status
+      if (!user) {
+        throw new Error("User not found");
+      }
+
+      // Roasters can only set status to "roasted" or "dispatched"
+      if (user.role === "roaster" && data.status === "delivered") {
+        throw new Error("Roasters can only update status to roasted or dispatched");
+      }
+
+      // Only roasters and roasteryOwners can update to "roasted"
+      if (data.status === "roasted" && !["roaster", "roasteryOwner"].includes(user.role)) {
+        throw new Error("Only roasters and roastery owners can mark orders as roasted");
+      }
+
+      // Only roasters and roasteryOwners can update to "dispatched" 
+      if (data.status === "dispatched" && !["roaster", "roasteryOwner"].includes(user.role)) {
+        throw new Error("Only roasters and roastery owners can mark orders as dispatched");
+      }
+
       const [order] = await db
         .update(orders)
         .set(data)
         .where(eq(orders.id, id))
         .returning();
+
+      console.log("Updated order:", order);
       return order;
     } catch (error) {
       console.error("Error updating order status:", error);
