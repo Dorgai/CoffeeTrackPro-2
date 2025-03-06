@@ -431,18 +431,26 @@ export class DatabaseStorage {
     try {
       console.log("Fetching retail inventories for shop:", shopId);
       const query = sql`
-        SELECT ri.*, 
-               s.name as shop_name, 
-               s.location as shop_location,
-               gc.name as coffee_name
+        SELECT 
+          ri.*,
+          s.name as shop_name,
+          s.location as shop_location,
+          gc.name as coffee_name,
+          gc.producer,
+          u.username as updated_by,
+          COALESCE(ri.updated_at, ri.created_at) as last_updated
         FROM retail_inventory ri
         LEFT JOIN shops s ON ri.shop_id = s.id
         LEFT JOIN green_coffee gc ON ri.green_coffee_id = gc.id
+        LEFT JOIN users u ON ri.updated_by_id = u.id
         WHERE ri.shop_id = ${shopId}
         ORDER BY ri.green_coffee_id`;
 
       const result = await db.execute(query);
       console.log("Found retail inventories for shop:", result.rows.length);
+      if (result.rows.length > 0) {
+        console.log("Sample inventory:", result.rows[0]);
+      }
       return result.rows;
     } catch (error) {
       console.error("Error getting retail inventories for shop:", error);

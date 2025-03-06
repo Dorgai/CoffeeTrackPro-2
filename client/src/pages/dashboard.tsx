@@ -43,14 +43,17 @@ export default function Dashboard() {
     enabled: !!user && (user.role === "roasteryOwner" || user.role === "owner"), // Updated for owner role
   });
 
-  // Update the shop-dependent queries to include shopId
-  const { data: shopInventory, isLoading: loadingInventory } = useQuery({
+  // Update the retail inventory query
+  const { data: retailInventory, isLoading: loadingInventory } = useQuery({
     queryKey: ["/api/retail-inventory", selectedShopId],
     queryFn: async () => {
       if (!selectedShopId) return [];
+      console.log("Fetching retail inventory for shop:", selectedShopId);
       const res = await fetch(`/api/retail-inventory?shopId=${selectedShopId}`);
       if (!res.ok) throw new Error('Failed to fetch inventory');
-      return res.json();
+      const data = await res.json();
+      console.log("Received inventory data for shop:", selectedShopId, data);
+      return data;
     },
     enabled: !!selectedShopId,
   });
@@ -201,7 +204,7 @@ export default function Dashboard() {
             <CardContent>
               {!selectedShopId ? (
                 <p className="text-center text-muted-foreground">Please select a shop to view performance</p>
-              ) : !shopInventory?.length ? (
+              ) : !retailInventory?.length ? (
                 <p className="text-center text-muted-foreground">No inventory data available</p>
               ) : (
                 <div key={selectedShopId} className="space-y-4">
@@ -212,29 +215,37 @@ export default function Dashboard() {
                     </Badge>
                   </div>
                   <div className="mt-4 space-y-2">
-                    {shopInventory.slice(0, 5).map(inv => {
+                    {retailInventory.map(inv => {
                       const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
                       return (
                         <div key={`${selectedShopId}-${inv.greenCoffeeId}`} className="p-2 bg-muted rounded">
-                          <div className="text-sm font-medium mb-2">{coffee?.name}</div>
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <div className="text-sm font-medium">{coffee?.name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                Last updated: {formatDate(inv.updatedAt || inv.createdAt)}
+                                {inv.updatedBy && <span> by {inv.updatedBy}</span>}
+                              </div>
+                            </div>
+                          </div>
                           <div className="space-y-2">
                             <StockProgress
                               current={inv.smallBags || 0}
                               desired={shop?.desiredSmallBags || 20}
-                              label="Small Bags (200g)"
+                              label={`Small Bags (200g) - Current: ${inv.smallBags || 0}`}
                             />
                             <StockProgress
                               current={inv.largeBags || 0}
                               desired={shop?.desiredLargeBags || 10}
-                              label="Large Bags (1kg)"
+                              label={`Large Bags (1kg) - Current: ${inv.largeBags || 0}`}
                             />
                           </div>
                         </div>
                       );
                     })}
-                    {shopInventory.length > 5 && (
+                    {retailInventory.length > 5 && (
                       <div className="text-center text-sm text-muted-foreground pt-2">
-                        Showing 5 of {shopInventory.length} items
+                        Showing 5 of {retailInventory.length} items
                       </div>
                     )}
                   </div>
@@ -676,7 +687,7 @@ export default function Dashboard() {
             <div className="space-y-4">
               {!selectedShopId ? (
                 <p className="text-center text-muted-foreground">Please select a shop to view inventory</p>
-              ) : !shopInventory?.length ? (
+              ) : !retailInventory?.length ? (
                 <p className="text-center text-muted-foreground">No inventory data available for selected shop</p>
               ) : (
                 <div key={selectedShopId} className="space-y-4">
@@ -864,10 +875,10 @@ export default function Dashboard() {
                     <div>
                       <div className="font-medium">{coffee.currentStock}kg</div>
                       <StockProgress
-                        current={Number(coffee.currentStock)}
-                        desired={Number(coffee.minThreshold) * 2}
-                        label="Stock Level"
-                      />
+                          current={Number(coffee.currentStock)}
+                          desired={Number(coffee.minThreshold) * 2}
+                          label="Stock Level"
+                        />
                     </div>
                   </TableCell>
                   <TableCell>
