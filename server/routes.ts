@@ -138,13 +138,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         assignedShops: shopIds
       });
 
+      // Get all active shops
+      const allShops = await storage.getShops();
+      const activeShops = allShops.filter(shop => shop.isActive);
+      const activeShopIds = activeShops.map(shop => shop.id);
+
       // Verify all shops exist and are active
-      for (const shopId of shopIds) {
-        const shop = await storage.getShop(shopId);
-        if (!shop || !shop.isActive) {
-          console.log("Invalid shop found:", { shopId, exists: !!shop, active: shop?.isActive });
-          return res.status(404).json({ message: `Shop ${shopId} not found or inactive` });
-        }
+      const invalidShops = shopIds.filter(id => !activeShopIds.includes(id));
+      if (invalidShops.length > 0) {
+        console.log("Invalid shops found:", invalidShops);
+        return res.status(400).json({ 
+          message: "Some shops are invalid or inactive",
+          invalidShops
+        });
       }
 
       // Remove all existing assignments
@@ -173,6 +179,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/users/:id/shops", requireRole(["roasteryOwner"]), async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const userShops = await storage.getUserShops(userId);
+      console.log("Fetched shops for user:", userId, "Found shops:", userShops.length);
+      res.json(userShops);
+    } catch (error) {
+      console.error("Error fetching user's shops:", error);
+      res.status(500).json({ message: "Failed to fetch user's shops" });
+    }
+  });
+
   // Remove user from shop
   app.delete("/api/users/:id/shops/:shopId", requireRole(["roasteryOwner"]), async (req, res) => {
     try {
@@ -188,17 +206,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User's Shops Management Routes
-  app.get("/api/users/:id/shops", requireRole(["roasteryOwner"]), async (req, res) => {
-    try {
-      const userId = parseInt(req.params.id);
-      const userShops = await storage.getUserShops(userId);
-      res.json(userShops);
-    } catch (error) {
-      console.error("Error fetching user's shops:", error);
-      res.status(500).json({ message: "Failed to fetch user's shops" });
-    }
-  });
-
+  //This route is already handled above.
 
   // User's Shops Route
   app.get("/api/user/shops", async (req, res) => {

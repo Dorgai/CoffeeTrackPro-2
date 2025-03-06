@@ -451,7 +451,7 @@ export default function UserManagement() {
               {shops?.length ? (
                 <div className="space-y-2">
                   {shops
-                    .filter((shop: any) => !userShops?.some((us: any) => us.id === shop.id))
+                    .filter((shop: any) => shop.isActive && !userShops?.some((us: any) => us.id === shop.id))
                     .map((shop: any) => (
                       <div
                         key={shop.id}
