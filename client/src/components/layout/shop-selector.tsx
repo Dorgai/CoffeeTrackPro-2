@@ -1,6 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from 'react';
 import { Shop } from "@shared/schema";
+import { apiRequest } from "@/lib/queryClient";
+import { useActiveShop } from "@/hooks/use-active-shop";
+import { Store, Loader2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -8,9 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Store, Loader2, AlertCircle } from "lucide-react";
-import { useActiveShop } from "@/hooks/use-active-shop";
-import { apiRequest } from "@/lib/queryClient";
 
 export function ShopSelector() {
   const { activeShop, setActiveShop } = useActiveShop();
@@ -20,14 +20,13 @@ export function ShopSelector() {
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/user/shops");
       if (!res.ok) {
-        throw new Error("Failed to fetch shops");
+        const error = await res.json();
+        throw new Error(error.message || "Failed to fetch shops");
       }
-      const data = await res.json();
-      return data;
+      return res.json();
     }
   });
 
-  // Set initial shop if none selected
   useEffect(() => {
     if (shops.length > 0 && !activeShop) {
       setActiveShop(shops[0]);
@@ -58,20 +57,13 @@ export function ShopSelector() {
           }
         }}
       >
-        <SelectTrigger className={`w-[200px] ${error ? 'border-destructive' : ''}`}>
-          <SelectValue>
-            {error ? (
-              <div className="flex items-center gap-2 text-destructive">
-                <AlertCircle className="h-4 w-4" />
-                <span>Error loading shops</span>
-              </div>
-            ) : (
-              activeShop?.name || "Select a shop"
-            )}
+        <SelectTrigger className="w-[200px]">
+          <SelectValue placeholder="Select a shop">
+            {activeShop?.name || "Select a shop"}
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
-          {!error && shops.map((shop) => (
+          {shops.map((shop) => (
             <SelectItem key={shop.id} value={shop.id.toString()}>
               {shop.name}
             </SelectItem>

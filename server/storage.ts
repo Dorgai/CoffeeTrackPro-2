@@ -115,10 +115,14 @@ export class DatabaseStorage {
 
   async getShops(): Promise<Shop[]> {
     try {
-      return await db
+      console.log("Getting all shops");
+      const allShops = await db
         .select()
         .from(shops)
+        .where(eq(shops.isActive, true))
         .orderBy(shops.name);
+      console.log("Found shops:", allShops);
+      return allShops;
     } catch (error) {
       console.error("Error getting shops:", error);
       return [];
@@ -168,22 +172,24 @@ export class DatabaseStorage {
 
   async getUserShops(userId: number): Promise<Shop[]> {
     try {
+      console.log("Getting shops for user:", userId);
+
       // First get the user to check their role
       const [user] = await db
         .select()
         .from(users)
         .where(eq(users.id, userId));
 
-      // For roasteryOwner, return all shops
+      console.log("User role:", user?.role);
+
+      // For roasteryOwner, return all active shops
       if (user?.role === "roasteryOwner") {
         return this.getShops();
       }
 
-      // For non-roasteryOwner users, get shops through userShops association
-      const userShopsData = await db
-        .select({
-          shop: shops
-        })
+      // For other roles, get assigned shops
+      const shops = await db
+        .select()
         .from(userShops)
         .innerJoin(shops, eq(userShops.shopId, shops.id))
         .where(and(
@@ -191,10 +197,11 @@ export class DatabaseStorage {
           eq(shops.isActive, true)
         ));
 
-      return userShopsData.map(data => data.shop);
+      console.log("Found user shops:", shops);
+      return shops.map(({ shops: shop }) => shop);
     } catch (error) {
       console.error("Error getting user shops:", error);
-      throw error;
+      return [];
     }
   }
 }
