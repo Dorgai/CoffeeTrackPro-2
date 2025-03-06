@@ -76,18 +76,18 @@ type OrderWithDetails = {
   id: number;
   shopId: number;
   greenCoffeeId: number;
-  small_bags: number;
-  large_bags: number;
+  smallBags: number;
+  largeBags: number;
   status: string;
   createdAt: string;
   createdById: number | null;
   updatedById: number | null;
-  shop_name: string;
-  shop_location: string;
-  coffee_name: string;
+  shopName: string;
+  shopLocation: string;
+  coffeeName: string;
   producer: string;
-  created_by: string | null;
-  updated_by: string | null;
+  createdBy: string | null;
+  updatedBy: string | null;
 };
 
 const updateOrderSchema = z.object({
@@ -210,23 +210,23 @@ export default function RoastingOrders() {
                           <TableRow key={order.id}>
                             <TableCell>
                               <div>
-                                <p className="font-medium">{order.shop_name}</p>
-                                <p className="text-sm text-muted-foreground">{order.shop_location}</p>
+                                <p className="font-medium">{order.shopName}</p>
+                                <p className="text-sm text-muted-foreground">{order.shopLocation}</p>
                               </div>
                             </TableCell>
                             <TableCell>
                               <div>
-                                <p>{order.coffee_name}</p>
+                                <p>{order.coffeeName}</p>
                                 <p className="text-sm text-muted-foreground">{order.producer}</p>
                               </div>
                             </TableCell>
                             <TableCell>
                               <div className="space-y-1">
-                                {order.small_bags > 0 && (
-                                  <div>Small Bags (200g): {order.small_bags}</div>
+                                {order.smallBags > 0 && (
+                                  <div>Small Bags (200g): {order.smallBags}</div>
                                 )}
-                                {order.large_bags > 0 && (
-                                  <div>Large Bags (1kg): {order.large_bags}</div>
+                                {order.largeBags > 0 && (
+                                  <div>Large Bags (1kg): {order.largeBags}</div>
                                 )}
                               </div>
                             </TableCell>
@@ -242,10 +242,10 @@ export default function RoastingOrders() {
                             </TableCell>
                             <TableCell>
                               <div className="space-y-1 text-sm">
-                                <div>Created by: {order.created_by || 'Unknown'}</div>
-                                {order.updated_by && (
+                                <div>Ordered by: {order.createdBy || 'Unknown'}</div>
+                                {order.updatedBy && (
                                   <div className="text-muted-foreground">
-                                    Updated by: {order.updated_by}
+                                    Last updated by: {order.updatedBy}
                                   </div>
                                 )}
                               </div>
@@ -257,8 +257,8 @@ export default function RoastingOrders() {
                                 onClick={() => {
                                   setSelectedOrder(order);
                                   form.reset({
-                                    smallBags: order.small_bags,
-                                    largeBags: order.large_bags,
+                                    smallBags: order.smallBags,
+                                    largeBags: order.largeBags,
                                     status: order.status === "pending" ? "roasted" : order.status,
                                   });
                                   setIsUpdateDialogOpen(true);
@@ -296,9 +296,9 @@ export default function RoastingOrders() {
           {selectedOrder && (
             <div className="py-4">
               <div className="mb-4">
-                <h4 className="font-medium">{selectedOrder.coffee_name}</h4>
+                <h4 className="font-medium">{selectedOrder.coffeeName}</h4>
                 <p className="text-sm text-muted-foreground">
-                  {selectedOrder.shop_name} - Order #{selectedOrder.id}
+                  {selectedOrder.shopName} - Order #{selectedOrder.id}
                 </p>
               </div>
               <Form {...form}>
@@ -326,7 +326,7 @@ export default function RoastingOrders() {
                             <Input
                               type="number"
                               min="0"
-                              max={selectedOrder.small_bags}
+                              max={selectedOrder.smallBags}
                               {...field}
                             />
                           </FormControl>
@@ -344,7 +344,6 @@ export default function RoastingOrders() {
                             <Input
                               type="number"
                               min="0"
-                              max={selectedOrder.large_bags}
                               {...field}
                             />
                           </FormControl>

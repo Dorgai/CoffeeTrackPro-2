@@ -443,18 +443,18 @@ export class DatabaseStorage {
           o.id,
           o.shop_id as "shopId",
           o.green_coffee_id as "greenCoffeeId",
-          o.small_bags,
-          o.large_bags,
+          o.small_bags as "smallBags",
+          o.large_bags as "largeBags",
           o.status,
           o.created_at as "createdAt",
           o.created_by_id as "createdById",
           o.updated_by_id as "updatedById",
-          s.name as shop_name,
-          s.location as shop_location,
-          gc.name as coffee_name,
+          s.name as "shopName",
+          s.location as "shopLocation",
+          gc.name as "coffeeName",
           gc.producer,
-          u1.username as created_by,
-          u2.username as updated_by
+          u1.username as "createdBy",
+          u2.username as "updatedBy"
         FROM orders o
         LEFT JOIN shops s ON o.shop_id = s.id
         LEFT JOIN green_coffee gc ON o.green_coffee_id = gc.id
