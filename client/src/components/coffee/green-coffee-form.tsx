@@ -1,9 +1,9 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { insertGreenCoffeeSchema, GreenCoffee } from "@shared/schema";
+import { insertGreenCoffeeSchema, GreenCoffee, coffeeGrades } from "@shared/schema";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 import {
   Form,
@@ -15,30 +15,21 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-// Create schema for form validation
-const formSchema = insertGreenCoffeeSchema.extend({
-  // Convert string to number for decimal fields
-  currentStock: z.coerce.number().min(0, "Current stock must be 0 or greater"),
-  minThreshold: z.coerce.number().min(0, "Minimum threshold must be 0 or greater"),
-  // Explicitly validate grade
-  grade: z.enum(["Specialty", "Premium", "Rarity"]),
-});
-
-type FormValues = z.infer<typeof formSchema>;
-
-type MutationData = Omit<FormValues, 'currentStock' | 'minThreshold'> & {
-  currentStock: string;
-  minThreshold: string;
+type FormValues = {
+  name: string;
+  producer: string;
+  country: string;
+  currentStock: number;
+  minThreshold: number;
+  grade: typeof coffeeGrades[number];
 };
 
 export function GreenCoffeeForm({
   coffee,
-  onSuccess,
+  onSuccess
 }: {
   coffee?: GreenCoffee;
   onSuccess?: () => void;
@@ -47,60 +38,43 @@ export function GreenCoffeeForm({
   const isEditing = !!coffee;
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: coffee
-      ? {
-          ...coffee,
-          details: coffee.details || {},
-        }
-      : {
-          name: "",
-          producer: "",
-          country: "",
-          altitude: "",
-          cuppingNotes: "",
-          details: {},
-          currentStock: 0,
-          minThreshold: 0,
-          grade: "Premium" // Set a default grade
-        },
+    resolver: zodResolver(insertGreenCoffeeSchema),
+    defaultValues: coffee || {
+      name: "",
+      producer: "",
+      country: "",
+      currentStock: 0,
+      minThreshold: 0,
+      grade: "TBD"
+    }
   });
 
   const mutation = useMutation({
     mutationFn: async (data: FormValues) => {
-      console.log("Starting mutation with data:", data);
-      try {
-        // Convert number fields to strings to match schema expectations
-        const processedData: MutationData = {
-          ...data,
-          currentStock: String(data.currentStock),
-          minThreshold: String(data.minThreshold)
-        };
+      // Convert numbers to strings for decimal fields
+      const processedData = {
+        ...data,
+        currentStock: String(data.currentStock),
+        minThreshold: String(data.minThreshold)
+      };
 
-        console.log("Processed form data:", processedData);
-
-        if (isEditing) {
-          const response = await apiRequest("PATCH", `/api/green-coffee/${coffee.id}`, processedData);
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || "Failed to update coffee");
-          }
-          return response.json();
-        } else {
-          const response = await apiRequest("POST", "/api/green-coffee", processedData);
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || "Failed to create coffee");
-          }
-          return response.json();
+      if (isEditing) {
+        const response = await apiRequest("PATCH", `/api/green-coffee/${coffee.id}`, processedData);
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || "Failed to update coffee");
         }
-      } catch (error) {
-        console.error("Mutation error:", error);
-        throw error;
+        return response.json();
+      } else {
+        const response = await apiRequest("POST", "/api/green-coffee", processedData);
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || "Failed to create coffee");
+        }
+        return response.json();
       }
     },
-    onSuccess: (data) => {
-      console.log("Mutation succeeded:", data);
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/green-coffee"] });
       toast({
         title: isEditing ? "Coffee Updated" : "Coffee Created",
@@ -109,39 +83,26 @@ export function GreenCoffeeForm({
       if (onSuccess) onSuccess();
     },
     onError: (error: Error) => {
-      console.error("Mutation error:", error);
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
       });
-      // Log form state on error
-      console.log("Form state on error:", form.formState);
     },
   });
 
   const onSubmit = async (data: FormValues) => {
-    console.log("Form submission initiated:", data);
     try {
       await mutation.mutateAsync(data);
     } catch (error) {
-      console.error("Form submission error:", error);
-      // Log validation errors if any
-      if (form.formState.errors) {
-        console.log("Form validation errors:", form.formState.errors);
-      }
+      console.error("Submit error:", error);
     }
   };
 
   return (
-    <>
+    <Card>
       <CardHeader>
         <CardTitle>{isEditing ? "Edit Green Coffee" : "Add New Green Coffee"}</CardTitle>
-        <CardDescription>
-          {isEditing
-            ? "Update the details of this green coffee"
-            : "Enter details for new green coffee"}
-        </CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -176,48 +137,14 @@ export function GreenCoffeeForm({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="country"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Country</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Ethiopia" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="altitude"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Altitude</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., 1800-2200m" {...field} value={field.value || ''} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
             <FormField
               control={form.control}
-              name="cuppingNotes"
+              name="country"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Cupping Notes</FormLabel>
+                  <FormLabel>Country</FormLabel>
                   <FormControl>
-                    <Textarea
-                      placeholder="e.g., Floral, citrus, bergamot with a bright acidity"
-                      {...field}
-                      value={field.value || ''}
-                    />
+                    <Input placeholder="e.g., Ethiopia" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -238,9 +165,11 @@ export function GreenCoffeeForm({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="Specialty">Specialty</SelectItem>
-                        <SelectItem value="Premium">Premium</SelectItem>
-                        <SelectItem value="Rarity">Rarity</SelectItem>
+                        {coffeeGrades.map((grade) => (
+                          <SelectItem key={grade} value={grade}>
+                            {grade}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -255,7 +184,12 @@ export function GreenCoffeeForm({
                   <FormItem>
                     <FormLabel>Current Stock (kg)</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" {...field} />
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        {...field}
+                        onChange={(e) => field.onChange(Number(e.target.value))}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -267,9 +201,14 @@ export function GreenCoffeeForm({
                 name="minThreshold"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Target Stock Level (kg)</FormLabel>
+                    <FormLabel>Min Threshold (kg)</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" {...field} />
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        {...field}
+                        onChange={(e) => field.onChange(Number(e.target.value))}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -279,12 +218,12 @@ export function GreenCoffeeForm({
 
             <div className="flex justify-end">
               <Button type="submit" disabled={mutation.isPending}>
-                {isEditing ? "Update Coffee" : "Add Coffee"}
+                {mutation.isPending ? (isEditing ? "Updating..." : "Adding...") : (isEditing ? "Update Coffee" : "Add Coffee")}
               </Button>
             </div>
           </form>
         </Form>
       </CardContent>
-    </>
+    </Card>
   );
 }
