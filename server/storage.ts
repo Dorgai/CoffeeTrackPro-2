@@ -1,4 +1,4 @@
-import { type RoastingBatch, type InsertRoastingBatch, roastingBatches, users, type User, type Shop, type InsertShop, shops, userShops, type GreenCoffee, greenCoffee } from "@shared/schema";
+import { type RoastingBatch, type InsertRoastingBatch, roastingBatches, users, type User, type Shop, type InsertShop, shops, userShops, type GreenCoffee, greenCoffee, type Order, type InsertOrder, orders } from "@shared/schema";
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
 import session from "express-session";
@@ -287,6 +287,77 @@ export class DatabaseStorage {
       return coffee;
     } catch (error) {
       console.error("Error updating green coffee stock:", error);
+      throw error;
+    }
+  }
+
+  // Order methods
+  async createOrder(data: InsertOrder): Promise<Order> {
+    try {
+      console.log("Creating order with data:", data);
+      const [order] = await db
+        .insert(orders)
+        .values(data)
+        .returning();
+      console.log("Created order:", order);
+      return order;
+    } catch (error) {
+      console.error("Error creating order:", error);
+      throw error;
+    }
+  }
+
+  async getOrder(id: number): Promise<Order | undefined> {
+    try {
+      const [order] = await db
+        .select()
+        .from(orders)
+        .where(eq(orders.id, id));
+      return order;
+    } catch (error) {
+      console.error("Error getting order:", error);
+      return undefined;
+    }
+  }
+
+  async getAllOrders(): Promise<Order[]> {
+    try {
+      return await db
+        .select()
+        .from(orders)
+        .orderBy(orders.createdAt);
+    } catch (error) {
+      console.error("Error getting all orders:", error);
+      return [];
+    }
+  }
+
+  async getOrdersByShop(shopId: number): Promise<Order[]> {
+    try {
+      return await db
+        .select()
+        .from(orders)
+        .where(eq(orders.shopId, shopId))
+        .orderBy(orders.createdAt);
+    } catch (error) {
+      console.error("Error getting shop orders:", error);
+      return [];
+    }
+  }
+
+  async updateOrderStatus(
+    id: number,
+    data: { status: string; smallBags?: number; largeBags?: number; updatedById: number }
+  ): Promise<Order> {
+    try {
+      const [order] = await db
+        .update(orders)
+        .set(data)
+        .where(eq(orders.id, id))
+        .returning();
+      return order;
+    } catch (error) {
+      console.error("Error updating order status:", error);
       throw error;
     }
   }
