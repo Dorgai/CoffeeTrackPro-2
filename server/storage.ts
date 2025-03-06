@@ -440,22 +440,27 @@ export class DatabaseStorage {
       console.log("Fetching all orders with details");
       const query = sql`
         SELECT 
-          o.*,
+          o.id,
+          o.shop_id,
+          o.green_coffee_id,
+          o.small_bags,
+          o.large_bags,
+          o.status,
+          o.created_at,
           s.name as shop_name,
           s.location as shop_location,
           gc.name as coffee_name,
-          gc.producer as producer,
-          u1.username as created_by,
-          u2.username as updated_by
+          gc.producer as producer
         FROM orders o
         LEFT JOIN shops s ON o.shop_id = s.id
         LEFT JOIN green_coffee gc ON o.green_coffee_id = gc.id
-        LEFT JOIN users u1 ON o.created_by_id = u1.id
-        LEFT JOIN users u2 ON o.updated_by_id = u2.id
         ORDER BY o.created_at DESC`;
 
       const result = await db.execute(query);
       console.log("Found orders:", result.rows.length);
+      if (result.rows.length > 0) {
+        console.log("Sample order:", result.rows[0]);
+      }
       return result.rows;
     } catch (error) {
       console.error("Error getting all orders:", error);
