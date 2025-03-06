@@ -1,4 +1,4 @@
-import { type RoastingBatch, type InsertRoastingBatch, roastingBatches, users, type User, type Shop, type InsertShop, shops, userShops, type GreenCoffee, type InsertGreenCoffee, greenCoffee, type Order, type InsertOrder, orders } from "@shared/schema";
+import { type RoastingBatch, type InsertRoastingBatch, roastingBatches, users, type User, type Shop, type InsertShop, shops, userShops, type GreenCoffee, type InsertGreenCoffee, greenCoffee, type Order, type InsertOrder, orders, type DispatchedCoffeeConfirmation, type InsertDispatchedCoffeeConfirmation, dispatchedCoffeeConfirmation } from "@shared/schema";
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
 import session from "express-session";
@@ -561,37 +561,72 @@ export class DatabaseStorage {
     }
   }
 
-    // Add dispatched coffee confirmation methods
-    async createDispatchedCoffeeConfirmation(data: any): Promise<any> {
-      try {
-        const [confirmation] = await db
-          .insert(dispatchedCoffeeConfirmation)
-          .values(data)
-          .returning();
-        return confirmation;
-      } catch (error) {
-        console.error("Error creating dispatch confirmation:", error);
-        throw error;
-      }
+  // Add dispatched coffee confirmation methods
+  async getDispatchedCoffeeConfirmations(shopId: number): Promise<any[]> {
+    try {
+      console.log("Fetching confirmations for shop:", shopId);
+      const query = sql`
+        SELECT 
+          dc.*,
+          s.name as shop_name,
+          s.location as shop_location,
+          gc.name as coffee_name,
+          gc.producer as producer,
+          u.username as confirmed_by
+        FROM dispatched_coffee_confirmation dc
+        LEFT JOIN shops s ON dc.shop_id = s.id
+        LEFT JOIN green_coffee gc ON dc.green_coffee_id = gc.id
+        LEFT JOIN users u ON dc.confirmed_by_id = u.id
+        WHERE dc.shop_id = ${shopId}
+        AND dc.status = 'pending'
+        ORDER BY dc.created_at DESC`;
+
+      const result = await db.execute(query);
+      console.log("Found confirmations:", result.rows.length);
+      return result.rows;
+    } catch (error) {
+      console.error("Error getting dispatched coffee confirmations:", error);
+      return [];
     }
-  
-    async confirmDispatchedCoffee(id: number, data: any): Promise<any> {
-      try {
-        const [confirmation] = await db
-          .update(dispatchedCoffeeConfirmation)
-          .set({
-            ...data,
-            status: 'confirmed',
-            confirmedAt: new Date()
-          })
-          .where(eq(dispatchedCoffeeConfirmation.id, id))
-          .returning();
-        return confirmation;
-      } catch (error) {
-        console.error("Error confirming dispatched coffee:", error);
-        throw error;
-      }
+  }
+
+  async createDispatchedCoffeeConfirmation(data: InsertDispatchedCoffeeConfirmation): Promise<DispatchedCoffeeConfirmation> {
+    try {
+      const [confirmation] = await db
+        .insert(dispatchedCoffeeConfirmation)
+        .values(data)
+        .returning();
+      return confirmation;
+    } catch (error) {
+      console.error("Error creating dispatch confirmation:", error);
+      throw error;
     }
+  }
+
+  async confirmDispatchedCoffee(
+    id: number,
+    data: {
+      receivedSmallBags: number;
+      receivedLargeBags: number;
+      confirmedById: number;
+    }
+  ): Promise<DispatchedCoffeeConfirmation> {
+    try {
+      const [confirmation] = await db
+        .update(dispatchedCoffeeConfirmation)
+        .set({
+          ...data,
+          status: 'confirmed',
+          confirmedAt: new Date()
+        })
+        .where(eq(dispatchedCoffeeConfirmation.id, id))
+        .returning();
+      return confirmation;
+    } catch (error) {
+      console.error("Error confirming dispatched coffee:", error);
+      throw error;
+    }
+  }
 }
 
 export const storage = new DatabaseStorage();
