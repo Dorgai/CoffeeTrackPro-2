@@ -23,9 +23,9 @@ function requireRole(roles: string[]) {
 
 async function checkShopAccess(userId: number, shopId: number) {
   try {
-    // For roasteryOwner, grant access to all shops
+    // For roasteryOwner and roaster, grant access to all shops
     const user = await storage.getUser(userId);
-    if (user?.role === "roasteryOwner") {
+    if (user?.role === "roasteryOwner" || user?.role === "roaster") {
       return true;
     }
 
@@ -383,10 +383,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireRole(["owner", "roasteryOwner", "roaster"]),
     async (req, res) => {
       try {
+        console.log("Creating roasting batch, request body:", req.body);
         const data = insertRoastingBatchSchema.parse(req.body);
+        console.log("Validated data:", data);
+
         const batch = await storage.createRoastingBatch({
           ...data,
-          roasterId: req.user!.id,
+          createdAt: new Date(),
+          status: "planned"
         });
 
         // Update green coffee stock
@@ -396,6 +400,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.updateGreenCoffeeStock(coffee.id, { currentStock: String(newStock) });
         }
 
+        console.log("Created batch:", batch);
         res.status(201).json(batch);
       } catch (error) {
         console.error("Error creating roasting batch:", error);
@@ -414,32 +419,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Fetching retail inventory for user:", req.user?.username, "role:", req.user?.role, "shopId:", shopId);
 
       // For roasteryOwner, owner, and roaster, return all inventories if no shopId provided
-      if ((req.user?.role === "roasteryOwner" || req.user?.role === "owner" || req.user?.role === "roaster") && !shopId) {
-        console.log("Fetching all retail inventories for roasteryOwner/owner/roaster");
+      if (req.user?.role === "roaster" || req.user?.role === "roasteryOwner" || req.user?.role === "owner") {
+        console.log("Fetching all retail inventories");
         const allInventory = await storage.getAllRetailInventories();
         console.log("Found inventories:", allInventory.length);
         return res.json(allInventory);
       }
 
       // For shop manager and barista, require shopId
-      if ((req.user?.role === "shopManager" || req.user?.role === "barista") && !shopId) {
-        const userShops = await storage.getUserShops(req.user!.id);
-        // If user has only one shop, use that
-        if (userShops.length === 1) {
-          shopId = userShops[0].id;
-        } else {
-          return res.status(400).json({ message: "Shop ID is required" });
-        }
+      if (!shopId) {
+        return res.status(400).json({ message: "Shop ID is required" });
       }
 
-      // Verify shop access for non-admin roles
-      if (req.user?.role !== "roasteryOwner" && req.user?.role !== "owner" && req.user?.role !== "roaster") {
-        if (!await checkShopAccess(req.user!.id, shopId!)) {
-          return res.status(403).json({ message: "User does not have access to this shop" });
-        }
+      // Verify shop access
+      if (!await checkShopAccess(req.user!.id, shopId)) {
+        return res.status(403).json({ message: "User does not have access to this shop" });
       }
 
-      const inventory = await storage.getRetailInventoriesByShop(shopId!);
+      const inventory = await storage.getRetailInventoriesByShop(shopId);
       console.log("Found shop inventory:", inventory.length, "items for shop:", shopId);
       return res.json(inventory);
     } catch (error) {
@@ -511,29 +508,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Fetching orders for user:", req.user?.username, "with role:", req.user?.role);
       const shopId = req.query.shopId ? Number(req.query.shopId) : undefined;
 
-      // For roaster, roasteryOwner, owner, return all orders if no shopId specified
-      if ((req.user?.role === "roaster" || req.user?.role === "roasteryOwner" || req.user?.role === "owner") && !shopId) {
-        console.log("Fetching all orders for roaster/owner/roasteryOwner");
+      // For roaster, roasteryOwner, and owner return all orders
+      if (req.user?.role === "roaster" || req.user?.role === "roasteryOwner" || req.user?.role === "owner") {
+        console.log("Fetching all orders for roaster/roasteryOwner/owner");
         const allOrders = await storage.getAllOrders();
         console.log("Found orders:", allOrders.length);
         return res.json(allOrders);
       }
 
       // For shop manager and barista, require shopId
-      if ((req.user?.role === "shopManager" || req.user?.role === "barista") && !shopId) {
+      if (!shopId) {
         return res.status(400).json({ message: "Shop ID is required" });
       }
 
-      if (shopId) {
-        if (!await checkShopAccess(req.user!.id, shopId)) {
-          return res.status(403).json({ message: "User does not have access to this shop" });
-        }
-
-        const orders = await storage.getOrdersByShop(shopId);
-        return res.json(orders);
+      // Verify shop access
+      if (!await checkShopAccess(req.user!.id, shopId)) {
+        return res.status(403).json({ message: "User does not have access to this shop" });
       }
 
-      return res.json([]);
+      const orders = await storage.getOrdersByShop(shopId);
+      return res.json(orders);
     } catch (error) {
       console.error("Error fetching orders:", error);
       res.status(500).json({ message: "Failed to fetch orders" });
@@ -798,11 +792,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(targets);
     } catch (error) {
       console.error("Error fetching coffee targets:", error);
-            res.status(500).json({ message: "Failed to fetch coffee targets" });
+      res.status(500).json({ message: "Failed to fetch coffee targets" });
     }
-  });
-
-  // Fix the incorrect syntax in the coffee target update route
+  });  // Fixthe incorrect syntax in the coffee target update route
   app.patch("/api/shops/:shopId/coffee/:coffeeId/target", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
     try {
       const shopId = parseInt(req.params.shopId);

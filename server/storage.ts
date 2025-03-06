@@ -1,4 +1,4 @@
-import { type RoastingBatch, type InsertRoastingBatch, roastingBatches, users, type User, type Shop, type InsertShop, shops, userShops, type GreenCoffee, type InsertGreenCoffee, greenCoffee, type Order, type InsertOrder, orders } from "@shared/schema";
+import { type RoastingBatch, type InsertRoastingBatch, roastingBatches, users, type User, type Shop, type InsertShop, shops, userShops, type GreenCoffee, type InsertGreenCoffee, greenCoffee, type Order, type InsertOrder, orders, type DispatchedCoffeeConfirmation, dispatchedCoffeeConfirmation } from "@shared/schema";
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
 import session from "express-session";
@@ -99,6 +99,88 @@ export class DatabaseStorage {
       throw error;
     }
   }
+
+  async getAllUsers(): Promise<User[]> {
+    try {
+      console.log("Fetching all users from database");
+      // First get all users
+      const allUsers = await db
+        .select()
+        .from(users)
+        .orderBy(users.username);
+
+      console.log("Found users:", allUsers.length);
+
+      // Then get their shop assignments
+      for (const user of allUsers) {
+        const userShopData = await db
+          .select({
+            shopId: userShops.shopId,
+            shopName: shops.name
+          })
+          .from(userShops)
+          .leftJoin(shops, eq(userShops.shopId, shops.id))
+          .where(eq(userShops.userId, user.id));
+
+        console.log(`Found ${userShopData.length} shops for user ${user.username}`);
+      }
+
+      return allUsers;
+    } catch (error) {
+      console.error("Error getting all users:", error);
+      throw error; // Let the route handler catch and format the error
+    }
+  }
+
+  async updateUser(id: number, data: Partial<User>): Promise<User> {
+    try {
+      console.log("Updating user:", id, "with data:", data);
+
+      // Validate role if it's being updated
+      if (data.role && !["owner", "roasteryOwner", "roaster", "shopManager", "barista"].includes(data.role)) {
+        throw new Error("Invalid role specified");
+      }
+
+      const [user] = await db
+        .update(users)
+        .set(data)
+        .where(eq(users.id, id))
+        .returning();
+
+      console.log("Updated user:", user);
+      return user;
+    } catch (error) {
+      console.error("Error updating user:", error);
+      throw error;
+    }
+  }
+
+  async assignUserToShop(userId: number, shopId: number): Promise<void> {
+    try {
+      await db
+        .insert(userShops)
+        .values({ userId, shopId })
+        .onConflictDoNothing();
+    } catch (error) {
+      console.error("Error assigning user to shop:", error);
+      throw error;
+    }
+  }
+
+  async removeUserFromShop(userId: number, shopId: number): Promise<void> {
+    try {
+      await db
+        .delete(userShops)
+        .where(and(
+          eq(userShops.userId, userId),
+          eq(userShops.shopId, shopId)
+        ));
+    } catch (error) {
+      console.error("Error removing user from shop:", error);
+      throw error;
+    }
+  }
+
 
   // Shop operations
   async getShop(id: number): Promise<Shop | undefined> {
@@ -388,6 +470,7 @@ export class DatabaseStorage {
 
   async getAllOrders(): Promise<Order[]> {
     try {
+      console.log("Fetching all orders with shop data");
       const orders = await db
         .select({
           id: orders.id,
@@ -413,7 +496,8 @@ export class DatabaseStorage {
         .leftJoin(shops, eq(orders.shopId, shops.id))
         .orderBy(orders.createdAt);
 
-      console.log("Fetched orders with shop data:", orders);
+      console.log("Found orders:", orders.length);
+      console.log("Sample order:", orders[0]);
       return orders;
     } catch (error) {
       console.error("Error getting all orders:", error);
@@ -473,6 +557,72 @@ export class DatabaseStorage {
       throw error;
     }
   }
+
+  // Fix inventory discrepancy methods
+  async getInventoryDiscrepancies(): Promise<any[]> {
+    try {
+      console.log("Fetching inventory discrepancies");
+      const query = sql`
+        SELECT 
+          dc.*,
+          s.name as shop_name,
+          s.location as shop_location,
+          gc.name as coffee_name,
+          u.username as confirmed_by
+        FROM dispatched_coffee_confirmation dc
+        LEFT JOIN shops s ON dc.shop_id = s.id
+        LEFT JOIN green_coffee gc ON dc.green_coffee_id = gc.id
+        LEFT JOIN users u ON dc.confirmed_by_id = u.id
+        WHERE dc.status = 'confirmed'
+        AND (
+          COALESCE(dc.dispatched_small_bags, 0) != COALESCE(dc.received_small_bags, 0)
+          OR COALESCE(dc.dispatched_large_bags, 0) != COALESCE(dc.received_large_bags, 0)
+        )
+        ORDER BY dc.created_at DESC`;
+
+      const result = await db.execute(query);
+      console.log("Found discrepancies:", result.rows.length);
+      if (result.rows.length > 0) {
+        console.log("Sample discrepancy:", result.rows[0]);
+      }
+      return result.rows;
+    } catch (error) {
+      console.error("Error getting inventory discrepancies:", error);
+      throw error;
+    }
+  }
+
+    // Add dispatched coffee confirmation methods
+    async createDispatchedCoffeeConfirmation(data: any): Promise<any> {
+      try {
+        const [confirmation] = await db
+          .insert(dispatchedCoffeeConfirmation)
+          .values(data)
+          .returning();
+        return confirmation;
+      } catch (error) {
+        console.error("Error creating dispatch confirmation:", error);
+        throw error;
+      }
+    }
+  
+    async confirmDispatchedCoffee(id: number, data: any): Promise<any> {
+      try {
+        const [confirmation] = await db
+          .update(dispatchedCoffeeConfirmation)
+          .set({
+            ...data,
+            status: 'confirmed',
+            confirmedAt: new Date()
+          })
+          .where(eq(dispatchedCoffeeConfirmation.id, id))
+          .returning();
+        return confirmation;
+      } catch (error) {
+        console.error("Error confirming dispatched coffee:", error);
+        throw error;
+      }
+    }
 }
 
 export const storage = new DatabaseStorage();

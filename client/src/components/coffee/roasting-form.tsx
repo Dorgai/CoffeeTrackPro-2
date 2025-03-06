@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { InfoIcon } from "@/components/ui/info-icon";
+import { InfoIcon } from "lucide-react";
 
 interface FormValues {
   greenCoffeeId: number;
@@ -57,46 +57,66 @@ export function RoastingForm({
 
   const createMutation = useMutation({
     mutationFn: async (data: FormValues) => {
-      return apiRequest("POST", "/api/roasting-batches", data);
+      console.log("Submitting roasting batch data:", data);
+      const response = await apiRequest("POST", "/api/roasting-batches", data);
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Error response:", errorData);
+        throw new Error(errorData.message || "Failed to create roasting batch");
+      }
+      return response.json();
     },
     onSuccess: () => {
+      console.log("Roasting batch created successfully");
       queryClient.invalidateQueries({ queryKey: ["/api/roasting-batches"] });
       queryClient.invalidateQueries({ queryKey: [`/api/roasting-batches/coffee/${greenCoffeeId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/green-coffee"] });
       if (onSuccess) onSuccess();
+      toast({
+        title: "Success",
+        description: "Roasting batch has been recorded successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      console.error("Mutation error:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to record roasting batch.",
+        variant: "destructive",
+      });
     },
   });
 
   const onSubmit = form.handleSubmit(async (data: FormValues) => {
-    const smallBagsProduced = Number(data.smallBagsProduced) || 0;
-    const largeBagsProduced = Number(data.largeBagsProduced) || 0;
-    const greenCoffeeAmount = Number(data.greenCoffeeAmount) || 0;
-    const roastedAmount = Number(data.roastedAmount) || 0;
-    const totalPackagedWeight = (smallBagsProduced * 0.2) + largeBagsProduced;
-    const roastingLoss = Math.max(0, greenCoffeeAmount - roastedAmount);
-
-    // Check if green coffee amount exceeds current stock
-    if (coffee && greenCoffeeAmount > coffee.currentStock) {
-      toast({
-        title: "Insufficient Stock",
-        description: "The amount of green coffee exceeds the available stock.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Check if packaging efficiency is at least 80%
-    const packagingEfficiency = (totalPackagedWeight / roastedAmount) * 100;
-    if (packagingEfficiency < 80) {
-      toast({
-        title: "Validation Error",
-        description: "Total packaged coffee should be at least 80% of roasted coffee.",
-        variant: "destructive",
-      });
-      return;
-    }
-
+    console.log("Form submitted with values:", data);
     try {
+      const smallBagsProduced = Number(data.smallBagsProduced) || 0;
+      const largeBagsProduced = Number(data.largeBagsProduced) || 0;
+      const greenCoffeeAmount = Number(data.greenCoffeeAmount) || 0;
+      const roastedAmount = Number(data.roastedAmount) || 0;
+      const totalPackagedWeight = (smallBagsProduced * 0.2) + largeBagsProduced;
+      const roastingLoss = Math.max(0, greenCoffeeAmount - roastedAmount);
+
+      // Validation checks
+      if (coffee && greenCoffeeAmount > Number(coffee.currentStock)) {
+        toast({
+          title: "Insufficient Stock",
+          description: "The amount of green coffee exceeds the available stock.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const packagingEfficiency = (totalPackagedWeight / roastedAmount) * 100;
+      if (roastedAmount > 0 && packagingEfficiency < 80) {
+        toast({
+          title: "Validation Error",
+          description: "Total packaged coffee should be at least 80% of roasted coffee.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       await createMutation.mutateAsync({
         ...data,
         greenCoffeeId: Number(greenCoffeeId),
@@ -106,17 +126,8 @@ export function RoastingForm({
         smallBagsProduced,
         largeBagsProduced,
       });
-      toast({
-        title: "Roasting Batch Recorded",
-        description: "The roasting batch has been recorded successfully.",
-      });
-      if (onSuccess) onSuccess();
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to record roasting batch.",
-        variant: "destructive",
-      });
+      console.error("Submit error:", error);
     }
   });
 
@@ -183,7 +194,7 @@ export function RoastingForm({
                         onChange={(e) => field.onChange(Number(e.target.value))}
                       />
                     </FormControl>
-                    <FormDescription>Total: {((field.value as number || 0) * 0.2).toFixed(2)} kg</FormDescription>
+                    <FormDescription>Total: {((field.value || 0) * 0.2).toFixed(2)} kg</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -202,7 +213,7 @@ export function RoastingForm({
                         onChange={(e) => field.onChange(Number(e.target.value))}
                       />
                     </FormControl>
-                    <FormDescription>Total: {(field.value as number || 0)} kg</FormDescription>
+                    <FormDescription>Total: {(field.value || 0)} kg</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -220,11 +231,12 @@ export function RoastingForm({
                       type="number"
                       step="0.01"
                       readOnly
+                      value={Math.max(0, (form.getValues("greenCoffeeAmount") || 0) - (form.getValues("roastedAmount") || 0))}
                       {...field}
                     />
                   </FormControl>
                   <FormDescription>
-                    Automatically calculated as green coffee amount minus packaged coffee
+                    Automatically calculated as green coffee amount minus roasted amount
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -233,17 +245,17 @@ export function RoastingForm({
 
             {coffee && (
               <Alert>
-                <InfoIcon />
+                <InfoIcon className="h-4 w-4" />
                 <AlertDescription>
                   <div className="flex justify-between items-center">
-                    <span>Remaining Stock: {(coffee.currentStock - (form.getValues("greenCoffeeAmount") || 0)).toFixed(2)} kg</span>
+                    <span>Remaining Stock: {(Number(coffee.currentStock) - (form.getValues("greenCoffeeAmount") || 0)).toFixed(2)} kg</span>
                   </div>
                 </AlertDescription>
               </Alert>
             )}
 
             <Button type="submit" disabled={createMutation.isPending}>
-              Record Batch
+              {createMutation.isPending ? "Recording..." : "Record Batch"}
             </Button>
           </form>
         </Form>
