@@ -132,17 +132,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      console.log("Fetching shops for user:", req.user.id, req.user.username);
+      console.log("Fetching shops for user:", req.user.id, req.user.username, "role:", req.user.role);
 
-      try {
-        const shops = await storage.getUserShops(req.user.id);
-        console.log("Shops found:", shops);
-        return res.json(shops || []);
-      } catch (dbError) {
-        console.error("Database error fetching user shops:", dbError);
-        // Return empty array instead of error to prevent UI issues
-        return res.json([]);
+      let shops;
+      if (req.user.role === "roasteryOwner") {
+        // Roastery owners can see all active shops
+        shops = await storage.getShops();
+      } else {
+        // Other roles get their assigned shops
+        shops = await storage.getUserShops(req.user.id);
       }
+
+      // Only return active shops
+      const activeShops = shops.filter(shop => shop.isActive);
+      console.log("Found active shops:", activeShops.length);
+      return res.json(activeShops);
+
     } catch (error) {
       console.error("Error fetching user shops:", error);
       // Return empty array instead of error status to prevent UI issues
