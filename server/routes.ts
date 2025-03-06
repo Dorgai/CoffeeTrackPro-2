@@ -21,11 +21,46 @@ function requireRole(roles: string[]) {
   };
 }
 
+// Update shop access middleware
+function requireShopAccess(allowedRoles: string[]) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const shopId = parseInt(req.params.shopId || req.query.shopId as string);
+
+    if (!req.user) {
+      return res.status(401).json({ message: "Unauthorized - Please log in" });
+    }
+
+    // Allow full access for roasteryOwner, owner, and retailOwner
+    if (["roasteryOwner", "owner", "retailOwner"].includes(req.user.role)) {
+      return next();
+    }
+
+    // Check if user role is allowed
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ message: "Unauthorized - Insufficient permissions" });
+    }
+
+    // Verify shop access for other roles
+    try {
+      const hasAccess = await checkShopAccess(req.user.id, shopId);
+      if (!hasAccess) {
+        return res.status(403).json({ message: "No access to this shop" });
+      }
+      next();
+    } catch (error) {
+      console.error("Error checking shop access:", error);
+      res.status(500).json({ message: "Error checking shop access" });
+    }
+  };
+}
+
 async function checkShopAccess(userId: number, shopId: number) {
   try {
-    // For roasteryOwner and roaster, grant access to all shops
+    // Get user role
     const user = await storage.getUser(userId);
-    if (user?.role === "roasteryOwner" || user?.role === "roaster") {
+
+    // Grant full access to owners, roasteryOwners, and retailOwners
+    if (user?.role === "owner" || user?.role === "roasteryOwner" || user?.role === "retailOwner") {
       return true;
     }
 
@@ -251,12 +286,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Shops Routes - accessible by roastery owner and shop manager
-  app.get("/api/shops/:id", requireRole(["roasteryOwner", "shopManager", "barista", "retailOwner"]), async (req, res) => {
+  app.get("/api/shops/:id", requireShopAccess(["shopManager", "barista"]), async (req, res) => {
     try {
       const shopId = parseInt(req.params.id);
 
       // For non-roasteryOwner users, verify shop access
-      if (req.user?.role !== "roasteryOwner") {
+      if (req.user?.role !== "roasteryOwner" && req.user?.role !== "owner" && req.user?.role !== "retailOwner") {
         const hasAccess = await checkShopAccess(req.user!.id, shopId);
         if (!hasAccess) {
           return res.status(403).json({ message: "User does not have access to this shop" });
@@ -275,10 +310,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/shops", requireRole(["roasteryOwner", "shopManager", "barista", "retailOwner"]), async (req, res) => {
+  app.get("/api/shops", requireShopAccess(["shopManager", "barista"]), async (req, res) => {
     try {
       let shops;
-      if (req.user?.role === "roasteryOwner") {
+      if (req.user?.role === "roasteryOwner" || req.user?.role === "owner" || req.user?.role === "retailOwner") {
         shops = await storage.getShops();
       } else {
         shops = await storage.getUserShops(req.user!.id);
@@ -303,15 +338,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/shops/:id", requireRole(["roasteryOwner"]), async (req, res) => {
+  // Update shop update route
+  app.patch("/api/shops/:id", requireShopAccess(["shopManager"]), async (req, res) => {
     try {
       const shopId = parseInt(req.params.id);
-      const shop = await storage.getShop(shopId);
 
-      if (!shop) {
-        return res.status(404).json({ message: "Shop not found" });
+      // Only allow shopManager to update their assigned shops
+      if (req.user?.role === "shopManager") {
+        const hasAccess = await checkShopAccess(req.user.id, shopId);
+        if (!hasAccess) {
+          return res.status(403).json({ message: "No access to this shop" });
+        }
+
+        // Limit what shopManager can update
+        const allowedUpdates = ["desiredSmallBags", "desiredLargeBags"];
+        const updates = Object.keys(req.body)
+          .filter(key => allowedUpdates.includes(key))
+          .reduce((obj, key) => ({
+            ...obj,
+            [key]: req.body[key]
+          }), {});
+
+        const updatedShop = await storage.updateShop(shopId, updates);
+        return res.json(updatedShop);
       }
 
+      // RoasteryOwner can update everything
       const updatedShop = await storage.updateShop(shopId, req.body);
       res.json(updatedShop);
     } catch (error) {
@@ -493,53 +545,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // Retail Inventory Routes - accessible by shop manager, barista and retail owner
-  app.get("/api/retail-inventory", requireRole(["owner", "roasteryOwner", "roaster", "shopManager", "barista", "retailOwner"]), async (req, res) => {
-    try {
-      let shopId = req.query.shopId ? Number(req.query.shopId) : undefined;
-      console.log("Fetching retail inventory for user:", req.user?.username, "role:", req.user?.role, "shopId:", shopId);
+  // Update retail inventory routes
+  app.get("/api/retail-inventory", 
+    requireShopAccess(["shopManager", "barista", "retailOwner"]), 
+    async (req, res) => {
+      try {
+        const shopId = req.query.shopId ? Number(req.query.shopId) : undefined;
+        console.log("Fetching retail inventory for user:", req.user?.username, "role:", req.user?.role, "shopId:", shopId);
 
-      // For all roles, if shopId is provided, return inventory for that shop
-      if (shopId) {
-        // Verify shop access for non-admin roles
-        if (!["roasteryOwner", "retailOwner", "roaster"].includes(req.user?.role || "")) {
-          if (!await checkShopAccess(req.user!.id, shopId)) {
-            return res.status(403).json({ message: "User does not have access to this shop" });
+        // For shopManager and barista, require shopId
+        if (["shopManager", "barista"].includes(req.user?.role || "") && !shopId) {
+          return res.status(400).json({ message: "Shop ID is required" });
+        }
+
+        // If shopId provided, verify access
+        if (shopId && !["roasteryOwner", "retailOwner", "owner"].includes(req.user?.role || "")) {
+          const hasAccess = await checkShopAccess(req.user!.id, shopId);
+          if (!hasAccess) {
+            return res.status(403).json({ message: "No access to this shop" });
           }
         }
 
-        const inventory = await storage.getRetailInventoriesByShop(shopId);
-        console.log("Found shop inventory:", inventory.length, "items for shop:", shopId);
-        return res.json(inventory);
-      }
+        const inventory = shopId 
+          ? await storage.getRetailInventoriesByShop(shopId)
+          : await storage.getAllRetailInventories();
 
-      // If no shopId provided, for admin roles return all inventories
-      if (["roaster", "roasteryOwner", "owner", "retailOwner"].includes(req.user?.role || "")) {
-        console.log("Fetching all retail inventories");
-        const allInventory = await storage.getAllRetailInventories();
-        console.log("Found inventories:", allInventory.length);
-        return res.json(allInventory);
+        console.log("Found inventory items:", inventory.length);
+        res.json(inventory);
+      } catch (error) {
+        console.error("Error fetching retail inventory:", error);
+        res.status(500).json({ message: "Failed to fetch inventory" });
       }
-
-      // For other roles without shopId, return error
-      return res.status(400).json({ message: "Shop ID is required" });
-    } catch (error) {
-      console.error("Error fetching retail inventory:", error);
-      res.status(500).json({ message: "Failed to fetch retail inventory" });
-    }
   });
 
-  app.post("/api/retail-inventory", requireRole(["shopManager", "barista", "retailOwner"]), async (req, res) => {
+  app.post("/api/retail-inventory", requireShopAccess(["shopManager", "barista", "retailOwner"]), async (req, res) => {
     try {
       const { shopId } = req.body;
       if (!shopId) {
         return res.status(400).json({ message: "Shop ID is required" });
-      }
-
-      // For retailOwner, bypass shop access check
-      if (req.user?.role !== "retailOwner") {
-        if (!await checkShopAccess(req.user!.id, shopId)) {
-          return res.status(403).json({ message: "User does not have access to this shop" });
-        }
       }
 
       const data = insertRetailInventorySchema.parse({
@@ -559,12 +602,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Add new endpoint for inventory history
-  app.get("/api/retail-inventory/history", requireRole(["shopManager", "barista", "roasteryOwner", "retailOwner"]), async (req, res) => {
+  app.get("/api/retail-inventory/history", requireShopAccess(["shopManager", "barista", "roasteryOwner", "retailOwner"]), async (req, res) => {
     try {
       const shopId = req.query.shopId ? Number(req.query.shopId) : undefined;
 
       // For roastery owner and retail owner, return all history if no shopId specified
-      if (["roasteryOwner", "retailOwner"].includes(req.user?.role || "") && !shopId) {
+      if (["roasteryOwner", "retailOwner", "owner"].includes(req.user?.role || "") && !shopId) {
         const allHistory = await storage.getAllRetailInventoryHistory();
         return res.json(allHistory);
       }
@@ -575,13 +618,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (shopId) {
-        // Skip shop access check for retail owner
-        if (req.user?.role !== "retailOwner") {
-          if (!await checkShopAccess(req.user!.id, shopId)) {
-            return res.status(403).json({ message: "User does not have access to this shop" });
-          }
-        }
-
         const history = await storage.getRetailInventoryHistory(shopId);
         return res.json(history);
       }
@@ -708,17 +744,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // Create new order
-  app.post("/api/orders", requireRole(["owner", "shopManager", "barista", "roasteryOwner", "retailOwner"]), async (req, res) => {
+  app.post("/api/orders", requireShopAccess(["owner", "shopManager", "barista", "roasteryOwner", "retailOwner"]), async (req, res) => {
     try {
       const { shopId } = req.body;
       if (!shopId) {
         return res.status(400).json({ message: "Shop ID is required" });
       }
 
-      // Only check shop access for non-roastery owners and non-owners
-      if (req.user?.role !== "roasteryOwner" && req.user?.role !== "owner" && !await checkShopAccess(req.user!.id, shopId)) {
-        return res.status(403).json({ message: "User does not have access to this shop" });
-      }
 
       const data = insertOrderSchema.parse({
         ...req.body,
@@ -737,13 +769,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Dispatched Coffee Confirmation Routes
-  app.get("/api/dispatched-coffee/confirmations", requireRole(["shopManager", "barista", "roasteryOwner", "retailOwner"]), async (req, res) => {
+  app.get("/api/dispatched-coffee/confirmations", requireShopAccess(["shopManager", "barista", "roasteryOwner", "retailOwner"]), async (req, res) => {
     try {
       const { shopId } = req.query;
       console.log("Request for confirmations received with shopId:", shopId);
 
       // For roasteryOwner, allow fetching without shopId to see all confirmations
-      if (["roasteryOwner", "retailOwner"].includes(req.user?.role || "") && !shopId) {
+      if (["roasteryOwner", "retailOwner", "owner"].includes(req.user?.role || "") && !shopId) {
         const allConfirmations = await storage.getAllDispatchedCoffeeConfirmations();
         console.log("Returning all confirmations for roasteryOwner:", allConfirmations);
         return res.json(allConfirmations);
@@ -751,14 +783,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!shopId) {
         return res.status(400).json({ message: "Shop ID is required" });
-      }
-
-      // For non-roasteryOwner users, verify shop access
-      if (!["roasteryOwner", "retailOwner"].includes(req.user?.role || "")) {
-        const hasAccess = await checkShopAccess(req.user!.id, Number(shopId));
-        if (!hasAccess) {
-          return res.status(403).json({ message: "User does not have access to this shop" });
-        }
       }
 
       console.log("Fetching confirmations for shop:", shopId);
@@ -771,7 +795,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/dispatched-coffee/confirm", requireRole(["roasteryOwner", "shopManager", "barista", "retailOwner"]), async (req, res) => {
+  app.post("/api/dispatched-coffee/confirm", requireShopAccess(["roasteryOwner", "shopManager", "barista", "retailOwner"]), async (req, res) => {
     try {
       const { confirmationId, receivedSmallBags, receivedLargeBags } = req.body;
       console.log("Received confirmation request:", {
@@ -800,14 +824,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!existingConfirmation) {
         return res.status(404).json({ message: "Confirmation not found" });
-      }
-
-      // For non-roasteryOwner users, verify shop access
-      if (!["roasteryOwner", "retailOwner"].includes(req.user?.role || "")) {
-        const hasAccess = await checkShopAccess(req.user!.id, existingConfirmation.shopId);
-        if (!hasAccess) {
-          return res.status(403).json({ message: "User does not have access to this shop" });
-        }
       }
 
       console.log("Processing confirmation:", {
@@ -870,12 +886,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   //  ////  // Add route for getting coffee-specific large bag targets
-  app.get("/api/shops/:id/coffee-targets", requireRole(["roasteryOwner", "shopManager", "retailOwner"]), async(req, res) => {
+  app.get("/api/shops/:id/coffee-targets", requireShopAccess(["roasteryOwner", "shopManager", "retailOwner"]), async(req, res) => {
     try {      const shopId = parseInt(req.params.id);
-
-      if (!await checkShopAccess(req.user!.id, shopId)) {
-        return res.status(403).json({ message: "User does not have access to this shop" });
-      }
 
       const targets = await storage.getCoffeeLargeBagTargets(shopId);
       res.json(targets);
@@ -884,7 +896,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch coffee targets" });
     }
   });  // Fixthe incorrect syntax in the coffee target update route
-  app.patch("/api/shops/:shopId/coffee/:coffeeId/target", requireRole(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
+  app.patch("/api/shops/:shopId/coffee/:coffeeId/target", requireShopAccess(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
     try {
       const shopId = parseInt(req.params.shopId);
       const coffeeId = parseInt(req.params.coffeeId);
@@ -893,14 +905,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate inputs
       if (typeof desiredLargeBags !== 'number' || desiredLargeBags < 0) {
         return res.status(400).json({ message: "Invalid desired large bags value" });
-      }
-
-      // For non-roasteryOwner users, verify shop access
-      if (!["roasteryOwner", "retailOwner"].includes(req.user?.role || "")) {
-        const hasAccess = await checkShopAccess(req.user!.id, shopId);
-        if (!hasAccess) {
-          return res.status(403).json({ message: "User does not have access to this shop" });
-        }
       }
 
       const target = await storage.updateCoffeeLargeBagTarget(
