@@ -208,10 +208,10 @@ export function NavBar() {
             </div>
           ) : (
             <div className="flex gap-2">
-              <Link href="/login" className="text-sm font-medium">
+              <Link href="/auth" className="text-sm font-medium">
                 Login
               </Link>
-              <Link href="/register" className="text-sm font-medium">
+              <Link href="/auth" className="text-sm font-medium">
                 Register
               </Link>
             </div>
