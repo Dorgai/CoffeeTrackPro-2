@@ -438,21 +438,28 @@ export class DatabaseStorage {
           ri.small_bags as "smallBags",
           ri.large_bags as "largeBags",
           ri.created_at as "createdAt",
+          ri.updated_at as "updatedAt",
           s.name as "shopName",
           s.location as "shopLocation",
           gc.name as "coffeeName",
           gc.producer,
-          ri.created_at as "lastUpdated"
+          u.username as "updatedBy",
+          COALESCE(ri.updated_at, ri.created_at) as "lastUpdated"
         FROM retail_inventory ri
         LEFT JOIN shops s ON ri.shop_id = s.id
         LEFT JOIN green_coffee gc ON ri.green_coffee_id = gc.id
+        LEFT JOIN users u ON ri.updated_by_id = u.id
         WHERE ri.shop_id = ${shopId}
         ORDER BY ri.green_coffee_id`;
 
       const result = await db.execute(query);
       console.log("Found retail inventories for shop:", result.rows.length);
       if (result.rows.length > 0) {
-        console.log("Sample inventory:", result.rows[0]);
+        console.log("Sample inventory:", {
+          ...result.rows[0],
+          smallBags: Number(result.rows[0].smallBags),
+          largeBags: Number(result.rows[0].largeBags)
+        });
       }
       return result.rows;
     } catch (error) {

@@ -222,6 +222,7 @@ export default function Dashboard() {
                               <div className="text-sm font-medium">{inv.coffeeName}</div>
                               <div className="text-xs text-muted-foreground">
                                 Last updated: {formatDate(inv.lastUpdated)}
+                                {inv.updatedBy && <span> by {inv.updatedBy}</span>}
                               </div>
                             </div>
                           </div>
@@ -232,7 +233,7 @@ export default function Dashboard() {
                             <StockProgress
                               current={inv.smallBags || 0}
                               desired={shop?.desiredSmallBags || 20}
-                              label={`Small Bags (200g)`}
+                              label="Small Bags (200g)"
                             />
                             <div className="text-sm">
                               <span className="font-medium">Large Bags (1kg):</span> {inv.largeBags || 0}
@@ -240,7 +241,7 @@ export default function Dashboard() {
                             <StockProgress
                               current={inv.largeBags || 0}
                               desired={shop?.desiredLargeBags || 10}
-                              label={`Large Bags (1kg)`}
+                              label="Large Bags (1kg)"
                             />
                           </div>
                         </div>
