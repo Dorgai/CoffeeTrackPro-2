@@ -474,8 +474,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Shop ID is required" });
       }
 
-      if (!await checkShopAccess(req.user!.id, shopId)) {
-        return res.status(403).json({ message: "User does not have access to this shop" });
+      // For retailOwner, bypass shop access check
+      if (req.user?.role !== "retailOwner") {
+        if (!await checkShopAccess(req.user!.id, shopId)) {
+          return res.status(403).json({ message: "User does not have access to this shop" });
+        }
       }
 
       const data = insertRetailInventorySchema.parse({
@@ -494,30 +497,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Add new endpoint for inventory history after the existing retail inventory routes
+  // Add new endpoint for inventory history
   app.get("/api/retail-inventory/history", requireRole(["shopManager", "barista", "roasteryOwner", "retailOwner"]), async (req, res) => {
     try {
       const shopId = req.query.shopId ? Number(req.query.shopId) : undefined;
 
-      // For roastery owner and shop manager, return all history if no shopId specified
-      if (["roasteryOwner", "shopManager", "retailOwner"].includes(req.user?.role || "") && !shopId) {
+      // For roastery owner and retail owner, return all history if no shopId specified
+      if (["roasteryOwner", "retailOwner"].includes(req.user?.role || "") && !shopId) {
         const allHistory = await storage.getAllRetailInventoryHistory();
         return res.json(allHistory);
       }
 
-      // Barista must provide shopId
-      if (req.user?.role === "barista" && !shopId) {
+      // Barista and shop manager must provide shopId
+      if (["barista", "shopManager"].includes(req.user?.role || "") && !shopId) {
         return res.status(400).json({ message: "Shop ID is required" });
       }
 
       if (shopId) {
-        if (!await checkShopAccess(req.user!.id, shopId)) {
-          return res.status(403).json({ message: "User does not have access to this shop" });
+        // Skip shop access check for retail owner
+        if (req.user?.role !== "retailOwner") {
+          if (!await checkShopAccess(req.user!.id, shopId)) {
+            return res.status(403).json({ message: "User does not have access to this shop" });
+          }
         }
 
         const history = await storage.getRetailInventoryHistory(shopId);
         return res.json(history);
       }
+
+      res.json([]);
     } catch (error) {
       console.error("Error fetching inventory history:", error);
       res.status(500).json({ message: "Failed to fetch inventory history" });
@@ -791,7 +799,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // For roasteryOwner and roaster, show all discrepancies
         console.log("Returning all discrepancies for roasteryOwner/roaster");
         res.json(discrepancies);
-      } catch (error) {
+      } catch (error){
         console.error("Error fetching inventory discrepancies:", error);
         res.status(500).json({
           message: "Failed to fetch discrepancies",
