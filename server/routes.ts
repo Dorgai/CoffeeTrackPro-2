@@ -504,21 +504,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Orders Routes - accessible by shop manager, barista, and roaster
-  app.get("/api/orders", requireRole(["owner", "shopManager", "barista", "roaster", "roasteryOwner"]), async (req, res) => {
+  app.get("/api/orders", requireRole(["owner", "roasteryOwner", "roaster", "shopManager", "barista"]), async (req, res) => {
     try {
       console.log("Fetching orders for user:", req.user?.username, "with role:", req.user?.role);
       const shopId = req.query.shopId ? Number(req.query.shopId) : undefined;
 
-      // For roaster, roastery owner, owner, and shop manager, return all orders if no shopId specified
-      if ((req.user?.role === "roaster" || req.user?.role === "roasteryOwner" || req.user?.role === "owner" || req.user?.role === "shopManager") && !shopId) {
-        console.log("Fetching all orders for roaster/owner/manager");
+      // For roaster, roasteryOwner, owner, return all orders if no shopId specified
+      if ((req.user?.role === "roaster" || req.user?.role === "roasteryOwner" || req.user?.role === "owner") && !shopId) {
+        console.log("Fetching all orders for roaster/owner/roasteryOwner");
         const allOrders = await storage.getAllOrders();
         console.log("Found orders:", allOrders.length);
         return res.json(allOrders);
       }
 
-      // Barista must provide shopId
-      if (req.user?.role === "barista" && !shopId) {
+      // For shop manager and barista, require shopId
+      if ((req.user?.role === "shopManager" || req.user?.role === "barista") && !shopId) {
         return res.status(400).json({ message: "Shop ID is required" });
       }
 
@@ -530,6 +530,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const orders = await storage.getOrdersByShop(shopId);
         return res.json(orders);
       }
+
+      return res.json([]);
     } catch (error) {
       console.error("Error fetching orders:", error);
       res.status(500).json({ message: "Failed to fetch orders" });

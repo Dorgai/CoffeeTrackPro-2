@@ -291,6 +291,21 @@ export class DatabaseStorage {
     }
   }
 
+  async createGreenCoffee(data: InsertGreenCoffee): Promise<GreenCoffee> {
+    try {
+      console.log("Creating green coffee with data:", data);
+      const [coffee] = await db
+        .insert(greenCoffee)
+        .values(data)
+        .returning();
+      console.log("Created green coffee:", coffee);
+      return coffee;
+    } catch (error) {
+      console.error("Error creating green coffee:", error);
+      throw error;
+    }
+  }
+
   // Order methods
   async createOrder(data: InsertOrder): Promise<Order> {
     try {
@@ -322,7 +337,7 @@ export class DatabaseStorage {
 
   async getAllOrders(): Promise<Order[]> {
     try {
-      return await db
+      const orders = await db
         .select({
           id: orders.id,
           shopId: orders.shopId,
@@ -346,6 +361,9 @@ export class DatabaseStorage {
         .from(orders)
         .leftJoin(shops, eq(orders.shopId, shops.id))
         .orderBy(orders.createdAt);
+
+      console.log("Fetched orders with shop data:", orders);
+      return orders;
     } catch (error) {
       console.error("Error getting all orders:", error);
       return [];
@@ -354,7 +372,7 @@ export class DatabaseStorage {
 
   async getOrdersByShop(shopId: number): Promise<Order[]> {
     try {
-      return await db
+      const orders = await db
         .select({
           id: orders.id,
           shopId: orders.shopId,
@@ -379,6 +397,9 @@ export class DatabaseStorage {
         .leftJoin(shops, eq(orders.shopId, shops.id))
         .where(eq(orders.shopId, shopId))
         .orderBy(orders.createdAt);
+
+      console.log("Fetched orders for shop:", shopId, "Count:", orders.length);
+      return orders;
     } catch (error) {
       console.error("Error getting shop orders:", error);
       return [];
