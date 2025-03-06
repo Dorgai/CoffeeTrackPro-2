@@ -2,8 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { Loader2, Package, ShoppingCart } from "lucide-react";
 import { Shop } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
+import { apiRequest } from "@/lib/queryClient";
 import { DispatchedCoffeeConfirmation } from "@/components/coffee/dispatched-coffee-confirmation";
 import { InventoryDiscrepancyView } from "@/components/coffee/inventory-discrepancy-view";
+import { ShopSelector } from "@/components/layout/shop-selector";
 import {
   Card,
   CardContent,
@@ -126,6 +128,10 @@ export default function RetailOverview() {
         <p className="text-muted-foreground">
           Monitor inventory and orders across retail locations
         </p>
+      </div>
+
+      <div className="mb-6">
+        <ShopSelector />
       </div>
 
       {user?.role === "roasteryOwner" && <InventoryDiscrepancyView />}

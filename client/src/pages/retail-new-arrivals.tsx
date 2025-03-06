@@ -26,42 +26,35 @@ export default function RetailNewArrivals() {
     );
   }
 
-  if (!activeShop) {
-    return (
-      <div className="container mx-auto py-8">
-        <Alert>
-          <AlertDescription>
-            Please select a shop to view new arrivals.
-          </AlertDescription>
-        </Alert>
-        <div className="mt-4">
-          <ShopSelector />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="container mx-auto py-8">
       <div className="mb-6">
         <ShopSelector />
       </div>
 
-      <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>New Inventory Arrivals</CardTitle>
-            <CardDescription>
-              Confirm and update inventory quantities for newly received coffee shipments
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <DispatchedCoffeeConfirmation shopId={activeShop.id} />
-          </CardContent>
-        </Card>
+      {!activeShop ? (
+        <Alert>
+          <AlertDescription>
+            Please select a shop to view new arrivals.
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>New Inventory Arrivals</CardTitle>
+              <CardDescription>
+                Confirm and update inventory quantities for newly received coffee shipments
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DispatchedCoffeeConfirmation shopId={activeShop.id} />
+            </CardContent>
+          </Card>
 
-        <InventoryDiscrepancyView />
-      </div>
+          <InventoryDiscrepancyView />
+        </div>
+      )}
     </div>
   );
 }
