@@ -8,20 +8,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Store, Loader2 } from "lucide-react";
+import { Store } from "lucide-react";
 import { useActiveShop } from "@/hooks/use-active-shop";
 
 export function ShopSelector() {
   const { activeShop, setActiveShop } = useActiveShop();
   const { data: shops = [], isLoading } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
-    refetchOnMount: "always",
-    staleTime: 0,
-    refetchInterval: 3000,
-    refetchOnWindowFocus: true,
-    refetchOnReconnect: true,
-    retry: 3,
-    retryDelay: 1000,
   });
 
   // Initialize shop selection if not already set
@@ -31,27 +24,8 @@ export function ShopSelector() {
     }
   }, [shops, activeShop, setActiveShop]);
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center gap-2">
-        <Store className="h-4 w-4" />
-        <div className="flex items-center gap-2 min-w-[200px] h-9 px-3 rounded-md border">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          <span className="text-sm">Loading shops...</span>
-        </div>
-      </div>
-    );
-  }
-
   if (!shops.length) {
-    return (
-      <div className="flex items-center gap-2">
-        <Store className="h-4 w-4" />
-        <div className="flex items-center gap-2 min-w-[200px] h-9 px-3 rounded-md border">
-          <span className="text-sm text-muted-foreground">No shops available</span>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return (
