@@ -40,7 +40,11 @@ export function NavBar() {
         </div>
 
         {/* Shop Selector */}
-        {user && <ShopSelector />}
+        {user && (
+          <div className="mr-4">
+            <ShopSelector />
+          </div>
+        )}
 
         <Menubar className="border-none">
           <MenubarMenu>
@@ -71,7 +75,6 @@ export function NavBar() {
               </MenubarContent>
             </MenubarMenu>
           )}
-
 
           {canAccessGreenCoffee && (
             <MenubarMenu>
