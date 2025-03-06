@@ -94,8 +94,8 @@ export const insertGreenCoffeeSchema = z.object({
   name: z.string().min(1, "Name is required"),
   producer: z.string().min(1, "Producer is required"),
   country: z.string().min(1, "Country is required"),
-  currentStock: z.string(),
-  minThreshold: z.string(),
+  currentStock: z.number().min(0, "Current stock must be 0 or greater"),
+  minThreshold: z.number().min(0, "Minimum threshold must be 0 or greater"),
   grade: z.enum(coffeeGrades),
   isActive: z.boolean().default(true)
 });

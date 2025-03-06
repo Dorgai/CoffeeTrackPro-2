@@ -51,7 +51,7 @@ export function GreenCoffeeForm({
 
   const mutation = useMutation({
     mutationFn: async (data: FormValues) => {
-      // Convert numbers to strings for decimal fields
+      // Convert numbers to strings for decimal fields before sending to server
       const processedData = {
         ...data,
         currentStock: String(data.currentStock),
@@ -184,9 +184,9 @@ export function GreenCoffeeForm({
                   <FormItem>
                     <FormLabel>Current Stock (kg)</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        step="0.01" 
+                      <Input
+                        type="number"
+                        step="0.01"
                         {...field}
                         onChange={(e) => field.onChange(Number(e.target.value))}
                       />
@@ -203,9 +203,9 @@ export function GreenCoffeeForm({
                   <FormItem>
                     <FormLabel>Min Threshold (kg)</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        step="0.01" 
+                      <Input
+                        type="number"
+                        step="0.01"
                         {...field}
                         onChange={(e) => field.onChange(Number(e.target.value))}
                       />
