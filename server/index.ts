@@ -1,6 +1,10 @@
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { setupVite } from "./vite";
+import { seedInitialData } from "./db";
+import session from "express-session";
+import { storage } from "./storage";
+import { setupAuth } from "./auth";
 
 async function createServer() {
   const app = express();
@@ -18,6 +22,25 @@ async function createServer() {
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok' });
   });
+
+  // Set up session before auth
+  app.use(session({
+    secret: process.env.SESSION_SECRET || 'development_secret',
+    resave: false,
+    saveUninitialized: false,
+    store: storage.sessionStore,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
+  }));
+
+  // Set up authentication after session
+  setupAuth(app);
+
+  // Seed initial data before setting up routes
+  await seedInitialData();
 
   // Global error handler
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
