@@ -68,14 +68,6 @@ export default function UserManagement() {
   const { data: userShops, refetch: refetchUserShops } = useQuery({
     queryKey: ["/api/users", selectedUserForShops?.id, "shops"],
     enabled: !!selectedUserForShops?.id,
-    queryFn: async () => {
-      const res = await apiRequest(
-        "GET",
-        `/api/users/${selectedUserForShops?.id}/shops`
-      );
-      if (!res.ok) throw new Error("Failed to fetch user's shops");
-      return res.json();
-    },
   });
 
   // Update shop assignments mutation
@@ -111,6 +103,36 @@ export default function UserManagement() {
     },
   });
 
+  const updatePasswordMutation = useMutation({
+    mutationFn: async ({ userId, password }: { userId: number; password: string }) => {
+      const res = await apiRequest(
+        "POST",
+        `/api/users/${userId}/update-password`,
+        { password }
+      );
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error || "Failed to update password");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setIsPasswordDialogOpen(false);
+      setNewPassword("");
+      toast({
+        title: "Success",
+        description: "Password has been updated",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const toggleActivationMutation = useMutation({
     mutationFn: async ({ userId, isActive }: { userId: number; isActive: boolean }) => {
       const res = await apiRequest(
@@ -138,7 +160,6 @@ export default function UserManagement() {
     },
   });
 
-  // Component render
   if (currentUser?.role !== "roasteryOwner") {
     return (
       <div className="container mx-auto py-8">
@@ -176,16 +197,6 @@ export default function UserManagement() {
   const handleShopAssignment = (userId: number, shopIds: number[]) => {
     console.log("Assigning shops:", { userId, shopIds });
     updateShopAssignmentsMutation.mutate({ userId, shopIds });
-  };
-
-  const handleShopSelectionChange = (shopId: string) => {
-    const id = parseInt(shopId);
-    setSelectedShopIds(prev => {
-      if (prev.includes(id)) {
-        return prev.filter(x => x !== id);
-      }
-      return [...prev, id];
-    });
   };
 
   return (
@@ -252,19 +263,17 @@ export default function UserManagement() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      {!user.isPendingApproval && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedUserForShops(user);
-                            setIsShopAssignmentOpen(true);
-                          }}
-                        >
-                          <Building2 className="h-4 w-4 mr-2" />
-                          Manage Shops
-                        </Button>
-                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedUserForShops(user);
+                          setIsShopAssignmentOpen(true);
+                        }}
+                      >
+                        <Building2 className="h-4 w-4 mr-2" />
+                        Manage Shops
+                      </Button>
 
                       <Button
                         variant="outline"

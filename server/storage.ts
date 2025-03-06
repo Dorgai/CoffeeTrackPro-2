@@ -398,6 +398,20 @@ export class DatabaseStorage {
   async getAllRetailInventories(): Promise<any[]> {
     try {
       console.log("Fetching all retail inventories");
+
+      // First verify if shops exist
+      const shopsCount = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(shops)
+        .where(eq(shops.isActive, true));
+
+      console.log("Active shops count:", shopsCount[0]?.count || 0);
+
+      if (!shopsCount[0]?.count) {
+        console.log("No active shops found");
+        return [];
+      }
+
       const query = sql`
         SELECT 
           ri.id,
@@ -418,21 +432,33 @@ export class DatabaseStorage {
         LEFT JOIN shops s ON ri.shop_id = s.id
         LEFT JOIN green_coffee gc ON ri.green_coffee_id = gc.id
         LEFT JOIN users u ON ri.updated_by_id = u.id
+        WHERE s.is_active = true
         ORDER BY s.name, gc.name`;
 
       const result = await db.execute(query);
       console.log("Found retail inventories:", result.rows.length);
+
       if (result.rows.length > 0) {
         console.log("Sample inventory:", {
           ...result.rows[0],
           smallBags: Number(result.rows[0].smallBags),
-          largeBags: Number(result.rows[0].largeBags)
+          largeBags: Number(result.rows[0].largeBags),
+          shopName: result.rows[0].shopName,
+          coffeeName: result.rows[0].coffeeName,
+          updatedBy: result.rows[0].updatedBy
         });
+      } else {
+        console.log("No inventory records found");
       }
-      return result.rows;
+
+      return result.rows.map(row => ({
+        ...row,
+        smallBags: Number(row.smallBags),
+        largeBags: Number(row.largeBags)
+      }));
     } catch (error) {
       console.error("Error getting all retail inventories:", error);
-      return [];
+      throw error;
     }
   }
 
