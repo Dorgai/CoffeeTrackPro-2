@@ -75,8 +75,8 @@ type OrderWithDetails = {
   id: number;
   shopId: number;
   greenCoffeeId: number;
-  smallBags: number;
-  largeBags: number;
+  small_bags: number;
+  large_bags: number;
   status: string;
   createdAt: string;
   shop_name: string;
@@ -217,8 +217,8 @@ export default function RoastingOrders() {
                             </TableCell>
                             <TableCell>
                               <div>
-                                <div>Small Bags: {order.smallBags}</div>
-                                <div>Large Bags: {order.largeBags}</div>
+                                <div>Small Bags: {order.small_bags}</div>
+                                <div>Large Bags: {order.large_bags}</div>
                               </div>
                             </TableCell>
                             <TableCell>
@@ -242,9 +242,9 @@ export default function RoastingOrders() {
                                 onClick={() => {
                                   setSelectedOrder(order);
                                   form.reset({
-                                    smallBags: order.smallBags,
-                                    largeBags: order.largeBags,
-                                    status: "roasted",
+                                    smallBags: order.small_bags,
+                                    largeBags: order.large_bags,
+                                    status: order.status === "pending" ? "roasted" : order.status,
                                   });
                                   setIsUpdateDialogOpen(true);
                                 }}
@@ -311,7 +311,7 @@ export default function RoastingOrders() {
                             <Input
                               type="number"
                               min="0"
-                              max={selectedOrder.smallBags}
+                              max={selectedOrder.small_bags}
                               {...field}
                             />
                           </FormControl>
