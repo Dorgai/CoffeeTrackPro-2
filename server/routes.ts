@@ -83,6 +83,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Add after update user role/status route
+  app.post("/api/users/:id/approve", requireRole(["roasteryOwner"]), async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+
+      // Don't allow owner/roasteryOwner to modify their own role
+      if (userId === req.user!.id) {
+        return res.status(403).json({ message: "Cannot modify own user account" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const updatedUser = await storage.approveUser(userId);
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error approving user:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to approve user" 
+      });
+    }
+  });
+
   // Assign user to shop
   app.post("/api/users/:id/shops", requireRole(["roasteryOwner"]), async (req, res) => {
     try {
@@ -776,7 +801,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Add route for getting coffee-specific large bag targets
+  //  // Add route for getting coffee-specific large bag targets
   app.get("/api/shops/:id/coffee-targets", requireRole(["roasteryOwner", "shopManager"]), async(req, res) => {
     try {      const shopId = parseInt(req.params.id);
 

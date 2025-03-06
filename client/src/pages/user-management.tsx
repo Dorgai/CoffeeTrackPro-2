@@ -64,7 +64,7 @@ export default function UserManagement() {
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (updatedUser) => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       toast({
         title: "Success",
@@ -224,8 +224,13 @@ export default function UserManagement() {
                           variant="outline"
                           size="sm"
                           onClick={() => approveUserMutation.mutate(user.id)}
+                          disabled={approveUserMutation.isPending}
                         >
-                          Approve
+                          {approveUserMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            "Approve"
+                          )}
                         </Button>
                       )}
 

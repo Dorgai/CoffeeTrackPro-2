@@ -116,6 +116,23 @@ export class DatabaseStorage {
   async approveUser(id: number): Promise<User> {
     try {
       console.log("Approving user:", id);
+
+      // First check if user exists and their current status
+      const [existingUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, id));
+
+      if (!existingUser) {
+        throw new Error("User not found");
+      }
+
+      // Only update if user is actually pending approval
+      if (!existingUser.isPendingApproval) {
+        console.log("User is already approved:", existingUser);
+        return existingUser;
+      }
+
       const [user] = await db
         .update(users)
         .set({ isPendingApproval: false })
