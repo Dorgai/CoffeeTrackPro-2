@@ -19,6 +19,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { AlertCircle, Key, Building2, UserCheck, UserX, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -96,6 +106,33 @@ export default function UserManagement() {
       toast({
         title: "Error",
         description: error.message || "Failed to update shop assignments",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const toggleActivationMutation = useMutation({
+    mutationFn: async ({ userId, isActive }: { userId: number; isActive: boolean }) => {
+      const res = await apiRequest(
+        "POST",
+        `/api/users/${userId}/toggle-activation`,
+        { isActive }
+      );
+      if (!res.ok) throw new Error("Failed to update user activation status");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({
+        title: "Success",
+        description: "User activation status has been updated",
+      });
+      setUserToDeactivate(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
         variant: "destructive",
       });
     },
@@ -240,6 +277,24 @@ export default function UserManagement() {
                         <Key className="h-4 w-4 mr-2" />
                         Reset Password
                       </Button>
+
+                      <Button
+                        variant={user.isActive ? "destructive" : "outline"}
+                        size="sm"
+                        onClick={() => setUserToDeactivate(user)}
+                      >
+                        {user.isActive ? (
+                          <>
+                            <UserX className="h-4 w-4 mr-2" />
+                            Deactivate
+                          </>
+                        ) : (
+                          <>
+                            <UserCheck className="h-4 w-4 mr-2" />
+                            Activate
+                          </>
+                        )}
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -287,6 +342,7 @@ export default function UserManagement() {
           </div>
         </DialogContent>
       </Dialog>
+
       <AlertDialog
         open={!!userToDeactivate}
         onOpenChange={(open) => !open && setUserToDeactivate(null)}
