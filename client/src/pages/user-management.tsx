@@ -19,7 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { AlertCircle, Key, Building2, UserCheck, UserX } from "lucide-react";
+import { AlertCircle, Key, Building2, UserCheck, UserX, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -31,6 +31,8 @@ import {
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
+type FilterStatus = "all" | "pending" | "active" | "inactive";
+
 export default function UserManagement() {
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
@@ -41,8 +43,9 @@ export default function UserManagement() {
   const [selectedUserForShops, setSelectedUserForShops] = useState<User | null>(null);
   const [isShopAssignmentOpen, setIsShopAssignmentOpen] = useState(false);
   const [selectedShopIds, setSelectedShopIds] = useState<number[]>([]);
+  const [filter, setFilter] = useState<FilterStatus>("all");
 
-  // Existing queries
+  // Queries
   const { data: users, isLoading } = useQuery<User[]>({
     queryKey: ["/api/users"],
   });
@@ -112,6 +115,27 @@ export default function UserManagement() {
     );
   }
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  const filteredUsers = users?.filter(user => {
+    switch (filter) {
+      case "pending":
+        return user.isPendingApproval;
+      case "active":
+        return !user.isPendingApproval && user.isActive;
+      case "inactive":
+        return !user.isPendingApproval && !user.isActive;
+      default:
+        return true;
+    }
+  });
+
   const handleShopAssignment = (userId: number, shopIds: number[]) => {
     console.log("Assigning shops:", { userId, shopIds });
     updateShopAssignmentsMutation.mutate({ userId, shopIds });
@@ -137,7 +161,7 @@ export default function UserManagement() {
       </div>
 
       <div className="flex justify-end gap-2">
-        <Select value={filter} onValueChange={(value: any) => setFilter(value)}>
+        <Select value={filter} onValueChange={(value: FilterStatus) => setFilter(value)}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
@@ -191,41 +215,17 @@ export default function UserManagement() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      {user.isPendingApproval && (
+                      {!user.isPendingApproval && (
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => approveUserMutation.mutate(user.id)}
-                          disabled={approveUserMutation.isPending}
+                          onClick={() => {
+                            setSelectedUserForShops(user);
+                            setIsShopAssignmentOpen(true);
+                          }}
                         >
-                          {approveUserMutation.isPending ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <>
-                              <UserCheck className="h-4 w-4 mr-2" />
-                              Approve
-                            </>
-                          )}
-                        </Button>
-                      )}
-
-                      {!user.isPendingApproval && (
-                        <Button
-                          variant={user.isActive ? "destructive" : "outline"}
-                          size="sm"
-                          onClick={() => setUserToDeactivate(user)}
-                        >
-                          {user.isActive ? (
-                            <>
-                              <UserX className="h-4 w-4 mr-2" />
-                              Deactivate
-                            </>
-                          ) : (
-                            <>
-                              <UserCheck className="h-4 w-4 mr-2" />
-                              Activate
-                            </>
-                          )}
+                          <Building2 className="h-4 w-4 mr-2" />
+                          Manage Shops
                         </Button>
                       )}
 
@@ -240,20 +240,6 @@ export default function UserManagement() {
                         <Key className="h-4 w-4 mr-2" />
                         Reset Password
                       </Button>
-
-                      {!user.isPendingApproval && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedUserForShops(user);
-                            setIsShopAssignmentOpen(true);
-                          }}
-                        >
-                          <Building2 className="h-4 w-4 mr-2" />
-                          Manage Shops
-                        </Button>
-                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -301,7 +287,6 @@ export default function UserManagement() {
           </div>
         </DialogContent>
       </Dialog>
-
       <AlertDialog
         open={!!userToDeactivate}
         onOpenChange={(open) => !open && setUserToDeactivate(null)}
