@@ -268,11 +268,10 @@ export class DatabaseStorage {
       const [batch] = await db
         .insert(roastingBatches)
         .values({
-          greenCoffeeId: data.greenCoffeeId,
-          plannedAmount: data.plannedAmount,
-          smallBagsProduced: data.smallBagsProduced,
-          largeBagsProduced: data.largeBagsProduced,
-          status: data.status || "planned"
+          ...data,
+          plannedAmount: String(data.plannedAmount),
+          actualAmount: data.actualAmount ? String(data.actualAmount) : null,
+          roastingLoss: data.roastingLoss ? String(data.roastingLoss) : null,
         })
         .returning();
 
@@ -355,7 +354,11 @@ export class DatabaseStorage {
       console.log("Creating green coffee with data:", data);
       const [coffee] = await db
         .insert(greenCoffee)
-        .values(data)
+        .values({
+          ...data,
+          currentStock: String(data.currentStock),
+          minThreshold: String(data.minThreshold)
+        })
         .returning();
       console.log("Created green coffee:", coffee);
       return coffee;
