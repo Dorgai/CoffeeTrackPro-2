@@ -767,32 +767,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Inventory Discrepancies Routes
   app.get("/api/inventory-discrepancies", 
-    requireRole(["retailOwner", "roaster", "roasteryOwner", "shopManager"]), 
+    requireRole(["roaster", "roasteryOwner", "shopManager"]), 
     async (req, res) => {
       try {
         console.log("Fetching discrepancies for user:", req.user?.username, "with role:", req.user?.role);
         const discrepancies = await storage.getInventoryDiscrepancies();
         console.log("Found discrepancies:", discrepancies.length);
 
-        // For retailOwner, roasteryOwner and roaster, show all discrepancies
-        if (["retailOwner", "roasteryOwner", "roaster"].includes(req.user?.role || "")) {
-          console.log("Returning all discrepancies for retailOwner/roasteryOwner/roaster");
-          return res.json(discrepancies);
-        }
-
-        // For shop managers, filter discrepancies to only show their shops
+        // Filter discrepancies based on user role
         if (req.user?.role === "shopManager") {
+          // For shop managers, filter discrepancies to only show their shops
           const userShops = await storage.getUserShops(req.user.id);
           const shopIds = userShops.map(shop => shop.id);
           console.log("Shop manager shops:", shopIds);
           const filteredDiscrepancies = discrepancies.filter(
-            d => shopIds.includes(d.confirmation.shopId)
+            d => shopIds.includes(d.shopId)
           );
           console.log("Filtered discrepancies for shop manager:", filteredDiscrepancies.length);
           return res.json(filteredDiscrepancies);
         }
 
-        res.json([]);
+        // For roasteryOwner and roaster, show all discrepancies
+        console.log("Returning all discrepancies for roasteryOwner/roaster");
+        res.json(discrepancies);
       } catch (error) {
         console.error("Error fetching inventory discrepancies:", error);
         res.status(500).json({
@@ -800,8 +797,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           details: error instanceof Error ? error.message : undefined
         });
       }
-        }
-  });
+    }
+  );
 
   //  // Add route for getting coffee-specific large bag targets
   app.get("/api/shops/:id/coffee-targets", requireRole(["roasteryOwner", "shopManager", "retailOwner"]), async(req, res) => {
