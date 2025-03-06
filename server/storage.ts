@@ -408,6 +408,7 @@ export class DatabaseStorage {
             gc.id as coffee_id,
             gc.name as coffee_name,
             gc.producer,
+            gc.grade,
             COALESCE(ri.small_bags, 0) as small_bags,
             COALESCE(ri.large_bags, 0) as large_bags,
             ri.updated_at,
@@ -417,7 +418,7 @@ export class DatabaseStorage {
           CROSS JOIN green_coffee gc
           LEFT JOIN retail_inventory ri ON ri.shop_id = s.id AND ri.green_coffee_id = gc.id
           LEFT JOIN users u ON ri.updated_by_id = u.id
-          WHERE s.is_active = true
+          WHERE s.is_active = true AND gc.is_active = true
         )
         SELECT 
           shop_id as "shopId",
@@ -426,6 +427,7 @@ export class DatabaseStorage {
           shop_location as "shopLocation",
           coffee_name as "coffeeName",
           producer,
+          grade as "grade",
           small_bags as "smallBags",
           large_bags as "largeBags",
           updated_at as "updatedAt",
@@ -448,7 +450,7 @@ export class DatabaseStorage {
       }));
     } catch (error) {
       console.error("Error in getAllRetailInventories:", error);
-      throw error;
+      return [];
     }
   }
 
@@ -475,10 +477,10 @@ export class DatabaseStorage {
       const [coffee] = await db
         .select()
         .from(greenCoffee)
-        .where(eq(greenCoffee.id, data.greenCoffeeId));
+        .where(and(eq(greenCoffee.id, data.greenCoffeeId), eq(greenCoffee.isActive, true)));
 
       if (!coffee) {
-        throw new Error(`Coffee ${data.greenCoffeeId} not found`);
+        throw new Error(`Coffee ${data.greenCoffeeId} not found or inactive`);
       }
 
       const query = sql`

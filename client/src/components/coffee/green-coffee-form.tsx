@@ -45,7 +45,7 @@ export function GreenCoffeeForm({
       country: "",
       currentStock: 0,
       minThreshold: 0,
-      grade: "TBD"
+      grade: "Premium"
     }
   });
 

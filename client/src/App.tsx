@@ -5,6 +5,7 @@ import { AuthProvider } from "@/hooks/use-auth";
 import { Toaster } from "@/components/ui/toaster";
 import { PageLayout } from "@/components/layout/page-layout";
 import Dashboard from "@/pages/dashboard";
+import ManagerDashboard from "@/pages/manager-dashboard";
 import AuthPage from "@/pages/auth-page";
 import Inventory from "@/pages/inventory";
 import CoffeeDetail from "@/pages/coffee-detail";
@@ -40,12 +41,30 @@ export default function App() {
                 <ProtectedRoute
                   path="/"
                   component={Dashboard}
-                  roles={["owner", "roasteryOwner", "roaster", "shopManager", "barista"]}
+                  roles={["owner", "roasteryOwner", "roaster"]}
                 />
               )}
             </Route>
+
+            {/* Manager Dashboard */}
+            <Route path="/manager-dashboard">
+              {() => (
+                <ProtectedRoute
+                  path="/manager-dashboard"
+                  component={ManagerDashboard}
+                  roles={["shopManager"]}
+                />
+              )}
+            </Route>
+
             <Route path="/inventory">
-              {() => <ProtectedRoute path="/inventory" component={Inventory} roles={["owner", "roasteryOwner", "roaster"]} />}
+              {() => (
+                <ProtectedRoute
+                  path="/inventory"
+                  component={Inventory}
+                  roles={["owner", "roasteryOwner", "roaster", "shopManager"]}
+                />
+              )}
             </Route>
             <Route path="/coffee/:id">
               {() => <ProtectedRoute path="/coffee/:id" component={CoffeeDetail} roles={["owner", "roasteryOwner", "roaster"]} />}

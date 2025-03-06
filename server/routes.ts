@@ -546,7 +546,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Retail Inventory Routes - accessible by shop manager, barista and retail owner
   app.get("/api/retail-inventory", 
-    requireShopAccess(["shopManager", "barista", "retailOwner"]), 
+    requireShopAccess(["shopManager", "barista", "retailOwner", "owner", "roaster", "roasteryOwner"]), 
     async (req, res) => {
       try {
         const shopId = req.query.shopId ? Number(req.query.shopId) : undefined;
@@ -558,7 +558,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // If shopId provided, verify access
-        if (shopId && !["roasteryOwner", "retailOwner", "owner"].includes(req.user?.role || "")) {
+        if (shopId && !["roasteryOwner", "retailOwner", "owner", "roaster"].includes(req.user?.role || "")) {
           const hasAccess = await checkShopAccess(req.user!.id, shopId);
           if (!hasAccess) {
             return res.status(403).json({ message: "No access to this shop" });
@@ -580,28 +580,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
 
-  app.post("/api/retail-inventory", requireShopAccess(["shopManager", "barista", "retailOwner"]), async (req, res) => {
-    try {
-      const { shopId } = req.body;
-      if (!shopId) {
-        return res.status(400).json({ message: "Shop ID is required" });
+  app.post("/api/retail-inventory", 
+    requireShopAccess(["shopManager", "barista", "retailOwner", "owner", "roaster", "roasteryOwner"]), 
+    async (req, res) => {
+      try {
+        const { shopId } = req.body;
+        if (!shopId) {
+          return res.status(400).json({ message: "Shop ID is required" });
+        }
+
+        const data = insertRetailInventorySchema.parse({
+          ...req.body,
+          updatedById: req.user!.id
+        });
+
+        const inventory = await storage.updateRetailInventory(data);
+        res.status(201).json(inventory);
+      } catch (error) {
+        console.error("Error updating retail inventory:", error);
+        res.status(400).json({
+          message: error instanceof Error ? error.message : "Failed to update inventory",
+          details: error instanceof Error ? error.stack : undefined
+        });
       }
-
-      const data = insertRetailInventorySchema.parse({
-        ...req.body,
-        updatedById: req.user!.id
-      });
-
-      const inventory = await storage.updateRetailInventory(data);
-      res.status(201).json(inventory);
-    } catch (error) {
-      console.error("Error updating retail inventory:", error);
-      res.status(400).json({
-        message: error instanceof Error ? error.message : "Failed to update inventory",
-        details: error instanceof Error ? error.stack : undefined
-      });
-    }
-  });
+    });
 
   // Add new endpoint for inventory history
   app.get("/api/retail-inventory/history", requireShopAccess(["shopManager", "barista", "roasteryOwner", "retailOwner"]), async (req, res) => {
@@ -986,7 +988,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }))
       );
 
-      res.status(201).json(event);
+      res.json(event);
     } catch (error) {
       console.error("Error creating billing event:", error);
       res.status(500).json({ message: "Failed to create billing event" });

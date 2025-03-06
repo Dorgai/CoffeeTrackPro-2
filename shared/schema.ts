@@ -3,7 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const userRoles = ["retailOwner", "roasteryOwner", "roaster", "shopManager", "barista"] as const;
-export const coffeeGrades = ["AA", "AB", "PB", "C", "TBD"] as const;
+export const coffeeGrades = ["Specialty", "Premium", "Rarity"] as const;
 export type CoffeeGrade = typeof coffeeGrades[number];
 
 export const users = pgTable("users", {
@@ -39,7 +39,7 @@ export const greenCoffee = pgTable("green_coffee", {
   currentStock: decimal("current_stock", { precision: 10, scale: 2 }).notNull(),
   minThreshold: decimal("min_threshold", { precision: 10, scale: 2 }).notNull(),
   isActive: boolean("is_active").notNull().default(true),
-  grade: text("grade", { enum: coffeeGrades }).notNull().default("TBD"),
+  grade: text("grade", { enum: coffeeGrades }).notNull().default("Premium"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
