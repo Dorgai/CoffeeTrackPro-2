@@ -4,6 +4,7 @@ import { Shop } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useActiveShop } from "@/hooks/use-active-shop";
 import { Store, Loader2 } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Select,
   SelectContent,
@@ -14,6 +15,12 @@ import {
 
 export function ShopSelector() {
   const { activeShop, setActiveShop, clearActiveShop } = useActiveShop();
+  const { user } = useAuth();
+
+  // Hide shop selector for Roaster users
+  if (user?.role === "roaster") {
+    return null;
+  }
 
   const { data: shops = [], isLoading } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
