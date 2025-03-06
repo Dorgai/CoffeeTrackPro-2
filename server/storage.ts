@@ -1,4 +1,4 @@
-import { type User, type Shop, type InsertUser, type InsertShop, users, shops, userShops } from "@shared/schema";
+import { type RoastingBatch, type InsertRoastingBatch, roastingBatches, users, type User, type Shop, type InsertShop, shops, userShops, type GreenCoffee, greenCoffee } from "@shared/schema";
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
 import session from "express-session";
@@ -209,6 +209,84 @@ export class DatabaseStorage {
       return deletedShop;
     } catch (error) {
       console.error("Error deleting shop:", error);
+      throw error;
+    }
+  }
+
+  // Roasting batch methods
+  async getRoastingBatches(): Promise<RoastingBatch[]> {
+    try {
+      const batches = await db
+        .select()
+        .from(roastingBatches)
+        .orderBy(roastingBatches.createdAt);
+      return batches;
+    } catch (error) {
+      console.error("Error getting roasting batches:", error);
+      return [];
+    }
+  }
+
+  async createRoastingBatch(data: InsertRoastingBatch): Promise<RoastingBatch> {
+    try {
+      const [batch] = await db
+        .insert(roastingBatches)
+        .values(data)
+        .returning();
+      return batch;
+    } catch (error) {
+      console.error("Error creating roasting batch:", error);
+      throw error;
+    }
+  }
+
+  async updateRoastingBatch(id: number, data: Partial<InsertRoastingBatch>): Promise<RoastingBatch> {
+    try {
+      const [batch] = await db
+        .update(roastingBatches)
+        .set(data)
+        .where(eq(roastingBatches.id, id))
+        .returning();
+      return batch;
+    } catch (error) {
+      console.error("Error updating roasting batch:", error);
+      throw error;
+    }
+  }
+
+  // Green coffee methods
+  async getGreenCoffees(): Promise<GreenCoffee[]> {
+    try {
+      return await db.select().from(greenCoffee);
+    } catch (error) {
+      console.error("Error getting green coffees:", error);
+      return [];
+    }
+  }
+
+  async getGreenCoffee(id: number): Promise<GreenCoffee | undefined> {
+    try {
+      const [coffee] = await db
+        .select()
+        .from(greenCoffee)
+        .where(eq(greenCoffee.id, id));
+      return coffee;
+    } catch (error) {
+      console.error("Error getting green coffee:", error);
+      return undefined;
+    }
+  }
+
+  async updateGreenCoffeeStock(id: number, data: { currentStock: string }): Promise<GreenCoffee | undefined> {
+    try {
+      const [coffee] = await db
+        .update(greenCoffee)
+        .set(data)
+        .where(eq(greenCoffee.id, id))
+        .returning();
+      return coffee;
+    } catch (error) {
+      console.error("Error updating green coffee stock:", error);
       throw error;
     }
   }
