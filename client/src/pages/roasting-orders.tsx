@@ -79,21 +79,10 @@ type OrderWithDetails = {
   largeBags: number;
   status: string;
   createdAt: string;
-  updatedAt: string;
-  shop: {
-    name: string;
-    location: string;
-  };
-  greenCoffee: {
-    name: string;
-    producer: string;
-  };
-  user: {
-    username: string;
-  };
-  updatedBy?: {
-    username: string;
-  };
+  shop_name: string;
+  shop_location: string;
+  coffee_name: string;
+  producer: string;
 };
 
 const updateOrderSchema = z.object({
@@ -216,14 +205,14 @@ export default function RoastingOrders() {
                           <TableRow key={order.id}>
                             <TableCell>
                               <div>
-                                <p className="font-medium">{order.shop.name}</p>
-                                <p className="text-sm text-muted-foreground">{order.shop.location}</p>
+                                <p className="font-medium">{order.shop_name}</p>
+                                <p className="text-sm text-muted-foreground">{order.shop_location}</p>
                               </div>
                             </TableCell>
                             <TableCell>
                               <div>
-                                <p>{order.greenCoffee.name}</p>
-                                <p className="text-sm text-muted-foreground">{order.greenCoffee.producer}</p>
+                                <p>{order.coffee_name}</p>
+                                <p className="text-sm text-muted-foreground">{order.producer}</p>
                               </div>
                             </TableCell>
                             <TableCell>
@@ -233,21 +222,19 @@ export default function RoastingOrders() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <div className="space-y-1">
-                                <Badge
-                                  variant={order.status === "pending" ? "destructive" : "outline"}
-                                  className="capitalize"
-                                >
-                                  {order.status}
-                                </Badge>
-                                {order.updatedBy && (
-                                  <div className="text-xs text-muted-foreground">
-                                    by {order.updatedBy.username}
-                                  </div>
-                                )}
-                              </div>
+                              <Badge
+                                variant={order.status === "pending" ? "destructive" : "outline"}
+                                className="capitalize"
+                              >
+                                {order.status}
+                              </Badge>
+                              {order.updatedBy && (
+                                <div className="text-xs text-muted-foreground">
+                                  by {order.updatedBy.username}
+                                </div>
+                              )}
                             </TableCell>
-                            <TableCell>{formatDate(order.updatedAt || order.createdAt)}</TableCell>
+                            <TableCell>{formatDate(order.createdAt)}</TableCell>
                             <TableCell>
                               <Button
                                 variant="outline"
@@ -294,9 +281,9 @@ export default function RoastingOrders() {
           {selectedOrder && (
             <div className="py-4">
               <div className="mb-4">
-                <h4 className="font-medium">{selectedOrder.greenCoffee.name}</h4>
+                <h4 className="font-medium">{selectedOrder.coffee_name}</h4>
                 <p className="text-sm text-muted-foreground">
-                  {selectedOrder.shop.name} - Order #{selectedOrder.id}
+                  {selectedOrder.shop_name} - Order #{selectedOrder.id}
                 </p>
               </div>
               <Form {...form}>
