@@ -39,8 +39,8 @@ export function NavBar() {
           </Link>
         </div>
 
-        {/* Shop Selector */}
-        {user && (
+        {/* Shop Selector - Add it here in the main navigation area */}
+        {user && (isRetailUser || isRoasteryUser) && (
           <div className="mr-4">
             <ShopSelector />
           </div>
