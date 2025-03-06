@@ -4,6 +4,8 @@ import { queryClient } from "@/lib/queryClient";
 import { AuthProvider } from "@/hooks/use-auth";
 import { Toaster } from "@/components/ui/toaster";
 import { PageLayout } from "@/components/layout/page-layout";
+import { ProtectedRoute } from "@/lib/protected-route";
+import AuthPage from "@/pages/auth-page";
 
 function HomePage() {
   return (
@@ -20,7 +22,17 @@ export default function App() {
       <AuthProvider>
         <PageLayout>
           <Switch>
-            <Route path="/" component={HomePage} />
+            <Route path="/auth" component={AuthPage} />
+            <Route path="/login" component={AuthPage} />
+            <Route path="/">
+              {() => (
+                <ProtectedRoute
+                  path="/"
+                  component={HomePage}
+                  roles={["roasteryOwner", "retailOwner", "roaster", "shopManager", "barista"]}
+                />
+              )}
+            </Route>
           </Switch>
         </PageLayout>
         <Toaster />
