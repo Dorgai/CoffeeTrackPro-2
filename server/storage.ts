@@ -399,19 +399,6 @@ export class DatabaseStorage {
     try {
       console.log("Starting getAllRetailInventories");
 
-      // First verify if shops exist
-      const shopsCount = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(shops)
-        .where(eq(shops.isActive, true));
-
-      console.log("Active shops count:", shopsCount[0]?.count || 0);
-
-      if (!shopsCount[0]?.count) {
-        console.log("No active shops found");
-        return [];
-      }
-
       const query = sql`
         WITH shop_inventory AS (
           SELECT 
@@ -448,7 +435,7 @@ export class DatabaseStorage {
         ORDER BY shop_name, coffee_name`;
 
       const result = await db.execute(query);
-      console.log("Found retail inventories:", result.rows.length);
+      console.log("Found inventories:", result.rows.length);
 
       if (result.rows.length > 0) {
         console.log("Sample inventory entry:", result.rows[0]);

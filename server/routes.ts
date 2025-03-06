@@ -545,7 +545,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // Retail Inventory Routes - accessible by shop manager, barista and retail owner
-  // Update retail inventory routes
   app.get("/api/retail-inventory", 
     requireShopAccess(["shopManager", "barista", "retailOwner"]), 
     async (req, res) => {
@@ -566,17 +565,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        const inventory = shopId 
-          ? await storage.getRetailInventoriesByShop(shopId)
-          : await storage.getAllRetailInventories();
+        const inventory = await storage.getAllRetailInventories();
 
-        console.log("Found inventory items:", inventory.length);
-        res.json(inventory);
+        // Filter by shop if shopId is provided
+        const filteredInventory = shopId 
+          ? inventory.filter(item => item.shopId === shopId)
+          : inventory;
+
+        console.log("Found inventory items:", filteredInventory.length);
+        res.json(filteredInventory);
       } catch (error) {
         console.error("Error fetching retail inventory:", error);
         res.status(500).json({ message: "Failed to fetch inventory" });
       }
-  });
+    });
 
   app.post("/api/retail-inventory", requireShopAccess(["shopManager", "barista", "retailOwner"]), async (req, res) => {
     try {
@@ -813,7 +815,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (typeof receivedSmallBags !== 'number' || receivedSmallBags < 0) {
         return res.status(400).json({ message: "Invalid received small bags quantity" });
       }
-      if (typeof receivedLargeBags !== 'number' ||`receivedLargeBags < 0) {
+      if (typeof receivedLargeBags !== 'number' || receivedLargeBags < 0) {
         return res.status(400).json({ message: "Invalid received large bags quantity" });
       }
 
