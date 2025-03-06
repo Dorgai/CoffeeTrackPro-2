@@ -30,26 +30,6 @@ export async function apiRequest(
   return res;
 }
 
-type UnauthorizedBehavior = "returnNull" | "throw";
-export const getQueryFn: <T>(options: {
-  on401: UnauthorizedBehavior;
-}) => QueryFunction<T> =
-  ({ on401: unauthorizedBehavior }) =>
-  async ({ queryKey }) => {
-    const res = await fetch(queryKey[0] as string, {
-      credentials: "include",
-    });
-
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
-    }
-
-    await throwIfResNotOk(res);
-    return await res.json();
-  };
-
-import { QueryClient } from "@tanstack/react-query";
-
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -57,14 +37,22 @@ export const queryClient = new QueryClient({
       staleTime: 1000 * 60 * 5, // 5 minutes
       retry: false,
       queryFn: async ({ queryKey }) => {
-        const [url, ...params] = queryKey as [string, ...any[]];
-        const response = await fetch(url, {
-          credentials: 'include' // Include cookies for session authentication
+        const [url] = queryKey as [string, ...unknown[]];
+        const res = await fetch(url, {
+          credentials: 'include'
         });
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+
+        if (!res.ok) {
+          const text = await res.text();
+          try {
+            const error = JSON.parse(text);
+            throw new Error(error.message || text);
+          } catch {
+            throw new Error(text);
+          }
         }
-        return response.json();
+
+        return res.json();
       },
     },
     mutations: {

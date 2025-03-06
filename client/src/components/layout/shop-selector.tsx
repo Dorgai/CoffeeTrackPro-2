@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { Shop } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useActiveShop } from "@/hooks/use-active-shop";
-import { Store, Loader2 } from "lucide-react";
+import { Store, Loader2, AlertCircle } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -15,19 +15,16 @@ import {
 export function ShopSelector() {
   const { activeShop, setActiveShop, clearActiveShop } = useActiveShop();
 
-  const { data: shops = [], isLoading } = useQuery<Shop[]>({
+  const { data: shops = [], isLoading, error } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
     queryFn: async () => {
-      console.log("Fetching shops...");
+      console.log("Fetching user shops...");
       const res = await apiRequest("GET", "/api/user/shops");
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Failed to fetch shops");
-      }
       const data = await res.json();
-      console.log("Received shops:", data);
+      console.log("Received shops data:", data);
       return data;
-    }
+    },
+    retry: 1
   });
 
   // Clear active shop if it's not in the current shops list
@@ -61,12 +58,13 @@ export function ShopSelector() {
     );
   }
 
-  if (!shops || shops.length === 0) {
+  if (error) {
     return (
       <div className="flex items-center gap-2">
         <Store className="h-4 w-4" />
-        <div className="flex items-center gap-2 min-w-[200px] h-9 px-3 rounded-md border">
-          <span className="text-sm text-muted-foreground">No shops available</span>
+        <div className="flex items-center gap-2 min-w-[200px] h-9 px-3 rounded-md border border-destructive">
+          <AlertCircle className="h-4 w-4 text-destructive" />
+          <span className="text-sm text-destructive">Error loading shops</span>
         </div>
       </div>
     );
@@ -79,7 +77,7 @@ export function ShopSelector() {
         value={activeShop?.id?.toString() || ''}
         onValueChange={(value) => {
           console.log('Shop selection changed to:', value);
-          const selectedShop = shops.find((s) => s.id === parseInt(value));
+          const selectedShop = shops.find(shop => shop.id === parseInt(value));
           if (selectedShop) {
             console.log('Setting active shop to:', selectedShop);
             setActiveShop(selectedShop);
@@ -87,7 +85,9 @@ export function ShopSelector() {
         }}
       >
         <SelectTrigger className="w-[200px]">
-          <SelectValue>{activeShop?.name || "Select a shop"}</SelectValue>
+          <SelectValue>
+            {activeShop?.name || (shops.length === 0 ? "No shops available" : "Select a shop")}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {shops.map((shop) => (
