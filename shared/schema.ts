@@ -63,22 +63,34 @@ export const orders = pgTable("orders", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Add these fields to the roastingBatches table definition
 export const roastingBatches = pgTable("roasting_batches", {
   id: serial("id").primaryKey(),
   greenCoffeeId: integer("green_coffee_id").notNull().references(() => greenCoffee.id),
   plannedAmount: decimal("planned_amount", { precision: 10, scale: 2 }).notNull(),
   actualAmount: decimal("actual_amount", { precision: 10, scale: 2 }),
+  roastingLoss: decimal("roasting_loss", { precision: 10, scale: 2 }),
+  smallBagsProduced: integer("small_bags_produced").notNull().default(0),
+  largeBagsProduced: integer("large_bags_produced").notNull().default(0),
   status: text("status", { enum: ["planned", "in_progress", "completed"] }).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Create insert schemas
+// Update the insert schema to match the table definition
 export const insertUserSchema = createInsertSchema(users);
 export const insertShopSchema = createInsertSchema(shops);
 export const insertGreenCoffeeSchema = createInsertSchema(greenCoffee);
 export const insertRetailInventorySchema = createInsertSchema(retailInventory);
 export const insertOrderSchema = createInsertSchema(orders);
-export const insertRoastingBatchSchema = createInsertSchema(roastingBatches);
+export const insertRoastingBatchSchema = createInsertSchema(roastingBatches, {
+  greenCoffeeId: (schema) => schema.greenCoffeeId,
+  plannedAmount: (schema) => schema.plannedAmount,
+  actualAmount: (schema) => schema.actualAmount.optional(),
+  roastingLoss: (schema) => schema.roastingLoss.optional(),
+  smallBagsProduced: (schema) => schema.smallBagsProduced,
+  largeBagsProduced: (schema) => schema.largeBagsProduced,
+  status: (schema) => schema.status.default("planned"),
+});
 export const insertUserShopSchema = createInsertSchema(userShops);
 
 

@@ -1,4 +1,4 @@
-import { type RoastingBatch, type InsertRoastingBatch, roastingBatches, users, type User, type Shop, type InsertShop, shops, userShops, type GreenCoffee, type InsertGreenCoffee, greenCoffee, type Order, type InsertOrder, orders, type DispatchedCoffeeConfirmation, dispatchedCoffeeConfirmation } from "@shared/schema";
+import { type RoastingBatch, type InsertRoastingBatch, roastingBatches, users, type User, type Shop, type InsertShop, shops, userShops, type GreenCoffee, type InsertGreenCoffee, greenCoffee, type Order, type InsertOrder, orders } from "@shared/schema";
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
 import session from "express-session";
@@ -16,48 +16,6 @@ export class DatabaseStorage {
       pool,
       createTableIfMissing: true,
     });
-    this.initializeTestData();
-  }
-
-  private async initializeTestData() {
-    try {
-      // Check if we have any active shops
-      const existingShops = await db.select().from(shops).where(eq(shops.isActive, true));
-
-      if (existingShops.length === 0) {
-        console.log("Creating test shops...");
-        const testShops = [
-          {
-            name: "Main Roastery",
-            location: "123 Coffee Street",
-            isActive: true,
-            desiredSmallBags: 20,
-            desiredLargeBags: 10,
-          },
-          {
-            name: "Downtown Cafe",
-            location: "456 Main Street",
-            isActive: true,
-            desiredSmallBags: 15,
-            desiredLargeBags: 8,
-          },
-          {
-            name: "Airport Location",
-            location: "789 Terminal Ave",
-            isActive: true,
-            desiredSmallBags: 25,
-            desiredLargeBags: 12,
-          }
-        ];
-
-        for (const shop of testShops) {
-          await this.createShop(shop);
-          console.log(`Created shop: ${shop.name}`);
-        }
-      }
-    } catch (error) {
-      console.error("Error initializing test data:", error);
-    }
   }
 
   // User operations
@@ -297,33 +255,48 @@ export class DatabaseStorage {
   }
 
   // Roasting batch methods
-  async getRoastingBatches(): Promise<RoastingBatch[]> {
-    try {
-      console.log("Fetching all roasting batches");
-      const batches = await db
-        .select()
-        .from(roastingBatches)
-        .orderBy(roastingBatches.createdAt);
-      console.log("Found roasting batches:", batches.length);
-      return batches;
-    } catch (error) {
-      console.error("Error getting roasting batches:", error);
-      return [];
-    }
-  }
-
   async createRoastingBatch(data: InsertRoastingBatch): Promise<RoastingBatch> {
     try {
-      console.log("Creating roasting batch with data:", data);
+      console.log("Storage: Creating roasting batch with data:", {
+        greenCoffeeId: data.greenCoffeeId,
+        plannedAmount: data.plannedAmount,
+        smallBagsProduced: data.smallBagsProduced,
+        largeBagsProduced: data.largeBagsProduced,
+        status: data.status
+      });
+
       const [batch] = await db
         .insert(roastingBatches)
-        .values(data)
+        .values({
+          greenCoffeeId: data.greenCoffeeId,
+          plannedAmount: data.plannedAmount,
+          smallBagsProduced: data.smallBagsProduced,
+          largeBagsProduced: data.largeBagsProduced,
+          status: data.status || "planned"
+        })
         .returning();
-      console.log("Created roasting batch:", batch);
+
+      console.log("Storage: Created roasting batch:", batch);
       return batch;
     } catch (error) {
       console.error("Error creating roasting batch:", error);
       throw error;
+    }
+  }
+
+  async getRoastingBatches(): Promise<RoastingBatch[]> {
+    try {
+      console.log("Storage: Fetching all roasting batches");
+      const batches = await db
+        .select()
+        .from(roastingBatches)
+        .orderBy(roastingBatches.createdAt);
+
+      console.log("Storage: Found roasting batches:", batches.length);
+      return batches;
+    } catch (error) {
+      console.error("Error getting roasting batches:", error);
+      return [];
     }
   }
 
@@ -340,7 +313,6 @@ export class DatabaseStorage {
       throw error;
     }
   }
-
   // Green coffee methods
   async getGreenCoffees(): Promise<GreenCoffee[]> {
     try {

@@ -383,15 +383,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireRole(["owner", "roasteryOwner", "roaster"]),
     async (req, res) => {
       try {
-        console.log("Creating roasting batch, request body:", req.body);
-        const data = insertRoastingBatchSchema.parse(req.body);
-        console.log("Validated data:", data);
-
-        const batch = await storage.createRoastingBatch({
-          ...data,
-          createdAt: new Date(),
+        const data = insertRoastingBatchSchema.parse({
+          ...req.body,
+          plannedAmount: String(req.body.plannedAmount),
           status: "planned"
         });
+
+        const batch = await storage.createRoastingBatch(data);
 
         // Update green coffee stock
         const coffee = await storage.getGreenCoffee(data.greenCoffeeId);
@@ -400,13 +398,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.updateGreenCoffeeStock(coffee.id, { currentStock: String(newStock) });
         }
 
-        console.log("Created batch:", batch);
         res.status(201).json(batch);
       } catch (error) {
         console.error("Error creating roasting batch:", error);
         res.status(400).json({
-          message: error instanceof Error ? error.message : "Failed to create roasting batch",
-          details: error instanceof Error ? error.stack : undefined
+          message: error instanceof Error ? error.message : "Failed to create roasting batch"
         });
       }
     }
