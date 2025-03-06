@@ -27,7 +27,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { 
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -60,12 +60,7 @@ export default function UserManagement() {
       const res = await apiRequest("POST", `/api/users/${userId}/approve`);
       if (!res.ok) {
         const error = await res.text();
-        try {
-          const errorData = JSON.parse(error);
-          throw new Error(errorData.message || "Failed to approve user");
-        } catch {
-          throw new Error(error || "Failed to approve user");
-        }
+        throw new Error(error || "Failed to approve user");
       }
       return res.json();
     },
@@ -207,12 +202,12 @@ export default function UserManagement() {
                   <TableCell className="font-medium">{user.username}</TableCell>
                   <TableCell>{user.role}</TableCell>
                   <TableCell>
-                    <Badge 
+                    <Badge
                       variant={
-                        user.isPendingApproval 
+                        user.isPendingApproval
                           ? "outline"
-                          : user.isActive 
-                            ? "default" 
+                          : user.isActive
+                            ? "default"
                             : "destructive"
                       }
                     >

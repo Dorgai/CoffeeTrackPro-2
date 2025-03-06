@@ -95,7 +95,7 @@ export class DatabaseStorage {
       console.log("Updating user:", id, "with data:", data);
 
       // Validate role if it's being updated
-      if (data.role && !["owner", "roasteryOwner", "roaster", "shopManager", "barista"].includes(data.role)) {
+      if (data.role && !["roasteryOwner", "roaster", "shopManager", "barista"].includes(data.role)) {
         throw new Error("Invalid role specified");
       }
 
@@ -109,6 +109,23 @@ export class DatabaseStorage {
       return user;
     } catch (error) {
       console.error("Error updating user:", error);
+      throw error;
+    }
+  }
+
+  async approveUser(id: number): Promise<User> {
+    try {
+      console.log("Approving user:", id);
+      const [user] = await db
+        .update(users)
+        .set({ isPendingApproval: false })
+        .where(eq(users.id, id))
+        .returning();
+
+      console.log("Approved user:", user);
+      return user;
+    } catch (error) {
+      console.error("Error approving user:", error);
       throw error;
     }
   }
@@ -538,29 +555,57 @@ export class DatabaseStorage {
         throw new Error("User not found");
       }
 
-      // Roasters can only set status to "roasted" or "dispatched"
-      if (user.role === "roaster" && data.status === "delivered") {
-        throw new Error("Roasters can only update status to roasted or dispatched");
+      // RoasteryOwners can update to any status
+      if (user.role === "roasteryOwner") {
+        const [order] = await db
+          .update(orders)
+          .set(data)
+          .where(eq(orders.id, id))
+          .returning();
+        console.log("Updated order:", order);
+        return order;
       }
 
-      // Only roasters and roasteryOwners can update to "roasted"
-      if (data.status === "roasted" && !["roaster", "roasteryOwner"].includes(user.role)) {
-        throw new Error("Only roasters and roastery owners can mark orders as roasted");
+      // Get current order status
+      const [currentOrder] = await db
+        .select()
+        .from(orders)
+        .where(eq(orders.id, id));
+
+      if (!currentOrder) {
+        throw new Error("Order not found");
       }
 
-      // Only roasters and roasteryOwners can update to "dispatched" 
-      if (data.status === "dispatched" && !["roaster", "roasteryOwner"].includes(user.role)) {
-        throw new Error("Only roasters and roastery owners can mark orders as dispatched");
+      // Roasters can update pending orders to roasted, and roasted orders to dispatched
+      if (user.role === "roaster") {
+        if (
+          (currentOrder.status === "pending" && data.status === "roasted") ||
+          (currentOrder.status === "roasted" && data.status === "dispatched")
+        ) {
+          const [order] = await db
+            .update(orders)
+            .set(data)
+            .where(eq(orders.id, id))
+            .returning();
+          return order;
+        }
+        throw new Error("Invalid status transition for roaster");
       }
 
-      const [order] = await db
-        .update(orders)
-        .set(data)
-        .where(eq(orders.id, id))
-        .returning();
+      // Shop managers can only mark dispatched orders as delivered
+      if (user.role === "shopManager") {
+        if (currentOrder.status === "dispatched" && data.status === "delivered") {
+          const [order] = await db
+            .update(orders)
+            .set(data)
+            .where(eq(orders.id, id))
+            .returning();
+          return order;
+        }
+        throw new Error("Shop managers can only mark dispatched orders as delivered");
+      }
 
-      console.log("Updated order:", order);
-      return order;
+      throw new Error("Insufficient permissions to update order status");
     } catch (error) {
       console.error("Error updating order status:", error);
       throw error;
