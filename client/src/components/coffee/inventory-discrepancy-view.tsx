@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { InventoryDiscrepancy } from "@shared/schema";
 import { formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Loader2 } from "lucide-react";
@@ -22,16 +21,28 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 
+interface InventoryDiscrepancy {
+  id: number;
+  shopId: number;
+  greenCoffeeId: number;
+  dispatchedSmallBags: number;
+  dispatchedLargeBags: number;
+  receivedSmallBags: number;
+  receivedLargeBags: number;
+  status: string;
+  confirmedAt: string;
+  createdAt: string;
+  shopName: string;
+  shopLocation: string;
+  coffeeName: string;
+  producer: string;
+}
+
 export function InventoryDiscrepancyView() {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const { data: discrepancies, isLoading, error } = useQuery<(InventoryDiscrepancy & {
-    confirmation: {
-      greenCoffee: { name: string; producer: string };
-      shop: { name: string; location: string };
-    };
-  })[]>({
+  const { data: discrepancies, isLoading, error } = useQuery<InventoryDiscrepancy[]>({
     queryKey: ["/api/inventory-discrepancies"],
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/inventory-discrepancies");
@@ -99,44 +110,43 @@ export function InventoryDiscrepancyView() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {discrepancies?.map((discrepancy) => (
-              <TableRow key={discrepancy.id}>
-                <TableCell>{formatDate(discrepancy.createdAt)}</TableCell>
-                <TableCell>
-                  <div>
-                    <p className="font-medium">{discrepancy.confirmation.shop.name}</p>
-                    <p className="text-sm text-muted-foreground">{discrepancy.confirmation.shop.location}</p>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div>
-                    <p className="font-medium">{discrepancy.confirmation.greenCoffee.name}</p>
-                    <p className="text-sm text-muted-foreground">{discrepancy.confirmation.greenCoffee.producer}</p>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={discrepancy.smallBagsDifference < 0 ? "destructive" : "default"}>
-                    {discrepancy.smallBagsDifference > 0 ? "+" : ""}{discrepancy.smallBagsDifference}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={discrepancy.largeBagsDifference < 0 ? "destructive" : "default"}>
-                    {discrepancy.largeBagsDifference > 0 ? "+" : ""}{discrepancy.largeBagsDifference}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={
-                    discrepancy.status === "open" 
-                      ? "destructive" 
-                      : discrepancy.status === "investigating" 
-                        ? "outline"
-                        : "default"
-                  }>
-                    {discrepancy.status}
-                  </Badge>
-                </TableCell>
-              </TableRow>
-            ))}
+            {discrepancies?.map((discrepancy) => {
+              const smallBagsDiff = discrepancy.receivedSmallBags - discrepancy.dispatchedSmallBags;
+              const largeBagsDiff = discrepancy.receivedLargeBags - discrepancy.dispatchedLargeBags;
+
+              return (
+                <TableRow key={discrepancy.id}>
+                  <TableCell>{formatDate(discrepancy.createdAt)}</TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="font-medium">{discrepancy.shopName}</p>
+                      <p className="text-sm text-muted-foreground">{discrepancy.shopLocation}</p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="font-medium">{discrepancy.coffeeName}</p>
+                      <p className="text-sm text-muted-foreground">{discrepancy.producer}</p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={smallBagsDiff < 0 ? "destructive" : "default"}>
+                      {smallBagsDiff > 0 ? "+" : ""}{smallBagsDiff}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={largeBagsDiff < 0 ? "destructive" : "default"}>
+                      {largeBagsDiff > 0 ? "+" : ""}{largeBagsDiff}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">
+                      {discrepancy.status}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </CardContent>
