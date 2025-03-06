@@ -71,6 +71,7 @@ function groupOrdersByDate(orders: OrderWithDetails[]) {
   return groups;
 }
 
+// Update the OrderWithDetails type to match our SQL query
 type OrderWithDetails = {
   id: number;
   shopId: number;
@@ -79,14 +80,14 @@ type OrderWithDetails = {
   large_bags: number;
   status: string;
   createdAt: string;
-  createdById?: number;
-  updatedById?: number;
+  createdById: number | null;
+  updatedById: number | null;
   shop_name: string;
   shop_location: string;
   coffee_name: string;
   producer: string;
-  created_by?: string;
-  updated_by?: string;
+  created_by: string | null;
+  updated_by: string | null;
 };
 
 const updateOrderSchema = z.object({
