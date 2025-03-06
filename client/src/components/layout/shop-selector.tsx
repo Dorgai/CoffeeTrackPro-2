@@ -15,7 +15,7 @@ import {
 export function ShopSelector() {
   const { activeShop, setActiveShop, clearActiveShop } = useActiveShop();
 
-  const { data: shops = [], isLoading, error } = useQuery<Shop[]>({
+  const { data: shops = [], isLoading } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/user/shops");
@@ -27,11 +27,12 @@ export function ShopSelector() {
     }
   });
 
-  // Validate active shop exists in current shops list
+  // Clear active shop if it's not in the current shops list
   useEffect(() => {
     if (shops.length > 0 && activeShop) {
       const shopExists = shops.some(shop => shop.id === activeShop.id);
       if (!shopExists) {
+        console.log('Active shop not found in current shops list, clearing selection');
         clearActiveShop();
       }
     }
@@ -40,6 +41,7 @@ export function ShopSelector() {
   // Set initial shop if none selected
   useEffect(() => {
     if (shops.length > 0 && !activeShop) {
+      console.log('Setting initial shop:', shops[0]);
       setActiveShop(shops[0]);
     }
   }, [shops, activeShop, setActiveShop]);
@@ -60,18 +62,18 @@ export function ShopSelector() {
     <div className="flex items-center gap-2">
       <Store className="h-4 w-4" />
       <Select
-        value={activeShop?.id?.toString()}
+        value={activeShop?.id?.toString() || ''}
         onValueChange={(value) => {
+          console.log('Shop selection changed to:', value);
           const selectedShop = shops.find((s) => s.id === parseInt(value));
           if (selectedShop) {
+            console.log('Setting active shop to:', selectedShop);
             setActiveShop(selectedShop);
           }
         }}
       >
         <SelectTrigger className="w-[200px]">
-          <SelectValue placeholder="Select a shop">
-            {activeShop?.name || "Select a shop"}
-          </SelectValue>
+          <SelectValue placeholder="Select a shop" />
         </SelectTrigger>
         <SelectContent>
           {shops.map((shop) => (
