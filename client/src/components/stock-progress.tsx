@@ -11,23 +11,24 @@ export default function StockProgress({ current, desired, label }: StockProgress
 
   // Determine color based on percentage
   const getProgressColor = () => {
-    if (percentage >= 75) return "bg-green-500";
+    if (percentage >= 75) return "bg-emerald-500";
     if (percentage >= 50) return "bg-amber-500";
-    return "bg-red-500";
+    return "bg-destructive";
   };
 
   return (
     <div className="space-y-2">
       <div className="flex justify-between text-sm">
         <span>{label}</span>
-        <span className={percentage < 50 ? "text-red-500 font-medium" : ""}>{current} / {desired}</span>
+        <span className={percentage < 50 ? "text-destructive font-medium" : ""}>
+          {current} / {desired}
+        </span>
       </div>
-      <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
-        <div
-          className={`h-full transition-all ${getProgressColor()}`}
-          style={{ width: `${percentage}%` }}
-        />
-      </div>
+      <Progress 
+        value={percentage}
+        className="h-2"
+        indicatorClassName={getProgressColor()}
+      />
     </div>
   );
 }
