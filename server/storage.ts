@@ -1,6 +1,6 @@
-import { type User, type Shop, type InsertUser, type InsertShop, users, shops } from "@shared/schema";
+import { type User, type Shop, type InsertUser, type InsertShop, users, shops, userShops } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -168,11 +168,19 @@ export class DatabaseStorage {
 
   async getUserShops(userId: number): Promise<Shop[]> {
     try {
-      return await db
-        .select()
-        .from(shops)
-        .where(eq(shops.isActive, true))
-        .orderBy(shops.name);
+      // For non-roasteryOwner users, get shops through userShops association
+      const userShopsData = await db
+        .select({
+          shop: shops
+        })
+        .from(userShops)
+        .innerJoin(shops, eq(userShops.shopId, shops.id))
+        .where(and(
+          eq(userShops.userId, userId),
+          eq(shops.isActive, true)
+        ));
+
+      return userShopsData.map(data => data.shop);
     } catch (error) {
       console.error("Error getting user shops:", error);
       throw error;

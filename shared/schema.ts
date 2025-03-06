@@ -26,6 +26,12 @@ export const shops = pgTable("shops", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Add userShops table definition
+export const userShops = pgTable("user_shops", {
+  userId: integer("user_id").notNull().references(() => users.id),
+  shopId: integer("shop_id").notNull().references(() => shops.id),
+});
+
 export const greenCoffee = pgTable("green_coffee", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
@@ -73,6 +79,8 @@ export const insertGreenCoffeeSchema = createInsertSchema(greenCoffee);
 export const insertRetailInventorySchema = createInsertSchema(retailInventory);
 export const insertOrderSchema = createInsertSchema(orders);
 export const insertRoastingBatchSchema = createInsertSchema(roastingBatches);
+export const insertUserShopSchema = createInsertSchema(userShops);
+
 
 // Export types for use in application code
 export type User = typeof users.$inferSelect;
@@ -87,3 +95,4 @@ export type InsertGreenCoffee = z.infer<typeof insertGreenCoffeeSchema>;
 export type InsertRetailInventory = z.infer<typeof insertRetailInventorySchema>;
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type InsertRoastingBatch = z.infer<typeof insertRoastingBatchSchema>;
+export type InsertUserShop = z.infer<typeof insertUserShopSchema>;
