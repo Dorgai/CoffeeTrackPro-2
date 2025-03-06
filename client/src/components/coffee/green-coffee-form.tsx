@@ -51,22 +51,15 @@ export function GreenCoffeeForm({
 
   const mutation = useMutation({
     mutationFn: async (data: FormValues) => {
-      // Convert numbers to strings for decimal fields before sending to server
-      const processedData = {
-        ...data,
-        currentStock: String(data.currentStock),
-        minThreshold: String(data.minThreshold)
-      };
-
       if (isEditing) {
-        const response = await apiRequest("PATCH", `/api/green-coffee/${coffee.id}`, processedData);
+        const response = await apiRequest("PATCH", `/api/green-coffee/${coffee.id}`, data);
         if (!response.ok) {
           const error = await response.json();
           throw new Error(error.message || "Failed to update coffee");
         }
         return response.json();
       } else {
-        const response = await apiRequest("POST", "/api/green-coffee", processedData);
+        const response = await apiRequest("POST", "/api/green-coffee", data);
         if (!response.ok) {
           const error = await response.json();
           throw new Error(error.message || "Failed to create coffee");

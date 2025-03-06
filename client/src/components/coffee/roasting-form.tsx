@@ -57,11 +57,9 @@ export function RoastingForm({
 
   const createMutation = useMutation({
     mutationFn: async (data: FormValues) => {
-      // Convert numbers to strings for database storage
       const response = await apiRequest("POST", "/api/roasting-batches", {
         ...data,
         greenCoffeeId: Number(greenCoffeeId),
-        plannedAmount: String(data.plannedAmount),
         status: "planned"
       });
 

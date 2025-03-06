@@ -2,6 +2,11 @@ import { pgTable, text, serial, integer, boolean, timestamp, decimal } from "dri
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Add decimal column helpers for consistent type handling
+const decimalColumnSchema = (fieldName: string) => z.number()
+  .min(0, `${fieldName} must be 0 or greater`)
+  .transform(val => String(val)); // Convert to string for database
+
 export const userRoles = ["retailOwner", "roasteryOwner", "roaster", "shopManager", "barista"] as const;
 export const coffeeGrades = ["AA", "AB", "PB", "C", "TBD"] as const;
 export type CoffeeGrade = typeof coffeeGrades[number];
@@ -79,9 +84,9 @@ export const roastingBatches = pgTable("roasting_batches", {
 // Fix the roastingBatches insert schema
 export const insertRoastingBatchSchema = z.object({
   greenCoffeeId: z.number(),
-  plannedAmount: z.number().min(0, "Planned amount must be 0 or greater"),
-  actualAmount: z.number().optional(),
-  roastingLoss: z.number().optional(),
+  plannedAmount: decimalColumnSchema("Planned amount"),
+  actualAmount: decimalColumnSchema("Actual amount").optional(),
+  roastingLoss: decimalColumnSchema("Roasting loss").optional(),
   smallBagsProduced: z.number(),
   largeBagsProduced: z.number(),
   status: z.enum(["planned", "in_progress", "completed"]).default("planned"),
@@ -94,8 +99,8 @@ export const insertGreenCoffeeSchema = z.object({
   name: z.string().min(1, "Name is required"),
   producer: z.string().min(1, "Producer is required"),
   country: z.string().min(1, "Country is required"),
-  currentStock: z.number().min(0, "Current stock must be 0 or greater"),
-  minThreshold: z.number().min(0, "Minimum threshold must be 0 or greater"),
+  currentStock: decimalColumnSchema("Current stock"),
+  minThreshold: decimalColumnSchema("Minimum threshold"),
   grade: z.enum(coffeeGrades),
   isActive: z.boolean().default(true)
 });
