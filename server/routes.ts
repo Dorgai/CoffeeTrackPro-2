@@ -258,23 +258,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       let shops;
-      // Allow retail owners to see all shops like roastery owners
-      if (req.user.role === "roasteryOwner" || req.user.role === "retailOwner") {
-        // Roastery owners and retail owners can see all active shops
-        console.log("Fetching all shops for roasteryOwner/retailOwner");
+      // For admin roles (roasteryOwner, owner, retailOwner), return all active shops
+      if (["roasteryOwner", "owner", "retailOwner"].includes(req.user.role)) {
+        console.log("Fetching all shops for admin role");
         shops = await storage.getShops();
-        console.log("Found shops:", shops);
+        console.log("Found total shops:", shops.length);
       } else {
-        // Other roles get their assigned shops
-        console.log("Fetching assigned shops for user");
+        console.log("Fetching assigned shops for non-admin user");
         shops = await storage.getUserShops(req.user.id);
-        console.log("Found assigned shops:", shops);
+        console.log("Found assigned shops:", shops.length);
       }
 
-      // Only return active shops
-      const activeShops = shops.filter(shop => shop.isActive);
-      console.log("Returning active shops:", activeShops);
+      // Filter to only active shops and sort by name
+      const activeShops = shops
+        .filter(shop => shop.isActive)
+        .sort((a, b) => a.name.localeCompare(b.name));
 
+      console.log("Returning active shops:", activeShops.length);
       return res.json(activeShops);
     } catch (error) {
       console.error("Error in /api/user/shops:", error);
@@ -751,7 +751,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Shop ID is required" });
       }
 
-
       const data = insertOrderSchema.parse({
         ...req.body,
         createdById: req.user!.id,
@@ -814,7 +813,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (typeof receivedSmallBags !== 'number' || receivedSmallBags < 0) {
         return res.status(400).json({ message: "Invalid received small bags quantity" });
       }
-      if (typeof receivedLargeBags !== 'number' || receivedLargeBags < 0) {
+      if (typeof receivedLargeBags !== 'number' ||`receivedLargeBags < 0) {
         return res.status(400).json({ message: "Invalid received large bags quantity" });
       }
 

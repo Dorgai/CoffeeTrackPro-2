@@ -413,39 +413,52 @@ export class DatabaseStorage {
       }
 
       const query = sql`
+        WITH shop_inventory AS (
+          SELECT 
+            s.id as shop_id,
+            s.name as shop_name,
+            s.location as shop_location,
+            gc.id as coffee_id,
+            gc.name as coffee_name,
+            gc.producer,
+            COALESCE(ri.small_bags, 0) as small_bags,
+            COALESCE(ri.large_bags, 0) as large_bags,
+            ri.updated_at,
+            ri.updated_by_id,
+            u.username as updated_by
+          FROM shops s
+          CROSS JOIN green_coffee gc
+          LEFT JOIN retail_inventory ri ON ri.shop_id = s.id AND ri.green_coffee_id = gc.id
+          LEFT JOIN users u ON ri.updated_by_id = u.id
+          WHERE s.is_active = true
+        )
         SELECT 
-          ri.id,
-          ri.shop_id as "shopId",
-          ri.green_coffee_id as "greenCoffeeId",
-          COALESCE(ri.small_bags, 0)::integer as "smallBags",
-          COALESCE(ri.large_bags, 0)::integer as "largeBags",
-          ri.created_at as "createdAt",
-          ri.updated_at as "updatedAt",
-          ri.updated_by_id as "updatedById",
-          s.name as "shopName",
-          s.location as "shopLocation",
-          gc.name as "coffeeName",
-          gc.producer,
-          u.username as "updatedBy",
-          COALESCE(ri.updated_at, ri.created_at) as "lastUpdated"
-        FROM shops s
-        CROSS JOIN green_coffee gc
-        LEFT JOIN retail_inventory ri ON ri.shop_id = s.id AND ri.green_coffee_id = gc.id
-        LEFT JOIN users u ON ri.updated_by_id = u.id
-        WHERE s.is_active = true
-        ORDER BY s.name, gc.name`;
+          shop_id as "shopId",
+          coffee_id as "greenCoffeeId",
+          shop_name as "shopName",
+          shop_location as "shopLocation",
+          coffee_name as "coffeeName",
+          producer,
+          small_bags as "smallBags",
+          large_bags as "largeBags",
+          updated_at as "updatedAt",
+          updated_by_id as "updatedById",
+          updated_by as "updatedBy"
+        FROM shop_inventory
+        ORDER BY shop_name, coffee_name`;
 
       const result = await db.execute(query);
       console.log("Found retail inventories:", result.rows.length);
 
-      const inventories = result.rows.map(row => ({
+      if (result.rows.length > 0) {
+        console.log("Sample inventory entry:", result.rows[0]);
+      }
+
+      return result.rows.map(row => ({
         ...row,
         smallBags: Number(row.smallBags || 0),
         largeBags: Number(row.largeBags || 0)
       }));
-
-      console.log("Sample inventory entry:", inventories[0]);
-      return inventories;
     } catch (error) {
       console.error("Error in getAllRetailInventories:", error);
       throw error;
@@ -461,6 +474,25 @@ export class DatabaseStorage {
   }): Promise<any> {
     try {
       console.log("Updating retail inventory with data:", data);
+
+      // First verify if shop and coffee exist
+      const [shop] = await db
+        .select()
+        .from(shops)
+        .where(and(eq(shops.id, data.shopId), eq(shops.isActive, true)));
+
+      if (!shop) {
+        throw new Error(`Shop ${data.shopId} not found or inactive`);
+      }
+
+      const [coffee] = await db
+        .select()
+        .from(greenCoffee)
+        .where(eq(greenCoffee.id, data.greenCoffeeId));
+
+      if (!coffee) {
+        throw new Error(`Coffee ${data.greenCoffeeId} not found`);
+      }
 
       const query = sql`
         INSERT INTO retail_inventory (

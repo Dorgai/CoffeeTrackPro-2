@@ -1,5 +1,7 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
+import { Loader2 } from "lucide-react";
 
 interface ShopSelectorProps {
   value?: number;
@@ -7,14 +9,29 @@ interface ShopSelectorProps {
 }
 
 export function ShopSelector({ value, onChange }: ShopSelectorProps) {
-  const { data: shops } = useQuery({
-    queryKey: ["/api/shops"],
-    queryFn: async () => {
-      const res = await fetch("/api/shops");
-      if (!res.ok) throw new Error("Failed to fetch shops");
-      return res.json();
-    },
+  const { user } = useAuth();
+
+  const { data: shops, isLoading, error } = useQuery({
+    queryKey: ["/api/user/shops"],
+    enabled: !!user,
   });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        <span>Loading shops...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div>Error loading shops</div>;
+  }
+
+  if (!shops?.length) {
+    return <div>No shops available</div>;
+  }
 
   return (
     <Select
@@ -27,7 +44,7 @@ export function ShopSelector({ value, onChange }: ShopSelectorProps) {
         <SelectValue placeholder="Select a shop" />
       </SelectTrigger>
       <SelectContent>
-        {shops?.map((shop: any) => (
+        {shops.map((shop: any) => (
           <SelectItem key={shop.id} value={shop.id.toString()}>
             {shop.name}
           </SelectItem>

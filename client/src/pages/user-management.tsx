@@ -87,11 +87,16 @@ export default function UserManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      refetchUserShops();
+      if (selectedUserForShops) {
+        queryClient.invalidateQueries({ 
+          queryKey: ["/api/users", selectedUserForShops.id, "shops"]
+        });
+      }
       toast({
         title: "Success",
         description: "Shop assignments have been updated",
       });
+      setIsShopAssignmentOpen(false);
     },
     onError: (error: Error) => {
       console.error("Shop assignment error:", error);
@@ -194,6 +199,7 @@ export default function UserManagement() {
     }
   });
 
+  // Add shop assignment handler
   const handleShopAssignment = (userId: number, shopIds: number[]) => {
     console.log("Assigning shops:", { userId, shopIds });
     updateShopAssignmentsMutation.mutate({ userId, shopIds });
@@ -391,7 +397,6 @@ export default function UserManagement() {
           setIsShopAssignmentOpen(open);
           if (!open) {
             setSelectedUserForShops(null);
-            setSelectedShopIds([]);
           }
         }}
       >
@@ -451,7 +456,10 @@ export default function UserManagement() {
               {shops?.length ? (
                 <div className="space-y-2">
                   {shops
-                    .filter((shop: any) => shop.isActive && !userShops?.some((us: any) => us.id === shop.id))
+                    .filter((shop: any) => 
+                      shop.isActive && 
+                      !userShops?.some((us: any) => us.id === shop.id)
+                    )
                     .map((shop: any) => (
                       <div
                         key={shop.id}
