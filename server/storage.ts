@@ -168,6 +168,17 @@ export class DatabaseStorage {
 
   async getUserShops(userId: number): Promise<Shop[]> {
     try {
+      // First get the user to check their role
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, userId));
+
+      // For roasteryOwner, return all shops
+      if (user?.role === "roasteryOwner") {
+        return this.getShops();
+      }
+
       // For non-roasteryOwner users, get shops through userShops association
       const userShopsData = await db
         .select({
