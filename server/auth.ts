@@ -47,13 +47,23 @@ export function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Configure passport local strategy
+  // Configure passport local strategy with additional checks
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
         const user = await storage.getUserByUsername(username);
         if (!user) {
           return done(null, false, { message: "Invalid username or password" });
+        }
+
+        // Check if user is pending approval
+        if (user.isPendingApproval) {
+          return done(null, false, { message: "Your account is pending approval from a roastery owner" });
+        }
+
+        // Check if user is active
+        if (!user.isActive) {
+          return done(null, false, { message: "Your account has been deactivated" });
         }
 
         const isValid = await comparePasswords(password, user.password);
@@ -96,13 +106,15 @@ export function setupAuth(app: Express) {
       const user = await storage.createUser({
         ...req.body,
         password: hashedPassword,
+        isPendingApproval: true, // Set all new users to pending approval
+        isActive: false // Set all new users to inactive by default
       });
 
-      req.login(user, (err) => {
-        if (err) return next(err);
-        // Don't send password in response
-        const { password, ...userWithoutPassword } = user;
-        res.status(201).json(userWithoutPassword);
+      // Don't automatically log in new users since they need approval
+      const { password, ...userWithoutPassword } = user;
+      res.status(201).json({
+        ...userWithoutPassword,
+        message: "Registration successful. Please wait for approval from a roastery owner."
       });
     } catch (error) {
       next(error);

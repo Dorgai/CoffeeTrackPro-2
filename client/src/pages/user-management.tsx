@@ -37,7 +37,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Key, AlertCircle, Building2 } from "lucide-react";
+import { Loader2, Key, AlertCircle, Building2, UserCheck, UserX } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -62,9 +62,28 @@ export default function UserManagement() {
   const [userToDeactivate, setUserToDeactivate] = useState<User | null>(null);
   const [selectedUserForShops, setSelectedUserForShops] = useState<User | null>(null);
   const [isShopAssignmentOpen, setIsShopAssignmentOpen] = useState(false);
+  const [filter, setFilter] = useState<"all" | "pending" | "active" | "inactive">("all");
 
   const { data: users, isLoading } = useQuery<User[]>({
     queryKey: ["/api/users"],
+  });
+
+  const { data: shops } = useQuery({
+    queryKey: ["/api/shops"],
+    enabled: !!currentUser && currentUser.role === "roasteryOwner",
+  });
+
+  const { data: userShops } = useQuery({
+    queryKey: ["/api/users", selectedUserForShops?.id, "shops"],
+    enabled: !!selectedUserForShops?.id,
+    queryFn: async () => {
+      const res = await apiRequest(
+        "GET",
+        `/api/users/${selectedUserForShops?.id}/shops`
+      );
+      if (!res.ok) throw new Error("Failed to fetch user's shops");
+      return res.json();
+    },
   });
 
   const approveUserMutation = useMutation({
@@ -76,7 +95,7 @@ export default function UserManagement() {
       }
       return res.json();
     },
-    onSuccess: (updatedUser) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       toast({
         title: "Success",
@@ -99,12 +118,7 @@ export default function UserManagement() {
       });
       if (!res.ok) {
         const error = await res.text();
-        try {
-          const errorData = JSON.parse(error);
-          throw new Error(errorData.message || "Failed to update user activation status");
-        } catch {
-          throw new Error(error || "Failed to update user activation status");
-        }
+        throw new Error(error || "Failed to update user activation status");
       }
       return res.json();
     },
@@ -132,12 +146,7 @@ export default function UserManagement() {
       });
       if (!res.ok) {
         const error = await res.text();
-        try {
-          const errorData = JSON.parse(error);
-          throw new Error(errorData.message || "Failed to update password");
-        } catch {
-          throw new Error(error || "Failed to update password");
-        }
+        throw new Error(error || "Failed to update password");
       }
       return res.json();
     },
@@ -155,24 +164,6 @@ export default function UserManagement() {
         description: error.message,
         variant: "destructive",
       });
-    },
-  });
-
-  const { data: shops } = useQuery({
-    queryKey: ["/api/shops"],
-    enabled: !!currentUser && currentUser.role === "roasteryOwner",
-  });
-
-  const { data: userShops } = useQuery({
-    queryKey: ["/api/users", selectedUserForShops?.id, "shops"],
-    enabled: !!selectedUserForShops?.id,
-    queryFn: async () => {
-      const res = await apiRequest(
-        "GET",
-        `/api/users/${selectedUserForShops?.id}/shops`
-      );
-      if (!res.ok) throw new Error("Failed to fetch user's shops");
-      return res.json();
     },
   });
 
@@ -228,6 +219,19 @@ export default function UserManagement() {
     );
   }
 
+  const filteredUsers = users?.filter(user => {
+    switch (filter) {
+      case "pending":
+        return user.isPendingApproval;
+      case "active":
+        return !user.isPendingApproval && user.isActive;
+      case "inactive":
+        return !user.isPendingApproval && !user.isActive;
+      default:
+        return true;
+    }
+  });
+
   return (
     <div className="container mx-auto py-8 space-y-8">
       <div>
@@ -235,6 +239,20 @@ export default function UserManagement() {
         <p className="text-muted-foreground">
           Manage user accounts, approvals, and access
         </p>
+      </div>
+
+      <div className="flex justify-end gap-2">
+        <Select value={filter} onValueChange={(value: any) => setFilter(value)}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Filter by status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Users</SelectItem>
+            <SelectItem value="pending">Pending Approval</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="inactive">Inactive</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <Card>
@@ -256,7 +274,7 @@ export default function UserManagement() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users?.map((user) => (
+              {filteredUsers?.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell className="font-medium">{user.username}</TableCell>
                   <TableCell>{user.role}</TableCell>
@@ -288,7 +306,10 @@ export default function UserManagement() {
                           {approveUserMutation.isPending ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
-                            "Approve"
+                            <>
+                              <UserCheck className="h-4 w-4 mr-2" />
+                              Approve
+                            </>
                           )}
                         </Button>
                       )}
@@ -299,7 +320,17 @@ export default function UserManagement() {
                           size="sm"
                           onClick={() => setUserToDeactivate(user)}
                         >
-                          {user.isActive ? "Deactivate" : "Activate"}
+                          {user.isActive ? (
+                            <>
+                              <UserX className="h-4 w-4 mr-2" />
+                              Deactivate
+                            </>
+                          ) : (
+                            <>
+                              <UserCheck className="h-4 w-4 mr-2" />
+                              Activate
+                            </>
+                          )}
                         </Button>
                       )}
 
@@ -314,6 +345,7 @@ export default function UserManagement() {
                         <Key className="h-4 w-4 mr-2" />
                         Reset Password
                       </Button>
+
                       {user.role === "barista" && (
                         <Button
                           variant="outline"
@@ -434,6 +466,23 @@ export default function UserManagement() {
                       className="flex items-center justify-between bg-muted p-2 rounded"
                     >
                       <span>{shop.name}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (selectedUserForShops) {
+                            const newShopIds = userShops
+                              .filter((s: any) => s.id !== shop.id)
+                              .map((s: any) => s.id);
+                            updateShopAssignmentsMutation.mutate({
+                              userId: selectedUserForShops.id,
+                              shopIds: newShopIds,
+                            });
+                          }
+                        }}
+                      >
+                        Remove
+                      </Button>
                     </div>
                   ))}
                 </div>
