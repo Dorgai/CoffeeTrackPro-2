@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 
 export function ShopSelector() {
-  const { activeShop, setActiveShop } = useActiveShop();
+  const { activeShop, setActiveShop, clearActiveShop } = useActiveShop();
 
   const { data: shops = [], isLoading, error } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
@@ -27,6 +27,17 @@ export function ShopSelector() {
     }
   });
 
+  // Validate active shop exists in current shops list
+  useEffect(() => {
+    if (shops.length > 0 && activeShop) {
+      const shopExists = shops.some(shop => shop.id === activeShop.id);
+      if (!shopExists) {
+        clearActiveShop();
+      }
+    }
+  }, [shops, activeShop, clearActiveShop]);
+
+  // Set initial shop if none selected
   useEffect(() => {
     if (shops.length > 0 && !activeShop) {
       setActiveShop(shops[0]);

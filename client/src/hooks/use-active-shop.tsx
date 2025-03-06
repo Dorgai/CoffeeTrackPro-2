@@ -6,60 +6,8 @@ import { queryClient } from '@/lib/queryClient';
 interface ActiveShopState {
   activeShop: Shop | null;
   setActiveShop: (shop: Shop | null) => void;
-  refreshShopData: (shopId: number) => void;
+  clearActiveShop: () => void;
 }
-
-// Helper function to refresh shop data
-const refreshShopData = async (shopId: number) => {
-  // Define queries with retry logic
-  const queries = [
-    {
-      queryKey: ["/api/retail-inventory", shopId],
-      refetchInterval: 3000,
-      staleTime: 0,
-      refetchOnMount: "always",
-      refetchOnWindowFocus: true,
-      refetchOnReconnect: true,
-      retry: 3,
-      retryDelay: 1000,
-    },
-    {
-      queryKey: ["/api/orders", shopId],
-      refetchInterval: 3000,
-      staleTime: 0,
-      refetchOnMount: "always",
-      refetchOnWindowFocus: true,
-      refetchOnReconnect: true,
-      retry: 3,
-      retryDelay: 1000,
-    },
-    {
-      queryKey: ["/api/green-coffee"],
-      refetchInterval: 3000,
-      staleTime: 0,
-      refetchOnMount: "always",
-      refetchOnWindowFocus: true,
-      refetchOnReconnect: true,
-      retry: 3,
-      retryDelay: 1000,
-    }
-  ];
-
-  // First invalidate all queries to force refetch
-  await Promise.all(
-    queries.map(query => 
-      queryClient.invalidateQueries({ 
-        queryKey: query.queryKey,
-        refetchType: 'all'
-      })
-    )
-  );
-
-  // Then set up continuous fetching
-  queries.forEach(query => {
-    queryClient.prefetchQuery(query);
-  });
-};
 
 export const useActiveShop = create<ActiveShopState>()(
   persist(
@@ -68,15 +16,27 @@ export const useActiveShop = create<ActiveShopState>()(
       setActiveShop: (shop) => {
         set({ activeShop: shop });
         if (shop) {
-          refreshShopData(shop.id);
+          // Invalidate and refetch relevant queries
+          queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shop.id] });
+          queryClient.invalidateQueries({ queryKey: ["/api/orders", shop.id] });
+          queryClient.invalidateQueries({ queryKey: ["/api/green-coffee"] });
         }
       },
-      refreshShopData: (shopId: number) => {
-        refreshShopData(shopId);
-      }
+      clearActiveShop: () => set({ activeShop: null })
     }),
     {
       name: 'active-shop',
+      // Only persist the essential shop data
+      partialize: (state) => ({
+        activeShop: state.activeShop ? {
+          id: state.activeShop.id,
+          name: state.activeShop.name,
+          location: state.activeShop.location,
+          isActive: state.activeShop.isActive,
+          desiredSmallBags: state.activeShop.desiredSmallBags,
+          desiredLargeBags: state.activeShop.desiredLargeBags,
+        } : null
+      })
     }
   )
 );
