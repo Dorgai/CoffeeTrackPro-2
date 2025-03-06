@@ -5,16 +5,20 @@ import { seedInitialData } from "./db";
 import session from "express-session";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
+import { registerRoutes } from "./routes";
 
 async function createServer() {
   const app = express();
   const port = process.env.PORT || 5000;
 
-  // Basic middleware
+  // Configure CORS to handle credentials
   app.use(cors({
     origin: true,
-    credentials: true
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
   }));
+
   app.use(express.json());
   app.use(express.urlencoded({ extended: false }));
 
@@ -32,12 +36,16 @@ async function createServer() {
     cookie: {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      httpOnly: true
     }
   }));
 
   // Set up authentication after session
   setupAuth(app);
+
+  // Register API routes
+  await registerRoutes(app);
 
   // Seed initial data before setting up routes
   await seedInitialData();
@@ -58,7 +66,7 @@ async function createServer() {
   });
 
   // Create HTTP server
-  const httpServer = app.listen(port, "0.0.0.0", () => {
+  const httpServer = app.listen(Number(port), "0.0.0.0", () => {
     console.log(`Server is running on http://0.0.0.0:${port}`);
   });
 

@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { Shop } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useActiveShop } from "@/hooks/use-active-shop";
-import { Store, Loader2, AlertCircle } from "lucide-react";
+import { Store, Loader2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -15,7 +15,7 @@ import {
 export function ShopSelector() {
   const { activeShop, setActiveShop, clearActiveShop } = useActiveShop();
 
-  const { data: shops = [], isLoading, error } = useQuery<Shop[]>({
+  const { data: shops = [], isLoading } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
     queryFn: async () => {
       console.log("Fetching user shops...");
@@ -24,7 +24,8 @@ export function ShopSelector() {
       console.log("Received shops data:", data);
       return data;
     },
-    retry: 1
+    staleTime: 30000, // Cache for 30 seconds
+    retry: 3
   });
 
   // Clear active shop if it's not in the current shops list
@@ -58,13 +59,12 @@ export function ShopSelector() {
     );
   }
 
-  if (error) {
+  if (shops.length === 0) {
     return (
       <div className="flex items-center gap-2">
         <Store className="h-4 w-4" />
-        <div className="flex items-center gap-2 min-w-[200px] h-9 px-3 rounded-md border border-destructive">
-          <AlertCircle className="h-4 w-4 text-destructive" />
-          <span className="text-sm text-destructive">Error loading shops</span>
+        <div className="flex items-center gap-2 min-w-[200px] h-9 px-3 rounded-md border">
+          <span className="text-sm text-muted-foreground">No shops available</span>
         </div>
       </div>
     );
