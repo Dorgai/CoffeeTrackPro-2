@@ -76,23 +76,23 @@ export const roastingBatches = pgTable("roasting_batches", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Update the insert schema to match the table definition
+// Fix the roastingBatches insert schema
+export const insertRoastingBatchSchema = z.object({
+  greenCoffeeId: z.number(),
+  plannedAmount: z.string(),
+  actualAmount: z.string().optional(),
+  roastingLoss: z.string().optional(),
+  smallBagsProduced: z.number(),
+  largeBagsProduced: z.number(),
+  status: z.enum(["planned", "in_progress", "completed"]).default("planned"),
+});
+
 export const insertUserSchema = createInsertSchema(users);
 export const insertShopSchema = createInsertSchema(shops);
 export const insertGreenCoffeeSchema = createInsertSchema(greenCoffee);
 export const insertRetailInventorySchema = createInsertSchema(retailInventory);
 export const insertOrderSchema = createInsertSchema(orders);
-export const insertRoastingBatchSchema = createInsertSchema(roastingBatches, {
-  greenCoffeeId: (schema) => schema.greenCoffeeId,
-  plannedAmount: (schema) => schema.plannedAmount,
-  actualAmount: (schema) => schema.actualAmount.optional(),
-  roastingLoss: (schema) => schema.roastingLoss.optional(),
-  smallBagsProduced: (schema) => schema.smallBagsProduced,
-  largeBagsProduced: (schema) => schema.largeBagsProduced,
-  status: (schema) => schema.status.default("planned"),
-});
 export const insertUserShopSchema = createInsertSchema(userShops);
-
 
 // Export types for use in application code
 export type User = typeof users.$inferSelect;
