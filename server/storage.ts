@@ -438,7 +438,7 @@ export class DatabaseStorage {
   async getAllOrders(): Promise<Order[]> {
     try {
       console.log("Fetching all orders with shop data");
-      const orders = await db
+      const orderResults = await db
         .select({
           id: orders.id,
           shopId: orders.shopId,
@@ -463,9 +463,8 @@ export class DatabaseStorage {
         .leftJoin(shops, eq(orders.shopId, shops.id))
         .orderBy(orders.createdAt);
 
-      console.log("Found orders:", orders.length);
-      console.log("Sample order:", orders[0]);
-      return orders;
+      console.log("Found orders:", orderResults.length);
+      return orderResults;
     } catch (error) {
       console.error("Error getting all orders:", error);
       return [];
