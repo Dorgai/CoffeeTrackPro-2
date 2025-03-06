@@ -635,15 +635,23 @@ export class DatabaseStorage {
       console.log("Fetching inventory discrepancies");
       const query = sql`
         SELECT 
-          dc.*,
-          s.name as shop_name,
-          s.location as shop_location,
-          gc.name as coffee_name,
-          u.username as confirmed_by
+          dc.id,
+          dc.shop_id as "shopId",
+          dc.green_coffee_id as "greenCoffeeId",
+          dc.dispatched_small_bags as "dispatchedSmallBags",
+          dc.dispatched_large_bags as "dispatchedLargeBags",
+          dc.received_small_bags as "receivedSmallBags",
+          dc.received_large_bags as "receivedLargeBags",
+          dc.status,
+          dc.confirmed_at as "confirmedAt",
+          dc.created_at as "createdAt",
+          s.name as "shopName",
+          s.location as "shopLocation",
+          gc.name as "coffeeName",
+          gc.producer
         FROM dispatched_coffee_confirmation dc
         LEFT JOIN shops s ON dc.shop_id = s.id
         LEFT JOIN green_coffee gc ON dc.green_coffee_id = gc.id
-        LEFT JOIN users u ON dc.confirmed_by_id = u.id
         WHERE dc.status = 'confirmed'
         AND (
           COALESCE(dc.dispatched_small_bags, 0) != COALESCE(dc.received_small_bags, 0)
@@ -659,7 +667,7 @@ export class DatabaseStorage {
       return result.rows;
     } catch (error) {
       console.error("Error getting inventory discrepancies:", error);
-      throw error;
+      return [];
     }
   }
 
