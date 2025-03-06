@@ -79,6 +79,8 @@ type OrderWithDetails = {
   large_bags: number;
   status: string;
   createdAt: string;
+  createdById?: number;
+  updatedById?: number;
   shop_name: string;
   shop_location: string;
   coffee_name: string;
@@ -120,6 +122,7 @@ export default function RoastingOrders() {
         status: data.status,
         smallBags: data.smallBags,
         largeBags: data.largeBags,
+        updatedById: user?.id,
       });
       if (!res.ok) {
         const error = await res.json();
@@ -152,7 +155,6 @@ export default function RoastingOrders() {
       </div>
     );
   }
-
 
   const getAvailableStatuses = () => {
     if (user?.role === "roaster") {
@@ -198,7 +200,7 @@ export default function RoastingOrders() {
                           <TableHead>Coffee</TableHead>
                           <TableHead>Quantity</TableHead>
                           <TableHead>Status</TableHead>
-                          <TableHead>Created/Updated</TableHead>
+                          <TableHead>Created/Updated By</TableHead>
                           <TableHead>Actions</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -224,26 +226,19 @@ export default function RoastingOrders() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <div className="space-y-1">
-                                <Badge
-                                  variant={order.status === "pending" ? "destructive" : "outline"}
-                                  className="capitalize"
-                                >
-                                  {order.status}
-                                </Badge>
-                                {order.updated_by && (
-                                  <div className="text-xs text-muted-foreground">
-                                    Updated by: {order.updated_by}
-                                  </div>
-                                )}
-                              </div>
+                              <Badge
+                                variant={order.status === "pending" ? "destructive" : "outline"}
+                                className="capitalize"
+                              >
+                                {order.status}
+                              </Badge>
                             </TableCell>
                             <TableCell>
-                              <div>
-                                <div>{formatDate(order.createdAt)}</div>
-                                {order.created_by && (
-                                  <div className="text-xs text-muted-foreground">
-                                    Created by: {order.created_by}
+                              <div className="space-y-1 text-sm">
+                                <div>Created by: {order.created_by || 'Unknown'}</div>
+                                {order.updated_by && (
+                                  <div className="text-muted-foreground">
+                                    Updated by: {order.updated_by}
                                   </div>
                                 )}
                               </div>
@@ -342,6 +337,7 @@ export default function RoastingOrders() {
                             <Input
                               type="number"
                               min="0"
+                              max={selectedOrder.large_bags}
                               {...field}
                             />
                           </FormControl>
