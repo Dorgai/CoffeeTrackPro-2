@@ -83,6 +83,8 @@ type OrderWithDetails = {
   shop_location: string;
   coffee_name: string;
   producer: string;
+  created_by?: string;
+  updated_by?: string;
 };
 
 const updateOrderSchema = z.object({
@@ -196,7 +198,7 @@ export default function RoastingOrders() {
                           <TableHead>Coffee</TableHead>
                           <TableHead>Quantity</TableHead>
                           <TableHead>Status</TableHead>
-                          <TableHead>Last Updated</TableHead>
+                          <TableHead>Created/Updated</TableHead>
                           <TableHead>Actions</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -222,19 +224,30 @@ export default function RoastingOrders() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <Badge
-                                variant={order.status === "pending" ? "destructive" : "outline"}
-                                className="capitalize"
-                              >
-                                {order.status}
-                              </Badge>
-                              {order.updatedBy && (
-                                <div className="text-xs text-muted-foreground">
-                                  by {order.updatedBy.username}
-                                </div>
-                              )}
+                              <div className="space-y-1">
+                                <Badge
+                                  variant={order.status === "pending" ? "destructive" : "outline"}
+                                  className="capitalize"
+                                >
+                                  {order.status}
+                                </Badge>
+                                {order.updated_by && (
+                                  <div className="text-xs text-muted-foreground">
+                                    Updated by: {order.updated_by}
+                                  </div>
+                                )}
+                              </div>
                             </TableCell>
-                            <TableCell>{formatDate(order.createdAt)}</TableCell>
+                            <TableCell>
+                              <div>
+                                <div>{formatDate(order.createdAt)}</div>
+                                {order.created_by && (
+                                  <div className="text-xs text-muted-foreground">
+                                    Created by: {order.created_by}
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
                             <TableCell>
                               <Button
                                 variant="outline"
