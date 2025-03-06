@@ -274,27 +274,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log("Creating new green coffee request received by:", req.user?.username, "with role:", req.user?.role);
         console.log("Request body:", req.body);
 
-        // Convert string fields to numbers for numeric fields
-        const processedData = {
+        // Process and validate the data
+        const data = {
           ...req.body,
-          currentStock: String(req.body.currentStock),
-          minThreshold: String(req.body.minThreshold)
+          currentStock: String(req.body.currentStock || 0),
+          minThreshold: String(req.body.minThreshold || 0)
         };
 
-        console.log("Processed data:", processedData);
-        const data = insertGreenCoffeeSchema.parse(processedData);
-        const coffee = await storage.createGreenCoffee(data);
+        console.log("Processed data:", data);
+        const validatedData = insertGreenCoffeeSchema.parse(data);
+        const coffee = await storage.createGreenCoffee(validatedData);
 
         console.log("Successfully created green coffee:", coffee);
         res.status(201).json(coffee);
       } catch (error) {
         console.error("Error creating green coffee:", error);
+        if (error.name === 'ZodError') {
+          return res.status(400).json({
+            message: "Validation error",
+            details: error.errors
+          });
+        }
         res.status(400).json({
           message: error instanceof Error ? error.message : "Failed to create green coffee",
           details: error instanceof Error ? error.stack : undefined
         });
       }
-    },
+    }
   );
 
   // Update endpoint for green coffee with proper roaster permissions
@@ -788,7 +794,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(targets);
     } catch (error) {
       console.error("Error fetching coffee targets:", error);
-      res.status(500).json({ message: "Failed to fetch coffee targets" });
+            res.status(500).json({ message: "Failed to fetch coffee targets" });
     }
   });
 

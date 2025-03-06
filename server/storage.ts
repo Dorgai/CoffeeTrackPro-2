@@ -323,8 +323,28 @@ export class DatabaseStorage {
   async getAllOrders(): Promise<Order[]> {
     try {
       return await db
-        .select()
+        .select({
+          id: orders.id,
+          shopId: orders.shopId,
+          greenCoffeeId: orders.greenCoffeeId,
+          status: orders.status,
+          smallBags: orders.smallBags,
+          largeBags: orders.largeBags,
+          createdAt: orders.createdAt,
+          createdById: orders.createdById,
+          updatedById: orders.updatedById,
+          shop: {
+            id: shops.id,
+            name: shops.name,
+            location: shops.location,
+            isActive: shops.isActive,
+            desiredSmallBags: shops.desiredSmallBags,
+            desiredLargeBags: shops.desiredLargeBags,
+            createdAt: shops.createdAt
+          }
+        })
         .from(orders)
+        .leftJoin(shops, eq(orders.shopId, shops.id))
         .orderBy(orders.createdAt);
     } catch (error) {
       console.error("Error getting all orders:", error);
@@ -335,8 +355,28 @@ export class DatabaseStorage {
   async getOrdersByShop(shopId: number): Promise<Order[]> {
     try {
       return await db
-        .select()
+        .select({
+          id: orders.id,
+          shopId: orders.shopId,
+          greenCoffeeId: orders.greenCoffeeId,
+          status: orders.status,
+          smallBags: orders.smallBags,
+          largeBags: orders.largeBags,
+          createdAt: orders.createdAt,
+          createdById: orders.createdById,
+          updatedById: orders.updatedById,
+          shop: {
+            id: shops.id,
+            name: shops.name,
+            location: shops.location,
+            isActive: shops.isActive,
+            desiredSmallBags: shops.desiredSmallBags,
+            desiredLargeBags: shops.desiredLargeBags,
+            createdAt: shops.createdAt
+          }
+        })
         .from(orders)
+        .leftJoin(shops, eq(orders.shopId, shops.id))
         .where(eq(orders.shopId, shopId))
         .orderBy(orders.createdAt);
     } catch (error) {
