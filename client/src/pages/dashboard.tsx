@@ -48,17 +48,11 @@ export default function Dashboard() {
     queryKey: ["/api/retail-inventory", selectedShopId],
     queryFn: async () => {
       if (!selectedShopId) return [];
-      console.log("Fetching inventory for shop:", selectedShopId);
-      const res = await apiRequest("GET", `/api/retail-inventory?shopId=${selectedShopId}`);
+      const res = await fetch(`/api/retail-inventory?shopId=${selectedShopId}`);
       if (!res.ok) throw new Error('Failed to fetch inventory');
-      const data = await res.json();
-      console.log("Received inventory data:", data);
-      return data;
+      return res.json();
     },
     enabled: !!selectedShopId,
-    staleTime: 30000, // Cache for 30 seconds
-    retry: 3, // Retry failed requests 3 times
-    refetchOnWindowFocus: true, // Refetch when window regains focus
   });
 
   // Update roasting history query for roasteryOwner
@@ -623,6 +617,8 @@ export default function Dashboard() {
 
   // Update role condition for retail owner
   if (user?.role === "retailOwner") {
+    const shopInventory = allInventory?.filter(inv => inv.shopId === selectedShopId) || [];
+
     return (
       <div className="container mx-auto py-8 space-y-8">
         <div className="flex justify-between items-center">
@@ -677,50 +673,60 @@ export default function Dashboard() {
             <CardDescription>Overall performance data</CardDescription>
           </CardHeader>
           <CardContent>
-            {allShops?.map(shop => {
-              const shopInventory = allInventory?.filter(inv => inv.shopId === shop.id) || [];
-              const totalItems = shopInventory.length;
-              const healthyItems = shopInventory.filter(item =>
-                (item.smallBags || 0) >= (shop.desiredSmallBags || 20) / 2 &&
-                (item.largeBags || 0) >= (shop.desiredLargeBags || 10) / 2
-              ).length;
+            <div className="space-y-4">
+              {!selectedShopId ? (
+                <p className="text-center text-muted-foreground">Please select a shop to view inventory</p>
+              ) : !shopInventory?.length ? (
+                <p className="text-center text-muted-foreground">No inventory data available for selected shop</p>
+              ) : (
+                <div key={selectedShopId} className="space-y-4">
+                  {allShops?.map(shop => {
+                    const shopInventory = allInventory?.filter(inv => inv.shopId === shop.id) || [];
+                    const totalItems = shopInventory.length;
+                    const healthyItems = shopInventory.filter(item =>
+                      (item.smallBags || 0) >= (shop.desiredSmallBags || 20) / 2 &&
+                      (item.largeBags || 0) >= (shop.desiredLargeBags || 10) / 2
+                    ).length;
 
-              return (
-                <div key={shop.id} className="mb-6 last:mb-0">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-medium">{shop.name}</h3>
-                    <Badge variant={healthyItems < totalItems ? "destructive" : "outline"}>
-                      {healthyItems < totalItems ? `${totalItems - healthyItems} Low Stock` : "Stock OK"}
-                    </Badge>
-                  </div>
-                  <StockProgress
-                    current={healthyItems}
-                    desired={totalItems}
-                    label="Stock Health"
-                  />
-                  {shopInventory.map(inv => {
-                    const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
                     return (
-                      <div key={`${shop.id}-${inv.greenCoffeeId}`} className="mt-4 p-2 bg-muted rounded">
-                        <div className="text-sm font-medium mb-2">{coffee?.name}</div>
-                        <div className="space-y-2">
-                          <StockProgress
-                            current={inv.smallBags || 0}
-                            desired={shop.desiredSmallBags || 20}
-                            label="Small Bags (200g)"
-                          />
-                          <StockProgress
-                            current={inv.largeBags || 0}
-                            desired={shop.desiredLargeBags || 10}
-                            label="Large Bags (1kg)"
-                          />
+                      <div key={shop.id} className="mb-6 last:mb-0">
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="font-medium">{shop.name}</h3>
+                          <Badge variant={healthyItems < totalItems ? "destructive" : "outline"}>
+                            {healthyItems < totalItems ? `${totalItems - healthyItems} Low Stock` : "Stock OK"}
+                          </Badge>
                         </div>
+                        <StockProgress
+                          current={healthyItems}
+                          desired={totalItems}
+                          label="Stock Health"
+                        />
+                        {shopInventory.map(inv => {
+                          const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
+                          return (
+                            <div key={`${shop.id}-${inv.greenCoffeeId}`} className="mt-4 p-2 bg-muted rounded">
+                              <div className="text-sm font-medium mb-2">{coffee?.name}</div>
+                              <div className="space-y-2">
+                                <StockProgress
+                                  current={inv.smallBags || 0}
+                                  desired={shop.desiredSmallBags || 20}
+                                  label="Small Bags (200g)"
+                                />
+                                <StockProgress
+                                  current={inv.largeBags || 0}
+                                  desired={shop.desiredLargeBags || 10}
+                                  label="Large Bags (1kg)"
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     );
                   })}
                 </div>
-              );
-            })}
+              )}
+            </div>
           </CardContent>
         </Card>
 
