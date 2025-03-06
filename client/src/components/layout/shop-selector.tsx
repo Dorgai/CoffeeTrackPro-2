@@ -9,12 +9,23 @@ import {
 } from "@/components/ui/select";
 import { Store, Loader2 } from "lucide-react";
 import { useActiveShop } from "@/hooks/use-active-shop";
+import { apiRequest } from "@/lib/queryClient";
 import React from 'react';
 
 export function ShopSelector() {
   const { activeShop, setActiveShop } = useActiveShop();
   const { data: shops = [], isLoading } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
+    queryFn: async () => {
+      console.log("Fetching shops in ShopSelector");
+      const res = await apiRequest("GET", "/api/user/shops");
+      if (!res.ok) {
+        throw new Error("Failed to fetch shops");
+      }
+      const data = await res.json();
+      console.log("Received shops data:", data);
+      return data;
+    },
     refetchOnMount: "always",
     staleTime: 0,
     refetchInterval: 3000,
@@ -26,7 +37,9 @@ export function ShopSelector() {
 
   // Initialize shop selection if not already set
   React.useEffect(() => {
+    console.log("Shop selection effect running", { shops, activeShop });
     if (shops.length > 0 && !activeShop) {
+      console.log("Setting initial active shop:", shops[0]);
       setActiveShop(shops[0]);
     }
   }, [shops, activeShop, setActiveShop]);
@@ -42,6 +55,8 @@ export function ShopSelector() {
       </div>
     );
   }
+
+  console.log("Rendering ShopSelector with shops:", shops);
 
   if (!shops.length) {
     return (
@@ -60,8 +75,10 @@ export function ShopSelector() {
       <Select
         value={activeShop?.id?.toString()}
         onValueChange={(value) => {
+          console.log("Shop selection changed to:", value);
           const selectedShop = shops.find((s) => s.id === parseInt(value));
           if (selectedShop) {
+            console.log("Setting active shop to:", selectedShop);
             setActiveShop(selectedShop);
           }
         }}

@@ -129,29 +129,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/user/shops", async (req, res) => {
     try {
       if (!req.user) {
+        console.log("No user found in request");
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      console.log("Fetching shops for user:", req.user.id, req.user.username, "role:", req.user.role);
+      console.log("Fetching shops for user:", {
+        userId: req.user.id,
+        username: req.user.username,
+        role: req.user.role
+      });
 
       let shops;
       if (req.user.role === "roasteryOwner") {
         // Roastery owners can see all active shops
+        console.log("Fetching all shops for roasteryOwner");
         shops = await storage.getShops();
+        console.log("Found shops for roasteryOwner:", shops);
       } else {
         // Other roles get their assigned shops
+        console.log("Fetching assigned shops for user");
         shops = await storage.getUserShops(req.user.id);
+        console.log("Found assigned shops:", shops);
       }
 
       // Only return active shops
       const activeShops = shops.filter(shop => shop.isActive);
-      console.log("Found active shops:", activeShops.length);
-      return res.json(activeShops);
+      console.log("Returning active shops:", activeShops);
 
+      return res.json(activeShops);
     } catch (error) {
-      console.error("Error fetching user shops:", error);
-      // Return empty array instead of error status to prevent UI issues
-      return res.json([]);
+      console.error("Error in /api/user/shops:", error);
+      return res.status(500).json({ 
+        message: "Failed to fetch shops",
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
   });
 
@@ -794,7 +805,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const shopId = parseInt(req.params.id);
 
       if (!await checkShopAccess(req.user!.id, shopId)) {
-        return res.status(403).json({ message: "User does not have access to this shop" });
+        return res.status(403).json({ message: "User doesnot have access to this shop" });
       }
 
       const targets = await storage.getCoffeeLargeBagTargets(shopId);

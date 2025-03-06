@@ -2,15 +2,7 @@ import * as React from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Store, Coffee, Package } from "lucide-react";
-import {
-  Menubar,
-  MenubarContent,
-  MenubarItem,
-  MenubarMenu,
-  MenubarSeparator,
-  MenubarShortcut,
-  MenubarTrigger,
-} from "@/components/ui/menubar";
+import { Menubar, MenubarContent, MenubarItem, MenubarMenu, MenubarSeparator, MenubarShortcut, MenubarTrigger } from "@/components/ui/menubar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { GreenBeansStockIndicator } from "./green-beans-stock-indicator";
@@ -39,7 +31,12 @@ export function NavBar() {
           </Link>
         </div>
 
-        {user && (isRetailUser || isRoasteryUser) && <ShopSelector />}
+        {/* Shop Selector - placed before the Menubar */}
+        {user && (isRetailUser || isRoasteryUser) && (
+          <div className="mr-4">
+            <ShopSelector />
+          </div>
+        )}
 
         <Menubar className="border-none">
           <MenubarMenu>
