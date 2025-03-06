@@ -133,7 +133,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log("Fetching shops for user:", req.user.id, req.user.username);
-      
+
       try {
         const shops = await storage.getUserShops(req.user.id);
         console.log("Shops found:", shops);
@@ -175,39 +175,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/shops", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
+  app.get("/api/shops", requireRole(["roasteryOwner", "shopManager", "barista"]), async (req, res) => {
     try {
       let shops;
-
-      // For roasteryOwner, return all active shops
       if (req.user?.role === "roasteryOwner") {
         shops = await storage.getShops();
-        shops = shops.filter(shop => shop.isActive);
-      }
-      // For shopManager, return only their assigned shops
-      else {
+      } else {
         shops = await storage.getUserShops(req.user!.id);
-        shops = shops.filter(shop => shop.isActive);
       }
-
-      res.json(shops);
+      res.json(shops.filter(shop => shop.isActive));
     } catch (error) {
       console.error("Error fetching shops:", error);
       res.status(500).json({ message: "Failed to fetch shops" });
     }
   });
 
-  app.post(
-    "/api/shops",
-    requireRole(["roasteryOwner"]),
-    async (req, res) => {
+  app.post("/api/shops", requireRole(["roasteryOwner"]), async (req, res) => {
+    try {
       const data = insertShopSchema.parse(req.body);
       const shop = await storage.createShop(data);
       res.status(201).json(shop);
-    },
-  );
+    } catch (error) {
+      console.error("Error creating shop:", error);
+      res.status(400).json({ 
+        message: error instanceof Error ? error.message : "Failed to create shop" 
+      });
+    }
+  });
 
-  // Add DELETE endpoint for shops after the existing shops routes
+  app.patch("/api/shops/:id", requireRole(["roasteryOwner"]), async (req, res) => {
+    try {
+      const shopId = parseInt(req.params.id);
+      const shop = await storage.getShop(shopId);
+
+      if (!shop) {
+        return res.status(404).json({ message: "Shop not found" });
+      }
+
+      const updatedShop = await storage.updateShop(shopId, req.body);
+      res.json(updatedShop);
+    } catch (error) {
+      console.error("Error updating shop:", error);
+      res.status(500).json({ message: "Failed to update shop" });
+    }
+  });
+
   app.delete("/api/shops/:id", requireRole(["roasteryOwner"]), async (req, res) => {
     try {
       const shopId = parseInt(req.params.id);
@@ -217,59 +229,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Shop not found" });
       }
 
-      if (!shop.isActive) {
-        return res.status(400).json({ message: "Shop is already deleted" });
-      }
-
       const deletedShop = await storage.deleteShop(shopId);
-      res.json({ message: "Shop deleted successfully", shop: deletedShop });
+      res.json(deletedShop);
     } catch (error) {
       console.error("Error deleting shop:", error);
       res.status(500).json({ message: "Failed to delete shop" });
-    }
-  });
-
-  // Update shop settings route
-  app.patch("/api/shops/:id", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
-    try {
-      const shopId = parseInt(req.params.id);
-      const shop = await storage.getShop(shopId);
-
-      if (!shop) {
-        return res.status(404).json({ message: "Shop not found" });
-      }
-
-      // For non-roasteryOwner users, verify shop access
-      if (req.user?.role !== "roasteryOwner") {
-        const hasAccess = await checkShopAccess(req.user!.id, shopId);
-        if (!hasAccess) {
-          return res.status(403).json({ message: "User does not have access to this shop" });
-        }
-      }
-
-      const { desiredSmallBags, desiredLargeBags } = req.body;
-
-      // Validate inputs
-      if (typeof desiredSmallBags !== 'number' || desiredSmallBags < 0) {
-        return res.status(400).json({ message: "Invalid small bags value" });
-      }
-      if (typeof desiredLargeBags !== 'number' || desiredLargeBags < 0) {
-        return res.status(400).json({ message: "Invalid large bags value" });
-      }
-
-      console.log("Updating shop:", shopId, "with new targets - small:", desiredSmallBags, "large:", desiredLargeBags);
-
-      // Update shop using storage method
-      const updatedShop = await storage.updateShop(shopId, {
-        desiredSmallBags,
-        desiredLargeBags,
-      });
-
-      console.log("Shop updated successfully:", updatedShop);
-      res.json(updatedShop);
-    } catch (error) {
-      console.error("Error updating shop:", error);
-      res.status(500).json({ message: "Failed to update shop" });
     }
   });
 
