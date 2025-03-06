@@ -48,9 +48,12 @@ export default function Dashboard() {
     queryKey: ["/api/retail-inventory", selectedShopId],
     queryFn: async () => {
       if (!selectedShopId) return [];
+      console.log("Fetching inventory for shop:", selectedShopId);
       const res = await apiRequest("GET", `/api/retail-inventory?shopId=${selectedShopId}`);
       if (!res.ok) throw new Error('Failed to fetch inventory');
-      return res.json();
+      const data = await res.json();
+      console.log("Received inventory data:", data);
+      return data;
     },
     enabled: !!selectedShopId,
     staleTime: 30000, // Cache for 30 seconds
@@ -62,9 +65,12 @@ export default function Dashboard() {
   const { data: roastingHistory, isLoading: loadingRoastingHistory } = useQuery({
     queryKey: ["/api/roasting-batches"],
     queryFn: async () => {
+      console.log("Fetching roasting history, user role:", user?.role);
       const res = await apiRequest("GET", "/api/roasting-batches");
       if (!res.ok) throw new Error('Failed to fetch roasting history');
-      return res.json();
+      const data = await res.json();
+      console.log("Received roasting history:", data);
+      return data;
     },
     enabled: !!user && ["roasteryOwner", "roaster"].includes(user.role),
   });
@@ -85,7 +91,7 @@ export default function Dashboard() {
     enabled: !!selectedShopId && (user?.role === "shopManager" || user?.role === "barista"),
   });
 
-  const isLoading = loadingCoffees || loadingAllShops || loadingShop || loadingInventory ||
+  const isLoading = loadingCoffees || loadingAllShops || loadingInventory ||
     loadingAllInventory || loadingAllOrders || loadingShopOrders || loadingRoastingHistory;
 
   if (isLoading) {
@@ -118,7 +124,10 @@ export default function Dashboard() {
           <div className="flex items-center gap-4">
             <ShopSelector
               value={selectedShopId}
-              onChange={setSelectedShopId}
+              onChange={(shopId) => {
+                console.log("Shop selected:", shopId);
+                setSelectedShopId(shopId);
+              }}
             />
             <Button
               variant="outline"
@@ -781,7 +790,10 @@ export default function Dashboard() {
         <div className="flex gap-2">
           <ShopSelector
             value={selectedShopId}
-            onChange={setSelectedShopId}
+            onChange={(shopId) => {
+              console.log("Selected shop:", shopId);
+              setSelectedShopId(shopId);
+            }}
           />
           <Button
             variant="outline"
@@ -881,14 +893,16 @@ export default function Dashboard() {
           <CardDescription>Recent order status and activities</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table><TableHead>
+          <Table>
+            <TableHead>
               <TableRow>
                 <TableHead>Shop</TableHead>
                 <TableHead>Coffee</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Date</TableHead>
-              </TableRow            </TableHead>
+              </TableRow>
+            </TableHead>
             <TableBody>
               {allOrders?.slice(0, 5).map(order => {
                 const coffee = coffees?.find(c => c.id === order.greenCoffeeId);

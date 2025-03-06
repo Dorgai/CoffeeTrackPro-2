@@ -798,7 +798,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // For non-roasteryOwner users, verify shop access
       if (!["roasteryOwner", "retailOwner"].includes(req.user?.role || "")) {
-        const hasAccess = await checkShopAccess(req.user!..id, existingConfirmation.shopId);
+        const hasAccess = await checkShopAccess(req.user!.id, existingConfirmation.shopId);
         if (!hasAccess) {
           return res.status(403).json({ message: "User does not have access to this shop" });
         }
