@@ -96,7 +96,9 @@ export default function Analytics() {
   // Group orders by shop and calculate totals for both periods
   const calculateShopStats = (filteredOrders: any[]) => {
     return filteredOrders?.reduce((acc: any, order: any) => {
-      const shopName = order.shop.name;
+      // Handle missing shop data with a fallback
+      const shopName = order.shop?.name || 'Unassigned';
+
       if (!acc[shopName]) {
         acc[shopName] = {
           totalSmallBags: 0,
@@ -106,8 +108,8 @@ export default function Analytics() {
         };
       }
 
-      acc[shopName].totalSmallBags += order.smallBags;
-      acc[shopName].totalLargeBags += order.largeBags;
+      acc[shopName].totalSmallBags += order.smallBags || 0;
+      acc[shopName].totalLargeBags += order.largeBags || 0;
       acc[shopName].totalOrders += 1;
 
       const dateKey = format(new Date(order.createdAt), "yyyy-MM-dd");
@@ -117,8 +119,8 @@ export default function Analytics() {
           largeBags: 0,
         };
       }
-      acc[shopName].ordersByDate[dateKey].smallBags += order.smallBags;
-      acc[shopName].ordersByDate[dateKey].largeBags += order.largeBags;
+      acc[shopName].ordersByDate[dateKey].smallBags += order.smallBags || 0;
+      acc[shopName].ordersByDate[dateKey].largeBags += order.largeBags || 0;
 
       return acc;
     }, {});

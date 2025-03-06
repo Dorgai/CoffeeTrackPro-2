@@ -165,11 +165,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       let shops;
-      if (req.user.role === "roasteryOwner") {
-        // Roastery owners can see all active shops
-        console.log("Fetching all shops for roasteryOwner");
+      // Allow retail owners to see all shops like roastery owners
+      if (req.user.role === "roasteryOwner" || req.user.role === "retailOwner") {
+        // Roastery owners and retail owners can see all active shops
+        console.log("Fetching all shops for roasteryOwner/retailOwner");
         shops = await storage.getShops();
-        console.log("Found shops for roasteryOwner:", shops);
+        console.log("Found shops:", shops);
       } else {
         // Other roles get their assigned shops
         console.log("Fetching assigned shops for user");
@@ -800,7 +801,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
-  //  // Add route for getting coffee-specific large bag targets
+  //  ////  // Add route for getting coffee-specific large bag targets
   app.get("/api/shops/:id/coffee-targets", requireRole(["roasteryOwner", "shopManager", "retailOwner"]), async(req, res) => {
     try {      const shopId = parseInt(req.params.id);
 
