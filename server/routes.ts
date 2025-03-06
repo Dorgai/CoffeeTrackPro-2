@@ -112,53 +112,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/users/:id/shops", requireRole(["roasteryOwner"]), async (req, res) => {
     try {
       const userId = parseInt(req.params.id);
-      const { shopId, shopIds } = req.body;
+      const { shopIds } = req.body;
 
-      // Validate input
-      if (!shopId && !shopIds) {
-        return res.status(400).json({ message: "Either shopId or shopIds must be provided" });
+      console.log("Shop assignment request received:", {
+        userId,
+        shopIds,
+        requestUser: req.user?.username,
+        requestUserRole: req.user?.role
+      });
+
+      if (!Array.isArray(shopIds)) {
+        console.log("Invalid shopIds format:", shopIds);
+        return res.status(400).json({ message: "Shop IDs must be an array" });
       }
 
       const user = await storage.getUser(userId);
       if (!user) {
+        console.log("User not found:", userId);
         return res.status(404).json({ message: "User not found" });
       }
 
-      // Handle single shop assignment
-      if (shopId) {
+      console.log("Assigning shops to user:", {
+        username: user.username,
+        role: user.role,
+        assignedShops: shopIds
+      });
+
+      // Verify all shops exist and are active
+      for (const shopId of shopIds) {
         const shop = await storage.getShop(shopId);
         if (!shop || !shop.isActive) {
-          return res.status(404).json({ message: "Shop not found or inactive" });
+          console.log("Invalid shop found:", { shopId, exists: !!shop, active: shop?.isActive });
+          return res.status(404).json({ message: `Shop ${shopId} not found or inactive` });
         }
+      }
 
+      // Remove all existing assignments
+      console.log("Removing existing shop assignments for user:", userId);
+      await storage.removeAllUserShops(userId);
+
+      // Add new assignments
+      console.log("Adding new shop assignments:", shopIds);
+      for (const shopId of shopIds) {
         await storage.assignUserToShop(userId, shopId);
-        return res.json({ message: "User assigned to shop successfully" });
       }
 
-      // Handle multiple shop assignments
-      if (Array.isArray(shopIds)) {
-        // Verify all shops exist and are active
-        for (const id of shopIds) {
-          const shop = await storage.getShop(id);
-          if (!shop || !shop.isActive) {
-            return res.status(404).json({ message: `Shop ${id} not found or inactive` });
-          }
-        }
+      const updatedShops = await storage.getUserShops(userId);
+      console.log("Successfully updated shop assignments:", {
+        userId,
+        assignedShops: updatedShops.map(s => ({ id: s.id, name: s.name }))
+      });
 
-        // Remove all existing assignments and add new ones
-        await storage.removeAllUserShops(userId);
-        for (const id of shopIds) {
-          await storage.assignUserToShop(userId, id);
-        }
-
-        const updatedShops = await storage.getUserShops(userId);
-        return res.json(updatedShops);
-      }
-
-      return res.status(400).json({ message: "Invalid request format" });
+      res.json(updatedShops);
     } catch (error) {
-      console.error("Error assigning user to shop:", error);
-      res.status(500).json({ message: "Failed to assign user to shop" });
+      console.error("Error in shop assignment:", error);
+      res.status(500).json({ 
+        message: "Failed to update user's shop assignments",
+        details: error instanceof Error ? error.message : String(error)
+      });
     }
   });
 

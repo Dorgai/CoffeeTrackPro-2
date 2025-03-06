@@ -169,6 +169,7 @@ export default function UserManagement() {
 
   const updateShopAssignmentsMutation = useMutation({
     mutationFn: async ({ userId, shopIds }: { userId: number; shopIds: number[] }) => {
+      console.log("Updating shop assignments:", { userId, shopIds });
       const res = await apiRequest(
         "POST",
         `/api/users/${userId}/shops`,
@@ -190,9 +191,10 @@ export default function UserManagement() {
       setSelectedUserForShops(null);
     },
     onError: (error: Error) => {
+      console.error("Shop assignment error:", error);
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to update shop assignments",
         variant: "destructive",
       });
     },
@@ -346,7 +348,7 @@ export default function UserManagement() {
                         Reset Password
                       </Button>
 
-                      {user.role === "barista" && (
+                      {!user.isPendingApproval && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -356,7 +358,7 @@ export default function UserManagement() {
                           }}
                         >
                           <Building2 className="h-4 w-4 mr-2" />
-                          Assign Shops
+                          Manage Shops
                         </Button>
                       )}
                     </div>
@@ -452,7 +454,10 @@ export default function UserManagement() {
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>
-              Assign Shops to {selectedUserForShops?.username}
+              Manage Shop Access for {selectedUserForShops?.username}
+              <div className="text-sm font-normal text-muted-foreground mt-1">
+                Role: {selectedUserForShops?.role}
+              </div>
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-4">
@@ -465,7 +470,12 @@ export default function UserManagement() {
                       key={shop.id}
                       className="flex items-center justify-between bg-muted p-2 rounded"
                     >
-                      <span>{shop.name}</span>
+                      <div>
+                        <span className="font-medium">{shop.name}</span>
+                        <div className="text-xs text-muted-foreground">
+                          {shop.location}
+                        </div>
+                      </div>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -517,7 +527,7 @@ export default function UserManagement() {
                       )
                       .map((shop: any) => (
                         <SelectItem key={shop.id} value={shop.id.toString()}>
-                          {shop.name}
+                          {shop.name} - {shop.location}
                         </SelectItem>
                       ))}
                   </SelectContent>

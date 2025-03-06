@@ -432,17 +432,20 @@ export class DatabaseStorage {
       console.log("Fetching retail inventories for shop:", shopId);
       const query = sql`
         SELECT 
-          ri.*,
-          s.name as shop_name,
-          s.location as shop_location,
-          gc.name as coffee_name,
+          ri.id,
+          ri.shop_id as "shopId",
+          ri.green_coffee_id as "greenCoffeeId",
+          ri.small_bags as "smallBags",
+          ri.large_bags as "largeBags",
+          ri.created_at as "createdAt",
+          s.name as "shopName",
+          s.location as "shopLocation",
+          gc.name as "coffeeName",
           gc.producer,
-          u.username as updated_by,
-          COALESCE(ri.updated_at, ri.created_at) as last_updated
+          ri.created_at as "lastUpdated"
         FROM retail_inventory ri
         LEFT JOIN shops s ON ri.shop_id = s.id
         LEFT JOIN green_coffee gc ON ri.green_coffee_id = gc.id
-        LEFT JOIN users u ON ri.updated_by_id = u.id
         WHERE ri.shop_id = ${shopId}
         ORDER BY ri.green_coffee_id`;
 
