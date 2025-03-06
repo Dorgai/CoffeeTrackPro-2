@@ -27,12 +27,16 @@ export function ShopSelector() {
     queryFn: async () => {
       console.log("Fetching user shops...");
       const res = await apiRequest("GET", "/api/user/shops");
+      if (!res.ok) {
+        throw new Error("Failed to fetch shops");
+      }
       const data = await res.json();
       console.log("Received shops data:", data);
       return data;
     },
     staleTime: 30000, // Cache for 30 seconds
-    retry: 3
+    retry: 3,
+    enabled: !!user && user.role !== "roaster" // Only fetch for non-roaster users
   });
 
   // Clear active shop if it's not in the current shops list

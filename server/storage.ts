@@ -4,6 +4,7 @@ import { eq, and } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
+import { sql } from 'drizzle-orm';
 
 const PostgresSessionStore = connectPg(session);
 
@@ -307,6 +308,52 @@ export class DatabaseStorage {
     } catch (error) {
       console.error("Error creating green coffee:", error);
       throw error;
+    }
+  }
+
+  //Retail Inventory Methods
+  async getAllRetailInventories(): Promise<any[]> {
+    try {
+      console.log("Fetching all retail inventories");
+      const query = sql`
+        SELECT ri.*, 
+               s.name as shop_name, 
+               s.location as shop_location,
+               gc.name as coffee_name
+        FROM retail_inventory ri
+        LEFT JOIN shops s ON ri.shop_id = s.id
+        LEFT JOIN green_coffee gc ON ri.green_coffee_id = gc.id
+        ORDER BY ri.shop_id, ri.green_coffee_id`;
+
+      const result = await db.execute(query);
+      console.log("Found retail inventories:", result.rows.length);
+      return result.rows;
+    } catch (error) {
+      console.error("Error getting all retail inventories:", error);
+      return [];
+    }
+  }
+
+  async getRetailInventoriesByShop(shopId: number): Promise<any[]> {
+    try {
+      console.log("Fetching retail inventories for shop:", shopId);
+      const query = sql`
+        SELECT ri.*, 
+               s.name as shop_name, 
+               s.location as shop_location,
+               gc.name as coffee_name
+        FROM retail_inventory ri
+        LEFT JOIN shops s ON ri.shop_id = s.id
+        LEFT JOIN green_coffee gc ON ri.green_coffee_id = gc.id
+        WHERE ri.shop_id = ${shopId}
+        ORDER BY ri.green_coffee_id`;
+
+      const result = await db.execute(query);
+      console.log("Found retail inventories for shop:", result.rows.length);
+      return result.rows;
+    } catch (error) {
+      console.error("Error getting retail inventories for shop:", error);
+      return [];
     }
   }
 
