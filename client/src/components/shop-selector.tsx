@@ -16,15 +16,11 @@ export function ShopSelector({ value, onChange }: ShopSelectorProps) {
     },
   });
 
-  console.log("ShopSelector - Current value:", value, "Available shops:", shops);
-
   return (
     <Select
       value={value?.toString()}
       onValueChange={(val) => {
-        const shopId = parseInt(val);
-        console.log("ShopSelector - Selected shop ID:", shopId);
-        onChange(shopId);
+        onChange(parseInt(val));
       }}
     >
       <SelectTrigger className="w-[180px]">
