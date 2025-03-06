@@ -10,14 +10,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -27,17 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Loader2, Key, AlertCircle, Building2, UserCheck, UserX } from "lucide-react";
+import { AlertCircle, Key, Building2, UserCheck, UserX } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -47,11 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-type ShopAssignment = {
-  userId: number;
-  shopId: number;
-};
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export default function UserManagement() {
   const { user: currentUser } = useAuth();
@@ -62,8 +40,9 @@ export default function UserManagement() {
   const [userToDeactivate, setUserToDeactivate] = useState<User | null>(null);
   const [selectedUserForShops, setSelectedUserForShops] = useState<User | null>(null);
   const [isShopAssignmentOpen, setIsShopAssignmentOpen] = useState(false);
-  const [filter, setFilter] = useState<"all" | "pending" | "active" | "inactive">("all");
+  const [selectedShopIds, setSelectedShopIds] = useState<number[]>([]);
 
+  // Existing queries
   const { data: users, isLoading } = useQuery<User[]>({
     queryKey: ["/api/users"],
   });
@@ -73,7 +52,7 @@ export default function UserManagement() {
     enabled: !!currentUser && currentUser.role === "roasteryOwner",
   });
 
-  const { data: userShops } = useQuery({
+  const { data: userShops, refetch: refetchUserShops } = useQuery({
     queryKey: ["/api/users", selectedUserForShops?.id, "shops"],
     enabled: !!selectedUserForShops?.id,
     queryFn: async () => {
@@ -86,87 +65,7 @@ export default function UserManagement() {
     },
   });
 
-  const approveUserMutation = useMutation({
-    mutationFn: async (userId: number) => {
-      const res = await apiRequest("POST", `/api/users/${userId}/approve`);
-      if (!res.ok) {
-        const error = await res.text();
-        throw new Error(error || "Failed to approve user");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      toast({
-        title: "Success",
-        description: "User has been approved",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const toggleActivationMutation = useMutation({
-    mutationFn: async ({ userId, isActive }: { userId: number; isActive: boolean }) => {
-      const res = await apiRequest("POST", `/api/users/${userId}/toggle-activation`, {
-        isActive,
-      });
-      if (!res.ok) {
-        const error = await res.text();
-        throw new Error(error || "Failed to update user activation status");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      toast({
-        title: "Success",
-        description: "User activation status has been updated",
-      });
-      setUserToDeactivate(null);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const updatePasswordMutation = useMutation({
-    mutationFn: async ({ userId, password }: { userId: number; password: string }) => {
-      const res = await apiRequest("POST", `/api/users/${userId}/update-password`, {
-        password,
-      });
-      if (!res.ok) {
-        const error = await res.text();
-        throw new Error(error || "Failed to update password");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      setIsPasswordDialogOpen(false);
-      setNewPassword("");
-      toast({
-        title: "Success",
-        description: "Password has been updated",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
+  // Update shop assignments mutation
   const updateShopAssignmentsMutation = useMutation({
     mutationFn: async ({ userId, shopIds }: { userId: number; shopIds: number[] }) => {
       console.log("Updating shop assignments:", { userId, shopIds });
@@ -183,12 +82,11 @@ export default function UserManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      refetchUserShops();
       toast({
         title: "Success",
         description: "Shop assignments have been updated",
       });
-      setIsShopAssignmentOpen(false);
-      setSelectedUserForShops(null);
     },
     onError: (error: Error) => {
       console.error("Shop assignment error:", error);
@@ -200,6 +98,7 @@ export default function UserManagement() {
     },
   });
 
+  // Component render
   if (currentUser?.role !== "roasteryOwner") {
     return (
       <div className="container mx-auto py-8">
@@ -213,26 +112,20 @@ export default function UserManagement() {
     );
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
+  const handleShopAssignment = (userId: number, shopIds: number[]) => {
+    console.log("Assigning shops:", { userId, shopIds });
+    updateShopAssignmentsMutation.mutate({ userId, shopIds });
+  };
 
-  const filteredUsers = users?.filter(user => {
-    switch (filter) {
-      case "pending":
-        return user.isPendingApproval;
-      case "active":
-        return !user.isPendingApproval && user.isActive;
-      case "inactive":
-        return !user.isPendingApproval && !user.isActive;
-      default:
-        return true;
-    }
-  });
+  const handleShopSelectionChange = (shopId: string) => {
+    const id = parseInt(shopId);
+    setSelectedShopIds(prev => {
+      if (prev.includes(id)) {
+        return prev.filter(x => x !== id);
+      }
+      return [...prev, id];
+    });
+  };
 
   return (
     <div className="container mx-auto py-8 space-y-8">
@@ -448,6 +341,7 @@ export default function UserManagement() {
           setIsShopAssignmentOpen(open);
           if (!open) {
             setSelectedUserForShops(null);
+            setSelectedShopIds([]);
           }
         }}
       >
@@ -481,13 +375,12 @@ export default function UserManagement() {
                         size="sm"
                         onClick={() => {
                           if (selectedUserForShops) {
-                            const newShopIds = userShops
-                              .filter((s: any) => s.id !== shop.id)
-                              .map((s: any) => s.id);
-                            updateShopAssignmentsMutation.mutate({
-                              userId: selectedUserForShops.id,
-                              shopIds: newShopIds,
-                            });
+                            handleShopAssignment(
+                              selectedUserForShops.id,
+                              userShops
+                                .filter((s: any) => s.id !== shop.id)
+                                .map((s: any) => s.id)
+                            );
                           }
                         }}
                       >
@@ -504,34 +397,39 @@ export default function UserManagement() {
             </div>
 
             <div className="space-y-2">
-              <h4 className="text-sm font-medium">Add Shop Assignment</h4>
+              <h4 className="text-sm font-medium">Add Shop Assignments</h4>
               {shops?.length ? (
-                <Select
-                  onValueChange={(value) => {
-                    if (selectedUserForShops) {
-                      updateShopAssignmentsMutation.mutate({
-                        userId: selectedUserForShops.id,
-                        shopIds: [...(userShops?.map((s: any) => s.id) || []), parseInt(value)],
-                      });
-                    }
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a shop to assign" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {shops
-                      .filter(
-                        (shop: any) =>
-                          !userShops?.some((us: any) => us.id === shop.id)
-                      )
-                      .map((shop: any) => (
-                        <SelectItem key={shop.id} value={shop.id.toString()}>
-                          {shop.name} - {shop.location}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                <div className="space-y-2">
+                  {shops
+                    .filter((shop: any) => !userShops?.some((us: any) => us.id === shop.id))
+                    .map((shop: any) => (
+                      <div
+                        key={shop.id}
+                        className="flex items-center justify-between p-2 border rounded"
+                      >
+                        <div>
+                          <span className="font-medium">{shop.name}</span>
+                          <div className="text-xs text-muted-foreground">
+                            {shop.location}
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (selectedUserForShops) {
+                              handleShopAssignment(
+                                selectedUserForShops.id,
+                                [...(userShops?.map((s: any) => s.id) || []), shop.id]
+                              );
+                            }
+                          }}
+                        >
+                          Add
+                        </Button>
+                      </div>
+                    ))}
+                </div>
               ) : (
                 <p className="text-sm text-muted-foreground">No shops available</p>
               )}
