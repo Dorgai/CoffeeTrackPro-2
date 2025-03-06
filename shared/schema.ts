@@ -68,8 +68,6 @@ export const roastingBatches = pgTable("roasting_batches", {
   plannedAmount: decimal("planned_amount", { precision: 10, scale: 2 }).notNull(),
   actualAmount: decimal("actual_amount", { precision: 10, scale: 2 }),
   roastingLoss: decimal("roasting_loss", { precision: 10, scale: 2 }),
-  smallBagsProduced: integer("small_bags_produced").notNull().default(0),
-  largeBagsProduced: integer("large_bags_produced").notNull().default(0),
   status: text("status", { enum: ["planned", "in_progress", "completed"] }).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -77,10 +75,6 @@ export const roastingBatches = pgTable("roasting_batches", {
 export const insertRoastingBatchSchema = z.object({
   greenCoffeeId: z.number(),
   plannedAmount: z.coerce.number().min(0, "Planned amount must be 0 or greater"),
-  actualAmount: z.coerce.number().optional(),
-  roastingLoss: z.coerce.number().optional(),
-  smallBagsProduced: z.number(),
-  largeBagsProduced: z.number(),
   status: z.enum(["planned", "in_progress", "completed"]).default("planned"),
 });
 

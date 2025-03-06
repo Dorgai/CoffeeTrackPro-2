@@ -435,36 +435,28 @@ export class DatabaseStorage {
     }
   }
 
-  async getAllOrders(): Promise<Order[]> {
+  async getAllOrders(): Promise<any[]> {
     try {
-      console.log("Fetching all orders with shop data");
-      const orderResults = await db
-        .select({
-          id: orders.id,
-          shopId: orders.shopId,
-          greenCoffeeId: orders.greenCoffeeId,
-          status: orders.status,
-          smallBags: orders.smallBags,
-          largeBags: orders.largeBags,
-          createdAt: orders.createdAt,
-          createdById: orders.createdById,
-          updatedById: orders.updatedById,
-          shop: {
-            id: shops.id,
-            name: shops.name,
-            location: shops.location,
-            isActive: shops.isActive,
-            desiredSmallBags: shops.desiredSmallBags,
-            desiredLargeBags: shops.desiredLargeBags,
-            createdAt: shops.createdAt
-          }
-        })
-        .from(orders)
-        .leftJoin(shops, eq(orders.shopId, shops.id))
-        .orderBy(orders.createdAt);
+      console.log("Fetching all orders with details");
+      const query = sql`
+        SELECT 
+          o.*,
+          s.name as shop_name,
+          s.location as shop_location,
+          gc.name as coffee_name,
+          gc.producer as producer,
+          u1.username as created_by,
+          u2.username as updated_by
+        FROM orders o
+        LEFT JOIN shops s ON o.shop_id = s.id
+        LEFT JOIN green_coffee gc ON o.green_coffee_id = gc.id
+        LEFT JOIN users u1 ON o.created_by_id = u1.id
+        LEFT JOIN users u2 ON o.updated_by_id = u2.id
+        ORDER BY o.created_at DESC`;
 
-      console.log("Found orders:", orderResults.length);
-      return orderResults;
+      const result = await db.execute(query);
+      console.log("Found orders:", result.rows.length);
+      return result.rows;
     } catch (error) {
       console.error("Error getting all orders:", error);
       return [];
