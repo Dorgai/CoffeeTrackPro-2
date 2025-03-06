@@ -43,67 +43,7 @@ export default function Dashboard() {
     enabled: !!user && (user.role === "roasteryOwner" || user.role === "owner"), // Updated for owner role
   });
 
-{/* 
-  Proper table structure:
-  <Table>
-    <TableHeader>
-      <TableRow>
-        <TableHead>Header 1</TableHead>
-        <TableHead>Header 2</TableHead>
-      </TableRow>
-    </TableHeader>
-    <TableBody>
-      <TableRow>
-        <TableCell>Cell content 1</TableCell>
-        <TableCell>Cell content 2</TableCell>
-      </TableRow>
-    </TableBody>
-  </Table>
-*/}
-
-// Example implementation of a table with ShopSelector context:
-const ExampleDataTable = () => {
-  const { activeShop } = useActiveShop();
-  
-  if (!activeShop) return null;
-  
-  return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Coffee</TableHead>
-            <TableHead>Quantity</TableHead>
-            <TableHead>Status</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {/* Data rows would go here */}
-          <TableRow>
-            <TableCell>Example Coffee</TableCell>
-            <TableCell>10 bags</TableCell>
-            <TableCell>In Stock</TableCell>
-          </TableRow>
-        </TableBody>
-      </Table>
-    </div>
-  );
-};
-
-
-  const { data: shop, isLoading: loadingShop } = useQuery<Shop>({
-    queryKey: ["/api/shops", selectedShopId],
-    queryFn: async () => {
-      if (!selectedShopId) throw new Error('No shop selected');
-      const res = await apiRequest("GET", `/api/shops/${selectedShopId}`);
-      if (!res.ok) throw new Error('Failed to fetch shop details');
-      return res.json();
-    },
-    enabled: !!selectedShopId,
-    staleTime: 30000,
-    retry: 3,
-  });
-
+  // Update the shop-dependent queries to include shopId
   const { data: shopInventory, isLoading: loadingInventory } = useQuery({
     queryKey: ["/api/retail-inventory", selectedShopId],
     queryFn: async () => {
@@ -116,6 +56,17 @@ const ExampleDataTable = () => {
     staleTime: 30000, // Cache for 30 seconds
     retry: 3, // Retry failed requests 3 times
     refetchOnWindowFocus: true, // Refetch when window regains focus
+  });
+
+  // Update roasting history query for roasteryOwner
+  const { data: roastingHistory, isLoading: loadingRoastingHistory } = useQuery({
+    queryKey: ["/api/roasting-batches"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/roasting-batches");
+      if (!res.ok) throw new Error('Failed to fetch roasting history');
+      return res.json();
+    },
+    enabled: !!user && ["roasteryOwner", "roaster"].includes(user.role),
   });
 
   // Update the queries section to include retailOwner
@@ -135,7 +86,7 @@ const ExampleDataTable = () => {
   });
 
   const isLoading = loadingCoffees || loadingAllShops || loadingShop || loadingInventory ||
-    loadingAllInventory || loadingAllOrders || loadingShopOrders;
+    loadingAllInventory || loadingAllOrders || loadingShopOrders || loadingRoastingHistory;
 
   if (isLoading) {
     return (
@@ -394,14 +345,14 @@ const ExampleDataTable = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {!allOrders?.length ? (
+                {!roastingHistory?.length ? ( // Use roastingHistory here
                   <TableRow>
                     <TableCell colSpan={5} className="text-center text-muted-foreground">
                       No recent batches found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  allOrders.slice(0, 5).map(order => {
+                  roastingHistory.slice(0, 5).map(order => { // Use roastingHistory here
                     const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
                     return (
                       <TableRow key={order.id}>
@@ -937,8 +888,7 @@ const ExampleDataTable = () => {
                 <TableHead>Amount</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Date</TableHead>
-              </TableRow>
-            </TableHead>
+              </TableRow            </TableHead>
             <TableBody>
               {allOrders?.slice(0, 5).map(order => {
                 const coffee = coffees?.find(c => c.id === order.greenCoffeeId);

@@ -150,6 +150,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User's Shops Management Routes
+  app.get("/api/users/:id/shops", requireRole(["roasteryOwner"]), async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const userShops = await storage.getUserShops(userId);
+      res.json(userShops);
+    } catch (error) {
+      console.error("Error fetching user's shops:", error);
+      res.status(500).json({ message: "Failed to fetch user's shops" });
+    }
+  });
+
+  app.post("/api/users/:id/shops", requireRole(["roasteryOwner"]), async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const { shopIds } = req.body;
+
+      if (!Array.isArray(shopIds)) {
+        return res.status(400).json({ message: "Shop IDs must be an array" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Only allow assigning shops to baristas
+      if (user.role !== "barista") {
+        return res.status(400).json({ message: "Shop assignments are only allowed for barista users" });
+      }
+
+      // Verify all shops exist and are active
+      for (const shopId of shopIds) {
+        const shop = await storage.getShop(shopId);
+        if (!shop || !shop.isActive) {
+          return res.status(404).json({ message: `Shop ${shopId} not found or inactive` });
+        }
+      }
+
+      // Remove all existing assignments
+      await storage.removeAllUserShops(userId);
+
+      // Add new assignments
+      for (const shopId of shopIds) {
+        await storage.assignUserToShop(userId, shopId);
+      }
+
+      const updatedShops = await storage.getUserShops(userId);
+      res.json(updatedShops);
+    } catch (error) {
+      console.error("Error updating user's shops:", error);
+      res.status(500).json({ message: "Failed to update user's shop assignments" });
+    }
+  });
+
   // User's Shops Route
   app.get("/api/user/shops", async (req, res) => {
     try {
@@ -193,7 +248,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Shops Routes - accessible by roastery owner and shop manager
-  app.get("/api/shops/:id", requireRole(["roasteryOwner", "shopManager", "barista"]), async (req, res) => {
+  app.get("/api/shops/:id", requireRole(["roasteryOwner", "shopManager", "barista", "retailOwner"]), async (req, res) => {
     try {
       const shopId = parseInt(req.params.id);
 
@@ -217,7 +272,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/shops", requireRole(["roasteryOwner", "shopManager", "barista"]), async (req, res) => {
+  app.get("/api/shops", requireRole(["roasteryOwner", "shopManager", "barista", "retailOwner"]), async (req, res) => {
     try {
       let shops;
       if (req.user?.role === "roasteryOwner") {
@@ -280,7 +335,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Green Coffee Routes - accessible by roastery owner and roaster
-  app.get("/api/green-coffee", requireRole(["owner", "roasteryOwner", "roaster"]), async (req, res) => {
+  app.get("/api/green-coffee", requireRole(["owner", "roasteryOwner", "roaster", "retailOwner"]), async (req, res) => {
     try {
       console.log("Fetching green coffee list, requested by:", req.user?.username, "role:", req.user?.role);
       const coffees = await storage.getGreenCoffees();
@@ -366,7 +421,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // Get specific green coffee details
-  app.get("/api/green-coffee/:id", requireRole(["owner", "roasteryOwner", "roaster"]), async (req, res) => {
+  app.get("/api/green-coffee/:id", requireRole(["owner", "roasteryOwner", "roaster", "retailOwner"]), async (req, res) => {
     try {
       const coffeeId = parseInt(req.params.id);
       if (isNaN(coffeeId)) {
@@ -393,7 +448,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
   // Roasting Routes - accessible by roaster
-  app.get("/api/roasting-batches", requireRole(["owner", "roasteryOwner", "roaster"]), async (req, res) => {
+  app.get("/api/roasting-batches", requireRole(["owner", "roasteryOwner", "roaster", "retailOwner"]), async (req, res) => {
     try {
       const batches = await storage.getRoastingBatches();
       console.log("Fetched roasting batches:", batches);
@@ -743,7 +798,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // For non-roasteryOwner users, verify shop access
       if (!["roasteryOwner", "retailOwner"].includes(req.user?.role || "")) {
-        const hasAccess = await checkShopAccess(req.user!.id, existingConfirmation.shopId);
+        const hasAccess = await checkShopAccess(req.user!..id, existingConfirmation.shopId);
         if (!hasAccess) {
           return res.status(403).json({ message: "User does not have access to this shop" });
         }
@@ -797,7 +852,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // For roasteryOwner and roaster, show all discrepancies
-        console.log("Returning all discrepancies for roasteryOwner/roaster");
+        console.log("Returning all discrepancies forroasteryOwner/roaster");
         res.json(discrepancies);
       } catch (error){
         console.error("Error fetching inventory discrepancies:", error);
