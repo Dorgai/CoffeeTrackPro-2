@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Shop } from "@shared/schema";
 import {
@@ -10,15 +9,16 @@ import {
 } from "@/components/ui/select";
 import { Store } from "lucide-react";
 import { useActiveShop } from "@/hooks/use-active-shop";
+import React from 'react';
 
 export function ShopSelector() {
   const { activeShop, setActiveShop } = useActiveShop();
-  const { data: shops = [], isLoading } = useQuery<Shop[]>({
+  const { data: shops = [] } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
   });
 
   // Initialize shop selection if not already set
-  useEffect(() => {
+  React.useEffect(() => {
     if (shops.length > 0 && !activeShop) {
       setActiveShop(shops[0]);
     }
@@ -32,7 +32,7 @@ export function ShopSelector() {
     <div className="flex items-center gap-2">
       <Store className="h-4 w-4" />
       <Select
-        value={activeShop?.id?.toString() || ""}
+        value={activeShop?.id?.toString()}
         onValueChange={(value) => {
           const selectedShop = shops.find((s) => s.id === parseInt(value));
           if (selectedShop) {
@@ -41,7 +41,7 @@ export function ShopSelector() {
         }}
       >
         <SelectTrigger className="w-[200px]">
-          <SelectValue>
+          <SelectValue placeholder="Select a shop">
             {activeShop?.name || "Select a shop"}
           </SelectValue>
         </SelectTrigger>

@@ -1,7 +1,7 @@
 import * as React from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { Store, Coffee } from "lucide-react";
+import { Store, Coffee, Package } from "lucide-react";
 import {
   Menubar,
   MenubarContent,
@@ -18,6 +18,7 @@ import { ShopSelector } from "./shop-selector";
 
 export function NavBar() {
   const { user, logoutMutation } = useAuth();
+  const [, setLocation] = useLocation();
 
   // Role-based access control
   const isRetailUser = user?.role === "retailOwner" || user?.role === "shopManager" || user?.role === "barista";
@@ -26,8 +27,7 @@ export function NavBar() {
   const canManageUsers = user?.role === "roasteryOwner";
   const canAccessGreenCoffee = user?.role === "roasteryOwner" || user?.role === "roaster";
   const canAccessAnalytics = user?.role === "roasteryOwner" || user?.role === "retailOwner" || user?.role === "shopManager";
-  const canAccessFinance = user?.role === "roasteryOwner";
-  const canAccessRoasting = user?.role === "roaster";
+  const canAccessRoasting = user?.role === "roasteryOwner" || user?.role === "roaster";
   const canAccessRetail = user?.role === "roasteryOwner" || user?.role === "retailOwner" || user?.role === "shopManager" || user?.role === "barista";
 
   return (
@@ -35,14 +35,13 @@ export function NavBar() {
       <div className="flex h-16 items-center px-4">
         <div className="mr-4 flex">
           <Link href="/" className="flex items-center">
-            <img
-              src="/assets/logo.jpg"
-              alt="Sonic Beans Logo"
-              className="h-8 w-auto"
-            />
+            <Coffee className="h-6 w-6" />
           </Link>
         </div>
+
+        {/* Shop Selector */}
         {user && <ShopSelector />}
+
         <Menubar className="border-none">
           <MenubarMenu>
             <MenubarTrigger>Dashboard</MenubarTrigger>
@@ -73,18 +72,6 @@ export function NavBar() {
             </MenubarMenu>
           )}
 
-          {canAccessFinance && (
-            <MenubarMenu>
-              <MenubarTrigger>Finance</MenubarTrigger>
-              <MenubarContent>
-                <MenubarItem>
-                  <Link href="/billing" className="flex w-full">
-                    Billing Events
-                  </Link>
-                </MenubarItem>
-              </MenubarContent>
-            </MenubarMenu>
-          )}
 
           {canAccessGreenCoffee && (
             <MenubarMenu>
@@ -171,17 +158,7 @@ export function NavBar() {
         <div className="ml-auto flex items-center space-x-4">
           {user ? (
             <div className="flex items-center space-x-4">
-              {canAccessGreenCoffee && (
-                <>
-                  <GreenBeansStockIndicator />
-                  <Button variant="outline" size="sm" asChild>
-                    <Link href="/inventory" className="flex items-center">
-                      <Coffee className="h-4 w-4 mr-2" />
-                      Update Green Coffee
-                    </Link>
-                  </Button>
-                </>
-              )}
+              {canAccessGreenCoffee && <GreenBeansStockIndicator />}
               <Avatar>
                 <AvatarFallback>
                   {user.username.charAt(0).toUpperCase()}
