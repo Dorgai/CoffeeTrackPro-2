@@ -279,7 +279,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Green Coffee Routes - accessible by roastery owner and roaster
-  app.get("/api/green-coffee", requireRole(["owner", "roasteryOwner", "roaster", "shopManager", "barista"]), async (req, res) => {
+  app.get("/api/green-coffee", requireRole(["owner", "roasteryOwner", "roaster"]), async (req, res) => {
     try {
       console.log("Fetching green coffee list, requested by:", req.user?.username, "role:", req.user?.role);
       const coffees = await storage.getGreenCoffees();
@@ -365,7 +365,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // Get specific green coffee details
-  app.get("/api/green-coffee/:id", requireRole(["owner", "roasteryOwner", "roaster", "shopManager", "barista"]), async (req, res) => {
+  app.get("/api/green-coffee/:id", requireRole(["owner", "roasteryOwner", "roaster"]), async (req, res) => {
     try {
       const coffeeId = parseInt(req.params.id);
       if (isNaN(coffeeId)) {
@@ -434,13 +434,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // Retail Inventory Routes - accessible by shop manager and barista
-  app.get("/api/retail-inventory", requireRole(["owner", "roasteryOwner", "roaster", "shopManager", "barista"]), async (req, res) => {
+  app.get("/api/retail-inventory", requireRole(["owner", "roasteryOwner", "roaster", "shopManager", "barista", "retailOwner"]), async (req, res) => {
     try {
       let shopId = req.query.shopId ? Number(req.query.shopId) : undefined;
       console.log("Fetching retail inventory for user:", req.user?.username, "role:", req.user?.role, "shopId:", shopId);
 
       // For roasteryOwner, owner, and roaster, return all inventories if no shopId provided
-      if (req.user?.role === "roaster" || req.user?.role === "roasteryOwner" || req.user?.role === "owner") {
+      if (["roaster", "roasteryOwner", "owner", "retailOwner"].includes(req.user?.role || "")) {
         console.log("Fetching all retail inventories");
         const allInventory = await storage.getAllRetailInventories();
         console.log("Found inventories:", allInventory.length);
@@ -494,12 +494,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Add new endpoint for inventory history after the existing retail inventory routes
-  app.get("/api/retail-inventory/history", requireRole(["shopManager", "barista", "roasteryOwner"]), async (req, res) => {
+  app.get("/api/retail-inventory/history", requireRole(["shopManager", "barista", "roasteryOwner", "retailOwner"]), async (req, res) => {
     try {
       const shopId = req.query.shopId ? Number(req.query.shopId) : undefined;
 
       // For roastery owner and shop manager, return all history if no shopId specified
-      if ((req.user?.role === "roasteryOwner" || req.user?.role === "shopManager") && !shopId) {
+      if (["roasteryOwner", "shopManager", "retailOwner"].includes(req.user?.role || "") && !shopId) {
         const allHistory = await storage.getAllRetailInventoryHistory();
         return res.json(allHistory);
       }
@@ -523,15 +523,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Orders Routes - accessible by shop manager, barista, and roaster
-  app.get("/api/orders", requireRole(["owner", "roasteryOwner", "roaster", "shopManager", "barista"]), async (req, res) => {
+  // Orders Routes - accessible by retail owner
+  app.get("/api/orders", requireRole(["retailOwner", "owner", "roasteryOwner", "roaster", "shopManager", "barista"]), async (req, res) => {
     try {
       console.log("Fetching orders for user:", req.user?.username, "with role:", req.user?.role);
       const shopId = req.query.shopId ? Number(req.query.shopId) : undefined;
 
-      // For roaster, roasteryOwner, and owner return all orders
-      if (req.user?.role === "roaster" || req.user?.role === "roasteryOwner" || req.user?.role === "owner") {
-        console.log("Fetching all orders for roaster/roasteryOwner/owner");
+      // For retailOwner, roaster, roasteryOwner, and owner return all orders
+      if (["retailOwner", "roaster", "roasteryOwner", "owner"].includes(req.user?.role || "")) {
+        console.log("Fetching all orders for roaster/roasteryOwner/owner/retailOwner");
         const allOrders = await storage.getAllOrders();
         console.log("Found orders:", allOrders.length);
         return res.json(allOrders);
@@ -555,10 +555,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update order status - restrict shop manager from changing roasting-related statuses
+  // Update order status
   app.patch(
     "/api/orders/:id/status",
-    requireRole(["owner", "roasteryOwner", "roaster", "shopManager", "barista"]),
+    requireRole(["retailOwner", "owner", "roasteryOwner", "roaster", "shopManager", "barista"]),
     async (req, res) => {
       try {
         console.log("Order status update requested by:", req.user?.username, "with role:", req.user?.role);
@@ -572,8 +572,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(404).json({ message: "Order not found" });
         }
 
-        // Owner and roasteryOwner have full access to all status changes
-        if (req.user?.role === "owner" || req.user?.role === "roasteryOwner") {
+        // Owner, retailOwner and roasteryOwner have full access to all status changes
+        if (["owner", "retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {
           if (smallBags > order.smallBags || largeBags > order.largeBags) {
             return res.status(400).json({
               message: "Updated quantities cannot exceed original order quantities"
@@ -638,7 +638,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // Create new order
-  app.post("/api/orders", requireRole(["owner", "shopManager", "barista", "roasteryOwner"]), async (req, res) => {
+  app.post("/api/orders", requireRole(["owner", "shopManager", "barista", "roasteryOwner", "retailOwner"]), async (req, res) => {
     try {
       const { shopId } = req.body;
       if (!shopId) {
@@ -667,13 +667,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Dispatched Coffee Confirmation Routes
-  app.get("/api/dispatched-coffee/confirmations", requireRole(["shopManager", "barista", "roasteryOwner"]), async (req, res) => {
+  app.get("/api/dispatched-coffee/confirmations", requireRole(["shopManager", "barista", "roasteryOwner", "retailOwner"]), async (req, res) => {
     try {
       const { shopId } = req.query;
       console.log("Request for confirmations received with shopId:", shopId);
 
       // For roasteryOwner, allow fetching without shopId to see all confirmations
-      if (req.user?.role === "roasteryOwner" && !shopId) {
+      if (["roasteryOwner", "retailOwner"].includes(req.user?.role || "") && !shopId) {
         const allConfirmations = await storage.getAllDispatchedCoffeeConfirmations();
         console.log("Returning all confirmations for roasteryOwner:", allConfirmations);
         return res.json(allConfirmations);
@@ -684,7 +684,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // For non-roasteryOwner users, verify shop access
-      if (req.user?.role !== "roasteryOwner") {
+      if (!["roasteryOwner", "retailOwner"].includes(req.user?.role || "")) {
         const hasAccess = await checkShopAccess(req.user!.id, Number(shopId));
         if (!hasAccess) {
           return res.status(403).json({ message: "User does not have access to this shop" });
@@ -701,7 +701,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/dispatched-coffee/confirm", requireRole(["roasteryOwner", "shopManager", "barista"]), async (req, res) => {
+  app.post("/api/dispatched-coffee/confirm", requireRole(["roasteryOwner", "shopManager", "barista", "retailOwner"]), async (req, res) => {
     try {
       const { confirmationId, receivedSmallBags, receivedLargeBags } = req.body;
       console.log("Received confirmation request:", {
@@ -733,7 +733,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // For non-roasteryOwner users, verify shop access
-      if (req.user?.role !== "roasteryOwner") {
+      if (!["roasteryOwner", "retailOwner"].includes(req.user?.role || "")) {
         const hasAccess = await checkShopAccess(req.user!.id, existingConfirmation.shopId);
         if (!hasAccess) {
           return res.status(403).json({ message: "User does not have access to this shop" });
@@ -766,43 +766,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Inventory Discrepancies Routes
-  app.get("/api/inventory-discrepancies", requireRole(["roaster", "roasteryOwner", "shopManager"]), async (req, res) => {
-    try {
-      console.log("Fetching discrepancies for user:", req.user?.username, "with role:", req.user?.role);
-      const discrepancies = await storage.getInventoryDiscrepancies();
-      console.log("Found discrepancies:", discrepancies.length);
-      console.log("Sample discrepancy:", discrepancies[0]);
+  app.get("/api/inventory-discrepancies", 
+    requireRole(["retailOwner", "roaster", "roasteryOwner", "shopManager"]), 
+    async (req, res) => {
+      try {
+        console.log("Fetching discrepancies for user:", req.user?.username, "with role:", req.user?.role);
+        const discrepancies = await storage.getInventoryDiscrepancies();
+        console.log("Found discrepancies:", discrepancies.length);
 
-      // Filter discrepancies based on user role
-      if (req.user?.role === "shopManager") {
+        // For retailOwner, roasteryOwner and roaster, show all discrepancies
+        if (["retailOwner", "roasteryOwner", "roaster"].includes(req.user?.role || "")) {
+          console.log("Returning all discrepancies for retailOwner/roasteryOwner/roaster");
+          return res.json(discrepancies);
+        }
+
         // For shop managers, filter discrepancies to only show their shops
-        const userShops = await storage.getUserShops(req.user.id);
-        const shopIds = userShops.map(shop => shop.id);
-        console.log("Shop manager shops:", shopIds);
-        const filteredDiscrepancies = discrepancies.filter(
-          d => shopIds.includes(d.confirmation.shopId)
-        );
-        console.log("Filtered discrepancies for shop manager:", filteredDiscrepancies.length);
-        return res.json(filteredDiscrepancies);
-      } else if (req.user?.role === "roaster") {
-        // For roasters, show all discrepancies as they need to handle all roasting-related issues
-        console.log("Returning all discrepancies for roaster");
-        return res.json(discrepancies);
-      }
+        if (req.user?.role === "shopManager") {
+          const userShops = await storage.getUserShops(req.user.id);
+          const shopIds = userShops.map(shop => shop.id);
+          console.log("Shop manager shops:", shopIds);
+          const filteredDiscrepancies = discrepancies.filter(
+            d => shopIds.includes(d.confirmation.shopId)
+          );
+          console.log("Filtered discrepancies for shop manager:", filteredDiscrepancies.length);
+          return res.json(filteredDiscrepancies);
+        }
 
-      // For roasteryOwner, show all discrepancies (no filtering needed)
-      console.log("Returning all discrepancies for roasteryOwner");
-      res.json(discrepancies);
-    } catch (error) {
-      console.error("Error fetching inventory discrepancies:", error);      res.status(500).json({
-        message: "Failed to fetch discrepancies",
-        details: error instanceof Error ? error.message : undefined
-      });
-    }
+        res.json([]);
+      } catch (error) {
+        console.error("Error fetching inventory discrepancies:", error);
+        res.status(500).json({
+          message: "Failed to fetch discrepancies",
+          details: error instanceof Error ? error.message : undefined
+        });
+      }
+        }
   });
 
   //  // Add route for getting coffee-specific large bag targets
-  app.get("/api/shops/:id/coffee-targets", requireRole(["roasteryOwner", "shopManager"]), async(req, res) => {
+  app.get("/api/shops/:id/coffee-targets", requireRole(["roasteryOwner", "shopManager", "retailOwner"]), async(req, res) => {
     try {      const shopId = parseInt(req.params.id);
 
       if (!await checkShopAccess(req.user!.id, shopId)) {
@@ -816,7 +818,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch coffee targets" });
     }
   });  // Fixthe incorrect syntax in the coffee target update route
-  app.patch("/api/shops/:shopId/coffee/:coffeeId/target", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
+  app.patch("/api/shops/:shopId/coffee/:coffeeId/target", requireRole(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
     try {
       const shopId = parseInt(req.params.shopId);
       const coffeeId = parseInt(req.params.coffeeId);
@@ -828,7 +830,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // For non-roasteryOwner users, verify shop access
-      if (req.user?.role !== "roasteryOwner") {
+      if (!["roasteryOwner", "retailOwner"].includes(req.user?.role || "")) {
         const hasAccess = await checkShopAccess(req.user!.id, shopId);
         if (!hasAccess) {
           return res.status(403).json({ message: "User does not have access to this shop" });
@@ -850,7 +852,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   //  // Add new billing routes after theexisting ones
-  app.get("/api/billing/lastevent", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
+  app.get("/api/billing/lastevent", requireRole(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
     try {
       const lastEvent = await storage.getLastBillingEvent();
       res.json(lastEvent);
@@ -860,7 +862,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/billing/quantities", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
+  app.get("/api/billing/quantities", requireRole(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
     try {
       console.log("Fetching billing quantities...");
 
@@ -921,7 +923,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Add billing history route
-  app.get("/api/billing/history", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
+  app.get("/api/billing/history", requireRole(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
     try {
       console.log("Fetching billing history for user:", req.user?.username, "role:", req.user?.role);
       const history = await storage.getBillingHistory();
@@ -933,7 +935,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/billing/details/:eventId", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
+  app.get("/api/billing/details/:eventId", requireRole(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
     try {
       const eventId = parseInt(req.params.eventId);
       if (isNaN(eventId)) {
@@ -951,7 +953,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Add analytics routes for roastery owner
-  app.get("/api/analytics/inventory", requireRole(["roasteryOwner"]), async (req, res) => {
+  app.get("/api/analytics/inventory", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
     try {
       const fromDate = req.query.fromDate ? new Date(req.query.fromDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // Default to last 30 days
       const toDate = req.query.toDate ? new Date(req.query.toDate as string) : new Date();
@@ -968,7 +970,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/analytics/orders", requireRole(["roasteryOwner"]), async (req, res) => {
+  app.get("/api/analytics/orders", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
     try {
       const fromDate = req.query.fromDate ? new Date(req.query.fromDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const toDate = req.query.toDate ? new Date(req.query.toDate as string) : new Date();
@@ -985,7 +987,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/analytics/roasting", requireRole(["roasteryOwner"]), async (req, res) => {
+  app.get("/api/analytics/roasting", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
     try {
       const fromDate = req.query.fromDate ? new Date(req.query.fromDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const toDate = req.query.toDate ? new Date(req.query.toDate as string) : new Date();
@@ -1003,7 +1005,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Add reports routes for roastery owner
-  app.get("/api/reports/inventory-status", requireRole(["roasteryOwner"]), async (req, res) => {
+  app.get("/api/reports/inventory-status", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
     try {
       console.log("Generating inventory status report");
       const report = await storage.generateInventoryStatusReport();
@@ -1017,7 +1019,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/reports/shop-performance", requireRole(["roasteryOwner"]), async (req, res) => {
+  app.get("/api/reports/shop-performance", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
     try {
       console.log("Generating shop performance report");
       const report = await storage.generateShopPerformanceReport();
@@ -1031,7 +1033,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/reports/coffee-consumption", requireRole(["roasteryOwner"]), async (req, res) => {
+  app.get("/api/reports/coffee-consumption", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
     try {
       console.log("Generating coffee consumption report");
       const report = await storage.generateCoffeeConsumptionReport();
@@ -1046,7 +1048,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Reports and Analytics Routes
-  app.get("/api/reports/monthly", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
+  app.get("/api/reports/monthly", requireRole(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
     try {
       console.log("Fetching monthly reports for user:", req.user?.username, "role:", req.user?.role);
       const reports = await storage.getMonthlyReports();
@@ -1057,7 +1059,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/analytics/data", requireRole(["roasteryOwner", "shopManager"]), async (req, res) => {
+  app.get("/api/analytics/data", requireRole(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
     try {
       console.log("Fetching analytics data for user:", req.user?.username, "role:", req.user?.role);
       const data = await storage.getAnalyticsData();
