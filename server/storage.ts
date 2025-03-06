@@ -365,10 +365,17 @@ export class DatabaseStorage {
     try {
       console.log("Fetching all retail inventories");
       const query = sql`
-        SELECT ri.*, 
-               s.name as shop_name, 
-               s.location as shop_location,
-               gc.name as coffee_name
+        SELECT 
+          ri.id,
+          ri.shop_id as "shopId",
+          ri.green_coffee_id as "greenCoffeeId",
+          ri.small_bags as "smallBags",
+          ri.large_bags as "largeBags",
+          ri.created_at as "createdAt",
+          s.name as "shopName",
+          s.location as "shopLocation",
+          gc.name as "coffeeName",
+          gc.producer
         FROM retail_inventory ri
         LEFT JOIN shops s ON ri.shop_id = s.id
         LEFT JOIN green_coffee gc ON ri.green_coffee_id = gc.id
@@ -376,6 +383,9 @@ export class DatabaseStorage {
 
       const result = await db.execute(query);
       console.log("Found retail inventories:", result.rows.length);
+      if (result.rows.length > 0) {
+        console.log("Sample inventory:", result.rows[0]);
+      }
       return result.rows;
     } catch (error) {
       console.error("Error getting all retail inventories:", error);
@@ -453,8 +463,8 @@ export class DatabaseStorage {
           s.location as "shopLocation",
           gc.name as "coffeeName",
           gc.producer,
-          u1.username as "createdBy",
-          u2.username as "updatedBy"
+          u1.username as "created_by",
+          u2.username as "updated_by"
         FROM orders o
         LEFT JOIN shops s ON o.shop_id = s.id
         LEFT JOIN green_coffee gc ON o.green_coffee_id = gc.id
