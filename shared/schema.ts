@@ -89,7 +89,16 @@ export const insertRoastingBatchSchema = z.object({
 
 export const insertUserSchema = createInsertSchema(users);
 export const insertShopSchema = createInsertSchema(shops);
-export const insertGreenCoffeeSchema = createInsertSchema(greenCoffee);
+// Fix the green coffee insert schema to handle decimal fields
+export const insertGreenCoffeeSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  producer: z.string().min(1, "Producer is required"),
+  country: z.string().min(1, "Country is required"),
+  currentStock: z.string(),
+  minThreshold: z.string(),
+  grade: z.enum(coffeeGrades),
+  isActive: z.boolean().default(true)
+});
 export const insertRetailInventorySchema = createInsertSchema(retailInventory);
 export const insertOrderSchema = createInsertSchema(orders);
 export const insertUserShopSchema = createInsertSchema(userShops);
