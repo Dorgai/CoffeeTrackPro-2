@@ -397,7 +397,7 @@ export class DatabaseStorage {
   //Retail Inventory Methods
   async getAllRetailInventories(): Promise<any[]> {
     try {
-      console.log("Fetching all retail inventories");
+      console.log("Starting getAllRetailInventories");
 
       // First verify if shops exist
       const shopsCount = await db
@@ -417,8 +417,8 @@ export class DatabaseStorage {
           ri.id,
           ri.shop_id as "shopId",
           ri.green_coffee_id as "greenCoffeeId",
-          ri.small_bags::integer as "smallBags",
-          ri.large_bags::integer as "largeBags",
+          COALESCE(ri.small_bags, 0)::integer as "smallBags",
+          COALESCE(ri.large_bags, 0)::integer as "largeBags",
           ri.created_at as "createdAt",
           ri.updated_at as "updatedAt",
           ri.updated_by_id as "updatedById",
@@ -428,9 +428,9 @@ export class DatabaseStorage {
           gc.producer,
           u.username as "updatedBy",
           COALESCE(ri.updated_at, ri.created_at) as "lastUpdated"
-        FROM retail_inventory ri
-        LEFT JOIN shops s ON ri.shop_id = s.id
-        LEFT JOIN green_coffee gc ON ri.green_coffee_id = gc.id
+        FROM shops s
+        CROSS JOIN green_coffee gc
+        LEFT JOIN retail_inventory ri ON ri.shop_id = s.id AND ri.green_coffee_id = gc.id
         LEFT JOIN users u ON ri.updated_by_id = u.id
         WHERE s.is_active = true
         ORDER BY s.name, gc.name`;
@@ -438,69 +438,61 @@ export class DatabaseStorage {
       const result = await db.execute(query);
       console.log("Found retail inventories:", result.rows.length);
 
-      if (result.rows.length > 0) {
-        console.log("Sample inventory:", {
-          ...result.rows[0],
-          smallBags: Number(result.rows[0].smallBags),
-          largeBags: Number(result.rows[0].largeBags),
-          shopName: result.rows[0].shopName,
-          coffeeName: result.rows[0].coffeeName,
-          updatedBy: result.rows[0].updatedBy
-        });
-      } else {
-        console.log("No inventory records found");
-      }
-
-      return result.rows.map(row => ({
+      const inventories = result.rows.map(row => ({
         ...row,
-        smallBags: Number(row.smallBags),
-        largeBags: Number(row.largeBags)
+        smallBags: Number(row.smallBags || 0),
+        largeBags: Number(row.largeBags || 0)
       }));
+
+      console.log("Sample inventory entry:", inventories[0]);
+      return inventories;
     } catch (error) {
-      console.error("Error getting all retail inventories:", error);
+      console.error("Error in getAllRetailInventories:", error);
       throw error;
     }
   }
 
-  async getRetailInventoriesByShop(shopId: number): Promise<any[]> {
+  async updateRetailInventory(data: {
+    shopId: number;
+    greenCoffeeId: number;
+    smallBags: number;
+    largeBags: number;
+    updatedById: number;
+  }): Promise<any> {
     try {
-      console.log("Fetching retail inventories for shop:", shopId);
+      console.log("Updating retail inventory with data:", data);
+
       const query = sql`
-        SELECT 
-          ri.id,
-          ri.shop_id as "shopId",
-          ri.green_coffee_id as "greenCoffeeId",
-          ri.small_bags::integer as "smallBags",
-          ri.large_bags::integer as "largeBags",
-          ri.created_at as "createdAt",
-          ri.updated_at as "updatedAt",
-          ri.updated_by_id as "updatedById",
-          s.name as "shopName",
-          s.location as "shopLocation",
-          gc.name as "coffeeName",
-          gc.producer,
-          u.username as "updatedBy",
-          COALESCE(ri.updated_at, ri.created_at) as "lastUpdated"
-        FROM retail_inventory ri
-        LEFT JOIN shops s ON ri.shop_id = s.id
-        LEFT JOIN green_coffee gc ON ri.green_coffee_id = gc.id
-        LEFT JOIN users u ON ri.updated_by_id = u.id
-        WHERE ri.shop_id = ${shopId}
-        ORDER BY gc.name`;
+        INSERT INTO retail_inventory (
+          shop_id, 
+          green_coffee_id, 
+          small_bags, 
+          large_bags, 
+          updated_by_id,
+          updated_at
+        )
+        VALUES (
+          ${data.shopId}, 
+          ${data.greenCoffeeId}, 
+          ${data.smallBags}, 
+          ${data.largeBags}, 
+          ${data.updatedById},
+          NOW()
+        )
+        ON CONFLICT (shop_id, green_coffee_id) 
+        DO UPDATE SET 
+          small_bags = EXCLUDED.small_bags,
+          large_bags = EXCLUDED.large_bags,
+          updated_by_id = EXCLUDED.updated_by_id,
+          updated_at = NOW()
+        RETURNING *`;
 
       const result = await db.execute(query);
-      console.log("Found retail inventories for shop:", result.rows.length);
-      if (result.rows.length > 0) {
-        console.log("Sample inventory:", {
-          ...result.rows[0],
-          smallBags: Number(result.rows[0].smallBags),
-          largeBags: Number(result.rows[0].largeBags)
-        });
-      }
-      return result.rows;
+      console.log("Updated inventory:", result.rows[0]);
+      return result.rows[0];
     } catch (error) {
-      console.error("Error getting retail inventories for shop:", error);
-      return [];
+      console.error("Error updating retail inventory:", error);
+      throw error;
     }
   }
 
