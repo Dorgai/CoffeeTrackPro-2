@@ -467,7 +467,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/retail-inventory", requireRole(["shopManager", "barista"]), async (req, res) => {
+  app.post("/api/retail-inventory", requireRole(["shopManager", "barista", "retailOwner"]), async (req, res) => {
     try {
       const { shopId } = req.body;
       if (!shopId) {
