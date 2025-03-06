@@ -79,9 +79,9 @@ export const roastingBatches = pgTable("roasting_batches", {
 // Fix the roastingBatches insert schema
 export const insertRoastingBatchSchema = z.object({
   greenCoffeeId: z.number(),
-  plannedAmount: z.string(),
-  actualAmount: z.string().optional(),
-  roastingLoss: z.string().optional(),
+  plannedAmount: z.number().min(0, "Planned amount must be 0 or greater"),
+  actualAmount: z.number().optional(),
+  roastingLoss: z.number().optional(),
   smallBagsProduced: z.number(),
   largeBagsProduced: z.number(),
   status: z.enum(["planned", "in_progress", "completed"]).default("planned"),

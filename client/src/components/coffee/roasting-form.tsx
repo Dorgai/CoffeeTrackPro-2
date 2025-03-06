@@ -23,7 +23,7 @@ import { InfoIcon } from "lucide-react";
 
 interface FormValues {
   greenCoffeeId: number;
-  plannedAmount: string;
+  plannedAmount: number;
   smallBagsProduced: number;
   largeBagsProduced: number;
 }
@@ -40,7 +40,7 @@ export function RoastingForm({
     resolver: zodResolver(insertRoastingBatchSchema),
     defaultValues: {
       greenCoffeeId,
-      plannedAmount: "0",
+      plannedAmount: 0,
       smallBagsProduced: 0,
       largeBagsProduced: 0,
     },
@@ -57,9 +57,11 @@ export function RoastingForm({
 
   const createMutation = useMutation({
     mutationFn: async (data: FormValues) => {
+      // Convert numbers to strings for database storage
       const response = await apiRequest("POST", "/api/roasting-batches", {
         ...data,
         greenCoffeeId: Number(greenCoffeeId),
+        plannedAmount: String(data.plannedAmount),
         status: "planned"
       });
 
@@ -89,7 +91,7 @@ export function RoastingForm({
 
   const onSubmit = form.handleSubmit(async (data: FormValues) => {
     try {
-      if (coffee && Number(data.plannedAmount) > Number(coffee.currentStock)) {
+      if (coffee && data.plannedAmount > Number(coffee.currentStock)) {
         toast({
           title: "Insufficient Stock",
           description: "The planned amount exceeds the available stock.",
@@ -123,7 +125,7 @@ export function RoastingForm({
                       type="number"
                       step="0.01"
                       {...field}
-                      onChange={(e) => field.onChange(e.target.value)}
+                      onChange={(e) => field.onChange(Number(e.target.value))}
                       value={field.value}
                     />
                   </FormControl>
@@ -180,7 +182,7 @@ export function RoastingForm({
                 <InfoIcon className="h-4 w-4" />
                 <AlertDescription>
                   <div className="flex justify-between items-center">
-                    <span>Remaining Stock: {(Number(coffee.currentStock) - Number(form.getValues("plannedAmount"))).toFixed(2)} kg</span>
+                    <span>Remaining Stock: {(Number(coffee.currentStock) - form.getValues("plannedAmount")).toFixed(2)} kg</span>
                   </div>
                 </AlertDescription>
               </Alert>
