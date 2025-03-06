@@ -76,9 +76,9 @@ export const roastingBatches = pgTable("roasting_batches", {
 
 export const insertRoastingBatchSchema = z.object({
   greenCoffeeId: z.number(),
-  plannedAmount: z.number().min(0, "Planned amount must be 0 or greater"),
-  actualAmount: z.number().optional(),
-  roastingLoss: z.number().optional(),
+  plannedAmount: z.coerce.number().min(0, "Planned amount must be 0 or greater"),
+  actualAmount: z.coerce.number().optional(),
+  roastingLoss: z.coerce.number().optional(),
   smallBagsProduced: z.number(),
   largeBagsProduced: z.number(),
   status: z.enum(["planned", "in_progress", "completed"]).default("planned"),
@@ -90,8 +90,8 @@ export const insertGreenCoffeeSchema = z.object({
   name: z.string().min(1, "Name is required"),
   producer: z.string().min(1, "Producer is required"),
   country: z.string().min(1, "Country is required"),
-  currentStock: z.number().min(0, "Current stock must be 0 or greater"),
-  minThreshold: z.number().min(0, "Minimum threshold must be 0 or greater"),
+  currentStock: z.coerce.number().min(0, "Current stock must be 0 or greater"),
+  minThreshold: z.coerce.number().min(0, "Minimum threshold must be 0 or greater"),
   grade: z.enum(coffeeGrades),
   isActive: z.boolean().default(true)
 });

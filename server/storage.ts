@@ -257,24 +257,16 @@ export class DatabaseStorage {
   // Roasting batch methods
   async createRoastingBatch(data: InsertRoastingBatch): Promise<RoastingBatch> {
     try {
-      console.log("Storage: Creating roasting batch with data:", {
-        greenCoffeeId: data.greenCoffeeId,
-        plannedAmount: data.plannedAmount,
-        smallBagsProduced: data.smallBagsProduced,
-        largeBagsProduced: data.largeBagsProduced,
-        status: data.status
-      });
-
+      console.log("Storage: Creating roasting batch with data:", data);
       const [batch] = await db
         .insert(roastingBatches)
         .values({
           ...data,
-          plannedAmount: String(data.plannedAmount),
-          actualAmount: data.actualAmount ? String(data.actualAmount) : null,
-          roastingLoss: data.roastingLoss ? String(data.roastingLoss) : null,
+          plannedAmount: data.plannedAmount.toString(),
+          actualAmount: data.actualAmount?.toString() || null,
+          roastingLoss: data.roastingLoss?.toString() || null,
         })
         .returning();
-
       console.log("Storage: Created roasting batch:", batch);
       return batch;
     } catch (error) {
@@ -356,8 +348,8 @@ export class DatabaseStorage {
         .insert(greenCoffee)
         .values({
           ...data,
-          currentStock: String(data.currentStock),
-          minThreshold: String(data.minThreshold)
+          currentStock: data.currentStock.toString(),
+          minThreshold: data.minThreshold.toString()
         })
         .returning();
       console.log("Created green coffee:", coffee);
