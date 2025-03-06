@@ -522,9 +522,10 @@ export class DatabaseStorage {
 
   async updateOrderStatus(
     id: number,
-    data: { status: string; smallBags?: number; largeBags?: number; updatedById: number }
+    data: { status: "roasted" | "dispatched" | "delivered"; smallBags?: number; largeBags?: number; updatedById: number }
   ): Promise<Order> {
     try {
+      console.log("Updating order status:", id, "with data:", data);
       const [order] = await db
         .update(orders)
         .set(data)

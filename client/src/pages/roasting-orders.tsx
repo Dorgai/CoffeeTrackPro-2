@@ -93,7 +93,7 @@ type OrderWithDetails = {
 const updateOrderSchema = z.object({
   smallBags: z.coerce.number().min(0, "Small bags must be 0 or greater"),
   largeBags: z.coerce.number().min(0, "Large bags must be 0 or greater"),
-  status: z.enum(["roasted", "dispatched", "delivered"]),
+  status: z.enum(["roasted", "dispatched", "delivered"] as const),
 });
 
 type UpdateOrderValues = z.infer<typeof updateOrderSchema>;
@@ -307,9 +307,8 @@ export default function RoastingOrders() {
                   try {
                     await updateOrderMutation.mutateAsync({
                       orderId: selectedOrder.id,
-                      smallBags: Number(data.smallBags),
-                      largeBags: Number(data.largeBags),
-                      status: data.status,
+                      ...data,
+                      updatedById: user?.id || 0,
                     });
                   } catch (error) {
                     console.error("Failed to update order:", error);
@@ -326,7 +325,6 @@ export default function RoastingOrders() {
                             <Input
                               type="number"
                               min="0"
-                              max={selectedOrder.smallBags}
                               {...field}
                             />
                           </FormControl>
