@@ -60,6 +60,8 @@ export const orders = pgTable("orders", {
   largeBags: integer("large_bags").notNull().default(0),
   status: text("status", { enum: ["pending", "roasted", "dispatched", "delivered"] }).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
+  createdById: integer("created_by_id").references(() => users.id),
+  updatedById: integer("updated_by_id").references(() => users.id),
 });
 
 export const roastingBatches = pgTable("roasting_batches", {

@@ -447,19 +447,13 @@ export class DatabaseStorage {
           o.large_bags,
           o.status,
           o.created_at as "createdAt",
-          o.created_by_id,
-          o.updated_by_id,
           s.name as shop_name,
           s.location as shop_location,
           gc.name as coffee_name,
-          gc.producer,
-          u1.username as created_by,
-          u2.username as updated_by
+          gc.producer
         FROM orders o
         LEFT JOIN shops s ON o.shop_id = s.id
         LEFT JOIN green_coffee gc ON o.green_coffee_id = gc.id
-        LEFT JOIN users u1 ON o.created_by_id = u1.id
-        LEFT JOIN users u2 ON o.updated_by_id = u2.id
         ORDER BY o.created_at DESC`;
 
       const result = await db.execute(query);
