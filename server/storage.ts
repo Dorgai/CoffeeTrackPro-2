@@ -71,6 +71,59 @@ export class DatabaseStorage {
     }
   }
 
+  async getShops(): Promise<Shop[]> {
+    try {
+      return await db
+        .select()
+        .from(shops)
+        .orderBy(shops.name);
+    } catch (error) {
+      console.error("Error getting shops:", error);
+      return [];
+    }
+  }
+
+  async createShop(shop: InsertShop): Promise<Shop> {
+    try {
+      const [newShop] = await db
+        .insert(shops)
+        .values(shop)
+        .returning();
+      return newShop;
+    } catch (error) {
+      console.error("Error creating shop:", error);
+      throw error;
+    }
+  }
+
+  async updateShop(id: number, data: Partial<InsertShop>): Promise<Shop> {
+    try {
+      const [updatedShop] = await db
+        .update(shops)
+        .set(data)
+        .where(eq(shops.id, id))
+        .returning();
+      return updatedShop;
+    } catch (error) {
+      console.error("Error updating shop:", error);
+      throw error;
+    }
+  }
+
+  async deleteShop(id: number): Promise<Shop> {
+    try {
+      const [deletedShop] = await db
+        .update(shops)
+        .set({ isActive: false })
+        .where(eq(shops.id, id))
+        .returning();
+      return deletedShop;
+    } catch (error) {
+      console.error("Error deleting shop:", error);
+      throw error;
+    }
+  }
+
   async getUserShops(userId: number): Promise<Shop[]> {
     try {
       return await db

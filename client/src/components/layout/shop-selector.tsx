@@ -58,7 +58,7 @@ export function ShopSelector() {
     <div className="flex items-center gap-2">
       <Store className="h-4 w-4" />
       <Select
-        value={activeShop?.id?.toString() || shops[0]?.id?.toString()}
+        value={activeShop?.id?.toString() || ""}
         onValueChange={(value) => {
           const selectedShop = shops.find((s) => s.id === parseInt(value));
           if (selectedShop) {
@@ -68,7 +68,7 @@ export function ShopSelector() {
       >
         <SelectTrigger className="w-[200px]">
           <SelectValue>
-            {activeShop?.name || shops[0]?.name || "Select a shop"}
+            {activeShop?.name || "Select a shop"}
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
