@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Store, Loader2 } from "lucide-react";
+import { Store, Loader2, AlertCircle } from "lucide-react";
 import { useActiveShop } from "@/hooks/use-active-shop";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -46,28 +46,6 @@ export function ShopSelector() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="flex items-center gap-2">
-        <Store className="h-4 w-4" />
-        <div className="flex items-center gap-2 min-w-[200px] h-9 px-3 rounded-md border">
-          <span className="text-sm text-destructive">Error loading shops</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (!shops.length) {
-    return (
-      <div className="flex items-center gap-2">
-        <Store className="h-4 w-4" />
-        <div className="flex items-center gap-2 min-w-[200px] h-9 px-3 rounded-md border">
-          <span className="text-sm text-muted-foreground">No shops available</span>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex items-center gap-2">
       <Store className="h-4 w-4" />
@@ -80,13 +58,20 @@ export function ShopSelector() {
           }
         }}
       >
-        <SelectTrigger className="w-[200px]">
-          <SelectValue placeholder="Select a shop">
-            {activeShop?.name || "Select a shop"}
+        <SelectTrigger className={`w-[200px] ${error ? 'border-destructive' : ''}`}>
+          <SelectValue>
+            {error ? (
+              <div className="flex items-center gap-2 text-destructive">
+                <AlertCircle className="h-4 w-4" />
+                <span>Error loading shops</span>
+              </div>
+            ) : (
+              activeShop?.name || "Select a shop"
+            )}
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
-          {shops.map((shop) => (
+          {!error && shops.map((shop) => (
             <SelectItem key={shop.id} value={shop.id.toString()}>
               {shop.name}
             </SelectItem>
