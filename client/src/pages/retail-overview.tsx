@@ -23,42 +23,32 @@ import {
 } from "@/components/ui/table";
 import { formatDate } from "@/lib/utils";
 
-type AllInventoryItem = {
-  id: number;
+type InventoryItem = {
+  id: number | null;
   shopId: number;
-  greenCoffeeId: number;
+  shopName: string;
+  shopLocation: string;
+  coffeeId: number;
+  coffeeName: string;
+  producer: string;
+  grade: string;
   smallBags: number;
   largeBags: number;
-  updatedAt: string;
-  shop: Shop;
-  greenCoffee: {
-    name: string;
-    producer: string;
-  };
-  updatedBy: {
-    username: string;
-  };
-  coffeeName?: string; //Added to match edited code's assumption.
-  producer?: string; //Added to match edited code's assumption.
-  updatedByUsername?: string; //Added to match edited code's assumption.
-
+  updatedAt: string | null;
+  updatedById: number | null;
+  updatedByUsername: string | null;
 };
 
-type AllOrderItem = {
+type OrderItem = {
   id: number;
   shopId: number;
-  greenCoffeeId: number;
+  coffeeId: number;
+  coffeeName: string;
   smallBags: number;
   largeBags: number;
   status: string;
   createdAt: string;
-  shop: Shop;
-  greenCoffee: {
-    name: string;
-  };
-  user: {
-    username: string;
-  };
+  createdBy: string;
 };
 
 export default function RetailOverview() {
@@ -70,7 +60,7 @@ export default function RetailOverview() {
     enabled: user?.role !== "roasteryOwner", // Only fetch for non-roasteryOwner users
   });
 
-  const { data: allInventory, isLoading: loadingInventory } = useQuery({
+  const { data: inventory, isLoading: loadingInventory } = useQuery<InventoryItem[]>({
     queryKey: ["/api/retail-inventory"],
     queryFn: async () => {
       console.log("Fetching retail inventory...");
@@ -84,7 +74,7 @@ export default function RetailOverview() {
     },
   });
 
-  const { data: allOrders, isLoading: loadingOrders } = useQuery({
+  const { data: orders, isLoading: loadingOrders } = useQuery<OrderItem[]>({
     queryKey: ["/api/orders"],
   });
 
@@ -96,7 +86,7 @@ export default function RetailOverview() {
     );
   }
 
-  if (!allInventory) {
+  if (!inventory) {
     return (
       <div className="container mx-auto py-8">
         <h1 className="text-3xl font-bold tracking-tight">Retail Overview</h1>
@@ -105,14 +95,14 @@ export default function RetailOverview() {
     );
   }
 
-  // Group inventory and orders by shop
-  const shopData = allInventory.reduce((acc, item) => {
-    if (!item || !item.shopId) {
-      console.log("Skipping invalid inventory item:", item);
-      return acc;
-    }
-
-    const shopId = item.shopId;
+  // Group inventory by shop
+  const shopData = inventory.reduce<Record<number, {
+    shopName: string;
+    shopLocation: string;
+    inventory: InventoryItem[];
+    orders: OrderItem[];
+  }>>((acc, item) => {
+    const { shopId, shopName, shopLocation } = item;
 
     // Only include shops that the user has access to
     if (user?.role !== "roasteryOwner" && !userShops?.some(s => s.id === shopId)) {
@@ -121,7 +111,8 @@ export default function RetailOverview() {
 
     if (!acc[shopId]) {
       acc[shopId] = {
-        shop: item.shop,
+        shopName,
+        shopLocation,
         inventory: [],
         orders: []
       };
@@ -129,17 +120,15 @@ export default function RetailOverview() {
 
     acc[shopId].inventory.push(item);
     return acc;
-  }, {} as Record<number, { shop: Shop; inventory: typeof allInventory; orders: typeof allOrders }>);
+  }, {});
 
   // Add orders to the grouped data
-  allOrders?.forEach(order => {
+  orders?.forEach(order => {
     const shopId = order.shopId;
     if (shopData[shopId]) {
       shopData[shopId].orders.push(order);
     }
   });
-
-  const hasShopData = Object.keys(shopData).length > 0;
 
   return (
     <div className="container mx-auto py-8 space-y-8">
@@ -156,22 +145,15 @@ export default function RetailOverview() {
 
       {user?.role === "roasteryOwner" && <InventoryDiscrepancyView />}
 
-      {!hasShopData && (
+      {Object.entries(shopData).length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
           No shop data available
         </div>
-      )}
-
-      {Object.entries(shopData).map(([shopId, data]) => {
-        if (!data.shop) {
-          console.log("Skipping shop without data:", shopId);
-          return null;
-        }
-
-        return (
+      ) : (
+        Object.entries(shopData).map(([shopId, data]) => (
           <div key={shopId} className="space-y-6 pb-8 border-b last:border-0">
-            <h2 className="text-2xl font-semibold">{data.shop.name}</h2>
-            <p className="text-muted-foreground">{data.shop.location}</p>
+            <h2 className="text-2xl font-semibold">{data.shopName}</h2>
+            <p className="text-muted-foreground">{data.shopLocation}</p>
 
             {["owner", "roasteryOwner", "shopManager", "barista"].includes(user?.role || "") && (
               <DispatchedCoffeeConfirmation shopId={parseInt(shopId)} />
@@ -191,6 +173,7 @@ export default function RetailOverview() {
                     <TableRow>
                       <TableHead>Coffee</TableHead>
                       <TableHead>Producer</TableHead>
+                      <TableHead>Grade</TableHead>
                       <TableHead>Small Bags (200g)</TableHead>
                       <TableHead>Large Bags (1kg)</TableHead>
                       <TableHead>Last Updated</TableHead>
@@ -199,18 +182,19 @@ export default function RetailOverview() {
                   </TableHeader>
                   <TableBody>
                     {data.inventory.map((item) => (
-                      <TableRow key={`${item.shopId}-${item.greenCoffeeId}`}>
-                        <TableCell className="font-medium">{item.greenCoffee?.name || item.coffeeName || '-'}</TableCell>
-                        <TableCell>{item.greenCoffee?.producer || item.producer || '-'}</TableCell>
-                        <TableCell>{item.smallBags || 0}</TableCell>
-                        <TableCell>{item.largeBags || 0}</TableCell>
+                      <TableRow key={`${item.shopId}-${item.coffeeId}`}>
+                        <TableCell className="font-medium">{item.coffeeName}</TableCell>
+                        <TableCell>{item.producer}</TableCell>
+                        <TableCell>{item.grade}</TableCell>
+                        <TableCell>{item.smallBags}</TableCell>
+                        <TableCell>{item.largeBags}</TableCell>
                         <TableCell>{item.updatedAt ? formatDate(item.updatedAt) : 'Never'}</TableCell>
-                        <TableCell>{item.updatedBy?.username || item.updatedByUsername || '-'}</TableCell>
+                        <TableCell>{item.updatedByUsername || '-'}</TableCell>
                       </TableRow>
                     ))}
                     {data.inventory.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center text-muted-foreground">
+                        <TableCell colSpan={7} className="text-center text-muted-foreground">
                           No inventory items found
                         </TableCell>
                       </TableRow>
@@ -236,18 +220,18 @@ export default function RetailOverview() {
                       <TableHead>Small Bags</TableHead>
                       <TableHead>Large Bags</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Ordered By</TableHead>
+                      <TableHead>Created By</TableHead>
                       <TableHead>Order Date</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {data.orders.map((order) => (
                       <TableRow key={order.id}>
-                        <TableCell className="font-medium">{order.greenCoffee?.name || '-'}</TableCell>
+                        <TableCell className="font-medium">{order.coffeeName}</TableCell>
                         <TableCell>{order.smallBags}</TableCell>
                         <TableCell>{order.largeBags}</TableCell>
                         <TableCell className="capitalize">{order.status}</TableCell>
-                        <TableCell>{order.user?.username || '-'}</TableCell>
+                        <TableCell>{order.createdBy}</TableCell>
                         <TableCell>{formatDate(order.createdAt)}</TableCell>
                       </TableRow>
                     ))}
@@ -263,8 +247,8 @@ export default function RetailOverview() {
               </CardContent>
             </Card>
           </div>
-        );
-      })}
+        ))
+      )}
     </div>
   );
 }

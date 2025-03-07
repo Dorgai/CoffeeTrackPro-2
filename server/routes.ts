@@ -578,15 +578,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Ensure all required fields are present
         const mappedResults = filteredInventory.map(item => ({
+          id: item.id,
           shopId: item.shopId,
-          greenCoffeeId: item.greenCoffeeId,
+          shopName: item.shopName,
+          shopLocation: item.shopLocation,
+          coffeeId: item.coffeeId,
           coffeeName: item.coffeeName,
           producer: item.producer,
           grade: item.grade,
           smallBags: parseInt(item.smallBags) || 0,
           largeBags: parseInt(item.largeBags) || 0,
           updatedAt: item.updatedAt,
-          updatedBy: item.updatedBy
+          updatedById: item.updatedById,
+          updatedByUsername: item.updatedByUsername
         }));
 
         console.log("Mapped inventory data:", mappedResults);
@@ -725,15 +729,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Ensure all required fields are present
         const mappedResults = filteredInventory.map(item => ({
+          id: item.id,
           shopId: item.shopId,
-          greenCoffeeId: item.greenCoffeeId,
+          shopName: item.shopName,
+          shopLocation: item.shopLocation,
+          coffeeId: item.coffeeId,
           coffeeName: item.coffeeName,
           producer: item.producer,
           grade: item.grade,
           smallBags: parseInt(item.smallBags) || 0,
           largeBags: parseInt(item.largeBags) || 0,
           updatedAt: item.updatedAt,
-          updatedBy: item.updatedBy
+          updatedById: item.updatedById,
+          updatedByUsername: item.updatedByUsername
         }));
 
         console.log("Mapped inventory data:", mappedResults);
@@ -829,7 +837,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(404).json({ message: "Order not found" });
         }
 
-        //        // Owner, retailOwner and roasteryOwner have full access to all status changes
+        //        // Owner, retailOwner and roasteryOwner have full access to allstatus changes
         if (["owner", "retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {
           if (smallBags > order.smallBags || largeBags > order.largeBags) {
             return res.status(400).json({
