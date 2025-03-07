@@ -550,33 +550,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req, res) => {
       try {
         const shopId = req.query.shopId ? Number(req.query.shopId) : undefined;
-        console.log("Fetching retail inventory for user:", req.user?.username, "role:", req.user?.role, "shopId:", shopId);
+        console.log("Fetching retail inventory for user:", {
+          userId: req.user?.id,
+          username: req.user?.username,
+          role: req.user?.role,
+          requestedShopId: shopId
+        });
 
         // For shopManager and barista, require shopId
         if (["shopManager", "barista"].includes(req.user?.role || "") && !shopId) {
+          console.log("Shop ID required for role:", req.user?.role);
           return res.status(400).json({ message: "Shop ID is required" });
         }
 
-        // If shopId provided, verify access
-        if (shopId && !["roasteryOwner", "retailOwner", "owner", "roaster"].includes(req.user?.role || "")) {
-          const hasAccess = await checkShopAccess(req.user!.id, shopId);
-          if (!hasAccess) {
-            return res.status(403).json({ message: "No access to this shop" });
-          }
-        }
-
+        // Get all inventory data
+        console.log("Fetching all retail inventories");
         const inventory = await storage.getAllRetailInventories();
+        console.log("Total inventory items fetched:", inventory.length);
 
         // Filter by shop if shopId is provided
         const filteredInventory = shopId 
           ? inventory.filter(item => item.shopId === shopId)
           : inventory;
 
-        console.log("Found inventory items:", filteredInventory.length);
+        console.log("Filtered inventory items:", {
+          total: inventory.length,
+          filtered: filteredInventory.length,
+          shopId
+        });
+
         res.json(filteredInventory);
       } catch (error) {
         console.error("Error fetching retail inventory:", error);
-        res.status(500).json({ message: "Failed to fetch inventory" });
+        res.status(500).json({ 
+          message: "Failed to fetch inventory",
+          details: error instanceof Error ? error.message : "Unknown error"
+        });
       }
     });
 

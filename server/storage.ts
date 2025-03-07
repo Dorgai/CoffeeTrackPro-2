@@ -397,7 +397,7 @@ export class DatabaseStorage {
   //Retail Inventory Methods
   async getAllRetailInventories(): Promise<any[]> {
     try {
-      console.log("Starting getAllRetailInventories");
+      console.log("Starting getAllRetailInventories with enhanced logging");
 
       const query = sql`
         WITH shop_inventory AS (
@@ -409,8 +409,8 @@ export class DatabaseStorage {
             gc.name as coffee_name,
             gc.producer,
             gc.grade,
-            COALESCE(ri.small_bags, 0) as small_bags,
-            COALESCE(ri.large_bags, 0) as large_bags,
+            COALESCE(ri.small_bags, 0)::integer as small_bags,
+            COALESCE(ri.large_bags, 0)::integer as large_bags,
             ri.updated_at,
             ri.updated_by_id,
             u.username as updated_by
@@ -427,7 +427,7 @@ export class DatabaseStorage {
           shop_location as "shopLocation",
           coffee_name as "coffeeName",
           producer,
-          grade as "grade",
+          grade,
           small_bags as "smallBags",
           large_bags as "largeBags",
           updated_at as "updatedAt",
@@ -436,21 +436,25 @@ export class DatabaseStorage {
         FROM shop_inventory
         ORDER BY shop_name, coffee_name`;
 
+      console.log("Executing inventory query...");
       const result = await db.execute(query);
-      console.log("Found inventories:", result.rows.length);
+      console.log("Raw query result count:", result.rows.length);
 
       if (result.rows.length > 0) {
         console.log("Sample inventory entry:", result.rows[0]);
       }
 
-      return result.rows.map(row => ({
+      const mappedResults = result.rows.map(row => ({
         ...row,
-        smallBags: Number(row.smallBags || 0),
-        largeBags: Number(row.largeBags || 0)
+        smallBags: parseInt(row.smallBags) || 0,
+        largeBags: parseInt(row.largeBags) || 0
       }));
+
+      console.log("Mapped results count:", mappedResults.length);
+      return mappedResults;
     } catch (error) {
       console.error("Error in getAllRetailInventories:", error);
-      return [];
+      throw error;
     }
   }
 
