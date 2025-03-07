@@ -8,6 +8,14 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Coffee, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface InventoryItem extends RetailInventory {
   coffeeName: string;
@@ -70,7 +78,7 @@ export function RetailInventoryList({ shopId }: { shopId?: number }) {
   }
 
   return (
-    <Card className="h-[500px]">
+    <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Coffee className="h-5 w-5" />
@@ -78,42 +86,52 @@ export function RetailInventoryList({ shopId }: { shopId?: number }) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[400px] pr-4">
-          <div className="space-y-4">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Coffee</TableHead>
+              <TableHead>Producer</TableHead>
+              <TableHead>Grade</TableHead>
+              <TableHead>Small Bags (200g)</TableHead>
+              <TableHead>Large Bags (1kg)</TableHead>
+              <TableHead>Last Updated</TableHead>
+              <TableHead>Updated By</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {inventory?.map((item) => (
-              <div key={`${item.shopId}-${item.greenCoffeeId}`} className="flex justify-between items-center p-2 rounded-lg border">
-                <div>
-                  <div className="font-medium">{item.coffeeName}</div>
-                  <div className="text-sm text-muted-foreground">{item.producer}</div>
-                  <Badge variant="outline" className="mt-1">{item.grade}</Badge>
-                  <div className="text-sm text-muted-foreground mt-1">
-                    Last Updated: {item.updatedAt ? new Date(item.updatedAt).toLocaleString() : 'Never'}
-                    {item.updatedBy && ` by ${item.updatedBy}`}
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <div className="flex items-center gap-2">
-                      <Package className="h-4 w-4" />
-                      <span>{item.smallBags || 0} × 200g</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Package className="h-4 w-4" />
-                      <span>{item.largeBags || 0} × 1kg</span>
-                    </div>
-                  </div>
+              <TableRow key={`${item.shopId}-${item.greenCoffeeId}`}>
+                <TableCell>{item.coffeeName}</TableCell>
+                <TableCell>{item.producer}</TableCell>
+                <TableCell>
+                  <Badge variant="outline">{item.grade}</Badge>
+                </TableCell>
+                <TableCell>{item.smallBags || 0} × 200g</TableCell>
+                <TableCell>{item.largeBags || 0} × 1kg</TableCell>
+                <TableCell>
+                  {item.updatedAt ? new Date(item.updatedAt).toLocaleString() : 'Never'}
+                </TableCell>
+                <TableCell>{item.updatedBy || '-'}</TableCell>
+                <TableCell>
                   <Button 
                     variant="outline" 
                     onClick={() => handleRestock(item.greenCoffeeId)}
-                    className="ml-4"
                   >
                     Restock
                   </Button>
-                </div>
-              </div>
+                </TableCell>
+              </TableRow>
             ))}
-          </div>
-        </ScrollArea>
+            {(!inventory || inventory.length === 0) && (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center text-muted-foreground">
+                  No inventory items found
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
       </CardContent>
     </Card>
   );
