@@ -12,7 +12,9 @@ export default function RetailNewArrivals() {
   const { user } = useAuth();
   const { activeShop } = useActiveShop();
 
-  // Get the active shop
+  // Check if user has admin privileges
+  const isAdminRole = user && ["roasteryOwner", "retailOwner", "owner"].includes(user.role);
+
   const { data: userShops, isLoading: isLoadingShops } = useQuery({
     queryKey: ["/api/user/shops"],
     enabled: !!user
@@ -32,7 +34,7 @@ export default function RetailNewArrivals() {
         <ShopSelector />
       </div>
 
-      {!activeShop ? (
+      {!activeShop && !isAdminRole ? (
         <Alert>
           <AlertDescription>
             Please select a shop to view new arrivals.
@@ -48,11 +50,11 @@ export default function RetailNewArrivals() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <DispatchedCoffeeConfirmation shopId={activeShop.id} />
+              <DispatchedCoffeeConfirmation shopId={isAdminRole ? undefined : activeShop?.id} />
             </CardContent>
           </Card>
 
-          <InventoryDiscrepancyView />
+          {isAdminRole && <InventoryDiscrepancyView />}
         </div>
       )}
     </div>
