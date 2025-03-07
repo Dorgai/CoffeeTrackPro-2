@@ -39,8 +39,8 @@ function requireShopAccess(allowedRoles: string[]) {
       allowedRoles
     });
 
-    // Allow full access for roasteryOwner, owner, and retailOwner
-    if (["roasteryOwner", "owner", "retailOwner"].includes(req.user.role)) {
+    // Always allow access for owner, roasteryOwner, and retailOwner
+    if (["owner", "roasteryOwner", "retailOwner"].includes(req.user.role)) {
       console.log("Full access granted for admin role:", req.user.role);
       return next();
     }
@@ -66,7 +66,8 @@ function requireShopAccess(allowedRoles: string[]) {
   };
 }
 
-async function checkShopAccess(userId: number, shopId: number) {
+// Update checkShopAccess function
+async function checkShopAccess(userId: number, shopId: number): Promise<boolean> {
   try {
     const user = await storage.getUser(userId);
 
