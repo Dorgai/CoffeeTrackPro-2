@@ -57,14 +57,19 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
         ? `/api/dispatched-coffee/confirmations?shopId=${shopId}`
         : "/api/dispatched-coffee/confirmations";
 
+      console.log("Fetching confirmations from:", url);
       const res = await apiRequest("GET", url);
+
       if (!res.ok) {
-        throw new Error(await res.text());
+        const error = await res.json().catch(() => ({ message: "Failed to fetch confirmations" }));
+        throw new Error(error.message);
       }
+
       const data = await res.json();
+      console.log("Fetched confirmations:", data);
       return data.filter(conf => conf.status === "pending");
     },
-    enabled: Boolean(user),
+    enabled: Boolean(user)
   });
 
   const confirmMutation = useMutation({
@@ -73,7 +78,8 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
       receivedSmallBags: number;
       receivedLargeBags: number;
     }) => {
-      console.log("Sending confirmation request:", data);
+      console.log("Attempting to confirm dispatch with data:", data);
+
       const res = await apiRequest(
         "POST",
         `/api/dispatched-coffee/confirmations/${data.confirmationId}/confirm`,
@@ -84,14 +90,18 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
       );
 
       if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText);
+        const error = await res.json().catch(() => ({ message: "Failed to process confirmation" }));
+        console.error("Confirmation error response:", error);
+        throw new Error(error.message);
       }
 
-      return res.json();
+      const confirmation = await res.json();
+      console.log("Received confirmation response:", confirmation);
+      return confirmation;
     },
     onSuccess: () => {
       setSelectedConfirmation(null);
+      setReceivedQuantities({ smallBags: 0, largeBags: 0 });
       queryClient.invalidateQueries({ queryKey: ["/api/dispatched-coffee/confirmations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory"] });
       toast({
@@ -132,12 +142,25 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
   }
 
   const handleConfirm = () => {
-    if (!selectedConfirmation) return;
+    if (!selectedConfirmation) {
+      console.error("No confirmation selected");
+      return;
+    }
 
+    console.log("Processing confirmation for:", selectedConfirmation.id);
     confirmMutation.mutate({
       confirmationId: selectedConfirmation.id,
-      receivedSmallBags: Number(receivedQuantities.smallBags),
-      receivedLargeBags: Number(receivedQuantities.largeBags),
+      receivedSmallBags: receivedQuantities.smallBags,
+      receivedLargeBags: receivedQuantities.largeBags
+    });
+  };
+
+  const handleConfirmClick = (confirmation: DispatchConfirmation) => {
+    console.log("Selected confirmation:", confirmation);
+    setSelectedConfirmation(confirmation);
+    setReceivedQuantities({
+      smallBags: confirmation.dispatchedSmallBags,
+      largeBags: confirmation.dispatchedLargeBags
     });
   };
 
@@ -169,13 +192,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
               </div>
               <Button
                 variant="outline"
-                onClick={() => {
-                  setSelectedConfirmation(confirmation);
-                  setReceivedQuantities({
-                    smallBags: confirmation.dispatchedSmallBags,
-                    largeBags: confirmation.dispatchedLargeBags,
-                  });
-                }}
+                onClick={() => handleConfirmClick(confirmation)}
               >
                 Confirm Receipt
               </Button>
@@ -186,7 +203,10 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
         <Dialog
           open={!!selectedConfirmation}
           onOpenChange={(open) => {
-            if (!open) setSelectedConfirmation(null);
+            if (!open) {
+              setSelectedConfirmation(null);
+              setReceivedQuantities({ smallBags: 0, largeBags: 0 });
+            }
           }}
         >
           <DialogContent>
@@ -206,7 +226,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
                   value={receivedQuantities.smallBags}
                   onChange={(e) => setReceivedQuantities(prev => ({
                     ...prev,
-                    smallBags: parseInt(e.target.value) || 0
+                    smallBags: Number(e.target.value) || 0
                   }))}
                 />
               </div>
@@ -219,7 +239,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
                   value={receivedQuantities.largeBags}
                   onChange={(e) => setReceivedQuantities(prev => ({
                     ...prev,
-                    largeBags: parseInt(e.target.value) || 0
+                    largeBags: Number(e.target.value) || 0
                   }))}
                 />
               </div>
@@ -238,7 +258,13 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setSelectedConfirmation(null)}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSelectedConfirmation(null);
+                  setReceivedQuantities({ smallBags: 0, largeBags: 0 });
+                }}
+              >
                 Cancel
               </Button>
               <Button

@@ -5,6 +5,7 @@ import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { insertGreenCoffeeSchema, insertRoastingBatchSchema, insertOrderSchema, insertShopSchema } from "@shared/schema";
 import { insertRetailInventorySchema } from "@shared/schema";
+import { WebSocketServer } from 'ws'; // Added WebSocketServer import
 
 function requireRole(roles: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -826,7 +827,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const orders = await storage.getOrdersByShop(shopId);
       return res.json(orders);
-    } catch (error) {
+    } catch ({
       console.error("Error fetching orders:", error);
       res.status(500).json({ message:"Failed to fetch orders" });
     }
