@@ -832,7 +832,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           largeBags
         });
 
-        const order = await storage.getOrder(orderId);
+        const order= await storage.getOrder(orderId);
         if (!order) {
           return res.status(404).json({ message: "Order not found" });
         }
@@ -931,53 +931,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/dispatched-coffee/confirmations", async (req, res) => {
     try {
       if (!req.user) {
-        return res.status(401).json({ message: "Unauthorized - Please log in" });
+        return res.status(401).json({ message: "Please log in" });
       }
 
-      const { shopId } = req.query;
-      console.log("Confirmations request:", {
+      console.log("Dispatched coffee request:", {
         user: req.user.username,
         role: req.user.role,
-        shopId
+        query: req.query
       });
 
-      // Admin roles can access all confirmations
+      // For owner, roasteryOwner, retailOwner - return all data
       if (["owner", "roasteryOwner", "retailOwner"].includes(req.user.role)) {
-        const confirmations = await storage.getAllDispatchedCoffeeConfirmations();
-        return res.json(confirmations);
+        const data = await storage.getAllDispatchedCoffeeConfirmations();
+        return res.json(data);
       }
 
-      // Non-admin roles need shopId
+      // For others, require shopId
+      const shopId = req.query.shopId ? Number(req.query.shopId) : null;
       if (!shopId) {
-        return res.status(400).json({ message: "Shop ID is required" });
+        return res.status(400).json({ message: "Shop ID required" });
       }
 
-      const confirmations = await storage.getDispatchedCoffeeConfirmations(Number(shopId));
-      res.json(confirmations);
+      const data = await storage.getDispatchedCoffeeConfirmations(shopId);
+      res.json(data);
     } catch (error) {
       console.error("Error fetching confirmations:", error);
       res.status(500).json({ message: "Failed to fetch confirmations" });
     }
   });
 
+  // Simplify the confirmation endpoint
   app.post("/api/dispatched-coffee/confirm", async (req, res) => {
     try {
       if (!req.user) {
-        return res.status(401).json({ message: "Unauthorized - Please log in" });
+        return res.status(401).json({ message: "Please log in" });
       }
 
       const { confirmationId, receivedSmallBags, receivedLargeBags } = req.body;
 
-      const confirmation = await storage.getDispatchedCoffeeConfirmation(confirmationId);
-      if (!confirmation) {
-        return res.status(404).json({ message: "Confirmation not found" });
-      }
-
       const result = await storage.confirmDispatchedCoffee(confirmationId, {
         receivedSmallBags,
         receivedLargeBags,
-        confirmedById: req.user.id
+        confirmedById: req.user.id,
+        status: "confirmed"
       });
+
+      // Update retail inventory after confirmation
+      const confirmation = await storage.getDispatchedCoffeeConfirmation(confirmationId);
+      if (confirmation) {
+        await storage.updateRetailInventory({
+          shopId: confirmation.shopId,
+          greenCoffeeId: confirmation.greenCoffeeId,
+          smallBags: receivedSmallBags,
+          largeBags: receivedLargeBags,
+          updatedById: req.user.id
+        });
+      }
 
       res.json(result);
     } catch (error) {
