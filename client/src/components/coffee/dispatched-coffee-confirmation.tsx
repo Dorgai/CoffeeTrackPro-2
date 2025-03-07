@@ -26,7 +26,7 @@ import { Loader2, AlertTriangle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface DispatchedCoffeeProps {
-  shopId: number;
+  shopId?: number;
 }
 
 export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) {
@@ -38,42 +38,42 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
     largeBags: 0
   });
 
-  // Query for confirmations
+  // Determine if user has admin access
+  const isAdminRole = user && ["owner", "roasteryOwner", "retailOwner"].includes(user.role);
+
   const { data: confirmations, isLoading } = useQuery({
     queryKey: ["/api/dispatched-coffee/confirmations", shopId],
     queryFn: async () => {
-      console.log("Fetching confirmations for shop:", shopId, "User role:", user?.role);
-      const res = await apiRequest("GET", `/api/dispatched-coffee/confirmations?shopId=${shopId}`);
+      console.log("Fetching confirmations:", {
+        shopId,
+        userRole: user?.role,
+        username: user?.username,
+        isAdminRole
+      });
+
+      // Admin roles can fetch all confirmations, others need shopId
+      const url = isAdminRole 
+        ? "/api/dispatched-coffee/confirmations"
+        : `/api/dispatched-coffee/confirmations?shopId=${shopId}`;
+
+      const res = await apiRequest("GET", url);
       if (!res.ok) {
         const error = await res.text();
         throw new Error(error);
       }
-      const confirmations = await res.json();
-      console.log("Received confirmations:", confirmations);
 
-      // Fetch coffee details for each confirmation
-      const confirmationsWithCoffee = await Promise.all(
-        confirmations.map(async (confirmation: any) => {
-          try {
-            const coffeeRes = await apiRequest("GET", `/api/green-coffee/${confirmation.greenCoffeeId}`);
-            if (!coffeeRes.ok) {
-              throw new Error(`Failed to fetch coffee details for ID ${confirmation.greenCoffeeId}`);
-            }
-            const coffee = await coffeeRes.json();
-            return { ...confirmation, coffee };
-          } catch (error) {
-            console.error("Error fetching coffee details:", error);
-            return { ...confirmation, coffee: { name: "Unknown Coffee" } };
-          }
-        })
-      );
+      const data = await res.json();
+      console.log("Received confirmations:", data?.length || 0);
 
       // Filter only pending confirmations
-      const pendingConfirmations = confirmationsWithCoffee.filter(conf => conf.status === "pending");
-      console.log("Pending confirmations:", pendingConfirmations);
+      const pendingConfirmations = data.filter(
+        (conf: DispatchConfirmationType) => conf.status === "pending"
+      );
+
+      console.log("Pending confirmations:", pendingConfirmations?.length || 0);
       return pendingConfirmations;
     },
-    enabled: Boolean(user && shopId),
+    enabled: Boolean(user && (isAdminRole || shopId)),
   });
 
   // Mutation for confirming received quantities
@@ -189,7 +189,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
           ))}
         </div>
 
-        <Dialog 
+        <Dialog
           open={!!selectedConfirmation}
           onOpenChange={(open) => {
             if (!open) setSelectedConfirmation(null);
@@ -247,7 +247,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
               <Button variant="outline" onClick={() => setSelectedConfirmation(null)}>
                 Cancel
               </Button>
-              <Button 
+              <Button
                 onClick={handleConfirm}
                 disabled={confirmMutation.isPending}
               >

@@ -21,41 +21,50 @@ function requireRole(roles: string[]) {
   };
 }
 
-// Update shop access middleware
+// Update shop access middleware to better handle admin roles
 function requireShopAccess(allowedRoles: string[]) {
   return async (req: Request, res: Response, next: NextFunction) => {
-    const shopId = parseInt(req.params.shopId || req.query.shopId as string);
-
     if (!req.user) {
       console.log("No user found in request");
       return res.status(401).json({ message: "Unauthorized - Please log in" });
     }
 
-    console.log("Checking shop access for:", {
-      userId: req.user.id,
-      username: req.user.username,
-      role: req.user.role,
-      shopId,
-      allowedRoles
+    console.log("Authorization check:", {
+      path: req.path,
+      method: req.method,
+      user: {
+        id: req.user.id,
+        username: req.user.username,
+        role: req.user.role
+      },
+      allowedRoles,
+      query: req.query,
+      params: req.params
     });
 
-    // Always allow access for owner, roasteryOwner, and retailOwner
+    // Admin roles (owner, roasteryOwner, retailOwner) always have access
     if (["owner", "roasteryOwner", "retailOwner"].includes(req.user.role)) {
-      console.log("Full access granted for admin role:", req.user.role);
+      console.log("Granting full access for admin role:", req.user.role);
       return next();
     }
 
-    // Check if user role is allowed
+    // For non-admin roles, first check if the role is allowed
     if (!allowedRoles.includes(req.user.role)) {
       console.log("Role not allowed:", req.user.role, "Allowed roles:", allowedRoles);
       return res.status(403).json({ message: "Unauthorized - Insufficient permissions" });
     }
 
-    // For non-admin roles, verify shop access
+    // Then check for shopId (required for non-admin roles)
+    const shopId = parseInt(req.params.shopId || req.query.shopId as string);
+    if (!shopId) {
+      console.log("Shop ID required for non-admin role:", req.user.role);
+      return res.status(400).json({ message: "Shop ID is required" });
+    }
+
     try {
       const hasAccess = await checkShopAccess(req.user.id, shopId);
       if (!hasAccess) {
-        console.log("No shop access for user:", req.user.id, "shop:", shopId);
+        console.log("Shop access denied for user:", req.user.id, "shop:", shopId);
         return res.status(403).json({ message: "No access to this shop" });
       }
       next();
@@ -66,17 +75,16 @@ function requireShopAccess(allowedRoles: string[]) {
   };
 }
 
-// Update checkShopAccess function
+// Update checkShopAccess function to better handle admin roles
 async function checkShopAccess(userId: number, shopId: number): Promise<boolean> {
   try {
     const user = await storage.getUser(userId);
-
     if (!user) {
       console.log("User not found:", userId);
       return false;
     }
 
-    // Grant full access to admin roles
+    // Admin roles always have access
     if (["owner", "roasteryOwner", "retailOwner"].includes(user.role)) {
       console.log("Full access granted for admin role:", user.role);
       return true;
@@ -84,7 +92,6 @@ async function checkShopAccess(userId: number, shopId: number): Promise<boolean>
 
     // For other roles, check userShops table
     const userShops = await storage.getUserShops(userId);
-    console.log("User shops for", userId, ":", userShops);
     return userShops.some(shop => shop.id === shopId);
   } catch (error) {
     console.error("Error checking shop access:", error);
@@ -94,6 +101,27 @@ async function checkShopAccess(userId: number, shopId: number): Promise<boolean>
 
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
+
+  // Add debug endpoint at the top of the routes registration
+  app.get("/api/debug-user", (req, res) => {
+    console.log("Debug user info:", {
+      authenticated: req.isAuthenticated(),
+      user: req.user ? {
+        id: req.user.id,
+        username: req.user.username,
+        role: req.user.role
+      } : null,
+      session: req.session
+    });
+    res.json({
+      authenticated: req.isAuthenticated(),
+      user: req.user ? {
+        id: req.user.id,
+        username: req.user.username,
+        role: req.user.role
+      } : null
+    });
+  });
 
   // User Management Routes
   app.get("/api/users", requireRole(["owner", "roasteryOwner"]), async (req, res) => {
@@ -788,11 +816,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireRole(["retailOwner", "owner", "roasteryOwner", "roaster", "shopManager", "barista"]),
     async (req, res) => {
       try {
-        console.log("Order status update requested by:", req.user?.username, "with role:", req.user?.role);
-        console.log("Update data:", req.body);
-
         const orderId = parseInt(req.params.id);
         const { status, smallBags, largeBags } = req.body;
+        console.log("Order status update requested by:", {
+          username: req.user?.username,
+          role: req.user?.role,
+          orderId,
+          status,
+          smallBags,
+          largeBags
+        });
 
         const order = await storage.getOrder(orderId);
         if (!order) {
@@ -829,11 +862,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
+        // Update the order status
         const updatedOrder = await storage.updateOrderStatus(orderId, {
           status,
           smallBags,
           largeBags,
-          updatedById: req.user!.id,
+          updatedById: req.user!.id
         });
 
         // Create dispatch confirmation when status changes to "dispatched"
@@ -889,15 +923,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Dispatched Coffee Confirmation Routes
-  app.get("/api/dispatched-coffee/confirmations", requireShopAccess(["owner", "shopManager", "barista", "roasteryOwner", "retailOwner"]), async (req, res) => {
+  app.get("/api/dispatched-coffee/confirmations", 
+    requireShopAccess(["owner", "roasteryOwner", "retailOwner", "shopManager", "barista"]), 
+    async (req, res) => {
     try {
       const { shopId } = req.query;
-      console.log("Request for confirmations received with shopId:", shopId);
+      console.log("Confirmations request from:", {
+        user: req.user?.username,
+        role: req.user?.role,
+        shopId
+      });
 
-      // For roasteryOwner, owner, and retailOwner, allow fetching without shopId to see all confirmations
-      if (["roasteryOwner", "retailOwner", "owner"].includes(req.user?.role || "") && !shopId) {
+      // For admin roles, allow fetching all confirmations
+      if (["owner", "roasteryOwner", "retailOwner"].includes(req.user?.role || "")) {
+        console.log("Fetching all confirmations for admin role");
         const allConfirmations = await storage.getAllDispatchedCoffeeConfirmations();
-        console.log("Returning all confirmations for admin role:", allConfirmations);
         return res.json(allConfirmations);
       }
 
@@ -905,28 +945,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Shop ID is required" });
       }
 
-      console.log("Fetching confirmations for shop:", shopId);
       const confirmations = await storage.getDispatchedCoffeeConfirmations(Number(shopId));
-      console.log("Found confirmations:", confirmations);
       res.json(confirmations);
     } catch (error) {
-      console.error("Error fetching dispatched coffee confirmations:", error);
+      console.error("Error fetching confirmations:", error);
       res.status(500).json({ message: "Failed to fetch confirmations" });
     }
   });
 
   app.post("/api/dispatched-coffee/confirm",
-    requireShopAccess(["owner", "shopManager", "barista", "roasteryOwner", "retailOwner"]),
+    requireShopAccess(["owner", "roasteryOwner", "retailOwner", "shopManager", "barista"]),
     async (req, res) => {
       try {
         const { confirmationId, receivedSmallBags, receivedLargeBags } = req.body;
-        console.log("Processing confirmation request:", {
-          userId: req.user?.id,
-          username: req.user?.username,
+        console.log("Confirmation request from:", {
+          user: req.user?.username,
           role: req.user?.role,
-          confirmationId,
-          receivedSmallBags,
-          receivedLargeBags
+          confirmationId
         });
 
         const confirmation = await storage.getDispatchedCoffeeConfirmation(confirmationId);
@@ -937,13 +972,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const result = await storage.confirmDispatchedCoffee(confirmationId, {
           receivedSmallBags,
           receivedLargeBags,
-          status: "confirmed",
           confirmedById: req.user!.id
         });
 
         res.json(result);
       } catch (error) {
-        console.error("Error confirming dispatched coffee:", error);
+        console.error("Error confirming dispatch:", error);
         res.status(500).json({ message: "Failed to confirm dispatch" });
       }
     });
