@@ -522,9 +522,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: "Shop ID is required" });
         }
 
-        // Get all inventory data
+        // Get all inventory data with detailed logging
         console.log("Fetching all retail inventories");
         const inventory = await storage.getAllRetailInventories();
+
+        // Log a sample inventory item
+        if (inventory.length > 0) {
+          console.log("Sample inventory entry:", inventory[0]);
+        }
+
         console.log("Total inventory items fetched:", inventory.length);
 
         // Filter by shop if shopId is provided
@@ -532,13 +538,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ? inventory.filter(item => item.shopId === shopId)
           : inventory;
 
-        console.log("Filtered inventory items:", {
-          total: inventory.length,
-          filtered: filteredInventory.length,
-          shopId
-        });
+        // Map the results to include all required fields
+        const mappedResults = filteredInventory.map(item => ({
+          ...item,
+          smallBags: item.smallBags || 0,
+          largeBags: item.largeBags || 0,
+          updatedAt: item.updatedAt,
+          updatedBy: item.updatedBy
+        }));
 
-        res.json(filteredInventory);
+        console.log("Mapped results count:", mappedResults.length);
+
+        res.json(mappedResults);
       } catch (error) {
         console.error("Error fetching retail inventory:", error);
         res.status(500).json({ 

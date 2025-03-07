@@ -13,6 +13,10 @@ interface InventoryItem extends RetailInventory {
   coffeeName: string;
   producer: string;
   grade: string;
+  updatedBy: string | null;
+  smallBags: number;
+  largeBags: number;
+  updatedAt: string | null;
 }
 
 export function RetailInventoryList({ shopId }: { shopId?: number }) {
@@ -34,7 +38,7 @@ export function RetailInventoryList({ shopId }: { shopId?: number }) {
 
   const handleRestock = async (coffeeId: number) => {
     if (!shopId) return;
-    
+
     try {
       const res = await apiRequest("POST", "/api/orders", {
         shopId,
@@ -82,16 +86,20 @@ export function RetailInventoryList({ shopId }: { shopId?: number }) {
                   <div className="font-medium">{item.coffeeName}</div>
                   <div className="text-sm text-muted-foreground">{item.producer}</div>
                   <Badge variant="outline" className="mt-1">{item.grade}</Badge>
+                  <div className="text-sm text-muted-foreground mt-1">
+                    Last Updated: {item.updatedAt ? new Date(item.updatedAt).toLocaleString() : 'Never'}
+                    {item.updatedBy && ` by ${item.updatedBy}`}
+                  </div>
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="text-right">
                     <div className="flex items-center gap-2">
                       <Package className="h-4 w-4" />
-                      <span>{item.smallBags} × 200g</span>
+                      <span>{item.smallBags || 0} × 200g</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Package className="h-4 w-4" />
-                      <span>{item.largeBags} × 1kg</span>
+                      <span>{item.largeBags || 0} × 1kg</span>
                     </div>
                   </div>
                   <Button 
