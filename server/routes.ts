@@ -830,8 +830,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         //        // Owner, retailOwner and roasteryOwner have full access to all status changes
-        if (["owner","retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {
-          if (smallBags > order.smallBags || largeBags > order.largeBags) {
+        if (["owner","retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {          if (smallBags > order.smallBags || largeBags > orderBags) {
             return res.status(400).json({
               message: "Updated quantities cannot exceed original order quantities"
             });
