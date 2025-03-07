@@ -143,7 +143,7 @@ export default function UserManagement() {
       const res = await apiRequest(
         "PATCH",
         `/api/users/${userId}`,
-        { is_active: isActive } // Changed to is_active
+        { isActive } 
       );
       if (!res.ok) {
         const error = await res.text();
@@ -167,6 +167,11 @@ export default function UserManagement() {
       });
     },
   });
+
+  const handleShopAssignment = (userId: number, shopIds: number[]) => {
+    console.log("Assigning shops:", { userId, shopIds });
+    updateShopAssignmentsMutation.mutate({ userId, shopIds });
+  };
 
   if (currentUser?.role !== "roasteryOwner") {
     return (
@@ -194,19 +199,14 @@ export default function UserManagement() {
       case "pending":
         return user.isPendingApproval;
       case "active":
-        return !user.isPendingApproval && user.is_active; // Changed to is_active
+        return !user.isPendingApproval && user.is_active;
       case "inactive":
-        return !user.isPendingApproval && !user.is_active; // Changed to is_active
+        return !user.isPendingApproval && !user.is_active;
       default:
         return true;
     }
   });
 
-  // Add shop assignment handler
-  const handleShopAssignment = (userId: number, shopIds: number[]) => {
-    console.log("Assigning shops:", { userId, shopIds });
-    updateShopAssignmentsMutation.mutate({ userId, shopIds });
-  };
 
   return (
     <div className="container mx-auto py-8 space-y-8">
@@ -259,12 +259,12 @@ export default function UserManagement() {
                       variant={
                         user.isPendingApproval
                           ? "outline"
-                          : user.is_active // Changed to is_active
+                          : user.is_active
                             ? "default"
                             : "destructive"
                       }
                     >
-                      {user.isPendingApproval ? "Pending Approval" : user.is_active ? "Active" : "Inactive"} // Changed to is_active
+                      {user.isPendingApproval ? "Pending Approval" : user.is_active ? "Active" : "Inactive"}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -297,11 +297,11 @@ export default function UserManagement() {
                       </Button>
 
                       <Button
-                        variant={user.is_active ? "destructive" : "outline"} // Changed to is_active
+                        variant={user.is_active ? "destructive" : "outline"}
                         size="sm"
                         onClick={() => setUserToDeactivate(user)}
                       >
-                        {user.is_active ? ( // Changed to is_active
+                        {user.is_active ? (
                           <>
                             <UserX className="h-4 w-4 mr-2" />
                             Deactivate
@@ -368,11 +368,11 @@ export default function UserManagement() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {userToDeactivate?.is_active ? "Deactivate" : "Activate"} User  {/* Changed to is_active */}
+              {userToDeactivate?.is_active ? "Deactivate" : "Activate"} User
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to {userToDeactivate?.is_active ? "deactivate" : "activate"} {userToDeactivate?.username}? {/* Changed to is_active */}
-              {userToDeactivate?.is_active && " This will prevent them from accessing the system."} {/* Changed to is_active */}
+              Are you sure you want to {userToDeactivate?.is_active ? "deactivate" : "activate"} {userToDeactivate?.username}?
+              {userToDeactivate?.is_active && " This will prevent them from accessing the system."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -382,13 +382,13 @@ export default function UserManagement() {
                 if (userToDeactivate) {
                   toggleActivationMutation.mutate({
                     userId: userToDeactivate.id,
-                    isActive: !userToDeactivate.is_active, // Changed to is_active
+                    isActive: !userToDeactivate.is_active,
                   });
                 }
               }}
-              className={userToDeactivate?.is_active ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""} // Changed to is_active
+              className={userToDeactivate?.is_active ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
             >
-              {userToDeactivate?.is_active ? "Deactivate" : "Activate"} {/* Changed to is_active */}
+              {userToDeactivate?.is_active ? "Deactivate" : "Activate"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -460,7 +460,7 @@ export default function UserManagement() {
                 <div className="space-y-2">
                   {shops
                     .filter((shop: any) => 
-                      shop.is_active && 
+                      shop.isActive && 
                       !userShops?.some((us: any) => us.id === shop.id)
                     )
                     .map((shop: any) => (

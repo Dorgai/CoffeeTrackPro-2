@@ -465,7 +465,7 @@ export class DatabaseStorage {
       const [shop] = await db
         .select()
         .from(shops)
-        .where(and(eq(shops.id, data.shopId), eq(shops.isActive, true)));
+        .where(and(eq(shops.id, data.shopId), eq(shops.is_active, true)));
 
       if (!shop) {
         throw new Error(`Shop ${data.shopId} not found or inactive`);
@@ -474,7 +474,7 @@ export class DatabaseStorage {
       const [coffee] = await db
         .select()
         .from(greenCoffee)
-        .where(and(eq(greenCoffee.id, data.greenCoffeeId), eq(greenCoffee.isActive, true)));
+        .where(and(eq(greenCoffee.id, data.greenCoffeeId), eq(greenCoffee.is_active, true)));
 
       if (!coffee) {
         throw new Error(`Coffee ${data.greenCoffeeId} not found or inactive`);
@@ -482,34 +482,28 @@ export class DatabaseStorage {
 
       const query = sql`
         INSERT INTO retail_inventory (
-          shop_id, 
-          green_coffee_id, 
-          small_bags, 
-          large_bags, 
+          shop_id,
+          green_coffee_id,
+          small_bags,
+          large_bags,
           updated_by_id,
           updated_at
         )
         VALUES (
-          ${data.shopId}, 
-          ${data.greenCoffeeId}, 
-          ${data.smallBags}, 
-          ${data.largeBags}, 
+          ${data.shopId},
+          ${data.greenCoffeeId},
+          ${data.smallBags},
+          ${data.largeBags},
           ${data.updatedById},
           NOW()
         )
-        ON CONFLICT (shop_id, green_coffee_id) 
-        DO UPDATE SET 
-          small_bags = ${data.smallBags},
-          large_bags = ${data.largeBags},
-          updated_by_id = ${data.updatedById},
-          updated_at = NOW()
-        RETURNING 
-          shop_id as "shopId",
-          green_coffee_id as "greenCoffeeId",
-          small_bags as "smallBags",
-          large_bags as "largeBags",
-          updated_by_id as "updatedById",
-          updated_at as "updatedAt"`;
+        ON CONFLICT (shop_id, green_coffee_id)
+        DO UPDATE SET
+          small_bags = EXCLUDED.small_bags,
+          large_bags = EXCLUDED.large_bags,
+          updated_by_id = EXCLUDED.updated_by_id,
+          updated_at = EXCLUDED.updated_at
+        RETURNING *`;
 
       const result = await db.execute(query);
       console.log("Updated inventory:", result.rows[0]);
