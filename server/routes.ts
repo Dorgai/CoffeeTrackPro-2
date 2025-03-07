@@ -924,7 +924,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Dispatched Coffee Confirmation Routes
   app.get("/api/dispatched-coffee/confirmations", 
-    requireShopAccess(["owner", "roasteryOwner", "retailOwner", "shopManager", "barista"]), 
+    requireRole(["owner", "roasteryOwner", "retailOwner", "shopManager", "barista"]), 
     async (req, res) => {
     try {
       const { shopId } = req.query;
@@ -934,15 +934,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         shopId
       });
 
-      // For admin roles, allow fetching all confirmations
+      // For admin roles (owner, roasteryOwner, retailOwner), return all confirmations
       if (["owner", "roasteryOwner", "retailOwner"].includes(req.user?.role || "")) {
         console.log("Fetching all confirmations for admin role");
         const allConfirmations = await storage.getAllDispatchedCoffeeConfirmations();
         return res.json(allConfirmations);
       }
 
+      // For non-admin roles, require shopId
       if (!shopId) {
         return res.status(400).json({ message: "Shop ID is required" });
+      }
+
+      // For non-admin roles, verify shop access
+      if (!await checkShopAccess(req.user!.id, Number(shopId))) {
+        return res.status(403).json({ message: "No access to this shop" });
       }
 
       const confirmations = await storage.getDispatchedCoffeeConfirmations(Number(shopId));
@@ -954,7 +960,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/dispatched-coffee/confirm",
-    requireShopAccess(["owner", "roasteryOwner", "retailOwner", "shopManager", "barista"]),
+    requireRole(["owner", "roasteryOwner", "retailOwner", "shopManager", "barista"]),
     async (req, res) => {
       try {
         const { confirmationId, receivedSmallBags, receivedLargeBags } = req.body;
@@ -967,6 +973,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const confirmation = await storage.getDispatchedCoffeeConfirmation(confirmationId);
         if (!confirmation) {
           return res.status(404).json({ message: "Confirmation not found" });
+        }
+
+        // For non-admin roles, verify shop access
+        if (!["owner", "roasteryOwner", "retailOwner"].includes(req.user?.role || "")) {
+          if (!await checkShopAccess(req.user!.id, confirmation.shopId)) {
+            return res.status(403).json({ message: "No access to this shop" });
+          }
         }
 
         const result = await storage.confirmDispatchedCoffee(confirmationId, {

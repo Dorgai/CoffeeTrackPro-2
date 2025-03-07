@@ -52,7 +52,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
       });
 
       // Admin roles can fetch all confirmations, others need shopId
-      const url = isAdminRole 
+      const url = isAdminRole
         ? "/api/dispatched-coffee/confirmations"
         : `/api/dispatched-coffee/confirmations?shopId=${shopId}`;
 
