@@ -13,6 +13,12 @@ function requireRole(roles: string[]) {
       return res.status(401).json({ message: "Unauthorized - Please log in" });
     }
 
+    // Admin roles (owner, roasteryOwner, retailOwner) always have access
+    if (["owner", "roasteryOwner", "retailOwner"].includes(req.user.role)) {
+      console.log("Authorization granted for admin role:", req.user.role);
+      return next();
+    }
+
     if (!roles.includes(req.user.role)) {
       console.log("Authorization failed: User role", req.user.role, "not in allowed roles:", roles);
       return res.status(403).json({ message: "Unauthorized - Insufficient permissions" });
@@ -818,7 +824,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const orderId = parseInt(req.params.id);
         const { status, smallBags, largeBags } = req.body;
-        console.log("Order status update requested by:", {
+        console.log("Order status update requestedby:", {
           username: req.user?.username,
           role: req.user?.role,
           orderId,
@@ -827,7 +833,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           largeBags
         });
 
-        const order = await storage.getOrder(orderId);
+        const order = awaitstorage.getOrder(orderId);
         if (!order) {
           return res.status(404).json({ message: "Order not found" });
         }
