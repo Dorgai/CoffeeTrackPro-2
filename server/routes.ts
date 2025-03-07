@@ -829,7 +829,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(404).json({ message: "Order not found" });
         }
 
-        // Owner, retailOwner and roasteryOwner have full access to all status changes
+        //        // Owner, retailOwner and roasteryOwner have full access to all status changes
         if (["owner", "retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {
           if (smallBags > order.smallBags || largeBags > order.largeBags) {
             return res.status(400).json({
@@ -1290,6 +1290,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Keep the existing code below
+  app.post(
+    "/api/dispatched-coffee/:id/confirm",
+    requireRole(["retailOwner", "owner", "roasteryOwner", "shopManager"]),
+    async (req, res) => {
+      try {
+        const confirmationId = parseInt(req.params.id);
+        const { receivedSmallBags, receivedLargeBags } = req.body;
+
+        console.log("Processing confirmation:", {
+          user: req.user?.username,
+          role: req.user?.role,
+          confirmationId,
+          receivedSmallBags,
+          receivedLargeBags
+        });
+
+        // Get the confirmation using getDispatchedCoffeeConfirmations and find by id
+        const confirmations = await storage.getDispatchedCoffeeConfirmations();
+        const confirmation = confirmations.find(c => c.id === confirmationId);
+
+        if (!confirmation) {
+          return res.status(404).json({ message: "Confirmation not found" });
+        }
+
+        // Verify shop access for non-admin users
+        if (!["owner", "retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {
+          const hasAccess = await checkShopAccess(req.user!.id, confirmation.shopId);
+          if (!hasAccess) {
+            return res.status(403).json({ message: "No access to this shop" });
+          }
+        }
+
+        // Update confirmation
+        const updatedConfirmation = await storage.updateDispatchedCoffeeConfirmation(confirmationId, {
+          receivedSmallBags,
+          receivedLargeBags,
+          status: "confirmed",
+          confirmedById: req.user!.id,
+          confirmedAt: new Date()
+        });
+
+        // If quantities don't match, create a discrepancy record
+        if (receivedSmallBags !== confirmation.dispatchedSmallBags || 
+            receivedLargeBags !== confirmation.dispatchedLargeBags) {
+          await storage.createDispatchDiscrepancy({
+            shopId: confirmation.shopId,
+            greenCoffeeId: confirmation.greenCoffeeId,
+            dispatchedSmallBags: confirmation.dispatchedSmallBags,
+            dispatchedLargeBags: confirmation.dispatchedLargeBags,
+            receivedSmallBags,
+            receivedLargeBags,
+            status: "confirmed",
+            confirmedById: req.user!.id,
+            confirmedAt: new Date()
+          });
+        }
+
+        // Update retail inventory
+        await storage.updateRetailInventory({
+          shopId: confirmation.shopId,
+          greenCoffeeId: confirmation.greenCoffeeId,
+          smallBags: receivedSmallBags,
+          largeBags: receivedLargeBags,
+          updatedById: req.user!.id
+        });
+
+        res.json(updatedConfirmation);
+      } catch (error) {
+        console.error("Error confirming dispatch:", error);
+        res.status(500).json({ 
+          message: error instanceof Error ? error.message : "Failed to confirm dispatch" 
+        });
+      }
+    }
+  );
   const httpServer = createServer(app);
   return httpServer;
 }
