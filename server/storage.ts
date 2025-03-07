@@ -409,8 +409,8 @@ export class DatabaseStorage {
             gc.name as coffee_name,
             gc.producer,
             gc.grade,
-            COALESCE(ri.small_bags, 0)::integer as small_bags,
-            COALESCE(ri.large_bags, 0)::integer as large_bags,
+            ri.small_bags::integer as small_bags,
+            ri.large_bags::integer as large_bags,
             ri.updated_at,
             ri.updated_by_id,
             u.username as updated_by
@@ -428,8 +428,8 @@ export class DatabaseStorage {
           coffee_name as "coffeeName",
           producer,
           grade,
-          small_bags as "smallBags",
-          large_bags as "largeBags",
+          COALESCE(small_bags, 0) as "smallBags",
+          COALESCE(large_bags, 0) as "largeBags",
           updated_at as "updatedAt",
           updated_by_id as "updatedById",
           updated_by as "updatedBy"
@@ -444,14 +444,7 @@ export class DatabaseStorage {
         console.log("Sample inventory entry:", result.rows[0]);
       }
 
-      const mappedResults = result.rows.map(row => ({
-        ...row,
-        smallBags: parseInt(row.smallBags) || 0,
-        largeBags: parseInt(row.largeBags) || 0
-      }));
-
-      console.log("Mapped results count:", mappedResults.length);
-      return mappedResults;
+      return result.rows;
     } catch (error) {
       console.error("Error in getAllRetailInventories:", error);
       throw error;
