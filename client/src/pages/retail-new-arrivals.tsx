@@ -15,10 +15,21 @@ export default function RetailNewArrivals() {
   // Check if user has admin privileges
   const isAdminRole = user && ["roasteryOwner", "retailOwner", "owner"].includes(user.role);
 
+  // Non-admin users need proper shop access
   const { data: userShops, isLoading: isLoadingShops } = useQuery({
     queryKey: ["/api/user/shops"],
-    enabled: !!user
+    enabled: !!user && !isAdminRole // Only fetch for non-admin users
   });
+
+  if (!user) {
+    return (
+      <Alert>
+        <AlertDescription>
+          Please log in to access this page.
+        </AlertDescription>
+      </Alert>
+    );
+  }
 
   if (isLoadingShops) {
     return (
@@ -30,9 +41,11 @@ export default function RetailNewArrivals() {
 
   return (
     <div className="container mx-auto py-8">
-      <div className="mb-6">
-        <ShopSelector />
-      </div>
+      {!isAdminRole && (
+        <div className="mb-6">
+          <ShopSelector />
+        </div>
+      )}
 
       {!activeShop && !isAdminRole ? (
         <Alert>

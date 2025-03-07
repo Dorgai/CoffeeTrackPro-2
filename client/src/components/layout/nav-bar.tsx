@@ -20,7 +20,7 @@ export function NavBar() {
   const { user, logoutMutation } = useAuth();
   const [, setLocation] = useLocation();
 
-  // Role-based access control
+  // Role-based access control for menu items
   const isRetailUser = ["retailOwner", "shopManager", "barista"].includes(user?.role || "");
   const isRoasteryUser = ["roasteryOwner", "roaster"].includes(user?.role || "");
   const canManageShops = user?.role === "roasteryOwner";
@@ -29,6 +29,7 @@ export function NavBar() {
   const canAccessAnalytics = ["roasteryOwner", "retailOwner", "shopManager"].includes(user?.role || "");
   const canAccessRoasting = ["roasteryOwner", "roaster"].includes(user?.role || "");
   const canAccessRetail = ["roasteryOwner", "retailOwner", "shopManager", "barista"].includes(user?.role || "");
+  const canAccessNewArrivals = ["roasteryOwner", "retailOwner", "shopManager", "barista"].includes(user?.role || "");
 
   // Redirect users to their appropriate dashboard
   const homePath = isRetailUser ? "/manager-dashboard" : "/";
@@ -49,7 +50,7 @@ export function NavBar() {
         )}
 
         <Menubar className="border-none">
-          {/* Dashboard Menu - Different for retail and roastery users */}
+          {/* Dashboard Menu */}
           <MenubarMenu>
             <MenubarTrigger>Dashboard</MenubarTrigger>
             <MenubarContent>
@@ -172,16 +173,18 @@ export function NavBar() {
                   </MenubarItem>
                 </MenubarContent>
               </MenubarMenu>
-              <MenubarMenu>
-                <MenubarTrigger>New Arrivals</MenubarTrigger>
-                <MenubarContent>
-                  <MenubarItem>
-                    <Link href="/retail/new-arrivals" className="flex w-full">
-                      Pending Confirmations
-                    </Link>
-                  </MenubarItem>
-                </MenubarContent>
-              </MenubarMenu>
+              {canAccessNewArrivals && (
+                <MenubarMenu>
+                  <MenubarTrigger>New Arrivals</MenubarTrigger>
+                  <MenubarContent>
+                    <MenubarItem>
+                      <Link href="/retail-new-arrivals" className="flex w-full">
+                        Pending Confirmations
+                      </Link>
+                    </MenubarItem>
+                  </MenubarContent>
+                </MenubarMenu>
+              )}
             </>
           )}
         </Menubar>
