@@ -830,7 +830,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         //        // Owner, retailOwner and roasteryOwner have full access to all status changes
-        if (["owner", "retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {
+        if (["owner","retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {
           if (smallBags > order.smallBags || largeBags > order.largeBags) {
             return res.status(400).json({
               message: "Updated quantities cannot exceed original order quantities"
@@ -1306,11 +1306,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           receivedLargeBags
         });
 
-        // Get the confirmation using getDispatchedCoffeeConfirmations and find by id
+        // Get all confirmations and find the one we need
         const confirmations = await storage.getDispatchedCoffeeConfirmations();
         const confirmation = confirmations.find(c => c.id === confirmationId);
 
         if (!confirmation) {
+          console.log("Confirmation not found:", confirmationId);
           return res.status(404).json({ message: "Confirmation not found" });
         }
 
@@ -1322,32 +1323,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        // Update confirmation
-        const updatedConfirmation = await storage.updateDispatchedCoffeeConfirmation(confirmationId, {
+        // Create a new confirmation record with updated values
+        const updatedConfirmation = await storage.createDispatchedCoffeeConfirmation({
+          shopId: confirmation.shopId,
+          greenCoffeeId: confirmation.greenCoffeeId,
+          dispatchedSmallBags: confirmation.dispatchedSmallBags,
+          dispatchedLargeBags: confirmation.dispatchedLargeBags,
           receivedSmallBags,
           receivedLargeBags,
           status: "confirmed",
-          confirmedById: req.user!.id,
-          confirmedAt: new Date()
+          confirmedAt: new Date(),
+          confirmedById: req.user!.id
         });
 
-        // If quantities don't match, create a discrepancy record
-        if (receivedSmallBags !== confirmation.dispatchedSmallBags || 
-            receivedLargeBags !== confirmation.dispatchedLargeBags) {
-          await storage.createDispatchDiscrepancy({
-            shopId: confirmation.shopId,
-            greenCoffeeId: confirmation.greenCoffeeId,
-            dispatchedSmallBags: confirmation.dispatchedSmallBags,
-            dispatchedLargeBags: confirmation.dispatchedLargeBags,
-            receivedSmallBags,
-            receivedLargeBags,
-            status: "confirmed",
-            confirmedById: req.user!.id,
-            confirmedAt: new Date()
-          });
-        }
-
-        // Update retail inventory
+        // Update retail inventory with received quantities
         await storage.updateRetailInventory({
           shopId: confirmation.shopId,
           greenCoffeeId: confirmation.greenCoffeeId,
@@ -1356,15 +1345,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           updatedById: req.user!.id
         });
 
+        console.log("Successfully confirmed dispatch:", {
+          confirmationId,
+          updatedConfirmation
+        });
+
         res.json(updatedConfirmation);
       } catch (error) {
         console.error("Error confirming dispatch:", error);
         res.status(500).json({ 
-          message: error instanceof Error ? error.message : "Failed to confirm dispatch" 
+          message: error instanceof Error ? error.message : "Failed to confirm dispatch",
+          details: error instanceof Error ? error.stack : undefined
         });
       }
     }
   );
+
   const httpServer = createServer(app);
   return httpServer;
 }
