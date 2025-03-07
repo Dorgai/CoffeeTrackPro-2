@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Coffee, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Table,
   TableBody,
@@ -50,25 +50,28 @@ export function RetailInventoryList({ shopId }: { shopId?: number }) {
     if (!shopId) return;
 
     try {
-      const res = await apiRequest("POST", "/api/orders", {
+      const res = await apiRequest("POST", "/api/retail-inventory", {
         shopId,
         greenCoffeeId: coffeeId,
         smallBags: 10,
         largeBags: 5,
-        status: "pending"
+        updatedById: user?.id
       });
 
       if (!res.ok) {
-        throw new Error("Failed to create restock order");
+        throw new Error("Failed to update inventory");
       }
 
+      // Invalidate queries to refetch data
+      await queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory"] });
+
       toast({
-        title: "Restock order created",
-        description: "Your order has been sent to the roastery",
+        title: "Inventory updated",
+        description: "The stock levels have been updated successfully",
       });
     } catch (error) {
       toast({
-        title: "Failed to create restock order",
+        title: "Failed to update inventory",
         description: error instanceof Error ? error.message : "Unknown error",
         variant: "destructive",
       });
@@ -109,8 +112,8 @@ export function RetailInventoryList({ shopId }: { shopId?: number }) {
                 <TableCell>
                   <Badge variant="outline">{item.grade}</Badge>
                 </TableCell>
-                <TableCell>{item.smallBags || 0} × 200g</TableCell>
-                <TableCell>{item.largeBags || 0} × 1kg</TableCell>
+                <TableCell>{item.smallBags} × 200g</TableCell>
+                <TableCell>{item.largeBags} × 1kg</TableCell>
                 <TableCell>
                   {item.updatedAt ? new Date(item.updatedAt).toLocaleString() : 'Never'}
                 </TableCell>

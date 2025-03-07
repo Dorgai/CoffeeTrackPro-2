@@ -397,7 +397,7 @@ export class DatabaseStorage {
   //Retail Inventory Methods
   async getAllRetailInventories(): Promise<any[]> {
     try {
-      console.log("Starting getAllRetailInventories with enhanced logging");
+      console.log("Starting getAllRetailInventories");
 
       const query = sql`
         WITH shop_inventory AS (
@@ -409,8 +409,8 @@ export class DatabaseStorage {
             gc.name as coffee_name,
             gc.producer,
             gc.grade,
-            ri.small_bags::integer as small_bags,
-            ri.large_bags::integer as large_bags,
+            COALESCE(ri.small_bags, 0)::integer as small_bags,
+            COALESCE(ri.large_bags, 0)::integer as large_bags,
             ri.updated_at,
             ri.updated_by_id,
             u.username as updated_by
@@ -428,8 +428,8 @@ export class DatabaseStorage {
           coffee_name as "coffeeName",
           producer,
           grade,
-          COALESCE(small_bags, 0) as "smallBags",
-          COALESCE(large_bags, 0) as "largeBags",
+          small_bags as "smallBags",
+          large_bags as "largeBags",
           updated_at as "updatedAt",
           updated_by_id as "updatedById",
           updated_by as "updatedBy"
@@ -499,11 +499,17 @@ export class DatabaseStorage {
         )
         ON CONFLICT (shop_id, green_coffee_id) 
         DO UPDATE SET 
-          small_bags = EXCLUDED.small_bags,
-          large_bags = EXCLUDED.large_bags,
-          updated_by_id = EXCLUDED.updated_by_id,
+          small_bags = ${data.smallBags},
+          large_bags = ${data.largeBags},
+          updated_by_id = ${data.updatedById},
           updated_at = NOW()
-        RETURNING *`;
+        RETURNING 
+          shop_id as "shopId",
+          green_coffee_id as "greenCoffeeId",
+          small_bags as "smallBags",
+          large_bags as "largeBags",
+          updated_by_id as "updatedById",
+          updated_at as "updatedAt"`;
 
       const result = await db.execute(query);
       console.log("Updated inventory:", result.rows[0]);

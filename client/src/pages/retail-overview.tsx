@@ -160,7 +160,7 @@ export default function RetailOverview() {
             <p className="text-muted-foreground">{data.shop.location}</p>
 
             {/* New Inventory Arrivals Section */}
-            {["roasteryOwner", "shopManager", "barista"].includes(user?.role || "") && (
+            {["owner", "roasteryOwner", "shopManager", "barista"].includes(user?.role || "") && (
               <DispatchedCoffeeConfirmation shopId={parseInt(shopId)} />
             )}
 

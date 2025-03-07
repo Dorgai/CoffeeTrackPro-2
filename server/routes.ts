@@ -639,6 +639,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           updatedById: req.user!.id
         });
 
+        console.log("Processing retail inventory update:", data);
+
         const inventory = await storage.updateRetailInventory(data);
         res.status(201).json(inventory);
       } catch (error) {
@@ -646,6 +648,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(400).json({
           message: error instanceof Error ? error.message : "Failed to update inventory",
           details: error instanceof Error ? error.stack : undefined
+        });
+      }
+    });
+
+  app.get("/api/retail-inventory", 
+    requireShopAccess(["shopManager", "barista", "retailOwner", "roasteryOwner", "roaster"]), 
+    async (req, res) => {
+      try {
+        const shopId = req.query.shopId ? Number(req.query.shopId) : undefined;
+        console.log("Fetching retail inventory for user:", {
+          userId: req.user?.id,
+          username: req.user?.username,
+          role: req.user?.role,
+          requestedShopId: shopId
+        });
+
+        // For shopManager and barista, require shopId
+        if (["shopManager", "barista"].includes(req.user?.role || "") && !shopId) {
+          console.log("Shop ID required for role:", req.user?.role);
+          return res.status(400).json({ message: "Shop ID is required" });
+        }
+
+        // Get all inventory data with enhanced logging
+        console.log("Fetching all retail inventories");
+        const inventory = await storage.getAllRetailInventories();
+        console.log("Raw inventory data:", inventory);
+
+        // Filter by shop if shopId is provided
+        const filteredInventory = shopId 
+          ? inventory.filter(item => item.shopId === shopId)
+          : inventory;
+
+        // Ensure all required fields are present
+        const mappedResults = filteredInventory.map(item => ({
+          shopId: item.shopId,
+          greenCoffeeId: item.greenCoffeeId,
+          coffeeName: item.coffeeName,
+          producer: item.producer,
+          grade: item.grade,
+          smallBags: parseInt(item.smallBags) || 0,
+          largeBags: parseInt(item.largeBags) || 0,
+          updatedAt: item.updatedAt,
+          updatedBy: item.updatedBy
+        }));
+
+        console.log("Mapped inventory data:", mappedResults);
+        res.json(mappedResults);
+      } catch (error) {
+        console.error("Error fetching retail inventory:", error);
+        res.status(500).json({ 
+          message: "Failed to fetch inventory",
+          details: error instanceof Error ? error.message : "Unknown error"
         });
       }
     });
@@ -771,7 +825,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const confirmation = await storage.createDispatchedCoffeeConfirmation({
               orderId: order.id,
               shopId: order.shopId!,
-              greenCoffeeId: order.greenCoffeeId!,
+              greenCoffeeId: order.greenId!,
               dispatchedSmallBags: smallBags,
               dispatchedLargeBags: largeBags,
               status: "pending"
@@ -817,15 +871,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Dispatched Coffee Confirmation Routes
-  app.get("/api/dispatched-coffee/confirmations", requireShopAccess(["shopManager", "barista", "roasteryOwner", "retailOwner"]), async (req, res) => {
+  app.get("/api/dispatched-coffee/confirmations", requireShopAccess(["owner", "shopManager", "barista", "roasteryOwner", "retailOwner"]), async (req, res) => {
     try {
       const { shopId } = req.query;
       console.log("Request for confirmations received with shopId:", shopId);
 
-      // For roasteryOwner, allow fetching without shopId to see all confirmations
+      // For roasteryOwner, owner, and retailOwner, allow fetching without shopId to see all confirmations
       if (["roasteryOwner", "retailOwner", "owner"].includes(req.user?.role || "") && !shopId) {
         const allConfirmations = await storage.getAllDispatchedCoffeeConfirmations();
-        console.log("Returning all confirmations for roasteryOwner:", allConfirmations);
+        console.log("Returning all confirmations for admin role:", allConfirmations);
         return res.json(allConfirmations);
       }
 
@@ -843,7 +897,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/dispatched-coffee/confirm", requireShopAccess(["roasteryOwner", "shopManager", "barista", "retailOwner"]), async (req, res) => {
+  app.post("/api/dispatched-coffee/confirm", requireShopAccess(["owner", "roasteryOwner", "shopManager", "barista", "retailOwner"]), async (req, res) => {
     try {
       const { confirmationId, receivedSmallBags, receivedLargeBags } = req.body;
       console.log("Received confirmation request:", {
