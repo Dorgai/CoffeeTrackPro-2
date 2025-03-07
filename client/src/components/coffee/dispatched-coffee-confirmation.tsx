@@ -50,27 +50,21 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
     largeBags: 0
   });
 
-  // Admin roles can see all confirmations without shopId
-  const isAdminRole = user && ["roasteryOwner", "retailOwner", "owner"].includes(user.role);
-
-  const { data: confirmations, isLoading } = useQuery<DispatchConfirmation[]>({
+  const { data: confirmations, isLoading, refetch } = useQuery<DispatchConfirmation[]>({
     queryKey: ["/api/dispatched-coffee/confirmations", shopId],
     queryFn: async () => {
-      // All admin roles have unrestricted access
-      const url = isAdminRole 
-        ? "/api/dispatched-coffee/confirmations"
-        : `/api/dispatched-coffee/confirmations?shopId=${shopId}`;
+      const url = shopId
+        ? `/api/dispatched-coffee/confirmations?shopId=${shopId}`
+        : "/api/dispatched-coffee/confirmations";
 
       const res = await apiRequest("GET", url);
       if (!res.ok) {
         throw new Error(await res.text());
       }
-
       const data = await res.json();
-      console.log("Fetched confirmations:", data);
-      return data.filter((conf: DispatchConfirmation) => conf.status === "pending");
+      return data.filter(conf => conf.status === "pending");
     },
-    enabled: Boolean(user && (isAdminRole || shopId)),
+    enabled: Boolean(user),
   });
 
   const confirmMutation = useMutation({
@@ -79,26 +73,28 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
       receivedSmallBags: number;
       receivedLargeBags: number;
     }) => {
-      console.log("Confirming dispatch:", data);
       const res = await apiRequest(
-        "POST", 
+        "POST",
         `/api/dispatched-coffee/confirmations/${data.confirmationId}/confirm`,
         data
       );
+
       if (!res.ok) {
         const error = await res.text();
         throw new Error(error);
       }
+
       return res.json();
     },
     onSuccess: () => {
+      setSelectedConfirmation(null);
       queryClient.invalidateQueries({ queryKey: ["/api/dispatched-coffee/confirmations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory"] });
-      setSelectedConfirmation(null);
       toast({
         title: "Success",
-        description: "Inventory has been updated successfully",
+        description: "Dispatch confirmation processed successfully",
       });
+      refetch();
     },
     onError: (error: Error) => {
       toast({
@@ -133,7 +129,6 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
   const handleConfirm = () => {
     if (!selectedConfirmation) return;
 
-    console.log("Handling confirmation for:", selectedConfirmation.id);
     confirmMutation.mutate({
       confirmationId: selectedConfirmation.id,
       receivedSmallBags: Number(receivedQuantities.smallBags),

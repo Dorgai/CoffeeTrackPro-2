@@ -824,11 +824,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!await checkShopAccess(req.user!.id, shopId)) {
         return res.status(403).json({ message: "User does not have access to this shop" });
       }
-
       const orders = await storage.getOrdersByShop(shopId);
       return res.json(orders);
     } catch (error) {
-      console.error("Error fetching orders:", error);res.status(500).json({ message: "Failed to fetch orders" });
+      console.error("Error fetching orders:", error);
+      res.status(500).json({ message:"Failed to fetch orders" });
     }
   });
 
@@ -1388,6 +1388,115 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("Error in confirmation process:", error);
         res.status(500).json({
           message: "Failed to confirm dispatch",
+          details: error instanceof Error ? error.message : "Unknown error"
+        });
+      }
+    }
+  );
+
+  // Update the dispatch confirmation endpoint
+  app.post(
+    "/api/dispatched-coffee/confirmations/:id/confirm",
+    requireShopAccess(["shopManager", "barista", "roasteryOwner", "retailOwner"]),
+    async (req, res) => {
+      try {
+        const confirmationId = parseInt(req.params.id);
+        const { receivedSmallBags, receivedLargeBags } = req.body;
+
+        console.log("Processing confirmation request:", {
+          confirmationId,
+          receivedSmallBags,
+          receivedLargeBags,
+          userId: req.user?.id,
+          userRole: req.user?.role
+        });
+
+        // Input validation
+        if (!confirmationId || typeof receivedSmallBags !== 'number' || typeof receivedLargeBags !== 'number') {
+          return res.status(400).json({
+            message: "Invalid input: required fields missing or invalid"
+          });
+        }
+
+        // Get the confirmation details first
+        const [confirmation] = await storage.db.execute(sql`
+          SELECT 
+            dc.*,
+            gc.name as coffee_name,
+            gc.producer as producer,
+            s.name as shop_name
+          FROM dispatched_coffee_confirmation dc
+          JOIN green_coffee gc ON dc.green_coffee_id = gc.id
+          JOIN shops s ON dc.shop_id = s.id
+          WHERE dc.id = ${confirmationId}
+            AND dc.status = 'pending'
+        `);
+
+        if (!confirmation) {
+          console.log("No pending confirmation found:", confirmationId);
+          return res.status(404).json({ 
+            message: "Confirmation not found or already processed" 
+          });
+        }
+
+        console.log("Found confirmation:", confirmation);
+
+        // Verify shop access for non-admin users
+        if (!["owner", "retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {
+          const hasAccess = await checkShopAccess(req.user!.id, confirmation.shop_id);
+          if (!hasAccess) {
+            return res.status(403).json({ message: "No access to this shop" });
+          }
+        }
+
+        // Update retail inventory first
+        try {
+          await storage.updateRetailInventory({
+            shopId: confirmation.shop_id,
+            greenCoffeeId: confirmation.green_coffee_id,
+            smallBags: receivedSmallBags,
+            largeBags: receivedLargeBags,
+            updatedById: req.user!.id
+          });
+          console.log("Updated retail inventory successfully");
+        } catch (error) {
+          console.error("Failed to update retail inventory:", error);
+          throw new Error("Failed to update retail inventory");
+        }
+
+        // Then update the confirmation status
+        const [updatedConfirmation] = await storage.db.execute(sql`
+          UPDATE dispatched_coffee_confirmation
+          SET 
+            received_small_bags = ${receivedSmallBags},
+            received_large_bags = ${receivedLargeBags},
+            status = 'confirmed',
+            confirmed_by_id = ${req.user!.id},
+            confirmed_at = NOW()
+          WHERE id = ${confirmationId}
+            AND status = 'pending'
+          RETURNING *
+        `);
+
+        if (!updatedConfirmation) {
+          throw new Error("Failed to update confirmation status");
+        }
+
+        console.log("Successfully updated confirmation:", updatedConfirmation);
+
+        // Return the updated confirmation with additional details
+        const response = {
+          ...updatedConfirmation,
+          coffeeName: confirmation.coffee_name,
+          producer: confirmation.producer,
+          shopName: confirmation.shop_name
+        };
+
+        res.json(response);
+      } catch (error) {
+        console.error("Error in confirmation process:", error);
+        res.status(500).json({
+          message: "Failed to process confirmation",
           details: error instanceof Error ? error.message : "Unknown error"
         });
       }
