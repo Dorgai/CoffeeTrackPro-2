@@ -1,4 +1,4 @@
-import { type RoastingBatch, type InsertRoastingBatch, roastingBatches, users, type User, type Shop, type InsertShop, shops, userShops, type GreenCoffee, type InsertGreenCoffee, greenCoffee, type Order, type InsertOrder, orders, type DispatchedCoffeeConfirmation, type InsertDispatchedCoffeeConfirmation, dispatchedCoffeeConfirmation } from "@shared/schema";
+import { type RoastingBatch, type InsertRoastingBatch, roastingBatches, users, type User, type Shop, type InsertShop, shops, userShops, type GreenCoffee, type InsertGreenCoffee, greenCoffee, type Order, type InsertOrder, orders, type DispatchedCoffeeConfirmation, type InsertDispatchedCoffeeConfirmation, dispatchedCoffeeConfirmation, type InsertUser } from "@shared/schema";
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
 import session from "express-session";
@@ -10,6 +10,7 @@ const PostgresSessionStore = connectPg(session);
 
 export class DatabaseStorage {
   sessionStore: session.Store;
+  db = db; // Expose db instance for direct queries
 
   constructor() {
     this.sessionStore = new PostgresSessionStore({
@@ -173,6 +174,74 @@ export class DatabaseStorage {
     }
   }
 
+
+  // Add missing methods that routes.ts needs
+  async removeAllUserShops(userId: number): Promise<void> {
+    try {
+      await db
+        .delete(userShops)
+        .where(eq(userShops.userId, userId));
+    } catch (error) {
+      console.error("Error removing all user shops:", error);
+      throw error;
+    }
+  }
+
+  async getDispatchConfirmation(id: number): Promise<DispatchedCoffeeConfirmation | undefined> {
+    try {
+      const [confirmation] = await db
+        .select()
+        .from(dispatchedCoffeeConfirmation)
+        .where(eq(dispatchedCoffeeConfirmation.id, id));
+      return confirmation;
+    } catch (error) {
+      console.error("Error getting dispatch confirmation:", error);
+      return undefined;
+    }
+  }
+
+  async getRetailInventoryHistory(shopId: number): Promise<any[]> {
+    try {
+      const query = sql`
+        SELECT 
+          ri.*,
+          u.username as updated_by_username,
+          gc.name as coffee_name
+        FROM retail_inventory_history ri
+        LEFT JOIN users u ON ri.updated_by_id = u.id
+        LEFT JOIN green_coffee gc ON ri.green_coffee_id = gc.id
+        WHERE ri.shop_id = ${shopId}
+        ORDER BY ri.updated_at DESC`;
+
+      const result = await db.execute(query);
+      return result.rows;
+    } catch (error) {
+      console.error("Error getting retail inventory history:", error);
+      return [];
+    }
+  }
+
+  async getAllRetailInventoryHistory(): Promise<any[]> {
+    try {
+      const query = sql`
+        SELECT 
+          ri.*,
+          u.username as updated_by_username,
+          gc.name as coffee_name,
+          s.name as shop_name
+        FROM retail_inventory_history ri
+        LEFT JOIN users u ON ri.updated_by_id = u.id
+        LEFT JOIN green_coffee gc ON ri.green_coffee_id = gc.id
+        LEFT JOIN shops s ON ri.shop_id = s.id
+        ORDER BY ri.updated_at DESC`;
+
+      const result = await db.execute(query);
+      return result.rows;
+    } catch (error) {
+      console.error("Error getting all retail inventory history:", error);
+      return [];
+    }
+  }
 
   // Shop operations
   async getShop(id: number): Promise<Shop | undefined> {
