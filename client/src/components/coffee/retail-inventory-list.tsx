@@ -34,12 +34,15 @@ export function RetailInventoryList({ shopId }: { shopId?: number }) {
   const { data: inventory, isLoading } = useQuery<InventoryItem[]>({
     queryKey: ["/api/retail-inventory", shopId],
     queryFn: async () => {
+      console.log("Fetching inventory for shop:", shopId);
       const url = shopId ? `/api/retail-inventory?shopId=${shopId}` : "/api/retail-inventory";
       const res = await apiRequest("GET", url);
       if (!res.ok) {
         throw new Error("Failed to fetch inventory");
       }
-      return res.json();
+      const data = await res.json();
+      console.log("Fetched inventory data:", data);
+      return data;
     },
     enabled: Boolean(user),
   });
