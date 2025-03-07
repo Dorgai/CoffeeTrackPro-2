@@ -57,8 +57,10 @@ export function setupAuth(app: Express) {
           return done(null, false, { message: "Invalid username or password" });
         }
 
-        // Always allow roastery owners to log in if credentials are correct
-        if (user.role === "roasteryOwner") {
+        // All admin roles (including roasteryOwner) should have unrestricted access
+        const isAdminRole = ["owner", "roasteryOwner", "retailOwner"].includes(user.role);
+
+        if (isAdminRole) {
           const isValid = await comparePasswords(password, user.password);
           if (!isValid) {
             return done(null, false, { message: "Invalid username or password" });
@@ -66,12 +68,11 @@ export function setupAuth(app: Express) {
           return done(null, user);
         }
 
-        // For non-roasteryOwner users, check approval status
+        // For non-admin roles, check approval and active status
         if (user.isPendingApproval) {
-          return done(null, false, { message: "Your account is pending approval from a roastery owner" });
+          return done(null, false, { message: "Your account is pending approval" });
         }
 
-        // Check if user is active
         if (!user.isActive) {
           return done(null, false, { message: "Your account has been deactivated" });
         }
@@ -85,10 +86,11 @@ export function setupAuth(app: Express) {
       } catch (error) {
         return done(error);
       }
-    }),
+    })
   );
 
   passport.serializeUser((user, done) => {
+    console.log("Serializing user:", { id: user.id, role: user.role });
     done(null, user.id);
   });
 
@@ -96,10 +98,13 @@ export function setupAuth(app: Express) {
     try {
       const user = await storage.getUser(id);
       if (!user) {
+        console.log("User not found during deserialization:", id);
         return done(null, false);
       }
+      console.log("Deserialized user:", { id: user.id, role: user.role });
       done(null, user);
     } catch (error) {
+      console.error("Error during deserialization:", error);
       done(error);
     }
   });
@@ -132,7 +137,7 @@ export function setupAuth(app: Express) {
       const { password, ...userWithoutPassword } = user;
       res.status(201).json({
         ...userWithoutPassword,
-        message: user.role === "roasteryOwner" 
+        message: user.role === "roasteryOwner"
           ? "Registration successful. You can now log in."
           : "Registration successful. Please wait for approval from a roastery owner."
       });

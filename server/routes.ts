@@ -195,67 +195,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Assign user to shop
+  // Update shop assignment endpoint to handle only active shops
   app.post("/api/users/:id/shops", requireRole(["roasteryOwner"]), async (req, res) => {
     try {
       const userId = parseInt(req.params.id);
       const { shopIds } = req.body;
 
-      console.log("Shop assignment request received:", {
-        userId,
-        shopIds,
-        requestUser: req.user?.username,
-        requestUserRole: req.user?.role
-      });
-
       if (!Array.isArray(shopIds)) {
-        console.log("Invalid shopIds format:", shopIds);
         return res.status(400).json({ message: "Shop IDs must be an array" });
       }
 
       const user = await storage.getUser(userId);
       if (!user) {
-        console.log("User not found:", userId);
         return res.status(404).json({ message: "User not found" });
       }
 
-      console.log("Assigning shops to user:", {
-        username: user.username,
-        role: user.role,
-        assignedShops: shopIds
-      });
+      // Get only active shops
+      const activeShops = await storage.getShops();
+      const validShopIds = activeShops
+        .filter(shop => shop.is_active)
+        .map(shop => shop.id);
 
-      // Get all active shops
-      const allShops = await storage.getShops();
-      const activeShops = allShops.filter(shop => shop.isActive);
-      const activeShopIds = activeShops.map(shop => shop.id);
+      // Filter out inactive shops
+      const shopIdsToAssign = shopIds.filter(id => validShopIds.includes(id));
 
-      // Verify all shops exist and are active
-      const invalidShops = shopIds.filter(id => !activeShopIds.includes(id));
-      if (invalidShops.length > 0) {
-        console.log("Invalid shops found:", invalidShops);
-        return res.status(400).json({ 
-          message: "Some shops are invalid or inactive",
-          invalidShops
-        });
-      }
-
-      // Remove all existing assignments
-      console.log("Removing existing shop assignments for user:", userId);
+      // Remove existing assignments
       await storage.removeAllUserShops(userId);
 
-      // Add new assignments
-      console.log("Adding new shop assignments:", shopIds);
-      for (const shopId of shopIds) {
+      // Add new assignments only for active shops
+      for (const shopId of shopIdsToAssign) {
         await storage.assignUserToShop(userId, shopId);
       }
 
       const updatedShops = await storage.getUserShops(userId);
-      console.log("Successfully updated shop assignments:", {
-        userId,
-        assignedShops: updatedShops.map(s => ({ id: s.id, name: s.name }))
-      });
-
       res.json(updatedShops);
     } catch (error) {
       console.error("Error in shop assignment:", error);
@@ -853,7 +825,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           // Roaster can only change status to roasted or dispatched
-          if (req.user?.role === "roaster" && !["roasted", "dispatched"].includes(status)) {
+          if (req.user?.role === "roaster" && !["roasted", "dispatched"].includes(status)){
             return res.status(403).json({
               message: "Roasters can only change status to 'roasted' or 'dispatched'"
             });
@@ -927,40 +899,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Dispatched Coffee Confirmation Routes
+  // Update dispatched coffee confirmation endpoint
   app.get("/api/dispatched-coffee/confirmations", async (req, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ message: "Please log in" });
       }
 
-      console.log("Dispatched coffee request:", {
-        user: req.user.username,
-        role: req.user.role,
-        query: req.query
-      });
+      const { shopId } = req.query;
+      const isAdminRole = ["owner", "roasteryOwner", "retailOwner"].includes(req.user.role);
 
-      // For owner, roasteryOwner, retailOwner - return all data
-      if (["owner", "roasteryOwner", "retailOwner"].includes(req.user.role)) {
-        const data = await storage.getAllDispatchedCoffeeConfirmations();
-        return res.json(data);
+      if (isAdminRole) {
+        const confirmations = await storage.getAllDispatchedCoffeeConfirmations();
+        return res.json(confirmations);
       }
 
-      // For others, require shopId
-      const shopId = req.query.shopId ? Number(req.query.shopId) : null;
       if (!shopId) {
-        return res.status(400).json({ message: "Shop ID required" });
+        return res.status(400).json({ message: "Shop ID is required" });
       }
 
-      const data = await storage.getDispatchedCoffeeConfirmations(shopId);
-      res.json(data);
+      const confirmations = await storage.getDispatchedCoffeeConfirmations(Number(shopId));
+      res.json(confirmations);
     } catch (error) {
       console.error("Error fetching confirmations:", error);
       res.status(500).json({ message: "Failed to fetch confirmations" });
     }
   });
 
-  // Simplify the confirmation endpoint
   app.post("/api/dispatched-coffee/confirm", async (req, res) => {
     try {
       if (!req.user) {
@@ -969,24 +934,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { confirmationId, receivedSmallBags, receivedLargeBags } = req.body;
 
+      console.log("Processing confirmation:", {
+        user: req.user.username,
+        role: req.user.role,
+        confirmationId,
+        receivedSmallBags,
+        receivedLargeBags
+      });
+
+      const confirmation = await storage.getDispatchedCoffeeConfirmation(confirmationId);
+      if (!confirmation) {
+        return res.status(404).json({ message: "Confirmation not found" });
+      }
+
+      // Allow admin roles full access
+      const isAdminRole = ["roasteryOwner", "retailOwner", "owner"].includes(req.user.role);
+
+      // For non-admin roles, verify shop access
+      if (!isAdminRole) {
+        const hasAccess = await checkShopAccess(req.user.id, confirmation.shopId);
+        if (!hasAccess) {
+          return res.status(403).json({ message: "No access to this shop" });
+        }
+      }
+
       const result = await storage.confirmDispatchedCoffee(confirmationId, {
         receivedSmallBags,
         receivedLargeBags,
-        confirmedById: req.user.id,
-        status: "confirmed"
+        confirmedById: req.user.id
       });
 
       // Update retail inventory after confirmation
-      const confirmation = await storage.getDispatchedCoffeeConfirmation(confirmationId);
-      if (confirmation) {
-        await storage.updateRetailInventory({
-          shopId: confirmation.shopId,
-          greenCoffeeId: confirmation.greenCoffeeId,
-          smallBags: receivedSmallBags,
-          largeBags: receivedLargeBags,
-          updatedById: req.user.id
-        });
-      }
+      await storage.updateRetailInventory({
+        shopId: confirmation.shopId,
+        greenCoffeeId: confirmation.greenCoffeeId,
+        smallBags: receivedSmallBags,
+        largeBags: receivedLargeBags,
+        updatedById: req.user.id
+      });
 
       res.json(result);
     } catch (error) {

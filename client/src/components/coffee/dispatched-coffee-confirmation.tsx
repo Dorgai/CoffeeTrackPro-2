@@ -39,12 +39,12 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
   });
 
   // Admin roles can see all confirmations without shopId
-  const isAdminRole = user && ["owner", "roasteryOwner", "retailOwner"].includes(user.role);
+  const isAdminRole = user && ["roasteryOwner", "retailOwner", "owner"].includes(user.role);
 
   const { data: confirmations, isLoading } = useQuery({
     queryKey: ["/api/dispatched-coffee/confirmations", shopId],
     queryFn: async () => {
-      // Admin roles fetch all confirmations, others need shopId
+      // All admin roles have unrestricted access
       const url = isAdminRole 
         ? "/api/dispatched-coffee/confirmations"
         : `/api/dispatched-coffee/confirmations?shopId=${shopId}`;
