@@ -173,18 +173,16 @@ export function NavBar() {
                   </MenubarItem>
                 </MenubarContent>
               </MenubarMenu>
-              {canAccessNewArrivals && (
-                <MenubarMenu>
-                  <MenubarTrigger>New Arrivals</MenubarTrigger>
-                  <MenubarContent>
-                    <MenubarItem>
-                      <Link href="/retail-new-arrivals" className="flex w-full">
-                        Pending Confirmations
-                      </Link>
-                    </MenubarItem>
-                  </MenubarContent>
-                </MenubarMenu>
-              )}
+              <MenubarMenu>
+                <MenubarTrigger>New Arrivals</MenubarTrigger>
+                <MenubarContent>
+                  <MenubarItem>
+                    <Link href="/retail/new-arrivals" className="flex w-full">
+                      Pending Confirmations
+                    </Link>
+                  </MenubarItem>
+                </MenubarContent>
+              </MenubarMenu>
             </>
           )}
         </Menubar>

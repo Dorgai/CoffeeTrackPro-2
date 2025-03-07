@@ -187,7 +187,7 @@ export default function App() {
                 <ProtectedRoute
                   path="/retail/new-arrivals"
                   component={RetailNewArrivals}
-                  roles={["retailOwner", "shopManager", "barista"]}
+                  roles={["roasteryOwner", "retailOwner", "shopManager", "barista"]}
                 />
               )}
             </Route>
