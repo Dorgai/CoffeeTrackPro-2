@@ -115,7 +115,7 @@ export default function App() {
                 <ProtectedRoute
                   path="/retail"
                   component={Retail}
-                  roles={["retailOwner", "shopManager", "barista"]}
+                  roles={["roasteryOwner", "retailOwner", "shopManager", "barista"]}
                 />
               )}
             </Route>
@@ -125,7 +125,7 @@ export default function App() {
                 <ProtectedRoute
                   path="/retail/orders"
                   component={RetailOrders}
-                  roles={["retailOwner", "shopManager", "barista"]}
+                  roles={["roasteryOwner", "retailOwner", "shopManager", "barista"]}
                 />
               )}
             </Route>
@@ -135,7 +135,7 @@ export default function App() {
                 <ProtectedRoute
                   path="/retail-overview"
                   component={RetailOverview}
-                  roles={["retailOwner", "shopManager"]}
+                  roles={["roasteryOwner", "retailOwner", "shopManager"]}
                 />
               )}
             </Route>

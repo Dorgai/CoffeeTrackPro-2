@@ -28,7 +28,7 @@ export function NavBar() {
   const canAccessGreenCoffee = ["roasteryOwner", "roaster"].includes(user?.role || "");
   const canAccessAnalytics = ["roasteryOwner", "retailOwner", "shopManager"].includes(user?.role || "");
   const canAccessRoasting = ["roasteryOwner", "roaster"].includes(user?.role || "");
-  const canAccessRetail = ["retailOwner", "shopManager", "barista"].includes(user?.role || "");
+  const canAccessRetail = ["roasteryOwner", "retailOwner", "shopManager", "barista"].includes(user?.role || "");
 
   // Redirect users to their appropriate dashboard
   const homePath = isRetailUser ? "/manager-dashboard" : "/";
@@ -163,6 +163,11 @@ export function NavBar() {
                   <MenubarItem>
                     <Link href="/retail/orders" className="flex w-full">
                       Orders
+                    </Link>
+                  </MenubarItem>
+                  <MenubarItem>
+                    <Link href="/retail-overview" className="flex w-full">
+                      Overview
                     </Link>
                   </MenubarItem>
                 </MenubarContent>
