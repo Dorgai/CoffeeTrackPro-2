@@ -405,15 +405,17 @@ export class DatabaseStorage {
             s.id as shop_id,
             s.name as shop_name,
             s.location as shop_location,
+            s.is_active,
             gc.id as coffee_id,
             gc.name as coffee_name,
             gc.producer,
             gc.grade,
-            COALESCE(ri.small_bags, 0)::integer as small_bags,
-            COALESCE(ri.large_bags, 0)::integer as large_bags,
+            ri.id as inventory_id,
+            COALESCE(ri.small_bags, 0) as small_bags,
+            COALESCE(ri.large_bags, 0) as large_bags,
             ri.updated_at,
             ri.updated_by_id,
-            u.username as updated_by
+            u.username as updated_by_username
           FROM shops s
           CROSS JOIN green_coffee gc
           LEFT JOIN retail_inventory ri ON ri.shop_id = s.id AND ri.green_coffee_id = gc.id
@@ -422,17 +424,18 @@ export class DatabaseStorage {
         )
         SELECT 
           shop_id as "shopId",
-          coffee_id as "greenCoffeeId",
           shop_name as "shopName",
           shop_location as "shopLocation",
+          coffee_id as "greenCoffeeId",
           coffee_name as "coffeeName",
           producer,
           grade,
+          inventory_id as "id",
           small_bags as "smallBags",
           large_bags as "largeBags",
           updated_at as "updatedAt",
           updated_by_id as "updatedById",
-          updated_by as "updatedBy"
+          updated_by_username as "updatedByUsername"
         FROM shop_inventory
         ORDER BY shop_name, coffee_name`;
 
@@ -480,6 +483,7 @@ export class DatabaseStorage {
         throw new Error(`Coffee ${data.greenCoffeeId} not found or inactive`);
       }
 
+      // Use parameterized query for the insert/update
       const query = sql`
         INSERT INTO retail_inventory (
           shop_id,
@@ -503,7 +507,14 @@ export class DatabaseStorage {
           large_bags = EXCLUDED.large_bags,
           updated_by_id = EXCLUDED.updated_by_id,
           updated_at = EXCLUDED.updated_at
-        RETURNING *`;
+        RETURNING 
+          id,
+          shop_id as "shopId",
+          green_coffee_id as "greenCoffeeId",
+          small_bags as "smallBags",
+          large_bags as "largeBags",
+          updated_by_id as "updatedById",
+          updated_at as "updatedAt"`;
 
       const result = await db.execute(query);
       console.log("Updated inventory:", result.rows[0]);

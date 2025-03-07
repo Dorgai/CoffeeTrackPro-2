@@ -136,8 +136,13 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
               key={confirmation.id}
               className="flex items-center justify-between p-4 border rounded-lg"
             >
-              <div>
-                <h4 className="font-medium">{confirmation.coffee?.name}</h4>
+              <div className="space-y-1">
+                <h4 className="font-medium">
+                  {confirmation.coffeeName || confirmation.coffee?.name}
+                </h4>
+                <p className="text-sm text-muted-foreground">
+                  Producer: {confirmation.producer || confirmation.coffee?.producer}
+                </p>
                 <p className="text-sm text-muted-foreground">
                   Dispatched: {confirmation.dispatchedSmallBags} small bags, {confirmation.dispatchedLargeBags} large bags
                 </p>
@@ -168,7 +173,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
             <DialogHeader>
               <DialogTitle>Confirm Received Quantities</DialogTitle>
               <DialogDescription>
-                Enter the actual quantities received for {selectedConfirmation?.coffee?.name}
+                Enter the actual quantities received for {selectedConfirmation?.coffeeName || selectedConfirmation?.coffee?.name}
               </DialogDescription>
             </DialogHeader>
 
