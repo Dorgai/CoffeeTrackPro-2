@@ -827,21 +827,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const orders = await storage.getOrdersByShop(shopId);
       return res.json(orders);
-    } catch ({
-      console.error("Error fetching orders:", error);
-      res.status(500).json({ message:"Failed to fetch orders" });
+    } catch (error) {
+      console.error("Error fetchingorders:", error);
+      res.status(500).json({ message: "Failed to fetch orders" });
     }
   });
 
-  // Update order status
+  // Update order status endpoint with corrected error handling
   app.patch(
-    "/apiorders/:id/status",
+    "/api/orders/:id/status",
     requireRole(["retailOwner", "owner", "roasteryOwner", "roaster", "shopManager", "barista"]),
     async (req, res) => {
       try {
         const orderId = parseInt(req.params.id);
         const { status, smallBags, largeBags } = req.body;
-        console.log("Order status update requestedby:", {
+        console.log("Order status update requested by:", {
           username: req.user?.username,
           role: req.user?.role,
           orderId,
@@ -855,7 +855,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(404).json({ message: "Order not found" });
         }
 
-        //        // Owner, retailOwner and roasteryOwner have full access to allstatus changes
+        // Owner, retailOwner and roasteryOwner have full access to all status changes
         if (["owner", "retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {
           if (smallBags > order.smallBags || largeBags > order.largeBags) {
             return res.status(400).json({
@@ -885,7 +885,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        // Update the order status
+        // Update the order status and create dispatch confirmation
         const updatedOrder = await storage.updateOrderStatus(orderId, {
           status,
           smallBags,
@@ -899,8 +899,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           try {
             const confirmation = await storage.createDispatchedCoffeeConfirmation({
               orderId: order.id,
-              shopId: order.shopId!,
-              greenCoffeeId: order.greenCoffeeId!,
+              shopId: order.shopId,
+              greenCoffeeId: order.greenCoffeeId,
               dispatchedSmallBags: smallBags,
               dispatchedLargeBags: largeBags,
               status: "pending"
@@ -914,8 +914,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json(updatedOrder);
       } catch (error) {
         console.error("Error updating order status:", error);
-        res.status(500).json({
-          message: error instanceof Error ? error.message : "Failed to update order"
+        res.status(500).json({ 
+          message: "Failed to update order status",
+          details: error instanceof Error ? error.message : "Unknown error"
         });
       }
     }
@@ -1504,85 +1505,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
-  app.post(
-    "/api/dispatched-coffee/confirmations/:id/confirm",
-    requireShopAccess(["shopManager", "barista", "roasteryOwner", "retailOwner"]),
+  // Dispatch confirmation routes
+  app.get("/api/dispatched-coffee/confirmations", requireRole(["shopManager", "barista", "retailOwner", "roasteryOwner"]), async (req, res) => {
+    try {
+      const shopId = req.query.shopId ? Number(req.query.shopId) : undefined;
+      console.log("Fetching dispatch confirmations for:", {
+        user: req.user?.username,
+        role: req.user?.role,
+        shopId
+      });
+
+      // Fetch confirmations
+      const query = sql`
+        SELECT 
+          dcc.*,
+          gc.name as coffee_name,
+          gc.producer as producer
+        FROM dispatched_coffee_confirmation dcc
+        JOIN green_coffee gc ON dcc.green_coffee_id = gc.id
+        WHERE 1=1
+        ${shopId ? sql`AND dcc.shop_id = ${shopId}` : sql``}
+        ORDER BY dcc.created_at DESC
+      `;
+
+      const confirmations = await storage.db.execute(query);
+      console.log("Found confirmations:", confirmations.length);
+
+      res.json(confirmations);
+    } catch (error) {
+      console.error("Error fetching dispatch confirmations:", error);
+      res.status(500).json({
+        message: "Failed to fetch confirmations",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // Confirm dispatch endpoint
+  app.post("/api/dispatched-coffee/confirmations/:id/confirm", 
+    requireRole(["shopManager", "barista", "retailOwner", "roasteryOwner"]), 
     async (req, res) => {
       try {
         const confirmationId = parseInt(req.params.id);
         const { receivedSmallBags, receivedLargeBags } = req.body;
 
-        // Input validation
-        if (typeof receivedSmallBags !== 'number' || typeof receivedLargeBags !== 'number') {
-          return res.status(400).json({
-            message: "Invalid input: receivedSmallBags and receivedLargeBags must be numbers"
-          });
-        }
+        console.log("Processing dispatch confirmation:", {
+          confirmationId,
+          receivedSmallBags,
+          receivedLargeBags,
+          user: req.user?.username,
+          role: req.user?.role
+        });
 
-        // Get the original confirmation
-        const [confirmation] = await storage.db.execute(sql`
-          SELECT * FROM dispatched_coffee_confirmation
-          WHERE id = ${confirmationId} AND status = 'pending'
-        `);
-
+        // Fetch the confirmation
+        const confirmation = await storage.getDispatchConfirmation(confirmationId);
         if (!confirmation) {
-          return res.status(404).json({ message: "Confirmation not found or already processed" });
+          return res.status(404).json({ message: "Confirmation not found" });
         }
 
-        // Verify shop access for non-admin users
-        if (!["owner", "retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {
-          const hasAccess = await checkShopAccess(req.user!.id, confirmation.shop_id);
+        // Verify shop access for non-admin roles
+        if (!["retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {
+          const hasAccess = await checkShopAccess(req.user!.id, confirmation.shopId);
           if (!hasAccess) {
             return res.status(403).json({ message: "No access to this shop" });
           }
         }
 
-        // Update the confirmation status
-        await storage.db.execute(sql`
-          UPDATE dispatched_coffee_confirmation
-          SET 
-            received_small_bags = ${receivedSmallBags},
-            received_large_bags = ${receivedLargeBags},
-            status = 'confirmed',
-            confirmed_by_id = ${req.user!.id},
-            confirmed_at = NOW()
-          WHERE id = ${confirmationId} AND status = 'pending'
-        `);
-
-        // Get the updated confirmation
-        const [updatedConfirmation] = await storage.db.execute(sql`
-          SELECT 
-            dc.*,
-            gc.name as coffee_name,
-            gc.producer as producer
-          FROM dispatched_coffee_confirmation dc
-          JOIN green_coffee gc ON dc.green_coffee_id = gc.id
-          WHERE dc.id = ${confirmationId}
-        `);
-
-        if (!updatedConfirmation) {
-          throw new Error("Failed to retrieve updated confirmation");
-        }
-
-        // Update retail inventory
-        await storage.updateRetailInventory({
-          shopId: confirmation.shop_id,
-          greenCoffeeId: confirmation.green_coffee_id,
-          smallBags: receivedSmallBags,
-          largeBags: receivedLargeBags,
-          updatedById: req.user!.id
+        // Update the confirmation
+        const updatedConfirmation = await storage.confirmDispatch(confirmationId, {
+          receivedSmallBags,
+          receivedLargeBags,
+          confirmedById: req.user!.id
         });
 
+        console.log("Updated confirmation:", updatedConfirmation);
         res.json(updatedConfirmation);
       } catch (error) {
-        console.error("Error in confirmation process:", error);
+        console.error("Error processing dispatch confirmation:", error);
         res.status(500).json({
-          message: "Failed to confirm dispatch",
+          message: "Failed to process confirmation",
           details: error instanceof Error ? error.message : "Unknown error"
         });
       }
     }
-  );
+  });
 
   const httpServer = createServer(app);
   return httpServer;
