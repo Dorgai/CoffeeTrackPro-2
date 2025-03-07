@@ -566,34 +566,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: "Shop ID is required" });
         }
 
-        // Get all inventory data with enhanced logging
-        console.log("Fetching all retail inventories");
-        const inventory = await storage.getAllRetailInventories();
-        console.log("Raw inventory data:", inventory);
+        // Get inventory with related data
+        const inventoryQuery = sql`
+          SELECT 
+            ri.*,
+            s.name as shop_name,
+            s.location as shop_location,
+            gc.name as coffee_name,
+            gc.producer as producer,
+            gc.grade as grade,
+            u.username as updated_by_username
+          FROM retail_inventory ri
+          JOIN shops s ON ri.shop_id = s.id
+          JOIN green_coffee gc ON ri.green_coffee_id = gc.id
+          LEFT JOIN users u ON ri.updated_by_id = u.id
+          WHERE s.is_active = true
+          ${shopId ? sql`AND ri.shop_id = ${shopId}` : sql``}
+        `;
 
-        // Filter by shop if shopId is provided
-        const filteredInventory = shopId
-          ? inventory.filter(item => item.shopId === shopId)
-          : inventory;
+        const inventory = await storage.db.execute(inventoryQuery);
 
-        // Ensure all required fields are present
-        const mappedResults = filteredInventory.map(item => ({
+        // Map the results to match the expected format
+        const mappedResults = inventory.map(item => ({
           id: item.id,
-          shopId: item.shopId,
-          shopName: item.shopName,
-          shopLocation: item.shopLocation,
-          coffeeId: item.coffeeId,
-          coffeeName: item.coffeeName,
+          shopId: item.shop_id,
+          shopName: item.shop_name,
+          shopLocation: item.shop_location,
+          coffeeId: item.green_coffee_id,
+          coffeeName: item.coffee_name,
           producer: item.producer,
           grade: item.grade,
-          smallBags: parseInt(item.smallBags) || 0,
-          largeBags: parseInt(item.largeBags) || 0,
-          updatedAt: item.updatedAt,
-          updatedById: item.updatedById,
-          updatedByUsername: item.updatedByUsername
+          smallBags: parseInt(item.small_bags) || 0,
+          largeBags: parseInt(item.large_bags) || 0,
+          updatedAt: item.updated_at,
+          updatedById: item.updated_by_id,
+          updatedByUsername: item.updated_by_username
         }));
 
-        console.log("Mapped inventory data:", mappedResults);
         res.json(mappedResults);
       } catch (error) {
         console.error("Error fetching retail inventory:", error);
@@ -717,34 +726,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: "Shop ID is required" });
         }
 
-        // Get all inventory data with enhanced logging
-        console.log("Fetching all retail inventories");
-        const inventory = await storage.getAllRetailInventories();
-        console.log("Raw inventory data:", inventory);
+        // Get inventory with related data
+        const inventoryQuery = sql`
+          SELECT 
+            ri.*,
+            s.name as shop_name,
+            s.location as shop_location,
+            gc.name as coffee_name,
+            gc.producer as producer,
+            gc.grade as grade,
+            u.username as updated_by_username
+          FROM retail_inventory ri
+          JOIN shops s ON ri.shop_id = s.id
+          JOIN green_coffee gc ON ri.green_coffee_id = gc.id
+          LEFT JOIN users u ON ri.updated_by_id = u.id
+          WHERE s.is_active = true
+          ${shopId ? sql`AND ri.shop_id = ${shopId}` : sql``}
+        `;
 
-        // Filter by shop if shopId is provided
-        const filteredInventory = shopId
-          ? inventory.filter(item => item.shopId === shopId)
-          : inventory;
+        const inventory = await storage.db.execute(inventoryQuery);
 
-        // Ensure all required fields are present
-        const mappedResults = filteredInventory.map(item => ({
+        // Map the results to match the expected format
+        const mappedResults = inventory.map(item => ({
           id: item.id,
-          shopId: item.shopId,
-          shopName: item.shopName,
-          shopLocation: item.shopLocation,
-          coffeeId: item.coffeeId,
-          coffeeName: item.coffeeName,
+          shopId: item.shop_id,
+          shopName: item.shop_name,
+          shopLocation: item.shop_location,
+          coffeeId: item.green_coffee_id,
+          coffeeName: item.coffee_name,
           producer: item.producer,
           grade: item.grade,
-          smallBags: parseInt(item.smallBags) || 0,
-          largeBags: parseInt(item.largeBags) || 0,
-          updatedAt: item.updatedAt,
-          updatedById: item.updatedById,
-          updatedByUsername: item.updatedByUsername
+          smallBags: parseInt(item.small_bags) || 0,
+          largeBags: parseInt(item.large_bags) || 0,
+          updatedAt: item.updated_at,
+          updatedById: item.updated_by_id,
+          updatedByUsername: item.updated_by_username
         }));
 
-        console.log("Mapped inventory data:", mappedResults);
         res.json(mappedResults);
       } catch (error) {
         console.error("Error fetching retail inventory:", error);
@@ -810,14 +828,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const orders = await storage.getOrdersByShop(shopId);
       return res.json(orders);
     } catch (error) {
-      console.error("Error fetching orders:", error);
-      res.status(500).json({ message: "Failed to fetch orders" });
+      console.error("Error fetching orders:", error);res.status(500).json({ message: "Failed to fetch orders" });
     }
   });
 
   // Update order status
   app.patch(
-    "/api/orders/:id/status",
+    "/apiorders/:id/status",
     requireRole(["retailOwner", "owner", "roasteryOwner", "roaster", "shopManager", "barista"]),
     async (req, res) => {
       try {
@@ -1358,6 +1375,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Then update the retail inventory
+        await storage.updateRetailInventory({
+          shopId: confirmation.shop_id,
+          greenCoffeeId: confirmation.green_coffee_id,
+          smallBags: receivedSmallBags,
+          largeBags: receivedLargeBags,
+          updatedById: req.user!.id
+        });
+
+        res.json(updatedConfirmation);
+      } catch (error) {
+        console.error("Error in confirmation process:", error);
+        res.status(500).json({
+          message: "Failed to confirm dispatch",
+          details: error instanceof Error ? error.message : "Unknown error"
+        });
+      }
+    }
+  );
+
+  app.post(
+    "/api/dispatched-coffee/confirmations/:id/confirm",
+    requireShopAccess(["shopManager", "barista", "roasteryOwner", "retailOwner"]),
+    async (req, res) => {
+      try {
+        const confirmationId = parseInt(req.params.id);
+        const { receivedSmallBags, receivedLargeBags } = req.body;
+
+        // Input validation
+        if (typeof receivedSmallBags !== 'number' || typeof receivedLargeBags !== 'number') {
+          return res.status(400).json({
+            message: "Invalid input: receivedSmallBags and receivedLargeBags must be numbers"
+          });
+        }
+
+        // Get the original confirmation
+        const [confirmation] = await storage.db.execute(sql`
+          SELECT * FROM dispatched_coffee_confirmation
+          WHERE id = ${confirmationId} AND status = 'pending'
+        `);
+
+        if (!confirmation) {
+          return res.status(404).json({ message: "Confirmation not found or already processed" });
+        }
+
+        // Verify shop access for non-admin users
+        if (!["owner", "retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {
+          const hasAccess = await checkShopAccess(req.user!.id, confirmation.shop_id);
+          if (!hasAccess) {
+            return res.status(403).json({ message: "No access to this shop" });
+          }
+        }
+
+        // Update the confirmation status
+        await storage.db.execute(sql`
+          UPDATE dispatched_coffee_confirmation
+          SET 
+            received_small_bags = ${receivedSmallBags},
+            received_large_bags = ${receivedLargeBags},
+            status = 'confirmed',
+            confirmed_by_id = ${req.user!.id},
+            confirmed_at = NOW()
+          WHERE id = ${confirmationId} AND status = 'pending'
+        `);
+
+        // Get the updated confirmation
+        const [updatedConfirmation] = await storage.db.execute(sql`
+          SELECT 
+            dc.*,
+            gc.name as coffee_name,
+            gc.producer as producer
+          FROM dispatched_coffee_confirmation dc
+          JOIN green_coffee gc ON dc.green_coffee_id = gc.id
+          WHERE dc.id = ${confirmationId}
+        `);
+
+        if (!updatedConfirmation) {
+          throw new Error("Failed to retrieve updated confirmation");
+        }
+
+        // Update retail inventory
         await storage.updateRetailInventory({
           shopId: confirmation.shop_id,
           greenCoffeeId: confirmation.green_coffee_id,

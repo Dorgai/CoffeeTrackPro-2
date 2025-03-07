@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { DispatchedCoffeeConfirmation as DispatchConfirmationType } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import {
   Card,
@@ -29,10 +28,23 @@ interface DispatchedCoffeeProps {
   shopId?: number;
 }
 
+type DispatchConfirmation = {
+  id: number;
+  shopId: number;
+  greenCoffeeId: number;
+  coffeeName: string;
+  producer: string;
+  dispatchedSmallBags: number;
+  dispatchedLargeBags: number;
+  status: string;
+  confirmedAt: string | null;
+  createdAt: string;
+};
+
 export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) {
   const { toast } = useToast();
   const { user } = useAuth();
-  const [selectedConfirmation, setSelectedConfirmation] = useState<DispatchConfirmationType | null>(null);
+  const [selectedConfirmation, setSelectedConfirmation] = useState<DispatchConfirmation | null>(null);
   const [receivedQuantities, setReceivedQuantities] = useState({
     smallBags: 0,
     largeBags: 0
@@ -41,7 +53,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
   // Admin roles can see all confirmations without shopId
   const isAdminRole = user && ["roasteryOwner", "retailOwner", "owner"].includes(user.role);
 
-  const { data: confirmations, isLoading } = useQuery({
+  const { data: confirmations, isLoading } = useQuery<DispatchConfirmation[]>({
     queryKey: ["/api/dispatched-coffee/confirmations", shopId],
     queryFn: async () => {
       // All admin roles have unrestricted access
@@ -55,7 +67,8 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
       }
 
       const data = await res.json();
-      return data.filter((conf: DispatchConfirmationType) => conf.status === "pending");
+      console.log("Fetched confirmations:", data);
+      return data.filter((conf: DispatchConfirmation) => conf.status === "pending");
     },
     enabled: Boolean(user && (isAdminRole || shopId)),
   });
@@ -66,9 +79,15 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
       receivedSmallBags: number;
       receivedLargeBags: number;
     }) => {
-      const res = await apiRequest("POST", "/api/dispatched-coffee/confirm", data);
+      console.log("Confirming dispatch:", data);
+      const res = await apiRequest(
+        "POST", 
+        `/api/dispatched-coffee/confirmations/${data.confirmationId}/confirm`,
+        data
+      );
       if (!res.ok) {
-        throw new Error(await res.text());
+        const error = await res.text();
+        throw new Error(error);
       }
       return res.json();
     },
@@ -114,6 +133,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
   const handleConfirm = () => {
     if (!selectedConfirmation) return;
 
+    console.log("Handling confirmation for:", selectedConfirmation.id);
     confirmMutation.mutate({
       confirmationId: selectedConfirmation.id,
       receivedSmallBags: Number(receivedQuantities.smallBags),
@@ -138,10 +158,10 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
             >
               <div className="space-y-1">
                 <h4 className="font-medium">
-                  {confirmation.coffeeName || confirmation.coffee?.name}
+                  {confirmation.coffeeName}
                 </h4>
                 <p className="text-sm text-muted-foreground">
-                  Producer: {confirmation.producer || confirmation.coffee?.producer}
+                  Producer: {confirmation.producer}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   Dispatched: {confirmation.dispatchedSmallBags} small bags, {confirmation.dispatchedLargeBags} large bags
@@ -173,7 +193,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
             <DialogHeader>
               <DialogTitle>Confirm Received Quantities</DialogTitle>
               <DialogDescription>
-                Enter the actual quantities received for {selectedConfirmation?.coffeeName || selectedConfirmation?.coffee?.name}
+                Enter the actual quantities received for {selectedConfirmation?.coffeeName}
               </DialogDescription>
             </DialogHeader>
 

@@ -6,6 +6,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { DispatchedCoffeeConfirmation } from "@/components/coffee/dispatched-coffee-confirmation";
 import { InventoryDiscrepancyView } from "@/components/coffee/inventory-discrepancy-view";
 import { ShopSelector } from "@/components/layout/shop-selector";
+import { useActiveShop } from "@/hooks/use-active-shop";
 import {
   Card,
   CardContent,
@@ -53,6 +54,7 @@ type OrderItem = {
 
 export default function RetailOverview() {
   const { user } = useAuth();
+  const { activeShop } = useActiveShop();
 
   // Get user's shops
   const { data: userShops } = useQuery<Shop[]>({
@@ -61,10 +63,11 @@ export default function RetailOverview() {
   });
 
   const { data: inventory, isLoading: loadingInventory } = useQuery<InventoryItem[]>({
-    queryKey: ["/api/retail-inventory"],
+    queryKey: ["/api/retail-inventory", activeShop?.id],
     queryFn: async () => {
-      console.log("Fetching retail inventory...");
-      const res = await apiRequest("GET", "/api/retail-inventory");
+      console.log("Fetching retail inventory for shop:", activeShop?.id);
+      const url = activeShop?.id ? `/api/retail-inventory?shopId=${activeShop.id}` : "/api/retail-inventory";
+      const res = await apiRequest("GET", url);
       if (!res.ok) {
         throw new Error("Failed to fetch inventory");
       }
@@ -72,10 +75,20 @@ export default function RetailOverview() {
       console.log("Fetched inventory data:", data);
       return data;
     },
+    enabled: Boolean(user) // Only fetch when user is logged in
   });
 
   const { data: orders, isLoading: loadingOrders } = useQuery<OrderItem[]>({
-    queryKey: ["/api/orders"],
+    queryKey: ["/api/orders", activeShop?.id],
+    queryFn: async () => {
+      const url = activeShop?.id ? `/api/orders?shopId=${activeShop.id}` : "/api/orders";
+      const res = await apiRequest("GET", url);
+      if (!res.ok) {
+        throw new Error("Failed to fetch orders");
+      }
+      return res.json();
+    },
+    enabled: Boolean(user)
   });
 
   if (loadingInventory || loadingOrders) {
@@ -103,6 +116,11 @@ export default function RetailOverview() {
     orders: OrderItem[];
   }>>((acc, item) => {
     const { shopId, shopName, shopLocation } = item;
+
+    // If activeShop is selected, only show that shop's data
+    if (activeShop?.id && activeShop.id !== shopId) {
+      return acc;
+    }
 
     // Only include shops that the user has access to
     if (user?.role !== "roasteryOwner" && !userShops?.some(s => s.id === shopId)) {
@@ -147,7 +165,7 @@ export default function RetailOverview() {
 
       {Object.entries(shopData).length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
-          No shop data available
+          {activeShop?.id ? "No data available for selected shop" : "No shop data available"}
         </div>
       ) : (
         Object.entries(shopData).map(([shopId, data]) => (
