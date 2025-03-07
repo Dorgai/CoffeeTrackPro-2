@@ -156,6 +156,11 @@ export function NavBar() {
                 </MenubarTrigger>
                 <MenubarContent>
                   <MenubarItem>
+                    <Link href="/retail" className="flex w-full">
+                      Inventory
+                    </Link>
+                  </MenubarItem>
+                  <MenubarItem>
                     <Link href="/retail/orders" className="flex w-full">
                       Orders
                     </Link>
