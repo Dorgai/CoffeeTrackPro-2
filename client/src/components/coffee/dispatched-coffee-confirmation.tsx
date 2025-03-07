@@ -38,56 +38,37 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
     largeBags: 0
   });
 
-  // Determine if user has admin access
+  // Admin roles can see all confirmations without shopId
   const isAdminRole = user && ["owner", "roasteryOwner", "retailOwner"].includes(user.role);
 
   const { data: confirmations, isLoading } = useQuery({
     queryKey: ["/api/dispatched-coffee/confirmations", shopId],
     queryFn: async () => {
-      console.log("Fetching confirmations:", {
-        shopId,
-        userRole: user?.role,
-        username: user?.username,
-        isAdminRole
-      });
-
-      // Admin roles can fetch all confirmations, others need shopId
-      const url = isAdminRole
+      // Admin roles fetch all confirmations, others need shopId
+      const url = isAdminRole 
         ? "/api/dispatched-coffee/confirmations"
         : `/api/dispatched-coffee/confirmations?shopId=${shopId}`;
 
       const res = await apiRequest("GET", url);
       if (!res.ok) {
-        const error = await res.text();
-        throw new Error(error);
+        throw new Error(await res.text());
       }
 
       const data = await res.json();
-      console.log("Received confirmations:", data?.length || 0);
-
-      // Filter only pending confirmations
-      const pendingConfirmations = data.filter(
-        (conf: DispatchConfirmationType) => conf.status === "pending"
-      );
-
-      console.log("Pending confirmations:", pendingConfirmations?.length || 0);
-      return pendingConfirmations;
+      return data.filter((conf: DispatchConfirmationType) => conf.status === "pending");
     },
     enabled: Boolean(user && (isAdminRole || shopId)),
   });
 
-  // Mutation for confirming received quantities
   const confirmMutation = useMutation({
     mutationFn: async (data: {
       confirmationId: number;
       receivedSmallBags: number;
       receivedLargeBags: number;
     }) => {
-      console.log("Sending confirmation data:", data);
       const res = await apiRequest("POST", "/api/dispatched-coffee/confirm", data);
       if (!res.ok) {
-        const error = await res.text();
-        throw new Error(error);
+        throw new Error(await res.text());
       }
       return res.json();
     },
@@ -101,7 +82,6 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
       });
     },
     onError: (error: Error) => {
-      console.error("Confirmation error:", error);
       toast({
         title: "Error",
         description: error.message,
@@ -127,23 +107,12 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
             There are currently no pending coffee shipments to confirm.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center p-8 text-muted-foreground">
-            <p>Once coffee is dispatched to your shop, you'll be able to confirm the received quantities here.</p>
-          </div>
-        </CardContent>
       </Card>
     );
   }
 
   const handleConfirm = () => {
     if (!selectedConfirmation) return;
-
-    console.log("Attempting to confirm dispatch:", {
-      confirmationId: selectedConfirmation.id,
-      receivedSmallBags: Number(receivedQuantities.smallBags),
-      receivedLargeBags: Number(receivedQuantities.largeBags)
-    });
 
     confirmMutation.mutate({
       confirmationId: selectedConfirmation.id,
