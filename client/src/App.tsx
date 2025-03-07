@@ -25,7 +25,6 @@ import Billing from "@/pages/billing";
 import RoastingDiscrepancies from "@/pages/roasting-discrepancies";
 import Retail from "@/pages/retail";
 
-
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -42,7 +41,7 @@ export default function App() {
                 <ProtectedRoute
                   path="/"
                   component={Dashboard}
-                  roles={["roasteryOwner", "roaster"]}
+                  roles={["roasteryOwner", "roaster", "retailOwner"]}
                 />
               )}
             </Route>
@@ -120,6 +119,7 @@ export default function App() {
                 />
               )}
             </Route>
+
             <Route path="/retail/orders">
               {() => (
                 <ProtectedRoute

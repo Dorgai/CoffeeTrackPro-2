@@ -617,48 +617,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // Retail Inventory Routes - accessible by shop manager, barista and retail owner
-  app.get("/api/retail-inventory", requireShopAccess(["shopManager", "barista", "retailOwner", "owner", "roaster", "roasteryOwner"]), async (req, res) => {
-      try {
-        const shopId = req.query.shopId ? Number(req.query.shopId) : undefined;
-        console.log("Fetching retail inventory for user:", {
-          userId: req.user?.id,
-          username: req.user?.username,
-          role: req.user?.role,
-          requestedShopId: shopId
-        });
-
-        // For shopManager and barista, require shopId
-        if (["shopManager", "barista"].includes(req.user?.role || "") && !shopId) {
-          console.log("Shop ID required for role:", req.user?.role);
-          return res.status(400).json({ message: "Shop ID is required" });
-        }
-
-        // Get all inventory data
-        console.log("Fetching all retail inventories");
-        const inventory = await storage.getAllRetailInventories();
-        console.log("Total inventory items fetched:", inventory.length);
-
-        // Filter by shop if shopId is provided
-        const filteredInventory = shopId 
-          ? inventory.filter(item => item.shopId === shopId)
-          : inventory;
-
-        console.log("Filtered inventory items:", {
-          total: inventory.length,
-          filtered: filteredInventory.length,
-          shopId
-        });
-
-        res.json(filteredInventory);
-      } catch (error) {
-        console.error("Error fetching retail inventory:", error);
-        res.status(500).json({ 
-          message: "Failed to fetch inventory",
-          details: error instanceof Error ? error.message : "Unknown error"
-        });
-      }
-    });
-
   app.post("/api/retail-inventory", 
     requireShopAccess(["shopManager", "barista", "retailOwner", "owner", "roaster", "roasteryOwner"]), 
     async (req, res) => {
