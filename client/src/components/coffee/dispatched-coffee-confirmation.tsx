@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { DispatchedCoffeeConfirmation as DispatchConfirmationType } from "@shared/schema";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Card,
   CardContent,
@@ -30,6 +31,7 @@ interface DispatchedCoffeeProps {
 
 export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [selectedConfirmation, setSelectedConfirmation] = useState<DispatchConfirmationType | null>(null);
   const [receivedQuantities, setReceivedQuantities] = useState({
     smallBags: 0,
@@ -40,7 +42,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
   const { data: confirmations, isLoading } = useQuery({
     queryKey: ["/api/dispatched-coffee/confirmations", shopId],
     queryFn: async () => {
-      console.log("Fetching confirmations for shop:", shopId);
+      console.log("Fetching confirmations for shop:", shopId, "User role:", user?.role);
       const res = await apiRequest("GET", `/api/dispatched-coffee/confirmations?shopId=${shopId}`);
       if (!res.ok) {
         const error = await res.text();
@@ -71,7 +73,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
       console.log("Pending confirmations:", pendingConfirmations);
       return pendingConfirmations;
     },
-    enabled: !!shopId,
+    enabled: Boolean(user && shopId),
   });
 
   // Mutation for confirming received quantities
