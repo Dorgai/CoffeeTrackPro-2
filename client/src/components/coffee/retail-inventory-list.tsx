@@ -16,14 +16,20 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-interface InventoryItem extends RetailInventory {
+interface InventoryItem {
+  id: number | null;
+  shopId: number;
+  shopName: string;
+  shopLocation: string;
+  coffeeId: number;
   coffeeName: string;
   producer: string;
   grade: string;
-  updatedBy: string | null;
   smallBags: number;
   largeBags: number;
   updatedAt: string | null;
+  updatedById: number | null;
+  updatedByUsername: string | null;
 }
 
 export function RetailInventoryList({ shopId }: { shopId?: number }) {
@@ -52,7 +58,7 @@ export function RetailInventoryList({ shopId }: { shopId?: number }) {
     try {
       const res = await apiRequest("POST", "/api/retail-inventory", {
         shopId,
-        greenCoffeeId: coffeeId,
+        coffeeId,
         smallBags: 10,
         largeBags: 5,
         updatedById: user?.id
@@ -106,8 +112,8 @@ export function RetailInventoryList({ shopId }: { shopId?: number }) {
           </TableHeader>
           <TableBody>
             {inventory?.map((item) => (
-              <TableRow key={`${item.shopId}-${item.greenCoffeeId}`}>
-                <TableCell>{item.coffeeName}</TableCell>
+              <TableRow key={`${item.shopId}-${item.coffeeId}`}>
+                <TableCell className="font-medium">{item.coffeeName}</TableCell>
                 <TableCell>{item.producer}</TableCell>
                 <TableCell>
                   <Badge variant="outline">{item.grade}</Badge>
@@ -117,12 +123,13 @@ export function RetailInventoryList({ shopId }: { shopId?: number }) {
                 <TableCell>
                   {item.updatedAt ? new Date(item.updatedAt).toLocaleString() : 'Never'}
                 </TableCell>
-                <TableCell>{item.updatedBy || '-'}</TableCell>
+                <TableCell>{item.updatedByUsername || '-'}</TableCell>
                 <TableCell>
                   <Button 
                     variant="outline" 
-                    onClick={() => handleRestock(item.greenCoffeeId)}
+                    onClick={() => handleRestock(item.coffeeId)}
                   >
+                    <Package className="h-4 w-4 mr-2" />
                     Restock
                   </Button>
                 </TableCell>

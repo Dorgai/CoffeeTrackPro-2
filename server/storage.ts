@@ -410,6 +410,7 @@ export class DatabaseStorage {
             gc.name as coffee_name,
             gc.producer,
             gc.grade,
+            gc.is_active as coffee_is_active,
             ri.id as inventory_id,
             COALESCE(ri.small_bags, 0) as small_bags,
             COALESCE(ri.large_bags, 0) as large_bags,
@@ -426,7 +427,7 @@ export class DatabaseStorage {
           shop_id as "shopId",
           shop_name as "shopName",
           shop_location as "shopLocation",
-          coffee_id as "greenCoffeeId",
+          coffee_id as "coffeeId",
           coffee_name as "coffeeName",
           producer,
           grade,
@@ -464,7 +465,7 @@ export class DatabaseStorage {
     try {
       console.log("Updating retail inventory with data:", data);
 
-      // First verify if shop and coffee exist
+      // First verify if shop and coffee exist and are active
       const [shop] = await db
         .select()
         .from(shops)
@@ -510,7 +511,7 @@ export class DatabaseStorage {
         RETURNING 
           id,
           shop_id as "shopId",
-          green_coffee_id as "greenCoffeeId",
+          green_coffee_id as "coffeeId",
           small_bags as "smallBags",
           large_bags as "largeBags",
           updated_by_id as "updatedById",
