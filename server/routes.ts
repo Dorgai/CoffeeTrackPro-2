@@ -144,9 +144,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/users/:id", requireRole(["owner", "roasteryOwner"]), async (req, res) => {
     try {
       const userId = parseInt(req.params.id);
-      const { role, isActive, defaultShopId } = req.body;
+      const { role, isActive } = req.body;
 
-      // Don't allow owner/roasteryOwner to modify their own role
+      // Don't allow owner/roasteryOwner to modify their own role or status
       if (userId === req.user!.id) {
         return res.status(403).json({ message: "Cannot modify own user account" });
       }
@@ -158,15 +158,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update user
       const updatedUser = await storage.updateUser(userId, {
-        role,
-        isActive,
-        defaultShopId
+        ...(role && { role }),
+        ...(typeof isActive === 'boolean' && { isActive })
       });
 
-      res.json(updatedUser);
+      // Remove sensitive data before sending response
+      const { password, ...userWithoutPassword } = updatedUser;
+      res.json(userWithoutPassword);
     } catch (error) {
       console.error("Error updating user:", error);
-      res.status(500).json({ message: "Failed to update user" });
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to update user" 
+      });
     }
   });
 
@@ -819,8 +822,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           // Shop manager can only mark orders as delivered
           if (req.user?.role === "shopManager" && status !== "delivered") {
-            return res.status(403).json({
-              message: "Shop managers can only mark orders as delivered"
+            return res.status(403).json({              message: "Shop managers can only mark orders as delivered"
             });
           }
 

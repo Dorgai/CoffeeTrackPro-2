@@ -141,11 +141,14 @@ export default function UserManagement() {
   const toggleActivationMutation = useMutation({
     mutationFn: async ({ userId, isActive }: { userId: number; isActive: boolean }) => {
       const res = await apiRequest(
-        "POST",
-        `/api/users/${userId}/toggle-activation`,
-        { isActive }
+        "PATCH",
+        `/api/users/${userId}`,
+        { is_active: isActive } // Changed to is_active
       );
-      if (!res.ok) throw new Error("Failed to update user activation status");
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error || "Failed to update user activation status");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -191,9 +194,9 @@ export default function UserManagement() {
       case "pending":
         return user.isPendingApproval;
       case "active":
-        return !user.isPendingApproval && user.isActive;
+        return !user.isPendingApproval && user.is_active; // Changed to is_active
       case "inactive":
-        return !user.isPendingApproval && !user.isActive;
+        return !user.isPendingApproval && !user.is_active; // Changed to is_active
       default:
         return true;
     }
@@ -256,12 +259,12 @@ export default function UserManagement() {
                       variant={
                         user.isPendingApproval
                           ? "outline"
-                          : user.isActive
+                          : user.is_active // Changed to is_active
                             ? "default"
                             : "destructive"
                       }
                     >
-                      {user.isPendingApproval ? "Pending Approval" : user.isActive ? "Active" : "Inactive"}
+                      {user.isPendingApproval ? "Pending Approval" : user.is_active ? "Active" : "Inactive"} // Changed to is_active
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -294,11 +297,11 @@ export default function UserManagement() {
                       </Button>
 
                       <Button
-                        variant={user.isActive ? "destructive" : "outline"}
+                        variant={user.is_active ? "destructive" : "outline"} // Changed to is_active
                         size="sm"
                         onClick={() => setUserToDeactivate(user)}
                       >
-                        {user.isActive ? (
+                        {user.is_active ? ( // Changed to is_active
                           <>
                             <UserX className="h-4 w-4 mr-2" />
                             Deactivate
@@ -365,11 +368,11 @@ export default function UserManagement() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {userToDeactivate?.isActive ? "Deactivate" : "Activate"} User
+              {userToDeactivate?.is_active ? "Deactivate" : "Activate"} User  {/* Changed to is_active */}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to {userToDeactivate?.isActive ? "deactivate" : "activate"} {userToDeactivate?.username}?
-              {userToDeactivate?.isActive && " This will prevent them from accessing the system."}
+              Are you sure you want to {userToDeactivate?.is_active ? "deactivate" : "activate"} {userToDeactivate?.username}? {/* Changed to is_active */}
+              {userToDeactivate?.is_active && " This will prevent them from accessing the system."} {/* Changed to is_active */}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -379,13 +382,13 @@ export default function UserManagement() {
                 if (userToDeactivate) {
                   toggleActivationMutation.mutate({
                     userId: userToDeactivate.id,
-                    isActive: !userToDeactivate.isActive,
+                    isActive: !userToDeactivate.is_active, // Changed to is_active
                   });
                 }
               }}
-              className={userToDeactivate?.isActive ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
+              className={userToDeactivate?.is_active ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""} // Changed to is_active
             >
-              {userToDeactivate?.isActive ? "Deactivate" : "Activate"}
+              {userToDeactivate?.is_active ? "Deactivate" : "Activate"} {/* Changed to is_active */}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -457,7 +460,7 @@ export default function UserManagement() {
                 <div className="space-y-2">
                   {shops
                     .filter((shop: any) => 
-                      shop.isActive && 
+                      shop.is_active && 
                       !userShops?.some((us: any) => us.id === shop.id)
                     )
                     .map((shop: any) => (
