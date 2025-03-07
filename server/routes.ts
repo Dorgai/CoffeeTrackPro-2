@@ -1,6 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
-import { sql } from "drizzle-orm"; // Updated import statement
+import { sql } from "drizzle-orm";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { insertGreenCoffeeSchema, insertRoastingBatchSchema, insertOrderSchema, insertShopSchema } from "@shared/schema";
@@ -167,8 +167,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(userWithoutPassword);
     } catch (error) {
       console.error("Error updating user:", error);
-      res.status(500).json({ 
-        message: error instanceof Error ? error.message : "Failed to update user" 
+      res.status(500).json({
+        message: error instanceof Error ? error.message : "Failed to update user"
       });
     }
   });
@@ -192,8 +192,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedUser);
     } catch (error) {
       console.error("Error approving user:", error);
-      res.status(500).json({ 
-        message: error instanceof Error ? error.message : "Failed to approve user" 
+      res.status(500).json({
+        message: error instanceof Error ? error.message : "Failed to approve user"
       });
     }
   });
@@ -234,7 +234,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedShops);
     } catch (error) {
       console.error("Error in shop assignment:", error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: "Failed to update user's shop assignments",
         details: error instanceof Error ? error.message : String(error)
       });
@@ -322,7 +322,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json(activeShops);
     } catch (error) {
       console.error("Error in /api/user/shops:", error);
-      return res.status(500).json({ 
+      return res.status(500).json({
         message: "Failed to fetch shops",
         error: error instanceof Error ? error.message : String(error)
       });
@@ -376,8 +376,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(shop);
     } catch (error) {
       console.error("Error creating shop:", error);
-      res.status(400).json({ 
-        message: error instanceof Error ? error.message : "Failed to create shop" 
+      res.status(400).json({
+        message: error instanceof Error ? error.message : "Failed to create shop"
       });
     }
   });
@@ -548,8 +548,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Roasting Routes - accessible by roaster
   // Update retail inventory routes
-  app.get("/api/retail-inventory", 
-    requireShopAccess(["shopManager", "barista", "retailOwner", "roasteryOwner", "roaster"]), 
+  app.get("/api/retail-inventory",
+    requireShopAccess(["shopManager", "barista", "retailOwner", "roasteryOwner", "roaster"]),
     async (req, res) => {
       try {
         const shopId = req.query.shopId ? Number(req.query.shopId) : undefined;
@@ -572,7 +572,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log("Raw inventory data:", inventory);
 
         // Filter by shop if shopId is provided
-        const filteredInventory = shopId 
+        const filteredInventory = shopId
           ? inventory.filter(item => item.shopId === shopId)
           : inventory;
 
@@ -593,7 +593,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json(mappedResults);
       } catch (error) {
         console.error("Error fetching retail inventory:", error);
-        res.status(500).json({ 
+        res.status(500).json({
           message: "Failed to fetch inventory",
           details: error instanceof Error ? error.message : "Unknown error"
         });
@@ -601,8 +601,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
 
   // Update roasting batch routes
-  app.get("/api/roasting-batches", 
-    requireRole(["roasteryOwner", "roaster"]), 
+  app.get("/api/roasting-batches",
+    requireRole(["roasteryOwner", "roaster"]),
     async (req, res) => {
       try {
         console.log("Fetching roasting batches for user:", {
@@ -616,13 +616,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json(batches);
       } catch (error) {
         console.error("Error fetching roasting batches:", error);
-        res.status(500).json({ 
+        res.status(500).json({
           message: "Failed to fetch roasting batches",
           details: error instanceof Error ? error.message : "Unknown error"
         });
       }
     });
-
   app.post(
     "/api/roasting-batches",
     requireRole(["roasteryOwner", "roaster"]),
@@ -648,8 +647,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const coffee = await storage.getGreenCoffee(data.greenCoffeeId);
         if (coffee) {
           const newStock = Number(coffee.currentStock) - Number(data.plannedAmount);
-          await storage.updateGreenCoffeeStock(coffee.id, { 
-            currentStock: String(newStock) 
+          await storage.updateGreenCoffeeStock(coffee.id, {
+            currentStock: String(newStock)
           });
           console.log("Updated green coffee stock:", {
             coffeeId: coffee.id,
@@ -669,8 +668,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // Retail Inventory Routes - accessible by shop manager, barista and retail owner
-  app.post("/api/retail-inventory", 
-    requireShopAccess(["shopManager", "barista", "retailOwner", "owner", "roaster", "roasteryOwner"]), 
+  app.post("/api/retail-inventory",
+    requireShopAccess(["shopManager", "barista", "retailOwner", "owner", "roaster", "roasteryOwner"]),
     async (req, res) => {
       try {
         const { shopId } = req.body;
@@ -696,8 +695,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
 
-  app.get("/api/retail-inventory", 
-    requireShopAccess(["shopManager", "barista", "retailOwner", "roasteryOwner", "roaster"]), 
+  app.get("/api/retail-inventory",
+    requireShopAccess(["shopManager", "barista", "retailOwner", "roasteryOwner", "roaster"]),
     async (req, res) => {
       try {
         const shopId = req.query.shopId ? Number(req.query.shopId) : undefined;
@@ -720,7 +719,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log("Raw inventory data:", inventory);
 
         // Filter by shop if shopId is provided
-        const filteredInventory = shopId 
+        const filteredInventory = shopId
           ? inventory.filter(item => item.shopId === shopId)
           : inventory;
 
@@ -741,7 +740,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json(mappedResults);
       } catch (error) {
         console.error("Error fetching retail inventory:", error);
-        res.status(500).json({ 
+        res.status(500).json({
           message: "Failed to fetch inventory",
           details: error instanceof Error ? error.message : "Unknown error"
         });
@@ -816,7 +815,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const orderId = parseInt(req.params.id);
         const { status, smallBags, largeBags } = req.body;
-        console.log("Order status update requestedby:", {          username: req.user?.username,
+        console.log("Order status update requestedby:", {
+          username: req.user?.username,
           role: req.user?.role,
           orderId,
           status,
@@ -824,12 +824,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           largeBags
         });
 
-        const order= await storage.getOrder(orderId);
-        if (!order) {          return res.status(404).json({ message: "Order not found" });
+        const order = await storage.getOrder(orderId);
+        if (!order) {
+          return res.status(404).json({ message: "Order not found" });
         }
 
         //        // Owner, retailOwner and roasteryOwner have full access to all status changes
-        if (["owner","retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {          if(smallBags > order.smallBags || largeBags > order.largeBags) {
+        if (["owner", "retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {
+          if (smallBags > order.smallBags ||largeBags > order.largeBags) {
             return res.status(400).json({
               message: "Updated quantities cannot exceed original order quantities"
             });
@@ -837,12 +839,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           // Shop manager can only mark orders as delivered
           if (req.user?.role === "shopManager" && status !== "delivered") {
-            return res.status(403).json({              message: "Shop managers can only mark orders as delivered"
+            return res.status(403).json({
+              message: "Shop managers can only mark orders as delivered"
             });
           }
 
           // Roaster can only change status to roasted or dispatched
-          if (req.user?.role === "roaster" && !["roasted", "dispatched"].includes(status)){
+          if (req.user?.role === "roaster" && !["roasted", "dispatched"].includes(status)) {
             return res.status(403).json({
               message: "Roasters can only change status to 'roasted' or 'dispatched'"
             });
@@ -998,8 +1001,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Inventory Discrepancies Routes
-  app.get("/api/inventory-discrepancies", 
-    requireRole(["roaster", "roasteryOwner", "shopManager"]), 
+  app.get("/api/inventory-discrepancies",
+    requireRole(["roaster", "roasteryOwner", "shopManager"]),
     async (req, res) => {
       try {
         console.log("Fetching discrepancies for user:", req.user?.username, "with role:", req.user?.role);
@@ -1022,7 +1025,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // For roasteryOwner and roaster, show all discrepancies
         console.log("Returning all discrepancies for roasteryOwner/roaster");
         res.json(discrepancies);
-      } catch (error){
+      } catch (error) {
         console.error("Error fetching inventory discrepancies:", error);
         res.status(500).json({
           message: "Failed to fetch discrepancies",
@@ -1033,8 +1036,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   //  ////  // Add route for getting coffee-specific large bag targets
-  app.get("/api/shops/:id/coffee-targets", requireShopAccess(["roasteryOwner", "shopManager", "retailOwner"]), async(req, res) => {
-    try {      const shopId = parseInt(req.params.id);
+  app.get("/api/shops/:id/coffee-targets", requireShopAccess(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
+    try {
+      const shopId = parseInt(req.params.id);
 
       const targets = await storage.getCoffeeLargeBagTargets(shopId);
       res.json(targets);
@@ -1042,7 +1046,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error fetching coffee targets:", error);
       res.status(500).json({ message: "Failed to fetch coffee targets" });
     }
-  });  // Fixthe incorrect syntax in the coffee target update route
+  });
+  // Fixthe incorrect syntax in the coffee target update route
   app.patch("/api/shops/:shopId/coffee/:coffeeId/target", requireShopAccess(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
     try {
       const shopId = parseInt(req.params.shopId);
@@ -1296,7 +1301,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const confirmationId = parseInt(req.params.id);
         const { receivedSmallBags, receivedLargeBags } = req.body;
 
-        console.log("Processing confirmation:", {
+        // Input validation
+        if (typeof receivedSmallBags !== 'number' || typeof receivedLargeBags !== 'number') {
+          return res.status(400).json({
+            message: "Invalid input: receivedSmallBags and receivedLargeBags must be numbers"
+          });
+        }
+
+        console.log("Starting dispatch confirmation:", {
           confirmationId,
           receivedSmallBags,
           receivedLargeBags,
@@ -1307,64 +1319,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         });
 
-        // Get all confirmations and find the one we need
-        const confirmations = await storage.getDispatchedCoffeeConfirmations();
-        const confirmation = confirmations.find(c => c.id === confirmationId);
+        // Get the original confirmation
+        const [confirmation] = await storage.db.query(`
+          SELECT * FROM dispatched_coffee_confirmation
+          WHERE id = $1 AND status = 'pending'
+        `, [confirmationId]);
 
         if (!confirmation) {
-          console.log("Confirmation not found:", confirmationId);
-          return res.status(404).json({ message: "Confirmation not found" });
+          console.log("No pending confirmation found with ID:", confirmationId);
+          return res.status(404).json({ message: "Confirmation not found or already processed" });
         }
+
+        console.log("Found confirmation to process:", confirmation);
 
         // Verify shop access for non-admin users
         if (!["owner", "retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {
-          const hasAccess = await checkShopAccess(req.user!.id, confirmation.shopId);
+          const hasAccess = await checkShopAccess(req.user!.id, confirmation.shop_id);
           if (!hasAccess) {
+            console.log("Access denied for shop:", confirmation.shop_id);
             return res.status(403).json({ message: "No access to this shop" });
           }
         }
 
-        try {
-          // Update the confirmation with received quantities
-          await storage.db.execute(sql`
-            UPDATE dispatched_coffee_confirmations 
+        // Begin a transaction to update both confirmation and inventory
+        await storage.db.transaction(async (tx) => {
+          // 1. Update the confirmation status
+          const [updatedConfirmation] = await tx.query(`
+            UPDATE dispatched_coffee_confirmation
             SET 
-              received_small_bags = ${receivedSmallBags},
-              received_large_bags = ${receivedLargeBags},
+              received_small_bags = $1,
+              received_large_bags = $2,
               status = 'confirmed',
-              confirmed_by_id = ${req.user!.id},
+              confirmed_by_id = $3,
               confirmed_at = NOW()
-            WHERE id = ${confirmationId}
-          `);
+            WHERE id = $4 AND status = 'pending'
+            RETURNING *
+          `, [receivedSmallBags, receivedLargeBags, req.user!.id, confirmationId]);
 
-          // Update retail inventory with received quantities
+          if (!updatedConfirmation) {
+            throw new Error("Failed to update confirmation status");
+          }
+
+          // 2. Update the retail inventory
           await storage.updateRetailInventory({
-            shopId: confirmation.shopId,
-            greenCoffeeId: confirmation.greenCoffeeId,
+            shopId: confirmation.shop_id,
+            greenCoffeeId: confirmation.green_coffee_id,
             smallBags: receivedSmallBags,
             largeBags: receivedLargeBags,
             updatedById: req.user!.id
           });
 
-          // Get the updated confirmation
-          const [updatedConfirmation] = await storage.db.execute(sql`
-            SELECT * FROM dispatched_coffee_confirmations 
-            WHERE id = ${confirmationId}
-          `);
+          return updatedConfirmation;
+        });
 
-          console.log("Successfully confirmed dispatch:", {
-            confirmationId,
-            updatedConfirmation
-          });
-
-          res.json(updatedConfirmation);
-        } catch (sqlError) {
-          console.error("SQL Error during confirmation:", sqlError);
-          throw new Error(`Database error: ${sqlError.message}`);
-        }
+        console.log("Successfully processed confirmation");
+        res.json({ message: "Dispatch confirmed successfully" });
       } catch (error) {
-        console.error("Error confirming dispatch:", error);
-        res.status(500).json({ 
+        console.error("Error in confirmation process:", error);
+        res.status(500).json({
           message: "Failed to confirm dispatch",
           details: error instanceof Error ? error.message : "Unknown error"
         });
