@@ -469,55 +469,31 @@ export class DatabaseStorage {
       console.log("Starting getAllRetailInventories");
 
       const query = sql`
-        WITH shop_inventory AS (
-          SELECT 
-            s.id as shop_id,
-            s.name as shop_name,
-            s.location as shop_location,
-            s.is_active,
-            gc.id as coffee_id,
-            gc.name as coffee_name,
-            gc.producer,
-            gc.grade,
-            gc.is_active as coffee_is_active,
-            ri.id as inventory_id,
-            COALESCE(ri.small_bags, 0) as small_bags,
-            COALESCE(ri.large_bags, 0) as large_bags,
-            ri.updated_at,
-            ri.updated_by_id,
-            u.username as updated_by_username
-          FROM shops s
-          CROSS JOIN green_coffee gc
-          LEFT JOIN retail_inventory ri ON ri.shop_id = s.id AND ri.green_coffee_id = gc.id
-          LEFT JOIN users u ON ri.updated_by_id = u.id
-          WHERE s.is_active = true AND gc.is_active = true
-        )
         SELECT 
-          shop_id as "shopId",
-          shop_name as "shopName",
-          shop_location as "shopLocation",
-          coffee_id as "coffeeId",
-          coffee_name as "coffeeName",
-          producer,
-          grade,
-          inventory_id as "id",
-          small_bags as "smallBags",
-          large_bags as "largeBags",
-          updated_at as "updatedAt",
-          updated_by_id as "updatedById",
-          updated_by_username as "updatedByUsername"
-        FROM shop_inventory
-        ORDER BY shop_name, coffee_name`;
+          ri.id,
+          ri.shop_id as "shopId",
+          ri.green_coffee_id as "coffeeId",
+          ri.small_bags as "smallBags",
+          ri.large_bags as "largeBags",
+          ri.updated_at as "updatedAt",
+          ri.updated_by_id as "updatedById",
+          s.name as "shopName",
+          s.location as "shopLocation",
+          gc.name as "coffeeName",
+          gc.producer,
+          gc.grade,
+          u.username as "updatedByUsername"
+        FROM retail_inventory ri
+        JOIN shops s ON ri.shop_id = s.id
+        JOIN green_coffee gc ON ri.green_coffee_id = gc.id
+        LEFT JOIN users u ON ri.updated_by_id = u.id
+        WHERE s.is_active = true AND gc.is_active = true
+        ORDER BY s.name, gc.name`;
 
-      console.log("Executing inventory query...");
-      const result = await db.execute(query);
-      console.log("Raw query result count:", result.rows.length);
+      const result = await this.db.execute(query);
+      console.log("Raw query result:", result);
 
-      if (result.rows.length > 0) {
-        console.log("Sample inventory entry:", result.rows[0]);
-      }
-
-      return result.rows;
+      return result as any[];
     } catch (error) {
       console.error("Error in getAllRetailInventories:", error);
       throw error;
