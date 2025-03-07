@@ -43,6 +43,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 type FilterStatus = "all" | "pending" | "active" | "inactive";
 
+interface Shop {
+  id: number;
+  name: string;
+  location: string;
+  isActive: boolean;
+}
+
 export default function UserManagement() {
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
@@ -52,7 +59,6 @@ export default function UserManagement() {
   const [userToDeactivate, setUserToDeactivate] = useState<User | null>(null);
   const [selectedUserForShops, setSelectedUserForShops] = useState<User | null>(null);
   const [isShopAssignmentOpen, setIsShopAssignmentOpen] = useState(false);
-  const [selectedShopIds, setSelectedShopIds] = useState<number[]>([]);
   const [filter, setFilter] = useState<FilterStatus>("all");
 
   // Queries
@@ -60,12 +66,12 @@ export default function UserManagement() {
     queryKey: ["/api/users"],
   });
 
-  const { data: shops } = useQuery({
+  const { data: shops } = useQuery<Shop[]>({
     queryKey: ["/api/shops"],
     enabled: !!currentUser && currentUser.role === "roasteryOwner",
   });
 
-  const { data: userShops, refetch: refetchUserShops } = useQuery({
+  const { data: userShops } = useQuery<Shop[]>({
     queryKey: ["/api/users", selectedUserForShops?.id, "shops"],
     enabled: !!selectedUserForShops?.id,
   });
@@ -86,6 +92,7 @@ export default function UserManagement() {
       return res.json();
     },
     onSuccess: () => {
+      // Invalidate both queries to ensure fresh data
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       if (selectedUserForShops) {
         queryClient.invalidateQueries({ 
@@ -143,7 +150,7 @@ export default function UserManagement() {
       const res = await apiRequest(
         "PATCH",
         `/api/users/${userId}`,
-        { isActive } 
+        { isActive }
       );
       if (!res.ok) {
         const error = await res.text();
@@ -199,14 +206,13 @@ export default function UserManagement() {
       case "pending":
         return user.isPendingApproval;
       case "active":
-        return !user.isPendingApproval && user.is_active;
+        return !user.isPendingApproval && user.isActive;
       case "inactive":
-        return !user.isPendingApproval && !user.is_active;
+        return !user.isPendingApproval && !user.isActive;
       default:
         return true;
     }
   });
-
 
   return (
     <div className="container mx-auto py-8 space-y-8">
@@ -259,12 +265,12 @@ export default function UserManagement() {
                       variant={
                         user.isPendingApproval
                           ? "outline"
-                          : user.is_active
+                          : user.isActive
                             ? "default"
                             : "destructive"
                       }
                     >
-                      {user.isPendingApproval ? "Pending Approval" : user.is_active ? "Active" : "Inactive"}
+                      {user.isPendingApproval ? "Pending Approval" : user.isActive ? "Active" : "Inactive"}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -297,11 +303,11 @@ export default function UserManagement() {
                       </Button>
 
                       <Button
-                        variant={user.is_active ? "destructive" : "outline"}
+                        variant={user.isActive ? "destructive" : "outline"}
                         size="sm"
                         onClick={() => setUserToDeactivate(user)}
                       >
-                        {user.is_active ? (
+                        {user.isActive ? (
                           <>
                             <UserX className="h-4 w-4 mr-2" />
                             Deactivate
@@ -368,11 +374,11 @@ export default function UserManagement() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {userToDeactivate?.is_active ? "Deactivate" : "Activate"} User
+              {userToDeactivate?.isActive ? "Deactivate" : "Activate"} User
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to {userToDeactivate?.is_active ? "deactivate" : "activate"} {userToDeactivate?.username}?
-              {userToDeactivate?.is_active && " This will prevent them from accessing the system."}
+              Are you sure you want to {userToDeactivate?.isActive ? "deactivate" : "activate"} {userToDeactivate?.username}?
+              {userToDeactivate?.isActive && " This will prevent them from accessing the system."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -382,13 +388,13 @@ export default function UserManagement() {
                 if (userToDeactivate) {
                   toggleActivationMutation.mutate({
                     userId: userToDeactivate.id,
-                    isActive: !userToDeactivate.is_active,
+                    isActive: !userToDeactivate.isActive,
                   });
                 }
               }}
-              className={userToDeactivate?.is_active ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
+              className={userToDeactivate?.isActive ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
             >
-              {userToDeactivate?.is_active ? "Deactivate" : "Activate"}
+              {userToDeactivate?.isActive ? "Deactivate" : "Activate"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -407,17 +413,14 @@ export default function UserManagement() {
           <DialogHeader>
             <DialogTitle>
               Manage Shop Access for {selectedUserForShops?.username}
-              <div className="text-sm font-normal text-muted-foreground mt-1">
-                Role: {selectedUserForShops?.role}
-              </div>
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-4">
             <div className="space-y-2">
               <h4 className="text-sm font-medium">Current Assignments</h4>
-              {userShops?.length ? (
+              {userShops && userShops.length > 0 ? (
                 <div className="space-y-2">
-                  {userShops.map((shop: any) => (
+                  {userShops.map((shop) => (
                     <div
                       key={shop.id}
                       className="flex items-center justify-between bg-muted p-2 rounded"
@@ -433,12 +436,10 @@ export default function UserManagement() {
                         size="sm"
                         onClick={() => {
                           if (selectedUserForShops) {
-                            handleShopAssignment(
-                              selectedUserForShops.id,
-                              userShops
-                                .filter((s: any) => s.id !== shop.id)
-                                .map((s: any) => s.id)
-                            );
+                            const updatedShopIds = userShops
+                              .filter((s) => s.id !== shop.id)
+                              .map((s) => s.id);
+                            handleShopAssignment(selectedUserForShops.id, updatedShopIds);
                           }
                         }}
                       >
@@ -455,15 +456,15 @@ export default function UserManagement() {
             </div>
 
             <div className="space-y-2">
-              <h4 className="text-sm font-medium">Add Shop Assignments</h4>
+              <h4 className="text-sm font-medium">Available Shops</h4>
               {shops?.length ? (
                 <div className="space-y-2">
                   {shops
-                    .filter((shop: any) => 
+                    .filter((shop) => 
                       shop.isActive && 
-                      !userShops?.some((us: any) => us.id === shop.id)
+                      !userShops?.some((us) => us.id === shop.id)
                     )
-                    .map((shop: any) => (
+                    .map((shop) => (
                       <div
                         key={shop.id}
                         className="flex items-center justify-between p-2 border rounded"
@@ -479,10 +480,11 @@ export default function UserManagement() {
                           size="sm"
                           onClick={() => {
                             if (selectedUserForShops) {
-                              handleShopAssignment(
-                                selectedUserForShops.id,
-                                [...(userShops?.map((s: any) => s.id) || []), shop.id]
-                              );
+                              const newShopIds = [
+                                ...(userShops?.map((s) => s.id) || []),
+                                shop.id
+                              ];
+                              handleShopAssignment(selectedUserForShops.id, newShopIds);
                             }
                           }}
                         >

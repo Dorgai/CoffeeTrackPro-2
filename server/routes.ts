@@ -241,12 +241,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update user's shops endpoint with better logging
   app.get("/api/users/:id/shops", requireRole(["roasteryOwner"]), async (req, res) => {
     try {
       const userId = parseInt(req.params.id);
+      console.log("Fetching shops for user:", userId);
+
       const userShops = await storage.getUserShops(userId);
-      console.log("Fetched shops for user:", userId, "Found shops:", userShops.length);
-      res.json(userShops);
+
+      // Only return active shops
+      const activeShops = userShops.filter(shop => shop.isActive);
+
+      console.log("Fetched shops for user:", {
+        userId,
+        totalShops: userShops.length,
+        activeShops: activeShops.length,
+        shopDetails: activeShops.map(shop => ({
+          id: shop.id,
+          name: shop.name,
+          isActive: shop.isActive
+        }))
+      });
+
+      res.json(activeShops);
     } catch (error) {
       console.error("Error fetching user's shops:", error);
       res.status(500).json({ message: "Failed to fetch user's shops" });
