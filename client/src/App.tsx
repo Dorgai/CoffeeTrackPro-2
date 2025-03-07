@@ -11,8 +11,6 @@ import Inventory from "@/pages/inventory";
 import CoffeeDetail from "@/pages/coffee-detail";
 import Roasting from "@/pages/roasting";
 import RoastingOrders from "@/pages/roasting-orders";
-import RoastingDiscrepancies from "@/pages/roasting-discrepancies";
-import Retail from "@/pages/retail";
 import RetailOrders from "@/pages/retail-orders";
 import RetailOverview from "@/pages/retail-overview";
 import Analytics from "@/pages/analytics";
@@ -24,6 +22,9 @@ import NotFound from "@/pages/not-found";
 import { ProtectedRoute } from "@/lib/protected-route";
 import RetailNewArrivals from "@/pages/retail-new-arrivals";
 import Billing from "@/pages/billing";
+import RoastingDiscrepancies from "@/pages/roasting-discrepancies";
+import Retail from "@/pages/retail";
+
 
 export default function App() {
   return (
@@ -35,92 +36,176 @@ export default function App() {
             <Route path="/auth" component={AuthPage} />
             <Route path="/login" component={AuthPage} />
 
-            {/* Protected routes */}
+            {/* Roastery Dashboard - for roastery staff */}
             <Route path="/">
               {() => (
                 <ProtectedRoute
                   path="/"
                   component={Dashboard}
-                  roles={["owner", "roasteryOwner", "roaster"]}
+                  roles={["roasteryOwner", "roaster"]}
                 />
               )}
             </Route>
 
-            {/* Manager Dashboard */}
+            {/* Manager/Retail Dashboard */}
             <Route path="/manager-dashboard">
               {() => (
                 <ProtectedRoute
                   path="/manager-dashboard"
                   component={ManagerDashboard}
-                  roles={["shopManager", "retailOwner"]}
+                  roles={["shopManager", "retailOwner", "barista"]}
                 />
               )}
             </Route>
 
+            {/* Inventory Management */}
             <Route path="/inventory">
               {() => (
                 <ProtectedRoute
                   path="/inventory"
                   component={Inventory}
-                  roles={["owner", "roasteryOwner", "roaster", "shopManager"]}
+                  roles={["roasteryOwner", "roaster"]}
                 />
               )}
             </Route>
 
             <Route path="/coffee/:id">
-              {() => <ProtectedRoute path="/coffee/:id" component={CoffeeDetail} roles={["owner", "roasteryOwner", "roaster"]} />}
+              {() => (
+                <ProtectedRoute
+                  path="/coffee/:id"
+                  component={CoffeeDetail}
+                  roles={["roasteryOwner", "roaster"]}
+                />
+              )}
             </Route>
 
+            {/* Roasting Operations */}
             <Route path="/roasting">
-              {() => <ProtectedRoute path="/roasting" component={Roasting} roles={["owner", "roasteryOwner", "roaster"]} />}
+              {() => (
+                <ProtectedRoute
+                  path="/roasting"
+                  component={Roasting}
+                  roles={["roasteryOwner", "roaster"]}
+                />
+              )}
             </Route>
 
             <Route path="/roasting/orders">
-              {() => <ProtectedRoute path="/roasting/orders" component={RoastingOrders} roles={["owner", "roasteryOwner", "roaster"]} />}
+              {() => (
+                <ProtectedRoute
+                  path="/roasting/orders"
+                  component={RoastingOrders}
+                  roles={["roasteryOwner", "roaster"]}
+                />
+              )}
             </Route>
 
             <Route path="/roasting/discrepancies">
-              {() => <ProtectedRoute path="/roasting/discrepancies" component={RoastingDiscrepancies} roles={["owner", "roasteryOwner", "roaster"]} />}
+              {() => (
+                <ProtectedRoute
+                  path="/roasting/discrepancies"
+                  component={RoastingDiscrepancies}
+                  roles={["roasteryOwner", "roaster"]}
+                />
+              )}
             </Route>
 
+            {/* Retail Operations */}
             <Route path="/retail">
-              {() => <ProtectedRoute path="/retail" component={Retail} roles={["owner", "roasteryOwner", "retailOwner", "shopManager", "barista"]} />}
+              {() => (
+                <ProtectedRoute
+                  path="/retail"
+                  component={Retail}
+                  roles={["retailOwner", "shopManager", "barista"]}
+                />
+              )}
             </Route>
-
             <Route path="/retail/orders">
-              {() => <ProtectedRoute path="/retail/orders" component={RetailOrders} roles={["owner", "roasteryOwner", "retailOwner", "shopManager", "barista"]} />}
+              {() => (
+                <ProtectedRoute
+                  path="/retail/orders"
+                  component={RetailOrders}
+                  roles={["retailOwner", "shopManager", "barista"]}
+                />
+              )}
             </Route>
 
             <Route path="/retail-overview">
-              {() => <ProtectedRoute path="/retail-overview" component={RetailOverview} roles={["owner", "roasteryOwner", "retailOwner"]} />}
+              {() => (
+                <ProtectedRoute
+                  path="/retail-overview"
+                  component={RetailOverview}
+                  roles={["retailOwner", "shopManager"]}
+                />
+              )}
             </Route>
 
+            {/* Analytics & Reports */}
             <Route path="/analytics">
-              {() => <ProtectedRoute path="/analytics" component={Analytics} roles={["owner", "roasteryOwner", "retailOwner", "shopManager"]} />}
+              {() => (
+                <ProtectedRoute
+                  path="/analytics"
+                  component={Analytics}
+                  roles={["roasteryOwner", "retailOwner", "shopManager"]}
+                />
+              )}
             </Route>
 
             <Route path="/reports">
-              {() => <ProtectedRoute path="/reports" component={Reports} roles={["owner", "roasteryOwner", "retailOwner", "shopManager"]} />}
+              {() => (
+                <ProtectedRoute
+                  path="/reports"
+                  component={Reports}
+                  roles={["roasteryOwner", "retailOwner", "shopManager"]}
+                />
+              )}
             </Route>
 
+            {/* Administration */}
             <Route path="/user-management">
-              {() => <ProtectedRoute path="/user-management" component={UserManagement} roles={["owner", "roasteryOwner"]} />}
+              {() => (
+                <ProtectedRoute
+                  path="/user-management"
+                  component={UserManagement}
+                  roles={["roasteryOwner"]}
+                />
+              )}
             </Route>
 
             <Route path="/shops">
-              {() => <ProtectedRoute path="/shops" component={Shops} roles={["owner", "roasteryOwner"]} />}
+              {() => (
+                <ProtectedRoute
+                  path="/shops"
+                  component={Shops}
+                  roles={["roasteryOwner"]}
+                />
+              )}
             </Route>
 
             <Route path="/retail/new-arrivals">
-              {() => <ProtectedRoute path="/retail/new-arrivals" component={RetailNewArrivals} roles={["owner", "roasteryOwner", "retailOwner", "shopManager", "barista"]} />}
+              {() => (
+                <ProtectedRoute
+                  path="/retail/new-arrivals"
+                  component={RetailNewArrivals}
+                  roles={["retailOwner", "shopManager", "barista"]}
+                />
+              )}
             </Route>
 
+            {/* User Profile - accessible by all authenticated users */}
             <Route path="/profile">
               {() => <ProtectedRoute path="/profile" component={Profile} />}
             </Route>
 
+            {/* Billing - roastery management only */}
             <Route path="/billing">
-              {() => <ProtectedRoute path="/billing" component={Billing} roles={["owner", "roasteryOwner"]} />}
+              {() => (
+                <ProtectedRoute
+                  path="/billing"
+                  component={Billing}
+                  roles={["roasteryOwner"]}
+                />
+              )}
             </Route>
 
             {/* 404 route */}

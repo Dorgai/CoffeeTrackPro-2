@@ -1,8 +1,16 @@
 import * as React from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { Store, Coffee, Package } from "lucide-react";
-import { Menubar, MenubarContent, MenubarItem, MenubarMenu, MenubarSeparator, MenubarShortcut, MenubarTrigger } from "@/components/ui/menubar";
+import { Store, Coffee, Package, BarChart2, Users, Settings } from "lucide-react";
+import {
+  Menubar,
+  MenubarContent,
+  MenubarItem,
+  MenubarMenu,
+  MenubarSeparator,
+  MenubarShortcut,
+  MenubarTrigger,
+} from "@/components/ui/menubar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { GreenBeansStockIndicator } from "./green-beans-stock-indicator";
@@ -13,46 +21,53 @@ export function NavBar() {
   const [, setLocation] = useLocation();
 
   // Role-based access control
-  const isRetailUser = user?.role === "retailOwner" || user?.role === "shopManager" || user?.role === "barista";
-  const isRoasteryUser = user?.role === "roasteryOwner" || user?.role === "roaster";
+  const isRetailUser = ["retailOwner", "shopManager", "barista"].includes(user?.role || "");
+  const isRoasteryUser = ["roasteryOwner", "roaster"].includes(user?.role || "");
   const canManageShops = user?.role === "roasteryOwner";
   const canManageUsers = user?.role === "roasteryOwner";
-  const canAccessGreenCoffee = user?.role === "roasteryOwner" || user?.role === "roaster";
-  const canAccessAnalytics = user?.role === "roasteryOwner" || user?.role === "retailOwner" || user?.role === "shopManager";
-  const canAccessRoasting = user?.role === "roasteryOwner" || user?.role === "roaster";
-  const canAccessRetail = user?.role === "roasteryOwner" || user?.role === "retailOwner" || user?.role === "shopManager" || user?.role === "barista";
+  const canAccessGreenCoffee = ["roasteryOwner", "roaster"].includes(user?.role || "");
+  const canAccessAnalytics = ["roasteryOwner", "retailOwner", "shopManager"].includes(user?.role || "");
+  const canAccessRoasting = ["roasteryOwner", "roaster"].includes(user?.role || "");
+  const canAccessRetail = ["retailOwner", "shopManager", "barista"].includes(user?.role || "");
+
+  // Redirect users to their appropriate dashboard
+  const homePath = isRetailUser ? "/manager-dashboard" : "/";
 
   return (
     <div className="border-b">
       <div className="flex h-16 items-center px-4">
         <div className="mr-4 flex">
-          <Link href="/" className="flex items-center">
+          <Link href={homePath} className="flex items-center">
             <Coffee className="h-6 w-6" />
           </Link>
         </div>
 
-        {/* Shop Selector - placed before the Menubar */}
-        {user && (isRetailUser || isRoasteryUser) && (
+        {user && (
           <div className="mr-4">
             <ShopSelector />
           </div>
         )}
 
         <Menubar className="border-none">
+          {/* Dashboard Menu - Different for retail and roastery users */}
           <MenubarMenu>
             <MenubarTrigger>Dashboard</MenubarTrigger>
             <MenubarContent>
               <MenubarItem>
-                <Link href="/" className="flex w-full">
+                <Link href={homePath} className="flex w-full">
                   Home
                 </Link>
               </MenubarItem>
             </MenubarContent>
           </MenubarMenu>
 
+          {/* Analytics Menu */}
           {canAccessAnalytics && (
             <MenubarMenu>
-              <MenubarTrigger>Analytics</MenubarTrigger>
+              <MenubarTrigger>
+                <BarChart2 className="h-4 w-4 mr-2" />
+                Analytics
+              </MenubarTrigger>
               <MenubarContent>
                 <MenubarItem>
                   <Link href="/analytics" className="flex w-full">
@@ -68,9 +83,13 @@ export function NavBar() {
             </MenubarMenu>
           )}
 
+          {/* Green Coffee Menu */}
           {canAccessGreenCoffee && (
             <MenubarMenu>
-              <MenubarTrigger>Green Coffee</MenubarTrigger>
+              <MenubarTrigger>
+                <Coffee className="h-4 w-4 mr-2" />
+                Green Coffee
+              </MenubarTrigger>
               <MenubarContent>
                 <MenubarItem>
                   <Link href="/inventory" className="flex w-full">
@@ -81,9 +100,13 @@ export function NavBar() {
             </MenubarMenu>
           )}
 
+          {/* Management Menu */}
           {canManageShops && (
             <MenubarMenu>
-              <MenubarTrigger>Management</MenubarTrigger>
+              <MenubarTrigger>
+                <Settings className="h-4 w-4 mr-2" />
+                Management
+              </MenubarTrigger>
               <MenubarContent>
                 <MenubarItem>
                   <Link href="/shops" className="flex w-full">
@@ -101,9 +124,13 @@ export function NavBar() {
             </MenubarMenu>
           )}
 
+          {/* Roasting Menu */}
           {canAccessRoasting && (
             <MenubarMenu>
-              <MenubarTrigger>Roasting</MenubarTrigger>
+              <MenubarTrigger>
+                <Package className="h-4 w-4 mr-2" />
+                Roasting
+              </MenubarTrigger>
               <MenubarContent>
                 <MenubarItem>
                   <Link href="/roasting/orders" className="flex w-full">
@@ -119,16 +146,15 @@ export function NavBar() {
             </MenubarMenu>
           )}
 
+          {/* Retail Menu */}
           {canAccessRetail && (
             <>
               <MenubarMenu>
-                <MenubarTrigger>Retail</MenubarTrigger>
+                <MenubarTrigger>
+                  <Store className="h-4 w-4 mr-2" />
+                  Retail
+                </MenubarTrigger>
                 <MenubarContent>
-                  <MenubarItem>
-                    <Link href="/retail" className="flex w-full">
-                      Inventory
-                    </Link>
-                  </MenubarItem>
                   <MenubarItem>
                     <Link href="/retail/orders" className="flex w-full">
                       Orders

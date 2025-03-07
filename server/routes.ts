@@ -503,22 +503,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
   // Roasting Routes - accessible by roaster
-  app.get("/api/roasting-batches", requireRole(["owner", "roasteryOwner", "roaster", "retailOwner"]), async (req, res) => {
-    try {
-      const batches = await storage.getRoastingBatches();
-      console.log("Fetched roasting batches:", batches);
-      res.json(batches);
-    } catch (error) {
-      console.error("Error fetching roasting batches:", error);
-      res.status(500).json({ message: "Failed to fetch roasting batches" });
-    }
-  });
+  // Update retail inventory routes
+  app.get("/api/retail-inventory", 
+    requireShopAccess(["shopManager", "barista", "retailOwner", "roasteryOwner", "roaster"]), 
+    async (req, res) => {
+      try {
+        const shopId = req.query.shopId ? Number(req.query.shopId) : undefined;
+        console.log("Fetching retail inventory for user:", {
+          userId: req.user?.id,
+          username: req.user?.username,
+          role: req.user?.role,
+          requestedShopId: shopId
+        });
+
+        // For shopManager and barista, require shopId
+        if (["shopManager", "barista"].includes(req.user?.role || "") && !shopId) {
+          console.log("Shop ID required for role:", req.user?.role);
+          return res.status(400).json({ message: "Shop ID is required" });
+        }
+
+        // Get all inventory data
+        console.log("Fetching all retail inventories");
+        const inventory = await storage.getAllRetailInventories();
+        console.log("Total inventory items fetched:", inventory.length);
+
+        // Filter by shop if shopId is provided
+        const filteredInventory = shopId 
+          ? inventory.filter(item => item.shopId === shopId)
+          : inventory;
+
+        console.log("Filtered inventory items:", {
+          total: inventory.length,
+          filtered: filteredInventory.length,
+          shopId
+        });
+
+        res.json(filteredInventory);
+      } catch (error) {
+        console.error("Error fetching retail inventory:", error);
+        res.status(500).json({ 
+          message: "Failed to fetch inventory",
+          details: error instanceof Error ? error.message : "Unknown error"
+        });
+      }
+    });
+
+  // Update roasting batch routes
+  app.get("/api/roasting-batches", 
+    requireRole(["roasteryOwner", "roaster"]), 
+    async (req, res) => {
+      try {
+        console.log("Fetching roasting batches for user:", {
+          userId: req.user?.id,
+          username: req.user?.username,
+          role: req.user?.role
+        });
+
+        const batches = await storage.getRoastingBatches();
+        console.log("Found roasting batches:", batches.length);
+        res.json(batches);
+      } catch (error) {
+        console.error("Error fetching roasting batches:", error);
+        res.status(500).json({ 
+          message: "Failed to fetch roasting batches",
+          details: error instanceof Error ? error.message : "Unknown error"
+        });
+      }
+    });
 
   app.post(
     "/api/roasting-batches",
-    requireRole(["owner", "roasteryOwner", "roaster"]),
+    requireRole(["roasteryOwner", "roaster"]),
     async (req, res) => {
       try {
+        console.log("Creating roasting batch, requested by:", {
+          userId: req.user?.id,
+          username: req.user?.username,
+          role: req.user?.role,
+          data: req.body
+        });
+
         const data = insertRoastingBatchSchema.parse({
           ...req.body,
           plannedAmount: String(req.body.plannedAmount),
@@ -526,12 +590,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         const batch = await storage.createRoastingBatch(data);
+        console.log("Created roasting batch:", batch);
 
         // Update green coffee stock
         const coffee = await storage.getGreenCoffee(data.greenCoffeeId);
         if (coffee) {
           const newStock = Number(coffee.currentStock) - Number(data.plannedAmount);
-          await storage.updateGreenCoffeeStock(coffee.id, { currentStock: String(newStock) });
+          await storage.updateGreenCoffeeStock(coffee.id, { 
+            currentStock: String(newStock) 
+          });
+          console.log("Updated green coffee stock:", {
+            coffeeId: coffee.id,
+            oldStock: coffee.currentStock,
+            newStock
+          });
         }
 
         res.status(201).json(batch);
@@ -545,9 +617,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // Retail Inventory Routes - accessible by shop manager, barista and retail owner
-  app.get("/api/retail-inventory", 
-    requireShopAccess(["shopManager", "barista", "retailOwner", "owner", "roaster", "roasteryOwner"]), 
-    async (req, res) => {
+  app.get("/api/retail-inventory", requireShopAccess(["shopManager", "barista", "retailOwner", "owner", "roaster", "roasteryOwner"]), async (req, res) => {
       try {
         const shopId = req.query.shopId ? Number(req.query.shopId) : undefined;
         console.log("Fetching retail inventory for user:", {
