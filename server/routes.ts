@@ -831,7 +831,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         //        // Owner, retailOwner and roasteryOwner have full access to all status changes
         if (["owner", "retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {
-          if (smallBags > order.smallBags ||largeBags > order.largeBags) {
+          if (smallBags > order.smallBags || largeBags > order.largeBags) {
             return res.status(400).json({
               message: "Updated quantities cannot exceed original order quantities"
             });
@@ -1320,17 +1320,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         // Get the original confirmation
-        const [confirmation] = await storage.db.query(`
-          SELECT * FROM dispatched_coffee_confirmation
-          WHERE id = $1 AND status = 'pending'
-        `, [confirmationId]);
+        const confirmation = await storage.getDispatchConfirmationById(confirmationId);
 
-        if (!confirmation) {
+        if (!confirmation || confirmation.status !== 'pending') {
           console.log("No pending confirmation found with ID:", confirmationId);
           return res.status(404).json({ message: "Confirmation not found or already processed" });
         }
-
-        console.log("Found confirmation to process:", confirmation);
 
         // Verify shop access for non-admin users
         if (!["owner", "retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {
@@ -1341,39 +1336,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        // Begin a transaction to update both confirmation and inventory
-        await storage.db.transaction(async (tx) => {
-          // 1. Update the confirmation status
-          const [updatedConfirmation] = await tx.query(`
-            UPDATE dispatched_coffee_confirmation
-            SET 
-              received_small_bags = $1,
-              received_large_bags = $2,
-              status = 'confirmed',
-              confirmed_by_id = $3,
-              confirmed_at = NOW()
-            WHERE id = $4 AND status = 'pending'
-            RETURNING *
-          `, [receivedSmallBags, receivedLargeBags, req.user!.id, confirmationId]);
-
-          if (!updatedConfirmation) {
-            throw new Error("Failed to update confirmation status");
-          }
-
-          // 2. Update the retail inventory
-          await storage.updateRetailInventory({
-            shopId: confirmation.shop_id,
-            greenCoffeeId: confirmation.green_coffee_id,
-            smallBags: receivedSmallBags,
-            largeBags: receivedLargeBags,
-            updatedById: req.user!.id
-          });
-
-          return updatedConfirmation;
+        // Update the confirmation first
+        const updatedConfirmation = await storage.updateDispatchConfirmation(confirmationId, {
+          received_small_bags: receivedSmallBags,
+          received_large_bags: receivedLargeBags,
+          status: 'confirmed',
+          confirmed_by_id: req.user!.id,
+          confirmed_at: new Date()
         });
 
-        console.log("Successfully processed confirmation");
-        res.json({ message: "Dispatch confirmed successfully" });
+        if (!updatedConfirmation) {
+          throw new Error("Failed to update confirmation");
+        }
+
+        // Then update the retail inventory
+        await storage.updateRetailInventory({
+          shopId: confirmation.shop_id,
+          greenCoffeeId: confirmation.green_coffee_id,
+          smallBags: receivedSmallBags,
+          largeBags: receivedLargeBags,
+          updatedById: req.user!.id
+        });
+
+        res.json(updatedConfirmation);
       } catch (error) {
         console.error("Error in confirmation process:", error);
         res.status(500).json({

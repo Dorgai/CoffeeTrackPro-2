@@ -38,6 +38,10 @@ type AllInventoryItem = {
   updatedBy: {
     username: string;
   };
+  coffeeName?: string; //Added to match edited code's assumption.
+  producer?: string; //Added to match edited code's assumption.
+  updatedByUsername?: string; //Added to match edited code's assumption.
+
 };
 
 type AllOrderItem = {
@@ -66,20 +70,21 @@ export default function RetailOverview() {
     enabled: user?.role !== "roasteryOwner", // Only fetch for non-roasteryOwner users
   });
 
-  const { data: allInventory, isLoading: loadingInventory } = useQuery<AllInventoryItem[]>({
+  const { data: allInventory, isLoading: loadingInventory } = useQuery({
     queryKey: ["/api/retail-inventory"],
     queryFn: async () => {
+      console.log("Fetching retail inventory...");
       const res = await apiRequest("GET", "/api/retail-inventory");
       if (!res.ok) {
-        const error = await res.text();
-        throw new Error(error);
+        throw new Error("Failed to fetch inventory");
       }
       const data = await res.json();
+      console.log("Fetched inventory data:", data);
       return data;
     },
   });
 
-  const { data: allOrders, isLoading: loadingOrders } = useQuery<AllOrderItem[]>({
+  const { data: allOrders, isLoading: loadingOrders } = useQuery({
     queryKey: ["/api/orders"],
   });
 
@@ -102,13 +107,18 @@ export default function RetailOverview() {
 
   // Group inventory and orders by shop
   const shopData = allInventory.reduce((acc, item) => {
-    if (!item.shop) return acc; // Skip if shop data is missing
+    if (!item || !item.shopId) {
+      console.log("Skipping invalid inventory item:", item);
+      return acc;
+    }
 
     const shopId = item.shopId;
+
     // Only include shops that the user has access to
     if (user?.role !== "roasteryOwner" && !userShops?.some(s => s.id === shopId)) {
       return acc;
     }
+
     if (!acc[shopId]) {
       acc[shopId] = {
         shop: item.shop,
@@ -116,19 +126,20 @@ export default function RetailOverview() {
         orders: []
       };
     }
+
     acc[shopId].inventory.push(item);
     return acc;
-  }, {} as Record<number, { shop: Shop; inventory: AllInventoryItem[]; orders: AllOrderItem[] }>);
+  }, {} as Record<number, { shop: Shop; inventory: typeof allInventory; orders: typeof allOrders }>);
 
   // Add orders to the grouped data
   allOrders?.forEach(order => {
     const shopId = order.shopId;
-    if (shopData?.[shopId]) {
+    if (shopData[shopId]) {
       shopData[shopId].orders.push(order);
     }
   });
 
-  const hasShopData = Object.keys(shopData || {}).length > 0;
+  const hasShopData = Object.keys(shopData).length > 0;
 
   return (
     <div className="container mx-auto py-8 space-y-8">
@@ -151,15 +162,17 @@ export default function RetailOverview() {
         </div>
       )}
 
-      {Object.entries(shopData || {}).map(([shopId, data]) => {
-        if (!data.shop) return null;
+      {Object.entries(shopData).map(([shopId, data]) => {
+        if (!data.shop) {
+          console.log("Skipping shop without data:", shopId);
+          return null;
+        }
 
         return (
           <div key={shopId} className="space-y-6 pb-8 border-b last:border-0">
             <h2 className="text-2xl font-semibold">{data.shop.name}</h2>
             <p className="text-muted-foreground">{data.shop.location}</p>
 
-            {/* New Inventory Arrivals Section */}
             {["owner", "roasteryOwner", "shopManager", "barista"].includes(user?.role || "") && (
               <DispatchedCoffeeConfirmation shopId={parseInt(shopId)} />
             )}
@@ -186,15 +199,22 @@ export default function RetailOverview() {
                   </TableHeader>
                   <TableBody>
                     {data.inventory.map((item) => (
-                      <TableRow key={item.greenCoffeeId}>
-                        <TableCell className="font-medium">{item.greenCoffee?.name}</TableCell>
-                        <TableCell>{item.greenCoffee?.producer}</TableCell>
+                      <TableRow key={`${item.shopId}-${item.greenCoffeeId}`}>
+                        <TableCell className="font-medium">{item.greenCoffee?.name || item.coffeeName || '-'}</TableCell>
+                        <TableCell>{item.greenCoffee?.producer || item.producer || '-'}</TableCell>
                         <TableCell>{item.smallBags || 0}</TableCell>
                         <TableCell>{item.largeBags || 0}</TableCell>
                         <TableCell>{item.updatedAt ? formatDate(item.updatedAt) : 'Never'}</TableCell>
-                        <TableCell>{item.updatedBy?.username || '-'}</TableCell>
+                        <TableCell>{item.updatedBy?.username || item.updatedByUsername || '-'}</TableCell>
                       </TableRow>
                     ))}
+                    {data.inventory.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground">
+                          No inventory items found
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -223,14 +243,21 @@ export default function RetailOverview() {
                   <TableBody>
                     {data.orders.map((order) => (
                       <TableRow key={order.id}>
-                        <TableCell className="font-medium">{order.greenCoffee?.name}</TableCell>
+                        <TableCell className="font-medium">{order.greenCoffee?.name || '-'}</TableCell>
                         <TableCell>{order.smallBags}</TableCell>
                         <TableCell>{order.largeBags}</TableCell>
                         <TableCell className="capitalize">{order.status}</TableCell>
-                        <TableCell>{order.user?.username}</TableCell>
+                        <TableCell>{order.user?.username || '-'}</TableCell>
                         <TableCell>{formatDate(order.createdAt)}</TableCell>
                       </TableRow>
                     ))}
+                    {data.orders.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground">
+                          No orders found
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </CardContent>
