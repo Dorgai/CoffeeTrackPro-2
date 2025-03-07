@@ -1,10 +1,10 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
+import { sql } from "drizzle-orm"; // Updated import statement
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { insertGreenCoffeeSchema, insertRoastingBatchSchema, insertOrderSchema, insertShopSchema } from "@shared/schema";
-import {insertRetailInventorySchema} from "@shared/schema";
-import { sql } from "sql-template-strings";
+import { insertRetailInventorySchema } from "@shared/schema";
 
 function requireRole(roles: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -825,12 +825,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         const order= await storage.getOrder(orderId);
-        if (!order) {
-          return res.status(404).json({ message: "Order not found" });
+        if (!order) {          return res.status(404).json({ message: "Order not found" });
         }
 
         //        // Owner, retailOwner and roasteryOwner have full access to all status changes
-        if (["owner","retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {          if (smallBags > order.smallBags || largeBags > orderBags) {
+        if (["owner","retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {          if(smallBags > order.smallBags || largeBags > order.largeBags) {
             return res.status(400).json({
               message: "Updated quantities cannot exceed original order quantities"
             });
@@ -1298,11 +1297,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { receivedSmallBags, receivedLargeBags } = req.body;
 
         console.log("Processing confirmation:", {
-          user: req.user?.username,
-          role: req.user?.role,
           confirmationId,
           receivedSmallBags,
-          receivedLargeBags
+          receivedLargeBags,
+          user: {
+            id: req.user?.id,
+            username: req.user?.username,
+            role: req.user?.role
+          }
         });
 
         // Get all confirmations and find the one we need
@@ -1322,39 +1324,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        // Create a new confirmation record with updated values
-        const updatedConfirmation = await storage.createDispatchedCoffeeConfirmation({
-          shopId: confirmation.shopId,
-          greenCoffeeId: confirmation.greenCoffeeId,
-          dispatchedSmallBags: confirmation.dispatchedSmallBags,
-          dispatchedLargeBags: confirmation.dispatchedLargeBags,
-          receivedSmallBags,
-          receivedLargeBags,
-          status: "confirmed",
-          confirmedAt: new Date(),
-          confirmedById: req.user!.id
-        });
+        try {
+          // Update the confirmation with received quantities
+          await storage.db.execute(sql`
+            UPDATE dispatched_coffee_confirmations 
+            SET 
+              received_small_bags = ${receivedSmallBags},
+              received_large_bags = ${receivedLargeBags},
+              status = 'confirmed',
+              confirmed_by_id = ${req.user!.id},
+              confirmed_at = NOW()
+            WHERE id = ${confirmationId}
+          `);
 
-        // Update retail inventory with received quantities
-        await storage.updateRetailInventory({
-          shopId: confirmation.shopId,
-          greenCoffeeId: confirmation.greenCoffeeId,
-          smallBags: receivedSmallBags,
-          largeBags: receivedLargeBags,
-          updatedById: req.user!.id
-        });
+          // Update retail inventory with received quantities
+          await storage.updateRetailInventory({
+            shopId: confirmation.shopId,
+            greenCoffeeId: confirmation.greenCoffeeId,
+            smallBags: receivedSmallBags,
+            largeBags: receivedLargeBags,
+            updatedById: req.user!.id
+          });
 
-        console.log("Successfully confirmed dispatch:", {
-          confirmationId,
-          updatedConfirmation
-        });
+          // Get the updated confirmation
+          const [updatedConfirmation] = await storage.db.execute(sql`
+            SELECT * FROM dispatched_coffee_confirmations 
+            WHERE id = ${confirmationId}
+          `);
 
-        res.json(updatedConfirmation);
+          console.log("Successfully confirmed dispatch:", {
+            confirmationId,
+            updatedConfirmation
+          });
+
+          res.json(updatedConfirmation);
+        } catch (sqlError) {
+          console.error("SQL Error during confirmation:", sqlError);
+          throw new Error(`Database error: ${sqlError.message}`);
+        }
       } catch (error) {
         console.error("Error confirming dispatch:", error);
         res.status(500).json({ 
-          message: error instanceof Error ? error.message : "Failed to confirm dispatch",
-          details: error instanceof Error ? error.stack : undefined
+          message: "Failed to confirm dispatch",
+          details: error instanceof Error ? error.message : "Unknown error"
         });
       }
     }
