@@ -1,0 +1,206 @@
+# Coffee Supply Chain Management System
+## System Documentation - Current Functionality
+
+### 1. User Roles and Access Control
+
+#### 1.1 Existing Roles
+1. **Roastery Owner**
+   - Highest level access
+   - Can manage all users and shops
+   - Full access to all inventory operations
+   - Can approve new users
+   - Analytics and reporting access
+
+2. **Roaster**
+   - Manages roasting operations
+   - Updates green coffee inventory
+   - Creates roasting batches
+   - Can update order status to 'roasted' or 'dispatched'
+   - Views inventory discrepancies
+
+3. **Shop Manager**
+   - Manages assigned shop operations
+   - Updates shop inventory
+   - Creates and receives orders
+   - Can mark orders as 'delivered'
+   - Limited to assigned shops
+
+4. **Barista**
+   - Basic shop access
+   - Views shop inventory
+   - Creates orders
+   - Limited to assigned shops
+
+5. **Retail Owner**
+   - Access to retail operations
+   - Views all shops
+   - Access to analytics
+   - Can manage retail inventory
+
+### 2. Current Workflows
+
+#### 2.1 User Management
+1. **User Registration and Approval**
+   - New user registration
+   - Roastery owner approval required
+   - Role assignment
+   - Shop assignment (for shop-level roles)
+
+2. **User Shop Assignment**
+   - Roastery owner assigns users to shops
+   - Multiple shop assignments possible
+   - Only active shops can be assigned
+
+#### 2.2 Inventory Management
+1. **Green Coffee Management**
+   - Stock level tracking
+   - Minimum threshold monitoring
+   - Quality grade tracking
+   - Producer information
+
+2. **Retail Inventory**
+   - Shop-level inventory tracking
+   - Small and large bag quantities
+   - Real-time updates
+   - Historical tracking
+
+#### 2.3 Order Process
+1. **Order Creation**
+   - Shop creates order
+   - Specifies coffee type and quantities
+   - Status tracking:
+     - Pending
+     - Roasted
+     - Dispatched
+     - Delivered
+
+2. **Dispatch Confirmation**
+   - Roaster marks order as dispatched
+   - Shop confirms receipt
+   - Quantity verification
+   - Discrepancy handling
+
+#### 2.4 Analytics and Reporting
+1. **Inventory Analytics**
+   - Stock level trends
+   - Usage patterns
+   - Threshold alerts
+
+2. **Order Analytics**
+   - Order volume tracking
+   - Shop performance metrics
+   - Delivery statistics
+
+3. **Financial Reports**
+   - Billing cycles
+   - Split percentages
+   - Quantity-based calculations
+
+### 3. Data Structure
+
+#### 3.1 Core Entities
+1. **Users**
+   - Personal information
+   - Role
+   - Authentication details
+   - Shop assignments
+   - Active status
+
+2. **Shops**
+   - Location details
+   - Inventory targets
+   - Active status
+   - Desired stock levels
+
+3. **Green Coffee**
+   - Coffee details
+   - Producer information
+   - Stock levels
+   - Quality grades
+
+4. **Orders**
+   - Shop information
+   - Coffee quantities
+   - Status tracking
+   - Timestamps
+
+5. **Inventory**
+   - Current stock levels
+   - Historical records
+   - Shop assignments
+   - Update tracking
+
+### 4. Security Implementation
+
+#### 4.1 Authentication
+- Session-based authentication
+- Role-based access control
+- Shop-level access verification
+
+#### 4.2 Authorization
+- Route-level permission checks
+- Shop access validation
+- Role-specific operation limits
+
+### 5. API Endpoints
+
+#### 5.1 User Management
+- `/api/users` - User management
+- `/api/users/:id/shops` - Shop assignments
+- `/api/user/shops` - User's assigned shops
+
+#### 5.2 Inventory
+- `/api/green-coffee` - Green coffee management
+- `/api/retail-inventory` - Shop inventory
+- `/api/inventory-discrepancies` - Discrepancy tracking
+
+#### 5.3 Orders
+- `/api/orders` - Order management
+- `/api/dispatched-coffee/confirmations` - Dispatch tracking
+- `/api/orders/:id/status` - Status updates
+
+#### 5.4 Analytics
+- `/api/analytics/inventory` - Inventory analytics
+- `/api/analytics/orders` - Order analytics
+- `/api/reports/monthly` - Monthly reporting
+
+### 6. Current Limitations
+1. No automatic reordering system
+2. No real-time notifications
+3. Manual dispatch confirmation process
+4. Basic analytics visualization
+
+### 7. Data Flows
+
+#### 7.1 Order Flow
+```mermaid
+graph TD
+    A[Shop Creates Order] --> B[Roaster Processes]
+    B --> C[Mark as Roasted]
+    C --> D[Dispatch to Shop]
+    D --> E[Shop Confirms]
+    E --> F[Inventory Updated]
+```
+
+#### 7.2 Inventory Flow
+```mermaid
+graph TD
+    A[Green Coffee Received] --> B[Stock Updated]
+    B --> C[Roasting Batch Created]
+    C --> D[Green Stock Adjusted]
+    D --> E[Shop Inventory Updated]
+```
+
+### 8. System Integration
+
+#### 8.1 Database
+- PostgreSQL implementation
+- Drizzle ORM usage
+- Data validation with Zod
+
+#### 8.2 Frontend
+- React implementation
+- Real-time updates
+- Role-based interface
+
+This document reflects the current state of the application as of March 8, 2025.
