@@ -12,13 +12,13 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-// Initialize the connection pool with better settings
+// Initialize the connection pool with conservative settings
 export const pool = new Pool({ 
   connectionString: process.env.DATABASE_URL,
-  connectionTimeoutMillis: 5000, // 5 second timeout
-  max: 20, // Maximum number of clients in the pool
-  idleTimeoutMillis: 30000, // How long a client is allowed to remain idle before being closed
-  allowExitOnIdle: false // Don't allow the pool to exit while the server is running
+  connectionTimeoutMillis: 10000, // 10 second timeout for connection
+  max: 10, // Reduce max connections to prevent overloading
+  idleTimeoutMillis: 60000, // 1 minute idle timeout
+  allowExitOnIdle: false // Keep the pool alive
 });
 
 // Create the drizzle db instance
@@ -29,7 +29,7 @@ export async function initializeDatabase() {
   try {
     console.log("Testing database connection...");
 
-    // Test a simple query
+    // Test query to verify connection and get database info
     const result = await pool.query('SELECT current_database(), current_user, version();');
     console.log("Database connection test successful:", {
       database: result.rows[0].current_database,
