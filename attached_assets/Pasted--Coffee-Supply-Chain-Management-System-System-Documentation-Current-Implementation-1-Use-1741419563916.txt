@@ -1,0 +1,260 @@
+# Coffee Supply Chain Management System
+## System Documentation - Current Implementation
+
+### 1. User Roles and Access Control
+
+#### 1.1 Role-Based Access Control Implementation
+The system implements a hierarchical role-based access control through two main middleware functions:
+```typescript
+requireRole(roles: string[])
+requireShopAccess(allowedRoles: string[])
+```
+
+1. **Access Control Flow**
+   - Every request first checks authentication via session
+   - Role verification occurs through `requireRole` middleware
+   - Shop-specific access verified through `requireShopAccess`
+   - Admin roles (owner, roasteryOwner, retailOwner) automatically get full access
+
+2. **Shop Access Verification Process**
+   ```typescript
+   async function checkShopAccess(userId: number, shopId: number): Promise<boolean>
+   ```
+   - Verifies user's association with specific shops
+   - Maintains access control at data level
+   - Prevents unauthorized access to shop operations
+
+
+### 2. Core Workflows
+
+#### 2.1 Order Processing Workflow
+Implemented in routes.ts with the following status transitions:
+
+1. **Order Creation**
+   ```typescript
+   POST /api/orders
+   ```
+   - Validates shop access
+   - Creates order with "pending" status
+   - Records creator ID and timestamp
+
+2. **Status Transitions**
+   Each transition includes specific validation rules:
+
+   a) **Pending → Roasted**
+   - Only by Roaster/RoasteryOwner
+   - Updates green coffee inventory
+   - Records actual quantities
+
+   b) **Roasted → Dispatched**
+   - Creates dispatch confirmation record
+   - Updates tracking information
+   - Initiates confirmation workflow
+
+   c) **Dispatched → Delivered**
+   - Shop confirms receipt
+   - Validates quantities
+   - Updates shop inventory
+   - Records discrepancies
+
+#### 2.2 Inventory Management Workflow
+
+1. **Green Coffee Reception**
+   ```typescript
+   POST /api/green-coffee
+   ```
+   - Validates coffee details
+   - Updates stock levels
+   - Creates inventory record
+
+2. **Stock Level Updates**
+   ```typescript
+   PATCH /api/green-coffee/:id
+   ```
+   - Automatic updates from roasting
+   - Manual adjustments by authorized users
+   - Threshold monitoring
+
+3. **Retail Inventory**
+   ```typescript
+   POST /api/retail-inventory
+   ```
+   - Shop-specific stock tracking
+   - Automatic updates from deliveries
+   - Manual adjustments with authorization
+
+### 3. Data Flow Architecture
+
+#### 3.1 Order Processing Data Flow
+```mermaid
+graph TD
+    A[Shop Creates Order] --> B[Validate Shop Access]
+    B --> C[Check Coffee Availability]
+    C --> D[Create Order Record]
+    D --> E[Update Green Coffee Stock]
+    E --> F[Create Roasting Record]
+    F --> G[Update Retail Inventory]
+```
+
+#### 3.2 Inventory Update Flow
+```mermaid
+graph TD
+    A[Receive Green Coffee] --> B[Update Stock Levels]
+    B --> C[Monitor Thresholds]
+    C --> D[Create Roasting Batch]
+    D --> E[Adjust Green Coffee Stock]
+    E --> F[Update Retail Inventory]
+```
+
+### 4. Data Validation and Business Rules
+
+#### 4.1 Order Validation Rules
+Implemented in routes.ts:
+
+1. **Quantity Validation**
+   ```typescript
+   if (smallBags > order.smallBags || largeBags > order.largeBags) {
+     return res.status(400).json({
+       message: "Updated quantities cannot exceed original order quantities"
+     });
+   }
+   ```
+
+2. **Role-Specific Status Updates**
+   ```typescript
+   if (req.user?.role === "shopManager" && status !== "delivered") {
+     return res.status(403).json({
+       message: "Shop managers can only mark orders as delivered"
+     });
+   }
+   ```
+
+#### 4.2 Inventory Rules
+1. **Stock Level Validation**
+   - Non-negative quantities
+   - Threshold monitoring
+   - Automatic alerts
+
+2. **Dispatch Confirmation Rules**
+   - Quantity matching
+   - Timing restrictions
+   - Authorization requirements
+
+### 5. API Implementation
+
+#### 5.1 RESTful Endpoints
+Detailed implementation of each endpoint with validation:
+
+1. **Orders API**
+   ```typescript
+   POST /api/orders
+   GET /api/orders
+   PATCH /api/orders/:id/status
+   ```
+
+2. **Inventory API**
+   ```typescript
+   GET /api/green-coffee
+   POST /api/green-coffee
+   PATCH /api/green-coffee/:id
+   GET /api/retail-inventory
+   POST /api/retail-inventory
+   ```
+
+3. **Dispatch Confirmation API**
+   ```typescript
+   GET /api/dispatched-coffee/confirmations
+   POST /api/dispatched-coffee/confirmations/:id/confirm
+   ```
+
+### 6. Security Implementation
+
+#### 6.1 Authentication
+```typescript
+setupAuth(app)
+```
+- Session-based authentication
+- Secure password handling
+- Session persistence
+
+#### 6.2 Authorization
+```typescript
+requireRole(["roasteryOwner", "roaster"])
+requireShopAccess(["shopManager", "barista"])
+```
+- Role-based access control
+- Shop-level permissions
+- Action-specific authorization
+
+### 7. Error Handling
+
+#### 7.1 Validation Errors
+```typescript
+try {
+  const data = insertOrderSchema.parse(req.body);
+} catch (error) {
+  res.status(400).json({
+    message: error instanceof Error ? error.message : "Validation failed"
+  });
+}
+```
+
+#### 7.2 Business Logic Errors
+```typescript
+if (!hasAccess) {
+  return res.status(403).json({ message: "No access to this shop" });
+}
+```
+
+### 8. Database Operations
+
+#### 8.1 Transaction Management
+```typescript
+// Example from storage.ts
+async createOrder(data: InsertOrder) {
+  return await db.transaction(async (tx) => {
+    // Create order
+    // Update inventory
+    // Create tracking record
+  });
+}
+```
+
+#### 8.2 Query Optimization
+```typescript
+const query = sql`
+  SELECT 
+    ri.*,
+    s.name as shop_name,
+    gc.name as coffee_name
+  FROM retail_inventory ri
+  JOIN shops s ON ri.shop_id = s.id
+  JOIN green_coffee gc ON ri.green_coffee_id = gc.id
+  WHERE s.is_active = true
+`;
+```
+
+### 9. Monitoring and Logging
+
+#### 9.1 Request Logging
+```typescript
+console.log("Processing confirmation:", {
+  user: req.user.username,
+  role: req.user.role,
+  confirmationId,
+  quantities: { receivedSmallBags, receivedLargeBags }
+});
+```
+
+#### 9.2 Error Logging
+```typescript
+console.error("Error in confirmation process:", error);
+```
+
+This documentation reflects the actual implementation of the system based on the code in the repository, providing a detailed view of how each component works and interacts with others.
+
+### 6. Current Limitations
+1. No automatic reordering system
+2. No real-time notifications
+3. Manual dispatch confirmation process
+4. Basic analytics visualization

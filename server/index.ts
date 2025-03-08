@@ -8,74 +8,83 @@ import { setupAuth } from "./auth";
 import { registerRoutes } from "./routes";
 
 async function createServer() {
-  const app = express();
-  const port = process.env.PORT || 5000;
+  try {
+    console.log("Starting server initialization...");
+    const app = express();
+    const port = process.env.PORT || 5000;
 
-  // Configure CORS to handle credentials
-  app.use(cors({
-    origin: true,
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-  }));
+    console.log("Setting up CORS...");
+    app.use(cors({
+      origin: true,
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization']
+    }));
 
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: false }));
+    console.log("Setting up middleware...");
+    app.use(express.json());
+    app.use(express.urlencoded({ extended: false }));
 
-  // Basic health check endpoint
-  app.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok' });
-  });
-
-  // Set up session before auth
-  app.use(session({
-    secret: process.env.SESSION_SECRET || 'development_secret',
-    resave: false,
-    saveUninitialized: false,
-    store: storage.sessionStore,
-    cookie: {
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      httpOnly: true
-    }
-  }));
-
-  // Set up authentication after session
-  setupAuth(app);
-
-  // Register API routes
-  await registerRoutes(app);
-
-  // Seed initial data before setting up routes
-  await seedInitialData();
-
-  // Global error handler
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    console.error("Error:", err);
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({
-      error: {
-        message,
-        status,
-        timestamp: new Date().toISOString(),
-      }
+    // Basic health check endpoint
+    app.get('/api/health', (_req, res) => {
+      res.json({ status: 'ok' });
     });
-  });
 
-  // Create HTTP server
-  const httpServer = app.listen(Number(port), "0.0.0.0", () => {
-    console.log(`Server is running on http://0.0.0.0:${port}`);
-  });
+    console.log("Setting up session...");
+    app.use(session({
+      secret: process.env.SESSION_SECRET || 'development_secret',
+      resave: false,
+      saveUninitialized: false,
+      store: storage.sessionStore,
+      cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        httpOnly: true
+      }
+    }));
 
-  // Set up Vite in development mode
-  if (app.get("env") === "development") {
-    await setupVite(app, httpServer);
+    console.log("Setting up authentication...");
+    setupAuth(app);
+
+    console.log("Registering routes...");
+    await registerRoutes(app);
+
+    console.log("Seeding initial data...");
+    await seedInitialData();
+
+    // Global error handler
+    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      console.error("Error:", err);
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
+
+      res.status(status).json({
+        error: {
+          message,
+          status,
+          timestamp: new Date().toISOString(),
+        }
+      });
+    });
+
+    console.log("Starting HTTP server...");
+    const httpServer = app.listen(Number(port), "0.0.0.0", () => {
+      console.log(`Server is running on http://0.0.0.0:${port}`);
+    });
+
+    // Set up Vite in development mode
+    if (app.get("env") === "development") {
+      console.log("Setting up Vite for development...");
+      await setupVite(app, httpServer);
+    }
+
+    console.log("Server initialization completed successfully");
+    return httpServer;
+  } catch (error) {
+    console.error("Server initialization failed:", error);
+    throw error;
   }
-
-  return httpServer;
 }
 
 createServer().catch(error => {

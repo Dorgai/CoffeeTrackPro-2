@@ -567,44 +567,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: "Shop ID is required" });
         }
 
-        // Get inventory with related data
-        const inventoryQuery = sql`
-          SELECT 
-            ri.*,
-            s.name as shop_name,
-            s.location as shop_location,
-            gc.name as coffee_name,
-            gc.producer as producer,
-            gc.grade as grade,
-            u.username as updated_by_username
-          FROM retail_inventory ri
-          JOIN shops s ON ri.shop_id = s.id
-          JOIN green_coffee gc ON ri.green_coffee_id = gc.id
-          LEFT JOIN users u ON ri.updated_by_id = u.id
-          WHERE s.is_active = true
-          ${shopId ? sql`AND ri.shop_id = ${shopId}` : sql``}
-        `;
+        const inventory = await storage.getAllRetailInventories();
+        console.log("Retrieved inventory items:", {
+          count: inventory?.length || 0,
+          sample: inventory?.[0]
+        });
 
-        const inventory = await storage.db.execute(inventoryQuery);
+        if (!Array.isArray(inventory)) {
+          console.error("Invalid inventory data structure received");
+          return res.status(500).json({ message: "Error retrieving inventory data" });
+        }
 
-        // Map the results to match the expected format
-        const mappedResults = inventory.map(item => ({
-          id: item.id,
-          shopId: item.shop_id,
-          shopName: item.shop_name,
-          shopLocation: item.shop_location,
-          coffeeId: item.green_coffee_id,
-          coffeeName: item.coffee_name,
-          producer: item.producer,
-          grade: item.grade,
-          smallBags: parseInt(item.small_bags) || 0,
-          largeBags: parseInt(item.large_bags) || 0,
-          updatedAt: item.updated_at,
-          updatedById: item.updated_by_id,
-          updatedByUsername: item.updated_by_username
-        }));
+        // Filter by shop if shopId is provided
+        const filteredInventory = shopId
+          ? inventory.filter(item => item.shopId === shopId)
+          : inventory;
 
-        res.json(mappedResults);
+        console.log("Filtered inventory count:", filteredInventory.length);
+        res.json(filteredInventory);
       } catch (error) {
         console.error("Error fetching retail inventory:", error);
         res.status(500).json({
@@ -727,44 +707,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: "Shop ID is required" });
         }
 
-        // Get inventory with related data
-        const inventoryQuery = sql`
-          SELECT 
-            ri.*,
-            s.name as shop_name,
-            s.location as shop_location,
-            gc.name as coffee_name,
-            gc.producer as producer,
-            gc.grade as grade,
-            u.username as updated_by_username
-          FROM retail_inventory ri
-          JOIN shops s ON ri.shop_id = s.id
-          JOIN green_coffee gc ON ri.green_coffee_id = gc.id
-          LEFT JOIN users u ON ri.updated_by_id = u.id
-          WHERE s.is_active = true
-          ${shopId ? sql`AND ri.shop_id = ${shopId}` : sql``}
-        `;
+        const inventory = await storage.getAllRetailInventories();
+        console.log("Retrieved inventory items:", {
+          count: inventory?.length || 0,
+          sample: inventory?.[0]
+        });
 
-        const inventory = await storage.db.execute(inventoryQuery);
+        if (!Array.isArray(inventory)) {
+          console.error("Invalid inventory data structure received");
+          return res.status(500).json({ message: "Error retrieving inventory data" });
+        }
 
-        // Map the results to match the expected format
-        const mappedResults = inventory.map(item => ({
-          id: item.id,
-          shopId: item.shop_id,
-          shopName: item.shop_name,
-          shopLocation: item.shop_location,
-          coffeeId: item.green_coffee_id,
-          coffeeName: item.coffee_name,
-          producer: item.producer,
-          grade: item.grade,
-          smallBags: parseInt(item.small_bags) || 0,
-          largeBags: parseInt(item.large_bags) || 0,
-          updatedAt: item.updated_at,
-          updatedById: item.updated_by_id,
-          updatedByUsername: item.updated_by_username
-        }));
+        // Filter by shop if shopId is provided
+        const filteredInventory = shopId
+          ? inventory.filter(item => item.shopId === shopId)
+          : inventory;
 
-        res.json(mappedResults);
+        console.log("Filtered inventory count:", filteredInventory.length);
+        res.json(filteredInventory);
       } catch (error) {
         console.error("Error fetching retail inventory:", error);
         res.status(500).json({
@@ -829,633 +789,586 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json(orders);
     } catch (error) {
       console.error("Error fetching orders:", error);
-      res.status(500).jsonjson({ 
+      res.status(500).json({
         message: "Failed to fetch orders",
         details: error instanceof Error ? error.message : "Unknown error"
       });
-  }
-});
+    }
+  });
 
-// Update order status endpoint with corrected error handling
-app.patch(
-  "/api/orders/:id/status",
-  requireRole(["retailOwner", "owner", "roasteryOwner", "roaster", "shopManager", "barista"]),
-  async (req, res) => {
-    try {
-      const orderId = parseInt(req.params.id);
-      const { status, smallBags, largeBags } = req.body;
-      console.log("Order status update requested by:", {
-        username: req.user?.username,
-        role: req.user?.role,
-        orderId,
-        status,
-        smallBags,
-        largeBags
-      });
+  // Update order status endpoint with corrected error handling
+  app.patch(
+    "/api/orders/:id/status",
+    requireRole(["retailOwner", "owner", "roasteryOwner", "roaster", "shopManager", "barista"]),
+    async (req, res) => {
+      try {
+        const orderId = parseInt(req.params.id);
+        const { status, smallBags, largeBags } = req.body;
+        console.log("Order status update requested by:", {
+          username: req.user?.username,
+          role: req.user?.role,
+          orderId,
+          status,
+          smallBags,
+          largeBags
+        });
 
-      const order = await storage.getOrder(orderId);
-      if (!order) {
-        return res.status(404).json({ message: "Order not found" });
-      }
-
-      // Owner, retailOwner and roasteryOwner have full access to all status changes
-      if (["owner", "retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {
-        if (smallBags > order.smallBags || largeBags > order.largeBags) {
-          return res.status(400).json({
-            message: "Updated quantities cannot exceed original order quantities"
-          });
-        }
-      } else {
-        // Shop manager can only mark orders as delivered
-        if (req.user?.role === "shopManager" && status !== "delivered") {
-          return res.status(403).json({
-            message: "Shop managers can only mark orders as delivered"
-          });
+        const order = await storage.getOrder(orderId);
+        if (!order) {
+          return res.status(404).json({ message: "Order not found" });
         }
 
-        // Roaster can only change status to roasted or dispatched
-        if (req.user?.role === "roaster" && !["roasted", "dispatched"].includes(status)) {
-          return res.status(403).json({
-            message: "Roasters can only change status to 'roasted' or 'dispatched'"
-          });
+        // Owner, retailOwner and roasteryOwner have full access to all status changes
+        if (["owner", "retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {
+          if (smallBags > order.smallBags || largeBags > order.largeBags) {
+            return res.status(400).json({
+              message: "Updated quantities cannot exceed original order quantities"
+            });
+          }
+        } else {
+          // Shop manager can only mark orders as delivered
+          if (req.user?.role === "shopManager" && status !== "delivered") {
+            return res.status(403).json({
+              message: "Shop managers can only mark orders as delivered"
+            });
+          }
+
+          // Roaster can only change status to roasted or dispatched
+          if (req.user?.role === "roaster" && !["roasted", "dispatched"].includes(status)) {
+            return res.status(403).json({
+              message: "Roasters can only change status to 'roasted' or 'dispatched'"
+            });
+          }
+
+          // Validate quantities
+          if (smallBags > order.smallBags || largeBags > order.largeBags) {
+            return res.status(400).json({
+              message: "Updated quantities cannot exceed original order quantities"
+            });
+          }
         }
 
-        // Validate quantities
-        if (smallBags > order.smallBags || largeBags > order.largeBags) {
-          return res.status(400).json({
-            message: "Updated quantities cannot exceed original order quantities"
-          });
+        // Update the order status and create dispatch confirmation
+        const updatedOrder = await storage.updateOrderStatus(orderId, {
+          status,
+          smallBags,
+          largeBags,
+          updatedById: req.user!.id
+        });
+
+        // Create dispatch confirmation when status changes to "dispatched"
+        if (status === "dispatched") {
+          console.log("Creating dispatch confirmation for order:", orderId);
+          try {
+            const confirmation = await storage.createDispatchedCoffeeConfirmation({
+              orderId: order.id,
+              shopId: order.shopId,
+              greenCoffeeId: order.greenCoffeeId,
+              dispatchedSmallBags: smallBags,
+              dispatchedLargeBags: largeBags,
+              status: "pending"
+            });
+            console.log("Created dispatch confirmation:", confirmation);
+          } catch (error) {
+            console.error("Error creating dispatch confirmation:", error);
+          }
         }
-      }
 
-      // Update the order status and create dispatch confirmation
-      const updatedOrder = await storage.updateOrderStatus(orderId, {
-        status,
-        smallBags,
-        largeBags,
-        updatedById: req.user!.id
-      });
-
-      // Create dispatch confirmation when status changes to "dispatched"
-      if (status === "dispatched") {
-        console.log("Creating dispatch confirmation for order:", orderId);
-        try {
-          const confirmation = await storage.createDispatchedCoffeeConfirmation({
-            orderId: order.id,
-            shopId: order.shopId,
-            greenCoffeeId: order.greenCoffeeId,
-            dispatchedSmallBags: smallBags,
-            dispatchedLargeBags: largeBags,
-            status: "pending"
-          });
-          console.log("Created dispatch confirmation:", confirmation);
-        } catch (error) {
-          console.error("Error creating dispatch confirmation:", error);
-        }
-      }
-
-      res.json(updatedOrder);
-    } catch (error) {
-      console.error("Error updating order status:", error);
-      res.status(500).json({
-        message: "Failed to update order status",
-        details: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
-  }
-);
-
-// Create new order
-app.post("/api/orders", requireShopAccess(["owner", "shopManager", "barista", "roasteryOwner", "retailOwner"]), async (req, res) => {
-  try {
-    const { shopId } = req.body;
-    if (!shopId) {
-      return res.status(400).json({ message: "Shop ID is required" });
-    }
-
-    const data = insertOrderSchema.parse({
-      ...req.body,
-      createdById: req.user!.id,
-      status: "pending"
-    });
-
-    const order = await storage.createOrder(data);
-    res.status(201).json(order);
-  } catch (error) {
-    console.error("Error creating order:", error);
-    res.status(400).json({
-      message: error instanceof Error ? error.message : "Failed to create order"
-    });
-  }
-});
-
-// Update dispatched coffee confirmation endpoint
-app.get("/api/dispatched-coffee/confirmations", async (req, res) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ message: "Please log in" });
-    }
-
-    const { shopId } = req.query;
-    const isAdminRole = ["owner", "roasteryOwner", "retailOwner"].includes(req.user.role);
-
-    if (isAdminRole) {
-      const confirmations = await storage.getAllDispatchedCoffeeConfirmations();
-      return res.json(confirmations);
-    }
-
-    if (!shopId) {
-      return res.status(400).json({ message: "Shop ID is required" });
-    }
-
-    const confirmations = await storage.getDispatchedCoffeeConfirmations(Number(shopId));
-    res.json(confirmations);
-  } catch (error) {
-    console.error("Error fetching confirmations:", error);
-    res.status(500).json({ message: "Failed to fetch confirmations" });
-  }
-});
-
-app.post("/api/dispatched-coffee/confirm", async (req, res) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ message: "Please log in" });
-    }
-
-    const { confirmationId, receivedSmallBags, receivedLargeBags } = req.body;
-
-    console.log("Processing confirmation:", {
-      user: req.user.username,
-      role: req.user.role,
-      confirmationId,
-      receivedSmallBags,
-      receivedLargeBags
-    });
-
-    const confirmation = await storage.getDispatchedCoffeeConfirmation(confirmationId);
-    if (!confirmation) {
-      return res.status(404).json({ message: "Confirmation not found" });
-    }
-
-    // Allow admin roles full access
-    const isAdminRole = ["roasteryOwner", "retailOwner", "owner"].includes(req.user.role);
-
-    // For non-admin roles, verify shop access
-    if (!isAdminRole) {
-      const hasAccess = await checkShopAccess(req.user.id, confirmation.shopId);
-      if (!hasAccess) {
-        return res.status(403).json({ message: "No access to this shop" });
-      }
-    }
-
-    const result = await storage.confirmDispatchedCoffee(confirmationId, {
-      receivedSmallBags,
-      receivedLargeBags,
-      confirmedById: req.user.id
-    });
-
-    // Update retail inventory after confirmation
-    await storage.updateRetailInventory({
-      shopId: confirmation.shopId,
-      greenCoffeeId: confirmation.greenCoffeeId,
-      smallBags: receivedSmallBags,
-      largeBags: receivedLargeBags,
-      updatedById: req.user.id
-    });
-
-    res.json(result);
-  } catch (error) {
-    console.error("Error confirming dispatch:", error);
-    res.status(500).json({ message: "Failed to confirm dispatch" });
-  }
-});
-
-// Inventory Discrepancies Routes
-app.get("/api/inventory-discrepancies",
-  requireRole(["roaster", "roasteryOwner", "shopManager"]),
-  async (req, res) => {
-    try {
-      console.log("Fetching discrepancies for user:", req.user?.username, "with role:", req.user?.role);
-      const discrepancies = await storage.getInventoryDiscrepancies();
-      console.log("Found discrepancies:", discrepancies.length);
-
-      // Filter discrepancies based on user role
-      if (req.user?.role === "shopManager") {
-        // For shop managers, filter discrepancies to only show their shops
-        const userShops = await storage.getUserShops(req.user.id);
-        const shopIds = userShops.map(shop => shop.id);
-        console.log("Shop manager shops:", shopIds);
-        const filteredDiscrepancies = discrepancies.filter(
-          d => shopIds.includes(d.shopId)
-        );
-        console.log("Filtered discrepancies for shop manager:", filteredDiscrepancies.length);
-        return res.json(filteredDiscrepancies);
-      }
-
-      // For roasteryOwner and roaster, show all discrepancies
-      console.log("Returning all discrepancies for roasteryOwner/roaster");
-      res.json(discrepancies);
-    } catch (error) {
-      console.error("Error fetching inventory discrepancies:", error);
-      res.status(500).json({
-        message: "Failed to fetch discrepancies",
-        details: error instanceof Error ? error.message : undefined
-      });
-    }
-  }
-);
-
-//  ////  // Add route for getting coffee-specific large bag targets
-app.get("/api/shops/:id/coffee-targets", requireShopAccess(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
-  try {
-    const shopId = parseInt(req.params.id);
-
-    const targets = await storage.getCoffeeLargeBagTargets(shopId);
-    res.json(targets);
-  } catch (error) {
-    console.error("Error fetching coffee targets:", error);
-    res.status(500).json({ message: "Failed to fetch coffee targets" });
-  }
-});
-// Fixthe incorrect syntax in the coffee target update route
-app.patch("/api/shops/:shopId/coffee/:coffeeId/target", requireShopAccess(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
-  try {
-    const shopId = parseInt(req.params.shopId);
-    const coffeeId = parseInt(req.params.coffeeId);
-    const { desiredLargeBags } = req.body;
-
-    // Validate inputs
-    if (typeof desiredLargeBags !== 'number' || desiredLargeBags < 0) {
-      return res.status(400).json({ message: "Invalid desired large bags value" });
-    }
-
-    const target = await storage.updateCoffeeLargeBagTarget(
-      shopId,
-      coffeeId,
-      desiredLargeBags
-    );
-
-    console.log("Updated coffee target for shop:", shopId, "coffee:", coffeeId, "to:", desiredLargeBags);
-    res.json(target);
-  } catch (error) {
-    console.error("Error updating coffee target:", error);
-    res.status(500).json({ message: "Failed to update coffee target" });
-  }
-});
-
-//  // Add new billing routes after theexisting ones
-app.get("/api/billing/lastevent", requireRole(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
-  try {
-    const lastEvent = await storage.getLastBillingEvent();
-    res.json(lastEvent);
-  } catch (error) {
-    console.error("Error fetching last billing event:", error);
-    res.status(500).json({ message: "Failed to fetch last billing event" });
-  }
-});
-
-app.get("/api/billing/quantities", requireRole(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
-  try {
-    console.log("Fetching billing quantities...");
-
-    // Get the last billing event to determine the start date
-    const lastEvent = await storage.getLastBillingEvent();
-    const fromDate = lastEvent ? lastEvent.cycleEndDate : new Date(0); // Use epoch if no previous event
-
-    console.log("Using fromDate:", fromDate);
-
-    // Get quantities since last billing event
-    const quantities = await storage.getBillingQuantities(fromDate);
-    console.log("Retrieved quantities:", quantities);
-
-    // Send response with both fromDate and quantities
-    res.json({
-      fromDate: fromDate.toISOString(),
-      quantities: quantities
-    });
-  } catch (error) {
-    console.error("Error in /api/billing/quantities:", error);
-    res.status(500).json({
-      message: "Failed to fetch billing quantities",
-      details: error instanceof Error ? error.message : "Unknown error"
-    });
-  }
-});
-
-app.post("/api/billing/events", requireRole(["roasteryOwner"]), async (req, res) => {
-  try {
-    const { primarySplitPercentage, secondarySplitPercentage, quantities } = req.body;
-
-    // Get the last billing event to determine the cycle start date
-    const lastEvent = await storage.getLastBillingEvent();
-    const cycleStartDate = lastEvent ? lastEvent.cycleEndDate : new Date(0);
-    const cycleEndDate = new Date(); // Current time
-
-    // Create the billing event
-    const event = await storage.createBillingEvent(
-      {
-        cycleStartDate,
-        cycleEndDate,
-        primarySplitPercentage,
-        secondarySplitPercentage,
-        createdById: req.user!.id
-      },
-      quantities.map((q: any) => ({
-        grade: q.grade,
-        smallBagsQuantity: q.smallBagsQuantity,
-        largeBagsQuantity: q.largeBagsQuantity
-      }))
-    );
-
-    res.json(event);
-  } catch (error) {
-    console.error("Error creating billing event:", error);
-    res.status(500).json({ message: "Failed to create billing event" });
-  }
-});
-
-// Add billing history route
-app.get("/api/billing/history", requireRole(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
-  try {
-    console.log("Fetching billing history for user:", req.user?.username, "role:", req.user?.role);
-    const history = await storage.getBillingHistory();
-    console.log("Retrieved billing history:", history.length, "events");
-    res.json(history);
-  } catch (error) {
-    console.error("Error fetching billing history:", error);
-    res.status(500).json({ message: "Failed to fetch billing history" });
-  }
-});
-
-app.get("/api/billing/details/:eventId", requireRole(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
-  try {
-    const eventId = parseInt(req.params.eventId);
-    if (isNaN(eventId)) {
-      return res.status(400).json({ message: "Invalid event ID" });
-    }
-
-    console.log("Fetching billing details for event:", eventId, "user:", req.user?.username);
-    const details = await storage.getBillingEventDetails(eventId);
-    console.log("Retrieved billing details:", details);
-    res.json(details);
-  } catch (error) {
-    console.error("Error fetching billing details:", error);
-    res.status(500).json({ message: "Failed to fetch billing details" });
-  }
-});
-
-// Add analytics routes for roastery owner
-app.get("/api/analytics/inventory", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
-  try {
-    const fromDate = req.query.fromDate ? new Date(req.query.fromDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // Default to last 30 days
-    const toDate = req.query.toDate ? new Date(req.query.toDate as string) : new Date();
-
-    console.log("Fetching inventory analytics from", fromDate, "to", toDate);
-    const inventoryHistory = await storage.getAnalyticsInventoryHistory(fromDate, toDate);
-    res.json(inventoryHistory);
-  } catch (error) {
-    console.error("Error fetching inventory analytics:", error);
-    res.status(500).json({
-      message: "Failed to fetch inventory analytics",
-      details: error instanceof Error ? error.message : undefined
-    });
-  }
-});
-
-app.get("/api/analytics/orders", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
-  try {
-    const fromDate = req.query.fromDate ? new Date(req.query.fromDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const toDate = req.query.toDate ? new Date(req.query.toDate as string) : new Date();
-
-    console.log("Fetching order analytics from", fromDate, "to", toDate);
-    const orderAnalytics = await storage.getAnalyticsOrders(fromDate, toDate);
-    res.json(orderAnalytics);
-  } catch (error) {
-    console.error("Error fetching order analytics:", error);
-    res.status(500).json({
-      message: "Failed to fetch order analytics",
-      details: error instanceof Error ? error.message : undefined
-    });
-  }
-});
-
-app.get("/api/analytics/roasting", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
-  try {
-    const fromDate = req.query.fromDate ? new Date(req.query.fromDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const toDate = req.query.toDate ? new Date(req.query.toDate as string) : new Date();
-
-    console.log("Fetching roasting analytics from", fromDate, "to", toDate);
-    const roastingAnalytics = await storage.getAnalyticsRoasting(fromDate, toDate);
-    res.json(roastingAnalytics);
-  } catch (error) {
-    console.error("Error fetching roasting analytics:", error);
-    res.status(500).json({
-      message: "Failed to fetch roasting analytics",
-      details: error instanceof Error ? error.message : undefined
-    });
-  }
-});
-
-// Add reports routes for roastery owner
-app.get("/api/reports/inventory-status", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
-  try {
-    console.log("Generating inventory status report");
-    const report = await storage.generateInventoryStatusReport();
-    res.json(report);
-  } catch (error) {
-    console.error("Error generating inventory status report:", error);
-    res.status(500).json({
-      message: "Failed to generate inventory status report",
-      details: error instanceof Error ? error.message : undefined
-    });
-  }
-});
-
-app.get("/api/reports/shop-performance", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
-  try {
-    console.log("Generating shop performance report");
-    const report = await storage.generateShopPerformanceReport();
-    res.json(report);
-  } catch (error) {
-    console.error("Error generating shop performance report:", error);
-    res.status(500).json({
-      message: "Failed to generate shop performance report",
-      details: error instanceof Error ? error.message : undefined
-    });
-  }
-});
-
-app.get("/api/reports/coffee-consumption", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
-  try {
-    console.log("Generating coffee consumption report");
-    const report = await storage.generateCoffeeConsumptionReport();
-    res.json(report);
-  } catch (error) {
-    console.error("Error generating coffee consumption report:", error);
-    res.status(500).json({
-      message: "Failed to generate coffee consumption report",
-      details: error instanceof Error ? error.message : undefined
-    });
-  }
-});
-
-// Reports and Analytics Routes
-app.get("/api/reports/monthly", requireRole(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
-  try {
-    console.log("Fetching monthly reports for user:", req.user?.username, "role:", req.user?.role);
-    const reports = await storage.getMonthlyReports();
-    res.json(reports);
-  } catch (error) {
-    console.error("Error fetching monthly reports:", error);
-    res.status(500).json({ message: "Failed to fetch monthly reports" });
-  }
-});
-
-app.get("/api/analytics/data", requireRole(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
-  try {
-    console.log("Fetching analytics data for user:", req.user?.username, "role:", req.user?.role);
-    const data = await storage.getAnalyticsData();
-    res.json(data);
-  } catch (error) {
-    console.error("Error fetching analytics data:", error);
-    res.status(500).json({ message: "Failed to fetch analytics data" });
-  }
-});
-
-// Keep the existing code below
-app.post(
-  "/api/dispatched-coffee/:id/confirm",
-  requireRole(["retailOwner", "owner", "roasteryOwner", "shopManager"]),
-  async (req, res) => {
-    try {
-      const confirmationId = parseInt(req.params.id);
-      const { receivedSmallBags, receivedLargeBags } = req.body;
-
-      // Input validation
-      if (typeof receivedSmallBags !== 'number' || typeof receivedLargeBags !== 'number') {
-        return res.status(400).json({
-          message: "Invalid input: receivedSmallBags and receivedLargeBags must be numbers"
+        res.json(updatedOrder);
+      } catch (error) {
+        console.error("Error updating order status:", error);
+        res.status(500).json({
+          message: "Failed to update order status",
+          details: error instanceof Error ? error.message : "Unknown error"
         });
       }
+    }
+  );
 
-      console.log("Starting dispatch confirmation:", {
-        confirmationId,
-        receivedSmallBags,
-        receivedLargeBags,
-        user: {
-          id: req.user?.id,
-          username: req.user?.username,
-          role: req.user?.role
-        }
-      });
-
-      // Get the original confirmation
-      const confirmation = await storage.getDispatchConfirmationById(confirmationId);
-
-      if (!confirmation || confirmation.status !== 'pending') {
-        console.log("No pending confirmation found with ID:", confirmationId);
-        return res.status(404).json({ message: "Confirmation not found or already processed" });
+  // Create new order
+  app.post("/api/orders", requireShopAccess(["owner", "shopManager", "barista", "roasteryOwner", "retailOwner"]), async (req, res) => {
+    try {
+      const { shopId } = req.body;
+      if (!shopId) {
+        return res.status(400).json({ message: "Shop ID is required" });
       }
 
-      // Verify shop access for non-admin users
-      if (!["owner", "retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {
-        const hasAccess = await checkShopAccess(req.user!.id, confirmation.shop_id);
-        if (!hasAccess) {
-          console.log("Access denied for shop:", confirmation.shop_id);
-          return res.status(403).json({ message: "No access to this shop" });
-        }
-      }
-
-      // Update the confirmation first
-      const updatedConfirmation = await storage.updateDispatchConfirmation(confirmationId, {
-        received_small_bags: receivedSmallBags,
-        received_large_bags: receivedLargeBags,
-        status: 'confirmed',
-        confirmed_by_id: req.user!.id,
-        confirmed_at: new Date()
+      const data = insertOrderSchema.parse({
+        ...req.body,
+        createdById: req.user!.id,
+        status: "pending"
       });
 
-      if (!updatedConfirmation) {
-        throw new Error("Failed to update confirmation");
-      }
-
-      // Then update the retail inventory
-      await storage.updateRetailInventory({
-        shopId: confirmation.shop_id,
-        greenCoffeeId: confirmation.green_coffee_id,
-        smallBags: receivedSmallBags,
-        largeBags: receivedLargeBags,
-        updatedById: req.user!.id
-      });
-
-      res.json(updatedConfirmation);
+      const order = await storage.createOrder(data);
+      res.status(201).json(order);
     } catch (error) {
-      console.error("Error in confirmation process:", error);
-      res.status(500).json({
-        message: "Failed to confirm dispatch",
-        details: error instanceof Error ? error.message : "Unknown error"
+      console.error("Error creating order:", error);
+      res.status(400).json({
+        message: error instanceof Error ? error.message : "Failed to create order"
       });
     }
-  }
-);
+  });
 
-// Update the dispatch confirmation endpoint
-app.post(
-  "/api/dispatched-coffee/confirmations/:id/confirm",
-  requireShopAccess(["shopManager", "barista", "roasteryOwner", "retailOwner"]),
-  async (req, res) => {
+  // Update dispatched coffee confirmation endpoint
+  app.get("/api/dispatched-coffee/confirmations", async (req, res) => {
     try {
-      const confirmationId = parseInt(req.params.id);
-      const { receivedSmallBags, receivedLargeBags } = req.body;
+      if (!req.user) {
+        return res.status(401).json({ message: "Please log in" });
+      }
+
+      const { shopId } = req.query;
+      const isAdminRole = ["owner", "roasteryOwner", "retailOwner"].includes(req.user.role);
+
+      if (isAdminRole) {
+        const confirmations = await storage.getAllDispatchedCoffeeConfirmations();
+        return res.json(confirmations);
+      }
+
+      if (!shopId) {
+        return res.status(400).json({ message: "Shop ID is required" });
+      }
+
+      const confirmations = await storage.getDispatchedCoffeeConfirmations(Number(shopId));
+      res.json(confirmations);
+    } catch (error) {
+      console.error("Error fetching confirmations:", error);
+      res.status(500).json({ message: "Failed to fetch confirmations" });
+    }
+  });
+
+  app.post("/api/dispatched-coffee/confirm", async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Please log in" });
+      }
+
+      const { confirmationId, receivedSmallBags, receivedLargeBags } = req.body;
 
       console.log("Processing confirmation request:", {
         confirmationId,
         receivedSmallBags,
         receivedLargeBags,
-        userId: req.user?.id,
-        userRole: req.user?.role
+        user: req.user.username,
+        role: req.user.role
       });
 
       // Input validation
-      if (!confirmationId || typeof receivedSmallBags !== 'number' || typeof receivedLargeBags !== 'number') {
-        return res.status(400).json({
-          message: "Invalid input: required fields missing or invalid"
-        });
+      if (!confirmationId || typeof confirmationId !== 'number') {
+        return res.status(400).json({ message: "Invalid confirmation ID" });
       }
 
-      // Get the confirmation details first
-      const [confirmation] = await storage.db.execute(sql`
-        SELECT 
-          dc.*,
-          gc.name as coffee_name,
-          gc.producer as producer,
-          s.name as shop_name
-        FROM dispatched_coffee_confirmation dc
-        JOIN green_coffee gc ON dc.green_coffee_id = gc.id
-        JOIN shops s ON dc.shop_id = s.id
-        WHERE dc.id = ${confirmationId}
-          AND dc.status = 'pending'
-      `);
-
-      if (!confirmation) {
-        console.log("No pending confirmation found:", confirmationId);
-        return res.status(404).json({
-          message: "Confirmation not found or already processed"
-        });
+      if (typeof receivedSmallBags !== 'number' || typeof receivedLargeBags !== 'number') {
+        return res.status(400).json({ message: "Invalid quantities: must be numbers" });
       }
 
-      console.log("Found confirmation:", confirmation);
-
-      // Verify shop access for non-admin users
-      if (!["owner", "retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {
-        const hasAccess = await checkShopAccess(req.user!.id, confirmation.shop_id);
-        if (!hasAccess) {
-          return res.status(403).json({ message: "No access to this shop" });
-        }
+      if (receivedSmallBags < 0 || receivedLargeBags < 0) {
+        return res.status(400).json({ message: "Quantities cannot be negative" });
       }
 
-      // Update retail inventory first
       try {
+        // Get the confirmation details
+        const confirmation = await storage.getDispatchedCoffeeConfirmation(confirmationId);
+
+        if (!confirmation) {
+          return res.status(404).json({ message: "Confirmation not found" });
+        }
+
+        console.log("Found confirmation:", confirmation);
+
+        // Check access rights
+        if (!["roasteryOwner", "retailOwner", "owner"].includes(req.user.role)) {
+          const hasAccess = await checkShopAccess(req.user.id, confirmation.shopId);
+          if (!hasAccess) {
+            return res.status(403).json({ message: "No access to this shop" });
+          }
+        }
+
+        // Process the confirmation
+        const result = await storage.confirmDispatchedCoffee(confirmationId, {
+          receivedSmallBags,
+          receivedLargeBags,
+          confirmedById: req.user.id
+        });
+
+        // Update retail inventory
+        await storage.updateRetailInventory({
+          shopId: confirmation.shopId,
+          greenCoffeeId: confirmation.greenCoffeeId,
+          smallBags: receivedSmallBags,
+          largeBags: receivedLargeBags,
+          updatedById: req.user.id
+        });
+
+        console.log("Successfully processed confirmation:", result);
+        res.json(result);
+      } catch (error) {
+        console.error("Error processing confirmation:", error);
+
+        if (error instanceof Error && error.message.includes("not in pending status")) {
+          return res.status(400).json({ message: "Confirmation already processed" });
+        }
+
+        throw error;
+      }
+    } catch (error) {
+      console.error("Error in confirmation endpoint:", error);
+      res.status(500).json({
+        message: "Failed to process confirmation",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // Inventory Discrepancies Routes
+  app.get("/api/inventory-discrepancies",
+    requireRole(["roaster", "roasteryOwner", "shopManager"]),
+    async (req, res) => {
+      try {
+        console.log("Fetching discrepancies for user:", req.user?.username, "with role:", req.user?.role);
+        const discrepancies = await storage.getInventoryDiscrepancies();
+        console.log("Found discrepancies:", discrepancies.length);
+
+        // Filter discrepancies based on user role
+        if (req.user?.role === "shopManager") {
+          // For shop managers, filter discrepancies to only show their shops
+          const userShops = await storage.getUserShops(req.user.id);
+          const shopIds = userShops.map(shop => shop.id);
+          console.log("Shop manager shops:", shopIds);
+          const filteredDiscrepancies = discrepancies.filter(
+            d => shopIds.includes(d.shopId)
+          );
+          console.log("Filtered discrepancies for shop manager:", filteredDiscrepancies.length);
+          return res.json(filteredDiscrepancies);
+        }
+
+        // For roasteryOwner and roaster, show all discrepancies
+        console.log("Returning all discrepancies for roasteryOwner/roaster");
+        res.json(discrepancies);
+      } catch (error) {
+        console.error("Error fetching inventory discrepancies:", error);
+        res.status(500).json({
+          message: "Failed to fetch discrepancies",
+          details: error instanceof Error ? error.message : undefined
+        });
+      }
+    }
+  );
+
+  //  ////  // Add route for getting coffee-specific large bag targets
+  app.get("/api/shops/:id/coffee-targets", requireShopAccess(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
+    try {
+      const shopId = parseInt(req.params.id);
+
+      const targets = await storage.getCoffeeLargeBagTargets(shopId);
+      res.json(targets);
+    } catch (error) {
+      console.error("Error fetching coffee targets:", error);
+      res.status(500).json({ message: "Failed to fetch coffee targets" });
+    }
+  });
+  // Fixthe incorrect syntax in the coffee target update route
+  app.patch("/api/shops/:shopId/coffee/:coffeeId/target", requireShopAccess(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
+    try {
+      const shopId = parseInt(req.params.shopId);
+      const coffeeId = parseInt(req.params.coffeeId);
+      const { desiredLargeBags } = req.body;
+
+      // Validate inputs
+      if (typeof desiredLargeBags !== 'number' || desiredLargeBags < 0) {
+        return res.status(400).json({ message: "Invalid desired large bags value" });
+      }
+
+      const target = await storage.updateCoffeeLargeBagTarget(
+        shopId,
+        coffeeId,
+        desiredLargeBags
+      );
+
+      console.log("Updated coffee target for shop:", shopId, "coffee:", coffeeId, "to:", desiredLargeBags);
+      res.json(target);
+    } catch (error) {
+      console.error("Error updating coffee target:", error);
+      res.status(500).json({ message: "Failed to update coffee target" });
+    }
+  });
+
+  //  // Add new billing routes after theexisting ones
+  app.get("/api/billing/lastevent", requireRole(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
+    try {
+      const lastEvent = await storage.getLastBillingEvent();
+      res.json(lastEvent);
+    } catch (error) {
+      console.error("Error fetching last billing event:", error);
+      res.status(500).json({ message: "Failed to fetch last billing event" });
+    }
+  });
+
+  app.get("/api/billing/quantities", requireRole(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
+    try {
+      console.log("Fetching billing quantities...");
+
+      // Get the last billing event to determine the start date
+      const lastEvent = await storage.getLastBillingEvent();
+      const fromDate = lastEvent ? lastEvent.cycleEndDate : new Date(0); // Use epoch if no previous event
+
+      console.log("Using fromDate:", fromDate);
+
+      // Get quantities since last billing event
+      const quantities = await storage.getBillingQuantities(fromDate);
+      console.log("Retrieved quantities:", quantities);
+
+      // Send response with both fromDate and quantities
+      res.json({
+        fromDate: fromDate.toISOString(),
+        quantities: quantities
+      });
+    } catch (error) {
+      console.error("Error in /api/billing/quantities:", error);
+      res.status(500).json({
+        message: "Failed to fetch billing quantities",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  app.post("/api/billing/events", requireRole(["roasteryOwner"]), async (req, res) => {
+    try {
+      const { primarySplitPercentage, secondarySplitPercentage, quantities } = req.body;
+
+      // Get the last billing event to determine the cycle start date
+      const lastEvent = await storage.getLastBillingEvent();
+      const cycleStartDate = lastEvent ? lastEvent.cycleEndDate : new Date(0);
+      const cycleEndDate = new Date(); // Current time
+
+      // Create the billing event
+      const event = await storage.createBillingEvent(
+        {
+          cycleStartDate,
+          cycleEndDate,
+          primarySplitPercentage,
+          secondarySplitPercentage,
+          createdById: req.user!.id
+        },
+        quantities.map((q: any) => ({
+          grade: q.grade,
+          smallBagsQuantity: q.smallBagsQuantity,
+          largeBagsQuantity: q.largeBagsQuantity
+        }))
+      );
+
+      res.json(event);
+    } catch (error) {
+      console.error("Error creating billing event:", error);
+      res.status(500).json({ message: "Failed to create billing event" });
+    }
+  });
+
+  // Add billing history route
+  app.get("/api/billing/history", requireRole(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
+    try {
+      console.log("Fetching billing history for user:", req.user?.username, "role:", req.user?.role);
+      const history = await storage.getBillingHistory();
+      console.log("Retrieved billing history:", history.length, "events");
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching billing history:", error);
+      res.status(500).json({ message: "Failed to fetch billing history" });
+    }
+  });
+
+  app.get("/api/billing/details/:eventId", requireRole(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
+    try {
+      const eventId = parseInt(req.params.eventId);
+      if (isNaN(eventId)) {
+        return res.status(400).json({ message: "Invalid event ID" });
+      }
+
+      console.log("Fetching billing details for event:", eventId, "user:", req.user?.username);
+      const details = await storage.getBillingEventDetails(eventId);
+      console.log("Retrieved billing details:", details);
+      res.json(details);
+    } catch (error) {
+      console.error("Error fetching billing details:", error);
+      res.status(500).json({ message: "Failed to fetch billing details" });
+    }
+  });
+
+  // Add analytics routes for roastery owner
+  app.get("/api/analytics/inventory", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
+    try {
+      const fromDate = req.query.fromDate ? new Date(req.query.fromDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // Default to last 30 days
+      const toDate = req.query.toDate ? new Date(req.query.toDate as string) : new Date();
+
+      console.log("Fetching inventory analytics from", fromDate, "to", toDate);
+      const inventoryHistory = await storage.getAnalyticsInventoryHistory(fromDate, toDate);
+      res.json(inventoryHistory);
+    } catch (error) {
+      console.error("Error fetching inventory analytics:", error);
+      res.status(500).json({
+        message: "Failed to fetch inventory analytics",
+        details: error instanceof Error ? error.message : undefined
+      });
+    }
+  });
+
+  app.get("/api/analytics/orders", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
+    try {
+      const fromDate = req.query.fromDate ? new Date(req.query.fromDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const toDate = req.query.toDate ? new Date(req.query.toDate as string) : new Date();
+
+      console.log("Fetching order analytics from", fromDate, "to", toDate);
+      const orderAnalytics = await storage.getAnalyticsOrders(fromDate, toDate);
+      res.json(orderAnalytics);
+    } catch (error) {
+      console.error("Error fetching order analytics:", error);
+      res.status(500).json({
+        message: "Failed to fetch order analytics",
+        details: error instanceof Error ? error.message : undefined
+      });
+    }
+  });
+
+  app.get("/api/analytics/roasting", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
+    try {
+      const fromDate = req.query.fromDate ? new Date(req.query.fromDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const toDate = req.query.toDate ? new Date(req.query.toDate as string) : new Date();
+
+      console.log("Fetching roasting analytics from", fromDate, "to", toDate);
+      const roastingAnalytics = await storage.getAnalyticsRoasting(fromDate, toDate);
+      res.json(roastingAnalytics);
+    } catch (error) {
+      console.error("Error fetching roasting analytics:", error);
+      res.status(500).json({
+        message: "Failed to fetch roasting analytics",
+        details: error instanceof Error ? error.message : undefined
+      });
+    }
+  });
+
+  // Add reports routes for roastery owner
+  app.get("/api/reports/inventory-status", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
+    try {
+      console.log("Generating inventory status report");
+      const report = await storage.generateInventoryStatusReport();
+      res.json(report);
+    } catch (error) {
+      console.error("Error generating inventory status report:", error);
+      res.status(500).json({
+        message: "Failed to generate inventory status report",
+        details: error instanceof Error ? error.message : undefined
+      });
+    }
+  });
+
+  app.get("/api/reports/shop-performance", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
+    try {
+      console.log("Generating shop performance report");
+      const report = await storage.generateShopPerformanceReport();
+      res.json(report);
+    } catch (error) {
+      console.error("Error generating shop performance report:", error);
+      res.status(500).json({
+        message: "Failed to generate shop performance report",
+        details: error instanceof Error ? error.message : undefined
+      });
+    }
+  });
+
+  app.get("/api/reports/coffee-consumption", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
+    try {
+      console.log("Generating coffee consumption report");
+      const report = await storage.generateCoffeeConsumptionReport();
+      res.json(report);
+    } catch (error) {
+      console.error("Error generating coffee consumption report:", error);
+      res.status(500).json({
+        message: "Failed to generate coffee consumption report",
+        details: error instanceof Error ? error.message : undefined
+      });
+    }
+  });
+
+  // Reports and Analytics Routes
+  app.get("/api/reports/monthly", requireRole(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
+    try {
+      console.log("Fetching monthly reports for user:", req.user?.username, "role:", req.user?.role);
+      const reports = await storage.getMonthlyReports();
+      res.json(reports);
+    } catch (error) {
+      console.error("Error fetching monthly reports:", error);
+      res.status(500).json({ message: "Failed to fetch monthly reports" });
+    }
+  });
+
+  app.get("/api/analytics/data", requireRole(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
+    try {
+      console.log("Fetching analytics data for user:", req.user?.username, "role:", req.user?.role);
+      const data = await storage.getAnalyticsData();
+      res.json(data);
+    } catch (error) {
+      console.error("Error fetching analytics data:", error);
+      res.status(500).json({ message: "Failed to fetch analytics data" });
+    }
+  });
+
+  // Keep the existing code below
+  app.post(
+    "/api/dispatched-coffee/:id/confirm",
+    requireRole(["retailOwner", "owner", "roasteryOwner", "shopManager"]),
+    async (req, res) => {
+      try {
+        const confirmationId = parseInt(req.params.id);
+        const { receivedSmallBags, receivedLargeBags } = req.body;
+
+        // Input validation
+        if (typeof receivedSmallBags !== 'number' || typeof receivedLargeBags !== 'number') {
+          return res.status(400).json({
+            message: "Invalid input: receivedSmallBags and receivedLargeBags must be numbers"
+          });
+        }
+
+        console.log("Starting dispatch confirmation:", {
+          confirmationId,
+          receivedSmallBags,
+          receivedLargeBags,
+          user: {
+            id: req.user?.id,
+            username: req.user?.username,
+            role: req.user?.role
+          }
+        });
+
+        // Get the original confirmation
+        const confirmation = await storage.getDispatchConfirmationById(confirmationId);
+
+        if (!confirmation || confirmation.status !== 'pending') {
+          console.log("No pending confirmation found with ID:", confirmationId);
+          return res.status(404).json({ message: "Confirmation not found or already processed" });
+        }
+
+        // Verify shop access for non-admin users
+        if (!["owner", "retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {
+          const hasAccess = await checkShopAccess(req.user!.id, confirmation.shop_id);
+          if (!hasAccess) {
+            console.log("Access denied for shop:", confirmation.shop_id);
+            return res.status(403).json({ message: "No access to this shop" });
+          }
+        }
+
+        // Update the confirmation first
+        const updatedConfirmation = await storage.updateDispatchConfirmation(confirmationId, {
+          received_small_bags: receivedSmallBags,
+          received_large_bags: receivedLargeBags,
+          status: 'confirmed',
+          confirmed_by_id: req.user!.id,
+          confirmed_at: new Date()
+        });
+
+        if (!updatedConfirmation) {
+          throw new Error("Failed to update confirmation");
+        }
+
+        // Then update the retail inventory
         await storage.updateRetailInventory({
           shopId: confirmation.shop_id,
           greenCoffeeId: confirmation.green_coffee_id,
@@ -1463,185 +1376,261 @@ app.post(
           largeBags: receivedLargeBags,
           updatedById: req.user!.id
         });
-        console.log("Updated retail inventory successfully");
+
+        res.json(updatedConfirmation);
       } catch (error) {
-        console.error("Failed to update retail inventory:", error);
-        throw new Error("Failed to update retail inventory");
-      }
-
-      // Then update the confirmation status
-      const [updatedConfirmation] = await storage.db.execute(sql`
-        UPDATE dispatched_coffee_confirmation
-        SET 
-          received_small_bags = ${receivedSmallBags},
-          received_large_bags = ${receivedLargeBags},
-          status = 'confirmed',
-          confirmed_by_id = ${req.user!.id},
-          confirmed_at = NOW()
-        WHERE id = ${confirmationId}
-          AND status = 'pending'
-        RETURNING *
-      `);
-
-      if (!updatedConfirmation) {
-        throw new Error("Failed to update confirmation status");
-      }
-
-      console.log("Successfully updated confirmation:", updatedConfirmation);
-
-      // Return the updated confirmation with additional details
-      const response = {
-        ...updatedConfirmation,
-        coffeeName: confirmation.coffee_name,
-        producer: confirmation.producer,
-        shopName: confirmation.shop_name
-      };
-
-      res.json(response);
-    } catch (error) {
-      console.error("Error in confirmation process:", error);
-      res.status(500).json({
-        message: "Failed to process confirmation",
-        details: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
-  }
-);
-
-// Dispatch confirmation routes
-app.get("/api/dispatched-coffee/confirmations", requireRole(["shopManager", "barista", "retailOwner", "roasteryOwner"]), async (req, res) => {
-  try {
-    const shopId = req.query.shopId ? Number(req.query.shopId) : undefined;
-    console.log("Fetching dispatch confirmations for:", {
-      user: req.user?.username,
-      role: req.user?.role,
-      shopId
-    });
-
-    // Fetch confirmations
-    const query = sql`
-      SELECT 
-        dcc.*,
-        gc.name as coffee_name,
-        gc.producer as producer
-      FROM dispatched_coffee_confirmation dcc
-      JOIN green_coffee gc ON dcc.green_coffee_id = gc.id
-      WHERE 1=1
-      ${shopId ? sql`AND dcc.shop_id = ${shopId}` : sql``}
-      ORDER BY dcc.created_at DESC
-    `;
-
-    const confirmations = await storage.db.execute(query);
-    console.log("Found confirmations:", confirmations.length);
-
-    res.json(confirmations);
-  } catch (error) {
-    console.error("Error fetching dispatch confirmations:", error);
-    res.status(500).json({
-      message: "Failed to fetch confirmations",
-      details: error instanceof Error ? error.message : "Unknown error"
-    });
-  }
-});
-
-// Confirm dispatch endpoint
-app.post("/api/dispatched-coffee/confirmations/:id/confirm",
-  requireRole(["shopManager", "barista", "retailOwner", "roasteryOwner"]),
-  async (req, res) => {
-    try {
-      const confirmationId = parseInt(req.params.id);
-      const { receivedSmallBags, receivedLargeBags } = req.body;
-
-      console.log("Processing dispatch confirmation:", {
-        confirmationId,
-        receivedSmallBags,
-        receivedLargeBags,
-        user: req.user?.username,
-        role: req.user?.role
-      });
-
-      // Fetch the confirmation
-      const confirmation = await storage.getDispatchConfirmation(confirmationId);
-      if (!confirmation) {
-        return res.status(404).json({ message: "Confirmation not found" });
-      }
-
-      // Verify shop access for non-admin roles
-      if (!["retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {
-        const hasAccess = await checkShopAccess(req.user!.id, confirmation.shopId);
-        if (!hasAccess) {
-          return res.status(403).json({ message: "No access to this shop" });
-        }
-      }
-
-      // Update the confirmation
-      const updatedConfirmation = await storage.confirmDispatch(confirmationId, {
-        receivedSmallBags,
-        receivedLargeBags,
-        confirmedById: req.user!.id
-      });
-
-      console.log("Updated confirmation:", updatedConfirmation);
-      res.json(updatedConfirmation);
-    } catch (error) {
-      console.error("Error processing dispatch confirmation:", error);
-      res.status(500).json({
-        message: "Failed to process confirmation",
-        details: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
-  }
-);
-app.get('/api/dispatch-confirmation/:id', async (req, res) => {
-  try {
-    const confirmation = await storage.getDispatchConfirmation(parseInt(req.params.id));
-    if (!confirmation) {
-      return res.status(404).json({ error: 'Dispatch confirmation not found' });
-    }
-    res.json(confirmation);
-  } catch (error) {
-    console.error('Error getting dispatch confirmation:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Fix syntax in dispatch confirmation route
-app.post("/api/dispatched-coffee/confirmations/:id/confirm",
-  requireRole(["shopManager", "barista", "retailOwner", "roasteryOwner"]),
-  async (req, res) => {
-    try {
-      const confirmationId = parseInt(req.params.id);
-      const { receivedSmallBags, receivedLargeBags } = req.body;
-
-      if (!req.user) {
-        return res.status(401).json({ message: "Authentication required" });
-      }
-
-      const confirmation = await storage.getDispatchConfirmation(confirmationId);
-      if (!confirmation || confirmation.status !== 'pending') {
-        return res.status(404).json({ 
-          message: "Confirmation not found or already processed" 
+        console.error("Error in confirmation process:", error);
+        res.status(500).json({
+          message: "Failed to confirm dispatch",
+          details: error instanceof Error ? error.message : "Unknown error"
         });
       }
+    }
+  );
 
-      // Update the confirmation
-      const updatedConfirmation = await storage.confirmDispatchedCoffee(confirmationId, {
-        receivedSmallBags,
-        receivedLargeBags,
-        confirmedById: req.user.id
+  // Update the dispatch confirmation endpoint
+  app.post(
+    "/api/dispatched-coffee/confirmations/:id/confirm",
+    requireShopAccess(["shopManager", "barista", "roasteryOwner", "retailOwner"]),
+    async (req, res) => {
+      try {
+        const confirmationId = parseInt(req.params.id);
+        const { receivedSmallBags, receivedLargeBags } = req.body;
+
+        console.log("Processing confirmation request:", {
+          confirmationId,
+          receivedSmallBags,
+          receivedLargeBags,
+          userId: req.user?.id,
+          userRole: req.user?.role
+        });
+
+        // Input validation
+        if (!confirmationId || typeof receivedSmallBags !== 'number' || typeof receivedLargeBags !== 'number') {
+          return res.status(400).json({
+            message: "Invalid input: required fields missing or invalid"
+          });
+        }
+
+        // Get the confirmation details first
+        const [confirmation] = await storage.db.execute(sql`
+          SELECT 
+            dc.*,
+            gc.name as coffee_name,
+            gc.producer as producer,
+            s.name as shop_name
+          FROM dispatched_coffee_confirmation dc
+          JOIN green_coffee gc ON dc.green_coffee_id = gc.id
+          JOIN shops s ON dc.shop_id = s.id
+          WHERE dc.id = ${confirmationId}
+            AND dc.status = 'pending'
+        `);
+
+        if (!confirmation) {
+          console.log("No pending confirmation found:", confirmationId);
+          return res.status(404).json({
+            message: "Confirmation not found or already processed"
+          });
+        }
+
+        console.log("Found confirmation:", confirmation);
+
+        // Verify shop access for non-admin users
+        if (!["owner", "retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {
+          const hasAccess = await checkShopAccess(req.user!.id, confirmation.shop_id);
+          if (!hasAccess) {
+            return res.status(403).json({ message: "No access to this shop" });
+          }
+        }
+
+        // Update retail inventory first
+        try {
+          await storage.updateRetailInventory({
+            shopId: confirmation.shop_id,
+            greenCoffeeId: confirmation.green_coffee_id,
+            smallBags: receivedSmallBags,
+            largeBags: receivedLargeBags,
+            updatedById: req.user!.id
+          });
+          console.log("Updated retail inventory successfully");
+        } catch (error) {
+          console.error("Failed to update retail inventory:", error);
+          throw new Error("Failed to update retail inventory");
+        }
+
+        // Then update the confirmation status
+        const [updatedConfirmation] = await storage.db.execute(sql`
+          UPDATE dispatched_coffee_confirmation
+          SET 
+            received_small_bags = ${receivedSmallBags},
+            received_large_bags = ${receivedLargeBags},
+            status = 'confirmed',
+            confirmed_by_id = ${req.user!.id},
+            confirmed_at = NOW()
+          WHERE id = ${confirmationId}
+            AND status = 'pending'
+          RETURNING *
+        `);
+
+        if (!updatedConfirmation) {
+          throw new Error("Failed to update confirmation status");
+        }
+
+        console.log("Successfully updated confirmation:", updatedConfirmation);
+
+        // Return the updated confirmation with additional details
+        const response = {
+          ...updatedConfirmation,
+          coffeeName: confirmation.coffee_name,
+          producer: confirmation.producer,
+          shopName: confirmation.shop_name
+        };
+
+        res.json(response);
+      } catch (error) {
+        console.error("Error in confirmation process:", error);
+        res.status(500).json({
+          message: "Failed to process confirmation",
+          details: error instanceof Error ? error.message : "Unknown error"
+        });
+      }
+    }
+  );
+
+  // Dispatch confirmation routes
+  app.get("/api/dispatched-coffee/confirmations", requireRole(["shopManager", "barista", "retailOwner", "roasteryOwner"]), async (req, res) => {
+    try {
+      const shopId = req.query.shopId ? Number(req.query.shopId) : undefined;
+      console.log("Fetching dispatch confirmations for:", {
+        user: req.user?.username,
+        role: req.user?.role,
+        shopId
       });
 
-      res.json(updatedConfirmation);
+      // Fetch confirmations
+      const query = sql`
+        SELECT 
+          dcc.*,
+          gc.name as coffee_name,
+          gc.producer as producer
+        FROM dispatched_coffee_confirmation dcc
+        JOIN green_coffee gc ON dcc.green_coffee_id = gc.id
+        WHERE 1=1
+        ${shopId ? sql`AND dcc.shop_id = ${shopId}` : sql``}
+        ORDER BY dcc.created_at DESC
+      `;
+
+      const confirmations = await storage.db.execute(query);
+      console.log("Found confirmations:", confirmations.length);
+
+      res.json(confirmations);
     } catch (error) {
-      console.error("Error confirming dispatch:", error);
-      res.status(500).json({ 
-        message: "Failed to confirm dispatch",
+      console.error("Error fetching dispatch confirmations:", error);
+      res.status(500).json({
+        message: "Failed to fetch confirmations",
         details: error instanceof Error ? error.message : "Unknown error"
       });
     }
-  }
-);
+  });
 
-const httpServer = createServer(app);
-return httpServer;
+  // Confirm dispatch endpoint
+  app.post("/api/dispatched-coffee/confirmations/:id/confirm",
+    requireRole(["shopManager", "barista", "retailOwner", "roasteryOwner"]),
+    async (req, res) => {
+      try {
+        const confirmationId = parseInt(req.params.id);
+        const { receivedSmallBags, receivedLargeBags } = req.body;
+
+        console.log("Processing dispatch confirmation:", {
+          confirmationId,
+          receivedSmallBags,
+          receivedLargeBags,
+          user: req.user?.username,
+          role: req.user?.role
+        });
+
+        // Fetch the confirmation
+        const confirmation = await storage.getDispatchConfirmation(confirmationId);
+        if (!confirmation) {
+          return res.status(404).json({ message: "Confirmation not found" });
+        }
+
+        // Verify shop access for non-admin roles
+        if (!["retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {
+          const hasAccess = await checkShopAccess(req.user!.id, confirmation.shopId);
+          if (!hasAccess) {
+            return res.status(403).json({ message: "No access to this shop" });
+          }
+        }
+
+        // Update the confirmation
+        const updatedConfirmation = await storage.confirmDispatch(confirmationId, {
+          receivedSmallBags,
+          receivedLargeBags,
+          confirmedById: req.user!.id
+        });
+
+        console.log("Updated confirmation:", updatedConfirmation);
+        res.json(updatedConfirmation);
+      } catch (error) {
+        console.error("Error processing dispatch confirmation:", error);
+        res.status(500).json({
+          message: "Failed to process confirmation",
+          details: error instanceof Error ? error.message : "Unknown error"
+        });
+      }
+    }
+  );
+  app.get('/api/dispatch-confirmation/:id', async (req, res) => {
+    try {
+      const confirmation = await storage.getDispatchConfirmation(parseInt(req.params.id));
+      if (!confirmation) {
+        return res.status(404).json({ error: 'Dispatch confirmation not found' });
+      }
+      res.json(confirmation);
+    } catch (error) {
+      console.error('Error getting dispatch confirmation:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Fix syntax in dispatch confirmation route
+  app.post("/api/dispatched-coffee/confirmations/:id/confirm",
+    requireRole(["shopManager", "barista", "retailOwner", "roasteryOwner"]),
+    async (req, res) => {
+      try {
+        const confirmationId = parseInt(req.params.id);
+        const { receivedSmallBags, receivedLargeBags } = req.body;
+
+        if (!req.user) {
+          return res.status(401).json({ message: "Authentication required" });
+        }
+
+        const confirmation = await storage.getDispatchConfirmation(confirmationId);
+        if (!confirmation || confirmation.status !== 'pending') {
+          return res.status(404).json({
+            message: "Confirmation not found or already processed"
+          });
+        }
+
+        // Update the confirmation
+        const updatedConfirmation = await storage.confirmDispatchedCoffee(confirmationId, {
+          receivedSmallBags,
+          receivedLargeBags,
+          confirmedById: req.user.id
+        });
+
+        res.json(updatedConfirmation);
+      } catch (error) {
+        console.error("Error confirming dispatch:", error);
+        res.status(500).json({
+          message: "Failed to confirm dispatch",
+          details: error instanceof Error ? error.message : "Unknown error"
+        });
+      }
+    }
+  });
+
+  const httpServer = createServer(app);
+  return httpServer;
 }

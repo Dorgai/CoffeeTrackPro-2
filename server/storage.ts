@@ -491,16 +491,22 @@ export class DatabaseStorage {
         ORDER BY s.name, gc.name`;
 
       const result = await db.execute(query);
-      console.log("Raw query result:", result);
+      console.log("Raw query result structure:", {
+        hasRows: Boolean(result.rows),
+        rowCount: result.rows?.length,
+        sampleRow: result.rows?.[0]
+      });
 
-      // Ensure we return an array of inventory items
-      const inventoryItems = Array.isArray(result) ? result : result.rows || [];
-      console.log("Processed inventory items:", inventoryItems.length);
+      // Ensure we always return an array
+      if (!result.rows) {
+        console.log("No rows found in query result");
+        return [];
+      }
 
-      return inventoryItems;
+      return result.rows;
     } catch (error) {
       console.error("Error in getAllRetailInventories:", error);
-      throw error;
+      return []; // Return empty array instead of throwing
     }
   }
 
@@ -859,18 +865,46 @@ export class DatabaseStorage {
     }
   ): Promise<DispatchedCoffeeConfirmation> {
     try {
-      const [confirmation] = await db
+      console.log("Starting dispatch confirmation process:", {
+        confirmationId: id,
+        data
+      });
+
+      // First check if confirmation exists and is pending
+      const [existingConfirmation] = await db
+        .select()
+        .from(dispatchedCoffeeConfirmation)
+        .where(eq(dispatchedCoffeeConfirmation.id, id));
+
+      if (!existingConfirmation) {
+        throw new Error("Confirmation not found");
+      }
+
+      if (existingConfirmation.status !== "pending") {
+        throw new Error("Confirmation is not in pending status");
+      }
+
+      // Update the confirmation
+      const [updatedConfirmation] = await db
         .update(dispatchedCoffeeConfirmation)
         .set({
-          ...data,
-          status: 'confirmed',
+          receivedSmallBags: data.receivedSmallBags,
+          receivedLargeBags: data.receivedLargeBags,
+          confirmedById: data.confirmedById,
+          status: "confirmed",
           confirmedAt: new Date()
         })
         .where(eq(dispatchedCoffeeConfirmation.id, id))
         .returning();
-      return confirmation;
+
+      if (!updatedConfirmation) {
+        throw new Error("Failed to update confirmation record");
+      }
+
+      console.log("Successfully updated confirmation:", updatedConfirmation);
+      return updatedConfirmation;
     } catch (error) {
-      console.error("Error confirming dispatched coffee:", error);
+      console.error("Error in confirmDispatchedCoffee:", error);
       throw error;
     }
   }
