@@ -25,15 +25,6 @@ async function createServer() {
       allowedHeaders: ['Content-Type', 'Authorization']
     }));
 
-    // Set CSP headers
-    app.use((req, res, next) => {
-      res.setHeader(
-        'Content-Security-Policy',
-        "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval';"
-      );
-      next();
-    });
-
     console.log("Setting up middleware...");
     app.use(express.json());
     app.use(express.urlencoded({ extended: false }));
@@ -41,11 +32,6 @@ async function createServer() {
     // Basic health check endpoint
     app.get('/api/health', (_req, res) => {
       res.json({ status: 'ok' });
-    });
-
-    // Added root route handler
-    app.get('/', (_req, res) => {
-      res.send('Hello from the root path!');
     });
 
 
@@ -89,8 +75,8 @@ async function createServer() {
       console.log(`Server is running on http://0.0.0.0:${port}`);
     });
 
-    // Set up Vite in development mode if no errors occurred during startup
-    if (app.get("env") === "development" && process.env.ENABLE_VITE === "true") {
+    // Set up Vite in development mode
+    if (app.get("env") === "development") {
       console.log("Setting up Vite for development...");
       await setupVite(app, httpServer);
     }
