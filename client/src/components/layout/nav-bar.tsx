@@ -21,15 +21,15 @@ export function NavBar() {
   const [, setLocation] = useLocation();
 
   // Role-based access control for menu items
-  const isRetailUser = ["retailOwner", "shopManager", "barista"].includes(user?.role || "");
+  const isRetailUser = ["owner", "retailOwner", "shopManager", "barista"].includes(user?.role || "");
   const isRoasteryUser = ["roasteryOwner", "roaster"].includes(user?.role || "");
-  const canManageShops = user?.role === "roasteryOwner";
-  const canManageUsers = user?.role === "roasteryOwner";
-  const canAccessGreenCoffee = ["roasteryOwner", "roaster"].includes(user?.role || "");
-  const canAccessAnalytics = ["roasteryOwner", "retailOwner", "shopManager"].includes(user?.role || "");
-  const canAccessRoasting = ["roasteryOwner", "roaster"].includes(user?.role || "");
-  const canAccessRetail = ["roasteryOwner", "retailOwner", "shopManager", "barista"].includes(user?.role || "");
-  const canAccessNewArrivals = ["roasteryOwner", "retailOwner", "shopManager", "barista"].includes(user?.role || "");
+  const canManageShops = ["owner", "roasteryOwner"].includes(user?.role || "");
+  const canManageUsers = ["owner", "roasteryOwner"].includes(user?.role || "");
+  const canAccessGreenCoffee = ["owner", "roasteryOwner", "roaster"].includes(user?.role || "");
+  const canAccessAnalytics = ["owner", "roasteryOwner", "retailOwner", "shopManager"].includes(user?.role || "");
+  const canAccessRoasting = ["owner", "roasteryOwner", "roaster"].includes(user?.role || "");
+  const canAccessRetail = ["owner", "roasteryOwner", "retailOwner", "shopManager", "barista"].includes(user?.role || "");
+  const canAccessNewArrivals = ["owner", "roasteryOwner", "retailOwner", "shopManager", "barista"].includes(user?.role || "");
 
   // Redirect users to their appropriate dashboard
   const homePath = isRetailUser ? "/manager-dashboard" : "/";

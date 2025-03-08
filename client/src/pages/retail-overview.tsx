@@ -108,7 +108,7 @@ export default function RetailOverview() {
     );
   }
 
-  // Group inventory by shop
+  // Group inventory by shop with less restrictive filtering
   const shopData = inventory.reduce<Record<number, {
     shopName: string;
     shopLocation: string;
@@ -122,29 +122,26 @@ export default function RetailOverview() {
       return acc;
     }
 
-    // Only include shops that the user has access to
-    if (user?.role !== "roasteryOwner" && !userShops?.some(s => s.id === shopId)) {
-      return acc;
+    // For roasteryOwner and owner, show all shops
+    if (user?.role === "roasteryOwner" || user?.role === "owner" || userShops?.some(s => s.id === shopId)) {
+      if (!acc[shopId]) {
+        acc[shopId] = {
+          shopName,
+          shopLocation,
+          inventory: [],
+          orders: []
+        };
+      }
+      acc[shopId].inventory.push(item);
     }
 
-    if (!acc[shopId]) {
-      acc[shopId] = {
-        shopName,
-        shopLocation,
-        inventory: [],
-        orders: []
-      };
-    }
-
-    acc[shopId].inventory.push(item);
     return acc;
   }, {});
 
   // Add orders to the grouped data
   orders?.forEach(order => {
-    const shopId = order.shopId;
-    if (shopData[shopId]) {
-      shopData[shopId].orders.push(order);
+    if (shopData[order.shopId]) {
+      shopData[order.shopId].orders.push(order);
     }
   });
 
