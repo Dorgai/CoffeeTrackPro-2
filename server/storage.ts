@@ -490,10 +490,14 @@ export class DatabaseStorage {
         WHERE s.is_active = true AND gc.is_active = true
         ORDER BY s.name, gc.name`;
 
-      const result = await this.db.execute(query);
+      const result = await db.execute(query);
       console.log("Raw query result:", result);
 
-      return result as any[];
+      // Ensure we return an array of inventory items
+      const inventoryItems = Array.isArray(result) ? result : result.rows || [];
+      console.log("Processed inventory items:", inventoryItems.length);
+
+      return inventoryItems;
     } catch (error) {
       console.error("Error in getAllRetailInventories:", error);
       throw error;
