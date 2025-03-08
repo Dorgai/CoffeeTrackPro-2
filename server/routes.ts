@@ -106,7 +106,7 @@ async function checkShopAccess(userId: number, shopId: number): Promise<boolean>
   }
 }
 
-export async function registerRoutes(app: Express): Promise<Server> {
+export async function registerRoutes(app: Express): Promise<void> {
   setupAuth(app);
 
   // Add debug endpoint at the top of the routes registration
@@ -834,7 +834,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           // Roaster can only change status to roasted or dispatched
-          if (req.user?.role === "roaster" && !["roasted", "dispatched"].includes(status)) {
+          if (req.user?.role=== "roaster" && !["roasted", "dispatched"].includes(status)) {
             return res.status(403).json({
               message: "Roasters can only change status to 'roasted' or 'dispatched'"
             });
@@ -1629,8 +1629,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
     }
-  });
+  );
 
-  const httpServer = createServer(app);
-  return httpServer;
+  // Remove the httpServer creation from here as it's already handled in index.ts
+  app.get("/api/health", (_req, res) => {
+    res.json({ status: "ok" });
+  });
 }
