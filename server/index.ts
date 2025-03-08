@@ -1,15 +1,19 @@
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { setupVite } from "./vite";
-import { seedInitialData } from "./db";
 import session from "express-session";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { registerRoutes } from "./routes";
+import { initializeDatabase } from "./db";
 
 async function createServer() {
   try {
     console.log("Starting server initialization...");
+
+    // Initialize database connection first
+    await initializeDatabase();
+
     const app = express();
     const port = process.env.PORT || 5000;
 
@@ -50,9 +54,6 @@ async function createServer() {
     console.log("Registering routes...");
     await registerRoutes(app);
 
-    console.log("Seeding initial data...");
-    await seedInitialData();
-
     // Global error handler
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       console.error("Error:", err);
@@ -73,8 +74,8 @@ async function createServer() {
       console.log(`Server is running on http://0.0.0.0:${port}`);
     });
 
-    // Set up Vite in development mode
-    if (app.get("env") === "development") {
+    // Set up Vite in development mode if no errors occurred during startup
+    if (app.get("env") === "development" && process.env.ENABLE_VITE === "true") {
       console.log("Setting up Vite for development...");
       await setupVite(app, httpServer);
     }
