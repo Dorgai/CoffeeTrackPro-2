@@ -1,0 +1,274 @@
+# Coffee Supply Chain Management System
+## Functional Specification Document
+
+### 1. System Overview
+
+The Coffee Supply Chain Management System is a web-based application that manages the complete coffee supply chain workflow from green coffee inventory through roasting to retail distribution. The system implements role-based access control and handles complex workflows for inventory management, order processing, and dispatch confirmations.
+
+### 2. Core Workflows
+
+#### 2.1 Green Coffee Management Workflow
+
+1. **Inventory Reception**
+   - Roastery Owner or Roaster records new green coffee arrivals
+   - System captures:
+     * Coffee name
+     * Producer information
+     * Grade
+     * Current stock levels
+     * Minimum threshold for reordering
+   - Stock levels are automatically monitored against thresholds
+   - Implemented in routes: `/api/green-coffee` (POST, GET)
+
+2. **Stock Management**
+   - Real-time stock level tracking
+   - Automatic stock adjustments when:
+     * New batches are created (decrements green coffee)
+     * Roasting is completed (accounts for roasting loss)
+   - Threshold notifications when stock reaches minimum levels
+   - Implemented in: `updateGreenCoffeeStock` function
+
+#### 2.2 Order Processing Workflow
+
+1. **Order Creation**
+   - Initiated by Shop Manager or Barista
+   - Required information:
+     * Shop ID (validated against user's assigned shops)
+     * Coffee type selection
+     * Quantity in small and large bags
+   - System validates:
+     * User has permission for the shop
+     * Coffee is available
+     * Quantities are valid
+   - Creates order with "pending" status
+   - Implementation: `/api/orders` POST endpoint
+
+2. **Order Fulfillment Process**
+   Status progression:
+   a. **Pending → Roasted**
+      - Roaster confirms roasting completion
+      - Updates inventory levels
+      - Records actual quantities
+   
+   b. **Roasted → Dispatched**
+      - Roaster marks order for dispatch
+      - System creates dispatch confirmation record
+      - Updates internal tracking
+   
+   c. **Dispatched → Delivered**
+      - Shop confirms receipt
+      - Validates received quantities
+      - Updates shop inventory
+      - Records any discrepancies
+
+   Implementation: `/api/orders/:id/status` PATCH endpoint
+
+3. **Dispatch Confirmation Flow**
+   - System creates confirmation record when order is dispatched
+   - Shop staff verifies received quantities
+   - System tracks discrepancies between dispatched and received
+   - Updates inventory automatically
+   - Implementation: `/api/dispatched-coffee/confirmations` endpoints
+
+#### 2.3 Retail Inventory Management
+
+1. **Inventory Tracking**
+   - Real-time stock levels per shop
+   - Separate tracking for small and large bags
+   - Automatic updates based on:
+     * Confirmed deliveries
+     * Manual adjustments
+   - Historical tracking of all changes
+   - Implementation: `/api/retail-inventory` endpoints
+
+2. **Stock Level Optimization**
+   - Shops maintain desired stock levels
+   - System tracks:
+     * Current inventory
+     * Desired levels
+     * Pending orders
+   - Helps in order planning
+   - Implementation: Shop configuration endpoints
+
+### 3. Role-Based Access Control
+
+#### 3.1 Role Hierarchy
+
+1. **Roastery Owner**
+   - Full system access
+   - Can perform all operations
+   - Special permissions:
+     * User management
+     * Shop management
+     * System configuration
+     * Analytics access
+   - Implementation: `requireRole(["roasteryOwner"])` middleware
+
+2. **Roaster**
+   - Green coffee management
+   - Roasting batch control
+   - Order status updates (roasted/dispatched)
+   - Implementation: `requireRole(["roaster"])` middleware
+
+3. **Shop Manager**
+   - Shop-specific access
+   - Inventory management
+   - Order creation and receipt
+   - Staff management
+   - Implementation: `requireShopAccess(["shopManager"])` middleware
+
+4. **Barista**
+   - Basic shop operations
+   - Order creation
+   - Inventory viewing
+   - Implementation: `requireShopAccess(["barista"])` middleware
+
+#### 3.2 Access Control Implementation
+
+1. **Authentication System**
+   - Session-based authentication
+   - Secure password handling
+   - Session persistence
+   - Implementation: `setupAuth` function
+
+2. **Authorization Flow**
+   ```mermaid
+   graph TD
+     A[Request] --> B{Authenticated?}
+     B -- Yes --> C{Check Role}
+     B -- No --> D[401 Unauthorized]
+     C -- Has Permission --> E[Allow Access]
+     C -- No Permission --> F[403 Forbidden]
+   ```
+   Implementation: `requireRole` and `requireShopAccess` middlewares
+
+### 4. Data Flow Architecture
+
+#### 4.1 Order Processing Flow
+```mermaid
+graph TD
+    A[Shop Creates Order] --> B[Validate Shop Access]
+    B --> C[Check Coffee Availability]
+    C --> D[Create Order Record]
+    D --> E[Update Status to Pending]
+    E --> F[Roaster Processing]
+    F --> G[Mark as Roasted]
+    G --> H[Create Dispatch Record]
+    H --> I[Shop Confirms Receipt]
+    I --> J[Update Inventory]
+```
+
+#### 4.2 Inventory Management Flow
+```mermaid
+graph TD
+    A[Green Coffee Received] --> B[Update Stock Levels]
+    B --> C[Monitor Thresholds]
+    C --> D[Create Roasting Batch]
+    D --> E[Adjust Green Coffee Stock]
+    E --> F[Complete Roasting]
+    F --> G[Update Retail Inventory]
+```
+
+### 5. Data Validation and Business Rules
+
+#### 5.1 Order Validation Rules
+- Shops can only order active coffee types
+- Order quantities must be positive numbers
+- Shop must have sufficient quota
+- Implementation: `insertOrderSchema` validation
+
+#### 5.2 Inventory Rules
+- Stock levels cannot be negative
+- Roasting batches cannot exceed available green coffee
+- Dispatch quantities must match order quantities
+- Implementation: Various validation middleware
+
+#### 5.3 User Assignment Rules
+- Users can be assigned to multiple shops
+- Shop managers limited to assigned shops
+- Baristas limited to assigned shops
+- Implementation: `checkShopAccess` function
+
+### 6. Error Handling and Recovery
+
+#### 6.1 Transaction Management
+- Critical operations use database transactions
+- Rollback on failure
+- Consistent state maintenance
+- Implementation: Database transaction wrappers
+
+#### 6.2 Error Responses
+- Structured error messages
+- HTTP status codes
+- Detailed error logging
+- Implementation: Error handling middleware
+
+### 7. Integration Points
+
+#### 7.1 Frontend Integration
+- RESTful API endpoints
+- Real-time updates
+- Form validation
+- Implementation: API routes and validation
+
+#### 7.2 Database Integration
+- PostgreSQL with Drizzle ORM
+- Type-safe queries
+- Efficient data access
+- Implementation: Storage interface
+
+### 8. Security Implementation
+
+#### 8.1 Authentication Security
+- Session management
+- Password hashing
+- CSRF protection
+- Implementation: Auth middleware
+
+#### 8.2 Data Access Security
+- Role-based access control
+- Shop-level permissions
+- Data validation
+- Implementation: Access control middleware
+
+### 9. Monitoring and Logging
+
+#### 9.1 System Logging
+- Request logging
+- Error tracking
+- Performance monitoring
+- Implementation: Logging middleware
+
+#### 9.2 Audit Trail
+- User actions logged
+- Inventory changes tracked
+- Order status changes recorded
+- Implementation: Activity logging
+
+### 10. Current Limitations and Constraints
+
+1. **Process Limitations**
+   - Manual dispatch confirmation required
+   - No automated reordering
+   - Basic analytics visualization
+
+2. **Technical Constraints**
+   - Single database instance
+   - Session-based authentication
+   - HTTP-only API
+
+### 11. Future Considerations
+
+1. **Planned Enhancements**
+   - Real-time notifications
+   - Automated reordering
+   - Advanced analytics
+   - Mobile application support
+
+2. **Integration Possibilities**
+   - Payment processing
+   - Supplier integration
+   - Customer feedback system
+   - Logistics integration
+
+This specification reflects the current implementation state of the system as of March 8, 2025, based on the actual code in the repository.
