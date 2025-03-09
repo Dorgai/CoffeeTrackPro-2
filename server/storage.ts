@@ -870,25 +870,8 @@ export class DatabaseStorage {
         throw new Error("Confirmation is not in pending status");
       }
 
-      // Update the confirmation status first
-      const [updatedConfirmation] = await db
-        .update(dispatchedCoffeeConfirmation)
-        .set({
-          receivedSmallBags: data.receivedSmallBags,
-          receivedLargeBags: data.receivedLargeBags,
-          confirmedById: data.confirmedById,
-          status: "confirmed" as const,
-          confirmedAt: new Date().toISOString()
-        })
-        .where(eq(dispatchedCoffeeConfirmation.id, id))
-        .returning();
-
-      if (!updatedConfirmation) {
-        throw new Error("Failed to update confirmation");
-      }
-
-      // Then update the retail inventory
-      const updateQuery = sql`
+      // First update retail inventory
+      const retailInventoryQuery = sql`
         INSERT INTO retail_inventory (
           shop_id,
           green_coffee_id,
@@ -904,15 +887,31 @@ export class DatabaseStorage {
           ${data.confirmedById},
           NOW()
         )
-        ON CONFLICT (shop_id, green_coffee_id)
+        ON CONFLICT (shop_id, green_coffee_id) 
         DO UPDATE SET
           small_bags = EXCLUDED.small_bags,
           large_bags = EXCLUDED.large_bags,
           updated_by_id = EXCLUDED.updated_by_id,
-          updated_at = EXCLUDED.updated_at
-      `;
+          updated_at = EXCLUDED.updated_at`;
 
-      await db.execute(updateQuery);
+      await db.execute(retailInventoryQuery);
+
+      // Then update the confirmation status
+      const [updatedConfirmation] = await db
+        .update(dispatchedCoffeeConfirmation)
+        .set({
+          receivedSmallBags: data.receivedSmallBags,
+          receivedLargeBags: data.receivedLargeBags,
+          confirmedById: data.confirmedById,
+          status: "confirmed" as const,
+          confirmedAt: new Date()
+        })
+        .where(eq(dispatchedCoffeeConfirmation.id, id))
+        .returning();
+
+      if (!updatedConfirmation) {
+        throw new Error("Failed to update confirmation");
+      }
 
       return updatedConfirmation;
     } catch (error) {
