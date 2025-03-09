@@ -856,8 +856,6 @@ export class DatabaseStorage {
     }
   ): Promise<DispatchedCoffeeConfirmation> {
     try {
-      console.log("Starting dispatch confirmation process for id:", id, "with data:", data);
-
       // First check if confirmation exists and is pending
       const [existingConfirmation] = await db
         .select()
@@ -872,7 +870,7 @@ export class DatabaseStorage {
         throw new Error("Confirmation is not in pending status");
       }
 
-      // Update the confirmation
+      // Update the confirmation status
       const [updatedConfirmation] = await db
         .update(dispatchedCoffeeConfirmation)
         .set({
@@ -890,13 +888,32 @@ export class DatabaseStorage {
       }
 
       // Update the retail inventory
-      await this.updateRetailInventory({
-        shopId: existingConfirmation.shopId,
-        greenCoffeeId: existingConfirmation.greenCoffeeId,
-        smallBags: data.receivedSmallBags,
-        largeBags: data.receivedLargeBags,
-        updatedById: data.confirmedById
-      });
+      const sql = `
+        INSERT INTO retail_inventory (
+          shop_id,
+          green_coffee_id,
+          small_bags,
+          large_bags,
+          updated_by_id,
+          updated_at
+        ) VALUES (
+          $1, $2, $3, $4, $5, NOW()
+        )
+        ON CONFLICT (shop_id, green_coffee_id)
+        DO UPDATE SET
+          small_bags = EXCLUDED.small_bags,
+          large_bags = EXCLUDED.large_bags,
+          updated_by_id = EXCLUDED.updated_by_id,
+          updated_at = EXCLUDED.updated_at
+      `;
+
+      await db.execute(sql, [
+        existingConfirmation.shopId,
+        existingConfirmation.greenCoffeeId,
+        data.receivedSmallBags,
+        data.receivedLargeBags,
+        data.confirmedById
+      ]);
 
       return updatedConfirmation;
     } catch (error) {
