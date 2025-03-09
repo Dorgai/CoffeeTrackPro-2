@@ -64,11 +64,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
       }
 
       const data = await res.json();
-      if (!Array.isArray(data)) {
-        console.error("Unexpected response format:", data);
-        return [];
-      }
-      return data.filter((conf: DispatchConfirmation) => conf.status === "pending");
+      return Array.isArray(data) ? data.filter(conf => conf.status === "pending") : [];
     },
     enabled: Boolean(user)
   });
@@ -83,7 +79,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
         throw new Error("User not authenticated");
       }
 
-      const res = await apiRequest(
+      const response = await apiRequest(
         "POST",
         `/api/dispatched-coffee/confirmations/${data.confirmationId}/confirm`,
         {
@@ -93,19 +89,19 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
         }
       );
 
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Failed to confirm dispatch");
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to confirm receipt");
       }
 
-      return res.json();
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/dispatched-coffee/confirmations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory"] });
       toast({
         title: "Success",
-        description: "Dispatch confirmation processed successfully",
+        description: "Receipt confirmed successfully",
       });
       setSelectedConfirmation(null);
       setReceivedQuantities({ smallBags: 0, largeBags: 0 });
@@ -144,21 +140,21 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
     );
   }
 
+  const handleConfirmClick = (confirmation: DispatchConfirmation) => {
+    setSelectedConfirmation(confirmation);
+    setReceivedQuantities({
+      smallBags: confirmation.dispatchedSmallBags,
+      largeBags: confirmation.dispatchedLargeBags
+    });
+  };
+
   const handleConfirm = () => {
     if (!selectedConfirmation || !user?.id) return;
 
     confirmMutation.mutate({
       confirmationId: selectedConfirmation.id,
       receivedSmallBags: receivedQuantities.smallBags,
-      receivedLargeBags: receivedQuantities.largeBags,
-    });
-  };
-
-  const handleConfirmClick = (confirmation: DispatchConfirmation) => {
-    setSelectedConfirmation(confirmation);
-    setReceivedQuantities({
-      smallBags: confirmation.dispatchedSmallBags,
-      largeBags: confirmation.dispatchedLargeBags
+      receivedLargeBags: receivedQuantities.largeBags
     });
   };
 

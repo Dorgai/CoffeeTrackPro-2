@@ -870,7 +870,7 @@ export class DatabaseStorage {
         throw new Error("Confirmation is not in pending status");
       }
 
-      // Update the confirmation status
+      // Update the confirmation status first
       const [updatedConfirmation] = await db
         .update(dispatchedCoffeeConfirmation)
         .set({
@@ -887,8 +887,8 @@ export class DatabaseStorage {
         throw new Error("Failed to update confirmation");
       }
 
-      // Update the retail inventory
-      const sql = `
+      // Then update the retail inventory
+      const updateQuery = sql`
         INSERT INTO retail_inventory (
           shop_id,
           green_coffee_id,
@@ -897,7 +897,12 @@ export class DatabaseStorage {
           updated_by_id,
           updated_at
         ) VALUES (
-          $1, $2, $3, $4, $5, NOW()
+          ${existingConfirmation.shopId},
+          ${existingConfirmation.greenCoffeeId},
+          ${data.receivedSmallBags},
+          ${data.receivedLargeBags},
+          ${data.confirmedById},
+          NOW()
         )
         ON CONFLICT (shop_id, green_coffee_id)
         DO UPDATE SET
@@ -907,13 +912,7 @@ export class DatabaseStorage {
           updated_at = EXCLUDED.updated_at
       `;
 
-      await db.execute(sql, [
-        existingConfirmation.shopId,
-        existingConfirmation.greenCoffeeId,
-        data.receivedSmallBags,
-        data.receivedLargeBags,
-        data.confirmedById
-      ]);
+      await db.execute(updateQuery);
 
       return updatedConfirmation;
     } catch (error) {
