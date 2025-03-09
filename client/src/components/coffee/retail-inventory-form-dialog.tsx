@@ -29,7 +29,7 @@ export function RetailInventoryFormDialog({
 }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Update Inventory</DialogTitle>
         </DialogHeader>

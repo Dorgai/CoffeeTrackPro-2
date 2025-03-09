@@ -52,7 +52,7 @@ export function RetailInventoryTable({ onEditSuccess }: Props) {
   const { user } = useAuth();
   const { activeShop } = useActiveShop();
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const canEditInventory = ["owner", "shopManager", "retailOwner", "barista"].includes(user?.role || "");
 
@@ -115,14 +115,6 @@ export function RetailInventoryTable({ onEditSuccess }: Props) {
     );
   }
 
-  const handleEditComplete = () => {
-    setDialogOpen(false);
-    setSelectedItem(null);
-    if (onEditSuccess) {
-      onEditSuccess();
-    }
-  };
-
   return (
     <div className="space-y-4">
       <Card>
@@ -178,7 +170,7 @@ export function RetailInventoryTable({ onEditSuccess }: Props) {
                         size="icon"
                         onClick={() => {
                           setSelectedItem(item);
-                          setDialogOpen(true);
+                          setIsDialogOpen(true);
                         }}
                       >
                         <Edit className="h-4 w-4" />
@@ -194,14 +186,20 @@ export function RetailInventoryTable({ onEditSuccess }: Props) {
 
       {selectedItem && (
         <RetailInventoryFormDialog
-          open={dialogOpen}
-          onOpenChange={setDialogOpen}
+          open={isDialogOpen}
+          onOpenChange={(open) => {
+            setIsDialogOpen(open);
+            if (!open) setSelectedItem(null);
+          }}
           shopId={activeShop.id}
           coffeeId={selectedItem.coffeeId}
           currentSmallBags={selectedItem.smallBags}
           currentLargeBags={selectedItem.largeBags}
           coffeeName={selectedItem.coffeeName}
-          onSuccess={handleEditComplete}
+          onSuccess={() => {
+            setIsDialogOpen(false);
+            if (onEditSuccess) onEditSuccess();
+          }}
         />
       )}
     </div>
