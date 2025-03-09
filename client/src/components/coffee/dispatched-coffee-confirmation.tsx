@@ -57,17 +57,13 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
         ? `/api/dispatched-coffee/confirmations?shopId=${shopId}`
         : "/api/dispatched-coffee/confirmations";
 
-      console.log("Fetching confirmations from:", url);
       const res = await apiRequest("GET", url);
-
       if (!res.ok) {
-        const error = await res.json().catch(() => ({ message: "Failed to fetch confirmations" }));
-        throw new Error(error.message);
+        throw new Error("Failed to fetch confirmations");
       }
 
       const data = await res.json();
-      console.log("Fetched confirmations:", data);
-      return data.filter(conf => conf.status === "pending");
+      return data.filter((conf: DispatchConfirmation) => conf.status === "pending");
     },
     enabled: Boolean(user)
   });
@@ -78,38 +74,39 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
       receivedSmallBags: number;
       receivedLargeBags: number;
     }) => {
-      console.log("Attempting to confirm dispatch with data:", data);
+      if (!user?.id) {
+        throw new Error("User not authenticated");
+      }
 
       const res = await apiRequest(
         "POST",
         `/api/dispatched-coffee/confirmations/${data.confirmationId}/confirm`,
         {
           receivedSmallBags: data.receivedSmallBags,
-          receivedLargeBags: data.receivedLargeBags
+          receivedLargeBags: data.receivedLargeBags,
+          confirmedById: user.id
         }
       );
 
       if (!res.ok) {
         const error = await res.json();
-        console.error("Confirmation error response:", error);
-        throw new Error(error.message || "Failed to process confirmation");
+        throw new Error(error.message || "Failed to confirm dispatch");
       }
 
       return res.json();
     },
     onSuccess: () => {
-      setSelectedConfirmation(null);
-      setReceivedQuantities({ smallBags: 0, largeBags: 0 });
       queryClient.invalidateQueries({ queryKey: ["/api/dispatched-coffee/confirmations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory"] });
       toast({
         title: "Success",
         description: "Dispatch confirmation processed successfully",
       });
+      setSelectedConfirmation(null);
+      setReceivedQuantities({ smallBags: 0, largeBags: 0 });
       refetch();
     },
     onError: (error: Error) => {
-      console.error("Confirmation error:", error);
       toast({
         title: "Error",
         description: error.message,
@@ -127,25 +124,12 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
   }
 
   if (!confirmations || confirmations.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>No New Arrivals</CardTitle>
-          <CardDescription>
-            There are currently no pending coffee shipments to confirm.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    );
+    return null;
   }
 
   const handleConfirm = () => {
-    if (!selectedConfirmation) {
-      console.error("No confirmation selected");
-      return;
-    }
+    if (!selectedConfirmation || !user?.id) return;
 
-    console.log("Processing confirmation for:", selectedConfirmation.id);
     confirmMutation.mutate({
       confirmationId: selectedConfirmation.id,
       receivedSmallBags: receivedQuantities.smallBags,
@@ -154,7 +138,6 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
   };
 
   const handleConfirmClick = (confirmation: DispatchConfirmation) => {
-    console.log("Selected confirmation:", confirmation);
     setSelectedConfirmation(confirmation);
     setReceivedQuantities({
       smallBags: confirmation.dispatchedSmallBags,
@@ -224,7 +207,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
                   value={receivedQuantities.smallBags}
                   onChange={(e) => setReceivedQuantities(prev => ({
                     ...prev,
-                    smallBags: Number(e.target.value) || 0
+                    smallBags: parseInt(e.target.value) || 0
                   }))}
                 />
               </div>
@@ -237,7 +220,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
                   value={receivedQuantities.largeBags}
                   onChange={(e) => setReceivedQuantities(prev => ({
                     ...prev,
-                    largeBags: Number(e.target.value) || 0
+                    largeBags: parseInt(e.target.value) || 0
                   }))}
                 />
               </div>
