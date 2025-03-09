@@ -835,8 +835,7 @@ export async function registerRoutes(app: Express): Promise<void> {
             });          }
         } else {
           // Shop manager can only mark orders as delivered
-          if (req.user?.role === "shopManager" && status !== "delivered") {
-            return res.status(403).json({
+          if (req.user?.role === "shopManager" && status !== "delivered") {            return res.status(403).json({
               message: "Shopmanagers can only mark orders as delivered"
             });
           }
@@ -1212,5 +1211,23 @@ export async function registerRoutes(app: Express): Promise<void> {
   // Remove the httpServer creation from here as it's already handled in index.ts
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok" });
+  });
+
+  // Add after "/api/users/:id/shops" routes
+
+  // Bulk update user-shop assignments
+  app.post("/api/bulk-user-shop-assignments", requireRole(["roasteryOwner"]), async (req, res) => {
+    try {
+      const { assignments } = req.body;
+      if (!Array.isArray(assignments)) {
+        return res.status(400).json({ message: "Assignments must be an array" });
+      }
+
+      await storage.updateBulkUserShopAssignments(assignments);
+      res.json({ message: "Assignments updated successfully" });
+    } catch (error) {
+      console.error("Error updating bulk assignments:", error);
+      res.status(500).json({ message: "Failed to update assignments" });
+    }
   });
 }

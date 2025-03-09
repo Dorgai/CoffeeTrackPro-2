@@ -114,11 +114,18 @@ export function NavBar() {
                   </Link>
                 </MenubarItem>
                 {canManageUsers && (
-                  <MenubarItem>
-                    <Link href="/user-management" className="flex w-full">
-                      User Management
-                    </Link>
-                  </MenubarItem>
+                  <>
+                    <MenubarItem>
+                      <Link href="/user-management" className="flex w-full">
+                        User Management
+                      </Link>
+                    </MenubarItem>
+                    <MenubarItem>
+                      <Link href="/user-shop-management" className="flex w-full">
+                        User-Shop Assignment
+                      </Link>
+                    </MenubarItem>
+                  </>
                 )}
               </MenubarContent>
             </MenubarMenu>

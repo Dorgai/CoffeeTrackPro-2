@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { User, Shop } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 type Assignment = {
   userId: number;
@@ -34,19 +35,12 @@ export default function UserShopManagement() {
     queryKey: ["/api/shops"],
   });
 
-  // Fetch current assignments
-  const { data: currentAssignments = [], isLoading: loadingAssignments } = useQuery<Assignment[]>({
-    queryKey: ["/api/user-shop-assignments"],
-    onSuccess: (data) => {
-      setAssignments(data);
-    }
-  });
-
+  // Update assignments mutation
   const updateAssignments = useMutation({
     mutationFn: async (assignments: Assignment[]) => {
       const response = await apiRequest(
         "POST",
-        "/api/user-shop-assignments/bulk",
+        "/api/bulk-user-shop-assignments",
         { assignments }
       );
       if (!response.ok) {
@@ -55,7 +49,7 @@ export default function UserShopManagement() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/user-shop-assignments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       toast({
         title: "Success",
         description: "Shop assignments updated successfully",
@@ -70,19 +64,26 @@ export default function UserShopManagement() {
     },
   });
 
-  const toggleAssignment = (userId: number, shopId: number) => {
-    const isAssigned = assignments.some(
-      a => a.userId === userId && a.shopId === shopId
-    );
+  const isAssigned = (userId: number, shopId: number) => {
+    return assignments.some(a => a.userId === userId && a.shopId === shopId);
+  };
 
-    let newAssignments;
-    if (isAssigned) {
-      // Remove assignment
+  const toggleAssignment = (userId: number, shopId: number) => {
+    const user = users.find(u => u.id === userId);
+    if (user?.role === "roasteryOwner") {
+      toast({
+        title: "Info",
+        description: "Roastery owners automatically have access to all shops",
+      });
+      return;
+    }
+
+    let newAssignments: Assignment[];
+    if (isAssigned(userId, shopId)) {
       newAssignments = assignments.filter(
         a => !(a.userId === userId && a.shopId === shopId)
       );
     } else {
-      // Add assignment
       newAssignments = [...assignments, { userId, shopId }];
     }
 
@@ -90,11 +91,7 @@ export default function UserShopManagement() {
     updateAssignments.mutate(newAssignments);
   };
 
-  const isAssigned = (userId: number, shopId: number) => {
-    return assignments.some(a => a.userId === userId && a.shopId === shopId);
-  };
-
-  if (loadingUsers || loadingShops || loadingAssignments) {
+  if (loadingUsers || loadingShops) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -107,21 +104,23 @@ export default function UserShopManagement() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">User-Shop Management</h1>
         <p className="text-muted-foreground">
-          Manage user access to shops. Users will only see data for their assigned shops.
+          Manage user access to shops using the checkboxes below. Roastery owners automatically have access to all shops.
         </p>
       </div>
 
-      <div className="border rounded-lg">
+      <div className="border rounded-lg overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>User</TableHead>
-              {shops.map(shop => (
-                <TableHead key={shop.id} className="text-center">
-                  {shop.name}
-                  <div className="text-xs text-muted-foreground">{shop.location}</div>
-                </TableHead>
-              ))}
+              {shops
+                .filter(shop => shop.isActive)
+                .map(shop => (
+                  <TableHead key={shop.id} className="text-center">
+                    {shop.name}
+                    <div className="text-xs text-muted-foreground">{shop.location}</div>
+                  </TableHead>
+                ))}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -135,15 +134,17 @@ export default function UserShopManagement() {
                     </Badge>
                   </div>
                 </TableCell>
-                {shops.map(shop => (
-                  <TableCell key={shop.id} className="text-center">
-                    <Checkbox
-                      checked={isAssigned(user.id, shop.id)}
-                      disabled={user.role === "roasteryOwner"} // Owners always have access
-                      onCheckedChange={() => toggleAssignment(user.id, shop.id)}
-                    />
-                  </TableCell>
-                ))}
+                {shops
+                  .filter(shop => shop.isActive)
+                  .map(shop => (
+                    <TableCell key={shop.id} className="text-center">
+                      <Checkbox
+                        checked={user.role === "roasteryOwner" || isAssigned(user.id, shop.id)}
+                        disabled={user.role === "roasteryOwner"}
+                        onCheckedChange={() => toggleAssignment(user.id, shop.id)}
+                      />
+                    </TableCell>
+                  ))}
               </TableRow>
             ))}
           </TableBody>
