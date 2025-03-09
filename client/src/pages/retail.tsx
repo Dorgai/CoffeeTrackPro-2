@@ -15,11 +15,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RetailInventoryForm } from "@/components/coffee/retail-inventory-form";
 import { OrderForm } from "@/components/coffee/order-form";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Link } from "wouter";
-import { RetailInventoryList } from "@/components/coffee/retail-inventory-list";
+import { RetailInventoryTable } from "@/components/coffee/retail-inventory-table";
 
 export default function Retail() {
   const { toast } = useToast();
@@ -46,7 +45,7 @@ export default function Retail() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Retail Management</h1>
             <p className="text-muted-foreground">
-              Manage your shop's inventory
+              Manage your shop's inventory and orders
             </p>
           </div>
           <div className="flex gap-4">
@@ -70,17 +69,7 @@ export default function Retail() {
           Please select a shop from the dropdown above to manage inventory.
         </div>
       ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>Retail Inventory</CardTitle>
-            <CardDescription>
-              Current stock of roasted coffee available for order
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <RetailInventoryList shopId={activeShop.id} />
-          </CardContent>
-        </Card>
+        <RetailInventoryTable />
       )}
 
       <Dialog
