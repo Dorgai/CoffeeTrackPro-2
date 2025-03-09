@@ -11,7 +11,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { LogOut, Package, Loader2, Store, AlertTriangle, Coffee } from "lucide-react";
+import { LogOut, Package, Loader2, Store, AlertTriangle, Coffee, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableRow } from "@/components/ui/table";
@@ -589,9 +589,22 @@ export default function Dashboard() {
                   <div key={shop.id} className="mb-6 last:mb-0">
                     <div className="flex items-center justify-between mb-2">
                       <h3 className="font-medium">{shop.name}</h3>
-                      <Badge variant={healthyItems < totalItems ? "destructive" : "outline"}>
-                        {healthyItems < totalItems ? `${totalItems - healthyItems} Low Stock` : "Stock OK"}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={healthyItems < totalItems ? "destructive" : "outline"}>
+                          {healthyItems < totalItems ? `${totalItems - healthyItems} Low Stock` : "Stock OK"}
+                        </Badge>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedShopId(shop.id);
+                            setIsRestockOpen(true);
+                          }}
+                        >
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                          Restock
+                        </Button>
+                      </div>
                     </div>
                     <StockProgress
                       current={healthyItems}
@@ -600,9 +613,9 @@ export default function Dashboard() {
                     />
                     <div className="mt-4 space-y-2">
                       {shopInventory.map(inv => {
-                        const coffee = coffees?.find(c => c.id === inv.coffeeId);
+                        const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
                         return (
-                          <div key={`${shop.id}-${inv.coffeeId}`} className="p-2 bg-muted rounded">
+                          <div key={`${shop.id}-${inv.greenCoffeeId}`} className="p-2 bg-muted rounded">
                             <div className="text-sm font-medium mb-2">{coffee?.name || 'Unknown Coffee'}</div>
                             <div className="space-y-2">
                               <StockProgress
