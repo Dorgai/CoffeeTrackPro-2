@@ -24,6 +24,7 @@ import RetailNewArrivals from "@/pages/retail-new-arrivals";
 import Billing from "@/pages/billing";
 import RoastingDiscrepancies from "@/pages/roasting-discrepancies";
 import Retail from "@/pages/retail";
+import UserShopManagement from "@/pages/user-shop-management";
 
 export default function App() {
   return (
@@ -203,6 +204,17 @@ export default function App() {
                 <ProtectedRoute
                   path="/billing"
                   component={Billing}
+                  roles={["roasteryOwner"]}
+                />
+              )}
+            </Route>
+
+            {/* User-Shop Management - roasteryOwner only */}
+            <Route path="/user-shop-management">
+              {() => (
+                <ProtectedRoute
+                  path="/user-shop-management"
+                  component={UserShopManagement}
                   roles={["roasteryOwner"]}
                 />
               )}

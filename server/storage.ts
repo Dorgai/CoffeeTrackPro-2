@@ -827,6 +827,74 @@ export class DatabaseStorage {
       return [];
     }
   }
+
+  async getAllUserShopAssignments(): Promise<any[]> {
+    try {
+      console.log("Getting all user-shop assignments");
+
+      const result = await db
+        .select({
+          userId: userShops.userId,
+          shopId: userShops.shopId,
+        })
+        .from(userShops);
+
+      console.log("Found assignments:", result.length);
+      return result;
+    } catch (error) {
+      console.error("Error getting user-shop assignments:", error);
+      return [];
+    }
+  }
+
+  async updateBulkUserShopAssignments(assignments: { userId: number; shopId: number; }[]): Promise<void> {
+    try {
+      console.log("Updating bulk user-shop assignments");
+
+      return await db.transaction(async (tx) => {
+        // First get all roasteryOwners to ensure they keep full access
+        const owners = await tx
+          .select()
+          .from(users)
+          .where(eq(users.role, "roasteryOwner"));
+
+        const activeShops = await tx
+          .select()
+          .from(shops)
+          .where(eq(shops.isActive, true));
+
+        // Clear existing assignments
+        await tx.delete(userShops);
+
+        // Create new assignments including ensuring owners have all shops
+        const ownerAssignments = owners.flatMap(owner =>
+          activeShops.map(shop => ({
+            userId: owner.id,
+            shopId: shop.id
+          }))
+        );
+
+        // Combine owner assignments with the requested assignments
+        const allAssignments = [
+          ...ownerAssignments,
+          ...assignments.filter(a => 
+            !owners.some(owner => owner.id === a.userId)
+          )
+        ];
+
+        if (allAssignments.length > 0) {
+          await tx
+            .insert(userShops)
+            .values(allAssignments);
+        }
+
+        console.log("Successfully updated user-shop assignments");
+      });
+    } catch (error) {
+      console.error("Error updating user-shop assignments:", error);
+      throw error;
+    }
+  }
 }
 
 export const storage = new DatabaseStorage();
