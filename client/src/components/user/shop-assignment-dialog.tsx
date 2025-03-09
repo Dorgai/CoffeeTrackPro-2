@@ -3,22 +3,24 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Shop } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2 } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 
 interface Props {
   userId: number;
   username: string;
+  userRole: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
@@ -27,11 +29,13 @@ interface Props {
 export function ShopAssignmentDialog({
   userId,
   username,
+  userRole,
   open,
   onOpenChange,
   onSuccess
 }: Props) {
   const { toast } = useToast();
+  const [selectedShopId, setSelectedShopId] = useState<string>("");
 
   // Fetch all active shops
   const { data: allShops = [], isLoading: loadingShops } = useQuery<Shop[]>({
@@ -66,7 +70,7 @@ export function ShopAssignmentDialog({
       queryClient.invalidateQueries({ queryKey: ["/api/users", userId, "shops"] });
       toast({
         title: "Success",
-        description: "Shop assignments updated successfully",
+        description: "Shop assignment updated successfully",
       });
       onSuccess?.();
       onOpenChange(false);
@@ -80,110 +84,82 @@ export function ShopAssignmentDialog({
     },
   });
 
-  // Get unassigned shops
-  const unassignedShops = allShops.filter(
-    shop => shop.isActive && !userShops.some(us => us.id === shop.id)
-  );
+  // If user is roasteryOwner, show informational message
+  if (userRole === "roasteryOwner") {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Shop Access Information</DialogTitle>
+            <DialogDescription>
+              As a Roastery Owner, {username} automatically has access to all active shops.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => onOpenChange(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] h-[90vh] flex flex-col">
-        <DialogHeader className="flex-shrink-0">
-          <DialogTitle>Manage Shop Access for {username}</DialogTitle>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>Assign Shop to {username}</DialogTitle>
           <DialogDescription>
-            Select the shops this user should have access to
+            Select the shop this user should have access to
           </DialogDescription>
         </DialogHeader>
 
         {(loadingShops || loadingUserShops) ? (
-          <div className="flex items-center justify-center flex-1">
+          <div className="flex items-center justify-center py-8">
             <Loader2 className="h-8 w-8 animate-spin" />
           </div>
         ) : (
-          <div className="flex-1 overflow-hidden space-y-6 py-4">
-            {/* Current Assignments */}
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium mb-2">Current Assignments</h4>
-              <ScrollArea className="h-[200px] border rounded-md">
-                <div className="p-4">
-                  {userShops.length > 0 ? (
-                    <div className="space-y-2">
-                      {userShops.map((shop) => (
-                        <div
-                          key={shop.id}
-                          className="flex items-center justify-between bg-muted/50 p-3 rounded-lg"
-                        >
-                          <div>
-                            <div className="font-medium">{shop.name}</div>
-                            <div className="text-sm text-muted-foreground">{shop.location}</div>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              const updatedShopIds = userShops
-                                .filter((s) => s.id !== shop.id)
-                                .map((s) => s.id);
-                              assignShops.mutate(updatedShopIds);
-                            }}
-                          >
-                            Remove
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-muted-foreground text-center py-4">
-                      No shops currently assigned
-                    </div>
-                  )}
-                </div>
-              </ScrollArea>
-            </div>
-
-            {/* Available Shops */}
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium mb-2">Available Shops</h4>
-              <ScrollArea className="h-[200px] border rounded-md">
-                <div className="p-4">
-                  {unassignedShops.length > 0 ? (
-                    <div className="space-y-2">
-                      {unassignedShops.map((shop) => (
-                        <div
-                          key={shop.id}
-                          className="flex items-center justify-between border p-3 rounded-lg"
-                        >
-                          <div>
-                            <div className="font-medium">{shop.name}</div>
-                            <div className="text-sm text-muted-foreground">{shop.location}</div>
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              const newShopIds = [...userShops.map(s => s.id), shop.id];
-                              assignShops.mutate(newShopIds);
-                            }}
-                          >
-                            Add
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-muted-foreground text-center py-4">
-                      No shops available for assignment
-                    </div>
-                  )}
-                </div>
-              </ScrollArea>
-            </div>
+          <div className="py-4">
+            <RadioGroup
+              value={selectedShopId}
+              onValueChange={setSelectedShopId}
+              className="space-y-2"
+            >
+              {allShops
+                .filter(shop => shop.isActive)
+                .map(shop => (
+                  <div
+                    key={shop.id}
+                    className="flex items-center space-x-3 p-3 rounded-lg border"
+                  >
+                    <RadioGroupItem value={shop.id.toString()} id={`shop-${shop.id}`} />
+                    <Label htmlFor={`shop-${shop.id}`} className="flex-1 cursor-pointer">
+                      <div className="font-medium">{shop.name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {shop.location}
+                      </div>
+                    </Label>
+                  </div>
+                ))}
+            </RadioGroup>
           </div>
         )}
 
-        <DialogFooter className="flex-shrink-0 mt-4">
+        <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Close
+            Cancel
+          </Button>
+          <Button
+            onClick={() => {
+              if (selectedShopId) {
+                assignShops.mutate([parseInt(selectedShopId)]);
+              }
+            }}
+            disabled={!selectedShopId || assignShops.isPending}
+          >
+            {assignShops.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : null}
+            Save Changes
           </Button>
         </DialogFooter>
       </DialogContent>

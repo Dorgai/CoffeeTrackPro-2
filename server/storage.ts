@@ -153,21 +153,51 @@ export class DatabaseStorage {
       console.log(`Assigning shops ${shopIds.join(', ')} to user ${userId}`);
 
       return await db.transaction(async (tx) => {
-        // First remove all existing assignments
-        await tx
-          .delete(userShops)
-          .where(eq(userShops.userId, userId));
+        // First get the user to check their role
+        const [user] = await tx
+          .select()
+          .from(users)
+          .where(eq(users.id, userId));
 
-        // Then add new assignments
-        if (shopIds.length > 0) {
+        if (!user) {
+          throw new Error("User not found");
+        }
+
+        // For roasteryOwner, always assign all active shops
+        if (user.role === "roasteryOwner") {
+          const allActiveShops = await tx
+            .select()
+            .from(shops)
+            .where(eq(shops.isActive, true));
+
           await tx
-            .insert(userShops)
-            .values(
-              shopIds.map(shopId => ({
+            .delete(userShops)
+            .where(eq(userShops.userId, userId));
+
+          if (allActiveShops.length > 0) {
+            await tx
+              .insert(userShops)
+              .values(
+                allActiveShops.map(shop => ({
+                  userId,
+                  shopId: shop.id
+                }))
+              );
+          }
+        } else {
+          // For other roles, assign only to specified shop (taking the first one if multiple provided)
+          await tx
+            .delete(userShops)
+            .where(eq(userShops.userId, userId));
+
+          if (shopIds.length > 0) {
+            await tx
+              .insert(userShops)
+              .values({
                 userId,
-                shopId
-              }))
-            );
+                shopId: shopIds[0] // Only use the first shop
+              });
+          }
         }
 
         console.log("Shop assignments completed successfully");
