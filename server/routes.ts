@@ -3,8 +3,18 @@ import { createServer, type Server } from "http";
 import { sql } from "drizzle-orm";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { insertGreenCoffeeSchema, insertRoastingBatchSchema, insertOrderSchema, insertShopSchema } from "@shared/schema";
-import { insertRetailInventorySchema } from "@shared/schema";
+import { db } from "./db";
+import { 
+  insertGreenCoffeeSchema, 
+  insertRoastingBatchSchema, 
+  insertOrderSchema, 
+  insertShopSchema,
+  orders,
+  shops,
+  users,
+  greenCoffee
+} from "@shared/schema";
+import { eq, and } from "drizzle-orm";
 import { WebSocketServer } from 'ws'; // Added WebSocketServer import
 
 function requireRole(roles: string[]) {
@@ -815,6 +825,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           query = query.where(sql`DATE(${orders.createdAt}) <= ${toDate}`);
         }
 
+        console.log("Executing query for all orders");
         const allOrders = await query;
         console.log("Found orders:", allOrders.length);
         return res.json(allOrders);
