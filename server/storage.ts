@@ -473,30 +473,42 @@ export class DatabaseStorage {
       console.log("Starting getAllRetailInventories");
 
       const query = sql`
+        WITH latest_inventory AS (
+          SELECT DISTINCT ON (shop_id, green_coffee_id)
+            id,
+            shop_id,
+            green_coffee_id,
+            small_bags,
+            large_bags,
+            updated_at,
+            updated_by_id
+          FROM retail_inventory
+          ORDER BY shop_id, green_coffee_id, updated_at DESC
+        )
         SELECT 
-          ri.id,
-          ri.shop_id as "shopId",
-          ri.green_coffee_id as "coffeeId",
-          ri.small_bags as "smallBags",
-          ri.large_bags as "largeBags",
-          ri.updated_at as "updatedAt",
-          ri.updated_by_id as "updatedById",
+          li.id,
+          li.shop_id as "shopId",
+          li.green_coffee_id as "coffeeId",
+          li.small_bags as "smallBags",
+          li.large_bags as "largeBags",
+          li.updated_at as "updatedAt",
+          li.updated_by_id as "updatedById",
           s.name as "shopName",
           s.location as "shopLocation",
           gc.name as "coffeeName",
           gc.producer,
           gc.grade,
           u.username as "updatedByUsername"
-        FROM retail_inventory ri
-        JOIN shops s ON ri.shop_id = s.id
-        JOIN green_coffee gc ON ri.green_coffee_id = gc.id
-        LEFT JOIN users u ON ri.updated_by_id = u.id
+        FROM latest_inventory li
+        JOIN shops s ON li.shop_id = s.id
+        JOIN green_coffee gc ON li.green_coffee_id = gc.id
+        LEFT JOIN users u ON li.updated_by_id = u.id
         WHERE s.is_active = true
         ORDER BY s.name, gc.name`;
 
+      console.log("Executing retail inventory query");
       const result = await db.execute(query);
-      console.log("Raw query result structure:", {
-        hasRows: Boolean(result.rows),
+      console.log("Query result:", {
         rowCount: result.rows?.length,
         sampleRow: result.rows?.[0]
       });
@@ -557,13 +569,14 @@ export class DatabaseStorage {
         )
         ON CONFLICT (shop_id, green_coffee_id)
         DO UPDATE SET
-          small_bags = ${data.smallBags},
-          large_bags = ${data.largeBags},
+          small_bags = retail_inventory.small_bags + ${data.smallBags},
+          large_bags = retail_inventory.large_bags + ${data.largeBags},
           updated_by_id = ${data.updatedById},
           updated_at = NOW()
         RETURNING *`;
 
       const result = await db.execute(query);
+      console.log("Updated retail inventory:", result.rows?.[0]);
 
       if (!result.rows?.[0]) {
         throw new Error("Failed to update retail inventory");

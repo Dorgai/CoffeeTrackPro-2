@@ -29,7 +29,6 @@ export function NavBar() {
   const canAccessAnalytics = ["owner", "roasteryOwner", "retailOwner", "shopManager"].includes(user?.role || "");
   const canAccessRoasting = ["owner", "roasteryOwner", "roaster"].includes(user?.role || "");
   const canAccessRetail = ["owner", "roasteryOwner", "retailOwner", "shopManager", "barista"].includes(user?.role || "");
-  const canAccessNewArrivals = ["owner", "roasteryOwner", "retailOwner", "shopManager", "barista"].includes(user?.role || "");
 
   // Redirect users to their appropriate dashboard
   const homePath = isRetailUser ? "/manager-dashboard" : "/";
@@ -149,41 +148,29 @@ export function NavBar() {
 
           {/* Retail Menu */}
           {canAccessRetail && (
-            <>
-              <MenubarMenu>
-                <MenubarTrigger>
-                  <Store className="h-4 w-4 mr-2" />
-                  Retail
-                </MenubarTrigger>
-                <MenubarContent>
-                  <MenubarItem>
-                    <Link href="/retail" className="flex w-full">
-                      Inventory
-                    </Link>
-                  </MenubarItem>
-                  <MenubarItem>
-                    <Link href="/retail/orders" className="flex w-full">
-                      Orders
-                    </Link>
-                  </MenubarItem>
-                  <MenubarItem>
-                    <Link href="/retail-overview" className="flex w-full">
-                      Overview
-                    </Link>
-                  </MenubarItem>
-                </MenubarContent>
-              </MenubarMenu>
-              <MenubarMenu>
-                <MenubarTrigger>New Arrivals</MenubarTrigger>
-                <MenubarContent>
-                  <MenubarItem>
-                    <Link href="/retail/new-arrivals" className="flex w-full">
-                      Pending Confirmations
-                    </Link>
-                  </MenubarItem>
-                </MenubarContent>
-              </MenubarMenu>
-            </>
+            <MenubarMenu>
+              <MenubarTrigger>
+                <Store className="h-4 w-4 mr-2" />
+                Retail
+              </MenubarTrigger>
+              <MenubarContent>
+                <MenubarItem>
+                  <Link href="/retail" className="flex w-full">
+                    Inventory
+                  </Link>
+                </MenubarItem>
+                <MenubarItem>
+                  <Link href="/retail/orders" className="flex w-full">
+                    Orders
+                  </Link>
+                </MenubarItem>
+                <MenubarItem>
+                  <Link href="/retail-overview" className="flex w-full">
+                    Overview
+                  </Link>
+                </MenubarItem>
+              </MenubarContent>
+            </MenubarMenu>
           )}
         </Menubar>
 
