@@ -528,13 +528,12 @@ export class DatabaseStorage {
       const [coffee] = await db
         .select()
         .from(greenCoffee)
-        .where(and(eq(greenCoffee.id, data.greenCoffeeId), eq(greenCoffee.isActive, true)));
+        .where(eq(greenCoffee.id, data.greenCoffeeId));
 
       if (!coffee) {
-        throw new Error(`Coffee ${data.greenCoffeeId} not found or inactive`);
+        throw new Error(`Coffee ${data.greenCoffeeId} not found`);
       }
 
-      // Use parameterized query for the insert/update
       const query = sql`
         INSERT INTO retail_inventory (
           shop_id,
@@ -558,17 +557,14 @@ export class DatabaseStorage {
           large_bags = ${data.largeBags},
           updated_by_id = ${data.updatedById},
           updated_at = NOW()
-        RETURNING 
-          id,
-          shop_id as "shopId",
-          green_coffee_id as "coffeeId",
-          small_bags as "smallBags",
-          large_bags as "largeBags",
-          updated_by_id as "updatedById",
-          updated_at as "updatedAt"`;
+        RETURNING *`;
 
       const result = await db.execute(query);
-      console.log("Updated inventory:", result.rows[0]);
+
+      if (!result.rows?.[0]) {
+        throw new Error("Failed to update retail inventory");
+      }
+
       return result.rows[0];
     } catch (error) {
       console.error("Error updating retail inventory:", error);
