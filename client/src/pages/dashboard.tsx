@@ -40,7 +40,7 @@ export default function Dashboard() {
 
   const { data: allShops, isLoading: loadingAllShops } = useQuery<Shop[]>({
     queryKey: ["/api/shops"],
-    enabled: !!user && (user.role === "roasteryOwner" || user.role === "owner"), 
+    enabled: !!user && (user.role === "roasteryOwner" || user.role === "owner"),
   });
 
   const { data: retailInventory, isLoading: loadingInventory } = useQuery({
@@ -219,7 +219,7 @@ export default function Dashboard() {
                         <div key={`${selectedShopId}-${inv.greenCoffeeId}`} className="p-2 bg-muted rounded">
                           <div className="flex justify-between items-start mb-2">
                             <div>
-                              <div className="text-sm font-medium">{inv.coffeeName}</div>
+                              <div className="text-sm font-medium">{coffee?.name}</div>
                               <div className="text-xs text-muted-foreground">
                                 Last updated: {formatDate(inv.lastUpdated)}
                                 {inv.updatedBy && <span> by {inv.updatedBy}</span>}
@@ -363,14 +363,14 @@ export default function Dashboard() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {!roastingHistory?.length ? ( 
+                {!roastingHistory?.length ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center text-muted-foreground">
                       No recent batches found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  roastingHistory.slice(0, 5).map(order => { 
+                  roastingHistory.slice(0, 5).map(order => {
                     const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
                     return (
                       <TableRow key={order.id}>
