@@ -6,21 +6,6 @@ import { Loader2, Package } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -28,6 +13,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Form,
   FormControl,
@@ -40,8 +26,42 @@ import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { formatDate } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
+
+
+// Update the getAvailableStatuses function to handle order status transitions
+const getAvailableStatuses = (currentStatus: string, userRole: string) => {
+  // Roasters can only move orders from pending to roasted, and roasted to dispatched
+  if (userRole === "roaster") {
+    switch (currentStatus) {
+      case "pending":
+        return [{ value: "roasted", label: "Roasted" }];
+      case "roasted":
+        return [{ value: "dispatched", label: "Dispatched" }];
+      case "dispatched":
+      case "delivered":
+        return []; // No status changes allowed for dispatched/delivered orders
+      default:
+        return [];
+    }
+  }
+
+  // Other roles (like roasteryOwner) can change to any status
+  return [
+    { value: "roasted", label: "Roasted" },
+    { value: "dispatched", label: "Dispatched" },
+    { value: "delivered", label: "Delivered" },
+  ];
+};
 
 // Helper function to group orders by date
 function groupOrdersByDate(orders: OrderWithDetails[]) {
@@ -157,19 +177,6 @@ export default function RoastingOrders() {
     );
   }
 
-  const getAvailableStatuses = () => {
-    if (user?.role === "roaster") {
-      return [
-        { value: "roasted", label: "Roasted" },
-        { value: "dispatched", label: "Dispatched" },
-      ];
-    }
-    return [
-      { value: "roasted", label: "Roasted" },
-      { value: "dispatched", label: "Dispatched" },
-      { value: "delivered", label: "Delivered" },
-    ];
-  };
 
   return (
     <div className="container mx-auto py-8 space-y-8">
@@ -254,14 +261,23 @@ export default function RoastingOrders() {
                               <Button
                                 variant="outline"
                                 size="sm"
+                                // Disable the button for roasters if order is dispatched/delivered
+                                disabled={
+                                  user?.role === "roaster" &&
+                                  (order.status === "dispatched" || order.status === "delivered")
+                                }
                                 onClick={() => {
                                   setSelectedOrder(order);
-                                  form.reset({
-                                    smallBags: order.smallBags,
-                                    largeBags: order.largeBags,
-                                    status: order.status === "pending" ? "roasted" : order.status,
-                                  });
-                                  setIsUpdateDialogOpen(true);
+                                  // Only set the status options available for the current status
+                                  const availableStatuses = getAvailableStatuses(order.status, user?.role || "");
+                                  if (availableStatuses.length > 0) {
+                                    form.reset({
+                                      smallBags: order.smallBags,
+                                      largeBags: order.largeBags,
+                                      status: availableStatuses[0].value,
+                                    });
+                                    setIsUpdateDialogOpen(true);
+                                  }
                                 }}
                               >
                                 Update Status
@@ -308,7 +324,6 @@ export default function RoastingOrders() {
                     await updateOrderMutation.mutateAsync({
                       orderId: selectedOrder.id,
                       ...data,
-                      updatedById: user?.id || 0,
                     });
                   } catch (error) {
                     console.error("Failed to update order:", error);
@@ -362,7 +377,7 @@ export default function RoastingOrders() {
                             className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                             {...field}
                           >
-                            {getAvailableStatuses().map(status => (
+                            {getAvailableStatuses(selectedOrder.status, user?.role || "").map(status => (
                               <option key={status.value} value={status.value}>
                                 {status.label}
                               </option>

@@ -753,7 +753,12 @@ export class DatabaseStorage {
         // Update order status
         const [updatedOrder] = await tx
           .update(orders)
-          .set(data)
+          .set({
+            status: data.status,
+            smallBags: data.smallBags || currentOrder.smallBags,
+            largeBags: data.largeBags || currentOrder.largeBags,
+            updatedById: data.updatedById,
+          })
           .where(eq(orders.id, id))
           .returning();
 
@@ -761,27 +766,35 @@ export class DatabaseStorage {
         if (data.status === "dispatched" && currentOrder.status !== "dispatched") {
           console.log("Updating retail inventory for dispatched order");
 
-          // Update or insert into retail inventory
-          await tx
-            .insert(retailInventory)
-            .values({
-              shopId: currentOrder.shopId,
-              greenCoffeeId: currentOrder.greenCoffeeId,
-              smallBags: data.smallBags || currentOrder.smallBags,
-              largeBags: data.largeBags || currentOrder.largeBags,
-              updatedById: data.updatedById,
-              updatedAt: new Date()
-            })
-            .onConflictDoUpdate({
-              target: [retailInventory.shopId, retailInventory.greenCoffeeId],
-              set: {
-                smallBags: sql`retail_inventory.small_bags + ${data.smallBags || currentOrder.smallBags}`,
-                largeBags: sql`retail_inventory.large_bags + ${data.largeBags || currentOrder.largeBags}`,
-                updatedById: data.updatedById,
-                updatedAt: new Date()
-              }
-            });
+          const query = sql`
+            INSERT INTO retail_inventory (
+              shop_id,
+              green_coffee_id,
+              small_bags,
+              large_bags,
+              updated_by_id,
+              updated_at,
+              update_type
+            )
+            VALUES (
+              ${currentOrder.shopId},
+              ${currentOrder.greenCoffeeId},
+              COALESCE(${data.smallBags}, ${currentOrder.smallBags}),
+              COALESCE(${data.largeBags}, ${currentOrder.largeBags}),
+              ${data.updatedById},
+              NOW(),
+              'dispatch'
+            )
+            ON CONFLICT (shop_id, green_coffee_id)
+            DO UPDATE SET
+              small_bags = retail_inventory.small_bags + EXCLUDED.small_bags,
+              large_bags = retail_inventory.large_bags + EXCLUDED.large_bags,
+              updated_by_id = EXCLUDED.updated_by_id,
+              updated_at = EXCLUDED.updated_at,
+              update_type = EXCLUDED.update_type;
+          `;
 
+          await tx.execute(query);
           console.log("Successfully updated retail inventory");
         }
 
