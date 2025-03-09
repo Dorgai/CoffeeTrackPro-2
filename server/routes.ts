@@ -776,11 +776,46 @@ export async function registerRoutes(app: Express): Promise<void> {
     try {
       console.log("Fetching orders for user:", req.user?.username, "with role:", req.user?.role);
       const shopId = req.query.shopId ? Number(req.query.shopId) : undefined;
+      const fromDate = req.query.from as string;
+      const toDate = req.query.to as string;
+
+      console.log("Order filter params:", { shopId, fromDate, toDate });
 
       // For retailOwner, roaster, roasteryOwner, and owner return all orders
       if (["retailOwner", "roaster", "roasteryOwner", "owner"].includes(req.user?.role || "")) {
         console.log("Fetching all orders for roaster/roasteryOwner/owner/retailOwner");
-        const allOrders = await storage.getAllOrders();
+        let query = db
+          .select({
+            id: orders.id,
+            shopId: orders.shopId,
+            greenCoffeeId: orders.greenCoffeeId,
+            smallBags: orders.smallBags,
+            largeBags: orders.largeBags,
+            status: orders.status,
+            createdAt: orders.createdAt,
+            createdById: orders.createdById,
+            updatedById: orders.updatedById,
+            shopName: shops.name,
+            shopLocation: shops.location,
+            coffeeName: greenCoffee.name,
+            producer: greenCoffee.producer,
+            created_by: users.username,
+            updated_by: sql<string | null>`(SELECT username FROM users WHERE id = ${orders.updatedById})`
+          })
+          .from(orders)
+          .leftJoin(shops, eq(orders.shopId, shops.id))
+          .leftJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
+          .leftJoin(users, eq(orders.createdById, users.id));
+
+        // Add date range filtering if provided
+        if (fromDate) {
+          query = query.where(sql`DATE(${orders.createdAt}) >= ${fromDate}`);
+        }
+        if (toDate) {
+          query = query.where(sql`DATE(${orders.createdAt}) <= ${toDate}`);
+        }
+
+        const allOrders = await query;
         console.log("Found orders:", allOrders.length);
         return res.json(allOrders);
       }
@@ -794,8 +829,41 @@ export async function registerRoutes(app: Express): Promise<void> {
       if (!await checkShopAccess(req.user!.id, shopId)) {
         return res.status(403).json({ message: "User does not have access to this shop" });
       }
-      const orders = await storage.getOrdersByShop(shopId);
-      return res.json(orders);
+
+      let query = db
+        .select({
+          id: orders.id,
+          shopId: orders.shopId,
+          greenCoffeeId: orders.greenCoffeeId,
+          smallBags: orders.smallBags,
+          largeBags: orders.largeBags,
+          status: orders.status,
+          createdAt: orders.createdAt,
+          createdById: orders.createdById,
+          updatedById: orders.updatedById,
+          shopName: shops.name,
+          shopLocation: shops.location,
+          coffeeName: greenCoffee.name,
+          producer: greenCoffee.producer,
+          created_by: users.username,
+          updated_by: sql<string | null>`(SELECT username FROM users WHERE id = ${orders.updatedById})`
+        })
+        .from(orders)
+        .leftJoin(shops, eq(orders.shopId, shops.id))
+        .leftJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
+        .leftJoin(users, eq(orders.createdById, users.id))
+        .where(eq(orders.shopId, shopId));
+
+      // Add date range filtering if provided
+      if (fromDate) {
+        query = query.where(sql`DATE(${orders.createdAt}) >= ${fromDate}`);
+      }
+      if (toDate) {
+        query = query.where(sql`DATE(${orders.createdAt}) <= ${toDate}`);
+      }
+
+      const shopOrders = await query;
+      return res.json(shopOrders);
     } catch (error) {
       console.error("Error fetching orders:", error);
       res.status(500).json({
@@ -832,10 +900,12 @@ export async function registerRoutes(app: Express): Promise<void> {
           if (smallBags > order.smallBags || largeBags > order.largeBags) {
             return res.status(400).json({
               message: "Updated quantities cannot exceed original orderquantities"
-            });          }
+            });
+          }
         } else {
           // Shop manager can only mark orders as delivered
-          if (req.user?.role === "shopManager" && status !== "delivered") {            return res.status(403).json({
+          if (req.user?.role === "shopManager" && status !== "delivered") {
+            return res.status(403).json({
               message: "Shopmanagers can only mark orders as delivered"
             });
           }

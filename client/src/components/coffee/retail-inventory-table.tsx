@@ -50,7 +50,7 @@ type InventoryItem = {
   updatedAt: string;
   updatedById: number;
   updatedByUsername: string;
-  updateType: "manual" | "dispatch";
+  updateType: "manual" | "dispatch" | null;
   notes: string | null;
 };
 
@@ -172,7 +172,7 @@ export function RetailInventoryTable() {
                       <TableHead>Large Bags (1kg)</TableHead>
                       <TableHead>Last Updated</TableHead>
                       <TableHead>Updated By</TableHead>
-                      <TableHead>Type</TableHead>
+                      <TableHead>Update Method</TableHead>
                       {canEditInventory && <TableHead>Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
@@ -187,14 +187,15 @@ export function RetailInventoryTable() {
                         <TableCell>{formatDate(item.updatedAt)}</TableCell>
                         <TableCell>{item.updatedByUsername}</TableCell>
                         <TableCell>
-                          <span className={cn(
-                            "capitalize px-2 py-1 rounded-full text-xs",
-                            item.updateType === "manual" 
-                              ? "bg-blue-100 text-blue-700"
-                              : "bg-green-100 text-green-700"
-                          )}>
-                            {item.updateType}
-                          </span>
+                          {(() => {
+                            const method = item.updateType || "manual";
+                            const bgColor = method === "manual" ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700";
+                            return (
+                              <span className={cn("capitalize px-2 py-1 rounded-full text-xs", bgColor)}>
+                                {method}
+                              </span>
+                            );
+                          })()}
                         </TableCell>
                         {canEditInventory && (
                           <TableCell>
@@ -239,7 +240,7 @@ export function RetailInventoryTable() {
                               <TableHead>Previous Stock</TableHead>
                               <TableHead>New Stock</TableHead>
                               <TableHead>Updated By</TableHead>
-                              <TableHead>Type</TableHead>
+                              <TableHead>Update Method</TableHead>
                               <TableHead>Notes</TableHead>
                             </TableRow>
                           </TableHeader>

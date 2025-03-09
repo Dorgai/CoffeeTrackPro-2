@@ -528,72 +528,48 @@ export class DatabaseStorage {
     updatedById: number;
     updateType?: "manual" | "dispatch";
     notes?: string;
-  }): Promise<any> {
+  }): Promise<RetailInventory> {
     try {
       console.log("Updating retail inventory with data:", data);
 
-      return await db.transaction(async (tx) => {
-        // First get current inventory
-        const [currentInventory] = await tx
-          .select()
-          .from(retailInventory)
-          .where(
-            and(
-              eq(retailInventory.shopId, data.shopId),
-              eq(retailInventory.greenCoffeeId, data.greenCoffeeId)
-            )
-          )
-          .orderBy(sql`updated_at DESC`)
-          .limit(1);
+      const query = sql`
+        INSERT INTO retail_inventory (
+          shop_id,
+          green_coffee_id,
+          small_bags,
+          large_bags,
+          updated_by_id,
+          updated_at,
+          update_type,
+          notes
+        )
+        VALUES (
+          ${data.shopId},
+          ${data.greenCoffeeId},
+          ${data.smallBags},
+          ${data.largeBags},
+          ${data.updatedById},
+          NOW(),
+          ${data.updateType || "manual"},
+          ${data.notes}
+        )
+        ON CONFLICT (shop_id, green_coffee_id)
+        DO UPDATE SET
+          small_bags = EXCLUDED.small_bags,
+          large_bags = EXCLUDED.large_bags,
+          updated_by_id = EXCLUDED.updated_by_id,
+          updated_at = EXCLUDED.updated_at,
+          update_type = EXCLUDED.update_type,
+          notes = EXCLUDED.notes
+        RETURNING *`;
 
-        // Create history record if there's existing inventory
-        if (currentInventory) {
-          await tx.insert(retailInventoryHistory).values({
-            shopId: data.shopId,
-            greenCoffeeId: data.greenCoffeeId,
-            previousSmallBags: currentInventory.smallBags,
-            previousLargeBags: currentInventory.largeBags,
-            newSmallBags: data.smallBags,
-            newLargeBags: data.largeBags,
-            updatedById: data.updatedById,
-            updateType: data.updateType || "manual",
-            notes: data.notes,
-            updatedAt: new Date()
-          });
-        }
+      const result = await db.execute(query);
+      if (!result.rows?.[0]) {
+        throw new Error("Failed to update retail inventory");
+      }
 
-        // Then update or insert inventory
-        const query = sql`
-          INSERT INTO retail_inventory (
-            shop_id,
-            green_coffee_id,
-            small_bags,
-            large_bags,
-            updated_by_id,
-            updated_at,
-            update_type,
-            notes
-          )
-          VALUES (
-            ${data.shopId},
-            ${data.greenCoffeeId},
-            ${data.smallBags},
-            ${data.largeBags},
-            ${data.updatedById},
-            NOW(),
-            ${data.updateType || "manual"},
-            ${data.notes}
-          )
-          RETURNING *`;
-
-        const result = await tx.execute(query);
-        if (!result.rows?.[0]) {
-          throw new Error("Failed to update retail inventory");
-        }
-
-        console.log("Updated retail inventory:", result.rows[0]);
-        return result.rows[0];
-      });
+      console.log("Updated retail inventory:", result.rows[0]);
+      return result.rows[0];
     } catch (error) {
       console.error("Error updating retail inventory:", error);
       throw error;
@@ -919,21 +895,7 @@ export class DatabaseStorage {
     }
   }
 
-  async updateRetailInventory(data: Partial<RetailInventory>): Promise<RetailInventory> {
-    try {
-      console.log("Updating retail inventory with data:", data);
-      const [inventory] = await db
-        .insert(retailInventory)
-        .values(data)
-        .returning();
-
-      console.log("Updated retail inventory:", inventory);
-      return inventory;
-    } catch (error) {
-      console.error("Error updating retail inventory:", error);
-      throw error;
-    }
-  }
+  
 }
 
 export const storage = new DatabaseStorage();
