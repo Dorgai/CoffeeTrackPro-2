@@ -1,4 +1,4 @@
-import { type RoastingBatch, type InsertRoastingBatch, roastingBatches, users, type User, type Shop, type InsertShop, shops, userShops } from "@shared/schema";
+import { type RoastingBatch, type InsertRoastingBatch, roastingBatches, users, type User, type Shop, type InsertShop, shops, userShops, type GreenCoffee, greenCoffee, type Order, type InsertOrder, orders, type RetailInventory, retailInventory, type RetailInventoryHistory, retailInventoryHistory } from "@shared/schema";
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
 import session from "express-session";
@@ -211,6 +211,7 @@ export class DatabaseStorage {
   }
 
 
+
   async getRetailInventoryHistory(shopId: number): Promise<any[]> {
     try {
       const query = sql`
@@ -393,7 +394,14 @@ export class DatabaseStorage {
   // Green coffee methods
   async getGreenCoffees(): Promise<GreenCoffee[]> {
     try {
-      return await db.select().from(greenCoffee);
+      console.log("Storage: Fetching all green coffee entries");
+      const coffees = await db
+        .select()
+        .from(greenCoffee)
+        .orderBy(greenCoffee.name);
+
+      console.log("Found green coffees:", coffees.length);
+      return coffees;
     } catch (error) {
       console.error("Error getting green coffees:", error);
       return [];
@@ -877,7 +885,7 @@ export class DatabaseStorage {
         // Combine owner assignments with the requested assignments
         const allAssignments = [
           ...ownerAssignments,
-          ...assignments.filter(a => 
+          ...assignments.filter(a =>
             !owners.some(owner => owner.id === a.userId)
           )
         ];
@@ -892,6 +900,37 @@ export class DatabaseStorage {
       });
     } catch (error) {
       console.error("Error updating user-shop assignments:", error);
+      throw error;
+    }
+  }
+  // Retail Inventory methods
+  async getRetailInventories(): Promise<RetailInventory[]> {
+    try {
+      console.log("Storage: Fetching retail inventories");
+      const inventories = await db
+        .select()
+        .from(retailInventory);
+
+      console.log("Found retail inventories:", inventories.length);
+      return inventories;
+    } catch (error) {
+      console.error("Error getting retail inventories:", error);
+      return [];
+    }
+  }
+
+  async updateRetailInventory(data: Partial<RetailInventory>): Promise<RetailInventory> {
+    try {
+      console.log("Updating retail inventory with data:", data);
+      const [inventory] = await db
+        .insert(retailInventory)
+        .values(data)
+        .returning();
+
+      console.log("Updated retail inventory:", inventory);
+      return inventory;
+    } catch (error) {
+      console.error("Error updating retail inventory:", error);
       throw error;
     }
   }

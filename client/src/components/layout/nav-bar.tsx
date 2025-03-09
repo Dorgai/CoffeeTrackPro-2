@@ -14,7 +14,6 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { GreenBeansStockIndicator } from "./green-beans-stock-indicator";
-import { ShopSelector } from "./shop-selector";
 
 export function NavBar() {
   const { user, logoutMutation } = useAuth();
@@ -31,7 +30,7 @@ export function NavBar() {
   const canAccessRetail = ["owner", "roasteryOwner", "retailOwner", "shopManager", "barista"].includes(user?.role || "");
 
   // Redirect users to their appropriate dashboard
-  const homePath = isRetailUser ? "/manager-dashboard" : "/";
+  const homePath = isRetailUser ? "/retail" : "/";
 
   return (
     <div className="border-b">
@@ -41,12 +40,6 @@ export function NavBar() {
             <Coffee className="h-6 w-6" />
           </Link>
         </div>
-
-        {user && (
-          <div className="mr-4">
-            <ShopSelector />
-          </div>
-        )}
 
         <Menubar className="border-none">
           {/* Dashboard Menu */}

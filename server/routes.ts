@@ -439,7 +439,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   });
 
   // Green Coffee Routes - accessible by roastery owner and roaster
-  app.get("/api/green-coffee", requireRole(["owner", "roasteryOwner", "roaster", "retailOwner"]), async (req, res) => {
+  app.get("/api/green-coffee", requireRole(["owner", "roasteryOwner", "roaster", "retailOwner", "shopManager", "barista"]), async (req, res) => {
     try {
       console.log("Fetching green coffee list, requested by:", req.user?.username, "role:", req.user?.role);
       const coffees = await storage.getGreenCoffees();
@@ -530,7 +530,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   );
 
   // Get specific green coffee details
-  app.get("/api/green-coffee/:id", requireRole(["owner", "roasteryOwner", "roaster", "retailOwner"]), async (req, res) => {
+  app.get("/api/green-coffee/:id", requireRole(["owner", "roasteryOwner", "roaster", "retailOwner", "shopManager", "barista"]), async (req, res) => {
     try {
       const coffeeId = parseInt(req.params.id);
       if (isNaN(coffeeId)) {
@@ -893,12 +893,19 @@ export async function registerRoutes(app: Express): Promise<void> {
   );
 
   // Create new order
-  app.post("/api/orders", requireShopAccess(["owner", "shopManager", "barista", "roasteryOwner", "retailOwner"]), async (req, res) => {
+  app.post("/api/orders", requireShopAccess(["owner", "retailOwner", "shopManager", "barista"]), async (req, res) => {
     try {
       const { shopId } = req.body;
       if (!shopId) {
         return res.status(400).json({ message: "Shop ID is required" });
       }
+
+      console.log("Creating new order:", {
+        user: req.user?.username,
+        role: req.user?.role,
+        shopId,
+        body: req.body
+      });
 
       const data = insertOrderSchema.parse({
         ...req.body,
@@ -907,6 +914,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       });
 
       const order = await storage.createOrder(data);
+      console.log("Order created successfully:", order);
       res.status(201).json(order);
     } catch (error) {
       console.error("Error creating order:", error);
