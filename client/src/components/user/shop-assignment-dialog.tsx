@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { Shop } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Shop } from "@shared/schema";
+
 import {
   Dialog,
   DialogContent,
@@ -13,10 +14,10 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2 } from "lucide-react";
 
-interface ShopAssignmentDialogProps {
+interface Props {
   userId: number;
   username: string;
   open: boolean;
@@ -30,28 +31,31 @@ export function ShopAssignmentDialog({
   open,
   onOpenChange,
   onSuccess
-}: ShopAssignmentDialogProps) {
+}: Props) {
   const { toast } = useToast();
   const [selectedShops, setSelectedShops] = useState<number[]>([]);
 
   // Fetch all active shops
-  const { data: shops, isLoading: loadingShops } = useQuery<Shop[]>({
-    queryKey: ["/api/shops"],
+  const { data: shops = [], isLoading: loadingShops } = useQuery({
+    queryKey: ["/api/shops"] as const,
     enabled: open,
-    select: (data) => data.filter(shop => shop.isActive).sort((a, b) => a.name.localeCompare(b.name))
+    select: (data: Shop[]) => 
+      data
+        .filter(shop => shop.isActive)
+        .sort((a, b) => a.name.localeCompare(b.name))
   });
 
   // Fetch user's current shop assignments
-  const { isLoading: loadingUserShops } = useQuery<number[]>({
-    queryKey: ["/api/users", userId, "shops"],
+  useQuery({
+    queryKey: ["/api/users", userId, "shops"] as const,
     enabled: open,
-    onSuccess: (data) => {
-      setSelectedShops(data || []);
+    onSuccess: (data: number[]) => {
+      setSelectedShops(data);
     }
   });
 
-  // Mutation for assigning shops
-  const assignShopsMutation = useMutation({
+  // Handle shop assignment mutation
+  const assignShops = useMutation({
     mutationFn: async (shopIds: number[]) => {
       const response = await apiRequest(
         "POST",
@@ -73,7 +77,7 @@ export function ShopAssignmentDialog({
         title: "Success",
         description: "Shop assignments updated successfully",
       });
-      if (onSuccess) onSuccess();
+      onSuccess?.();
       onOpenChange(false);
     },
     onError: (error: Error) => {
@@ -85,25 +89,23 @@ export function ShopAssignmentDialog({
     },
   });
 
-  const isLoading = loadingShops || loadingUserShops;
-
-  const handleToggleShop = (shopId: number) => {
-    setSelectedShops(prev => {
-      if (prev.includes(shopId)) {
-        return prev.filter(id => id !== shopId);
-      } else {
-        return [...prev, shopId];
-      }
-    });
+  // Toggle shop selection
+  const toggleShop = (shopId: number) => {
+    setSelectedShops(prev => 
+      prev.includes(shopId)
+        ? prev.filter(id => id !== shopId)
+        : [...prev, shopId]
+    );
   };
 
+  // Handle save
   const handleSave = () => {
-    assignShopsMutation.mutate(selectedShops);
+    assignShops.mutate(selectedShops);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Assign Shops to {username}</DialogTitle>
           <DialogDescription>
@@ -111,50 +113,54 @@ export function ShopAssignmentDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {isLoading ? (
-          <div className="flex justify-center py-4">
-            <Loader2 className="h-6 w-6 animate-spin" />
+        {loadingShops ? (
+          <div className="flex justify-center py-6">
+            <Loader2 className="h-8 w-8 animate-spin" />
           </div>
-        ) : !shops?.length ? (
-          <div className="py-4 text-center text-muted-foreground">
+        ) : !shops.length ? (
+          <div className="py-6 text-center text-muted-foreground">
             No active shops available
           </div>
         ) : (
-          <div className="grid gap-4 py-4 max-h-[400px] overflow-y-auto">
-            {shops.map(shop => (
-              <div key={shop.id} className="flex items-center space-x-2 p-2 hover:bg-muted rounded-lg">
-                <Checkbox
-                  id={`shop-${shop.id}`}
-                  checked={selectedShops.includes(shop.id)}
-                  onCheckedChange={() => handleToggleShop(shop.id)}
-                />
-                <Label htmlFor={`shop-${shop.id}`} className="flex-1 cursor-pointer">
-                  {shop.name}
-                  <span className="text-muted-foreground ml-2">
-                    ({shop.location})
-                  </span>
-                </Label>
-              </div>
-            ))}
-          </div>
+          <ScrollArea className="h-[300px] pr-4">
+            <div className="space-y-4">
+              {shops.map(shop => (
+                <label
+                  key={shop.id}
+                  className="flex items-center space-x-3 p-2 rounded-lg hover:bg-accent cursor-pointer"
+                >
+                  <Checkbox
+                    checked={selectedShops.includes(shop.id)}
+                    onCheckedChange={() => toggleShop(shop.id)}
+                  />
+                  <div>
+                    <div className="font-medium">{shop.name}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {shop.location}
+                    </div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </ScrollArea>
         )}
 
         <DialogFooter>
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            disabled={assignShopsMutation.isPending}
+            disabled={assignShops.isPending}
           >
             Cancel
           </Button>
           <Button
             onClick={handleSave}
-            disabled={assignShopsMutation.isPending || isLoading}
+            disabled={assignShops.isPending || loadingShops}
           >
-            {assignShopsMutation.isPending && (
+            {assignShops.isPending && (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             )}
-            Save Assignments
+            Save Changes
           </Button>
         </DialogFooter>
       </DialogContent>
