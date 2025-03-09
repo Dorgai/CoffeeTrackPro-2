@@ -14,19 +14,15 @@ import { Loader2 } from "lucide-react";
 interface Props {
   userId: number;
   username: string;
-  userRole: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess?: () => void;
 }
 
 export function ShopAssignmentDialog({
   userId,
   username,
-  userRole,
   open,
   onOpenChange,
-  onSuccess
 }: Props) {
   // Fetch user's current shop assignments
   const { data: userShops = [], isLoading: loadingUserShops } = useQuery<Shop[]>({
@@ -34,28 +30,9 @@ export function ShopAssignmentDialog({
     enabled: open && !!userId,
   });
 
-  // If user is roasteryOwner, show informational message
-  if (userRole === "roasteryOwner") {
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Shop Access Information</DialogTitle>
-            <DialogDescription>
-              As a Roastery Owner, {username} automatically has access to all active shops.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button onClick={() => onOpenChange(false)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Shop Access for {username}</DialogTitle>
           <DialogDescription>

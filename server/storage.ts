@@ -1,4 +1,4 @@
-import { type RoastingBatch, type InsertRoastingBatch, roastingBatches, users, type User, type Shop, type InsertShop, shops, userShops, type GreenCoffee, type InsertGreenCoffee, greenCoffee, type Order, type InsertOrder, orders, retailInventory, retailInventoryHistory } from "@shared/schema";
+import { type RoastingBatch, type InsertRoastingBatch, roastingBatches, users, type User, type Shop, type InsertShop, shops, userShops } from "@shared/schema";
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
 import session from "express-session";
@@ -70,20 +70,6 @@ export class DatabaseStorage {
 
       console.log("Found users:", allUsers.length);
 
-      // Then get their shop assignments
-      for (const user of allUsers) {
-        const userShopData = await db
-          .select({
-            shopId: userShops.shopId,
-            shopName: shops.name
-          })
-          .from(userShops)
-          .leftJoin(shops, eq(userShops.shopId, shops.id))
-          .where(eq(userShops.userId, user.id));
-
-        console.log(`Found ${userShopData.length} shops for user ${user.username}`);
-      }
-
       return allUsers;
     } catch (error) {
       console.error("Error getting all users:", error);
@@ -148,12 +134,12 @@ export class DatabaseStorage {
     }
   }
 
-  async assignUserToShops(userId: number, shopIds: number[]): Promise<void> {
+  async assignUserToShops(userId: number): Promise<void> {
     try {
-      console.log(`Assigning shops ${shopIds.join(', ')} to user ${userId}`);
+      console.log("Assigning shops to user:", userId);
 
       return await db.transaction(async (tx) => {
-        // First get the user to check their role
+        // Get the user
         const [user] = await tx
           .select()
           .from(users)
@@ -163,44 +149,33 @@ export class DatabaseStorage {
           throw new Error("User not found");
         }
 
-        // For roasteryOwner, always assign all active shops
-        if (user.role === "roasteryOwner") {
-          const allActiveShops = await tx
-            .select()
-            .from(shops)
-            .where(eq(shops.isActive, true));
+        // Get all active shops
+        const activeShops = await tx
+          .select()
+          .from(shops)
+          .where(eq(shops.isActive, true));
 
-          await tx
-            .delete(userShops)
-            .where(eq(userShops.userId, userId));
-
-          if (allActiveShops.length > 0) {
-            await tx
-              .insert(userShops)
-              .values(
-                allActiveShops.map(shop => ({
-                  userId,
-                  shopId: shop.id
-                }))
-              );
-          }
-        } else {
-          // For other roles, assign only to specified shop (taking the first one if multiple provided)
-          await tx
-            .delete(userShops)
-            .where(eq(userShops.userId, userId));
-
-          if (shopIds.length > 0) {
-            await tx
-              .insert(userShops)
-              .values({
-                userId,
-                shopId: shopIds[0] // Only use the first shop
-              });
-          }
+        if (activeShops.length === 0) {
+          console.log("No active shops found");
+          return;
         }
 
-        console.log("Shop assignments completed successfully");
+        // Remove existing assignments
+        await tx
+          .delete(userShops)
+          .where(eq(userShops.userId, userId));
+
+        // Assign all active shops
+        await tx
+          .insert(userShops)
+          .values(
+            activeShops.map(shop => ({
+              userId,
+              shopId: shop.id
+            }))
+          );
+
+        console.log(`Assigned ${activeShops.length} shops to user ${userId}`);
       });
     } catch (error) {
       console.error("Error assigning shops to user:", error);
@@ -208,31 +183,33 @@ export class DatabaseStorage {
     }
   }
 
-  async removeUserFromShop(userId: number, shopId: number): Promise<void> {
+  async getUserShops(userId: number): Promise<Shop[]> {
     try {
-      await db
-        .delete(userShops)
-        .where(and(
-          eq(userShops.userId, userId),
-          eq(userShops.shopId, shopId)
-        ));
+      console.log("Getting shops for user:", userId);
+
+      // Get all active shops - every user has access to all shops
+      const userShopsData = await db
+        .select({
+          id: shops.id,
+          name: shops.name,
+          location: shops.location,
+          isActive: shops.isActive,
+          desiredSmallBags: shops.desiredSmallBags,
+          desiredLargeBags: shops.desiredLargeBags,
+          createdAt: shops.createdAt
+        })
+        .from(shops)
+        .where(eq(shops.isActive, true))
+        .orderBy(shops.name);
+
+      console.log("Found user assigned shops:", userShopsData);
+      return userShopsData;
     } catch (error) {
-      console.error("Error removing user from shop:", error);
-      throw error;
+      console.error("Error getting user shops:", error);
+      return [];
     }
   }
 
-
-  async removeAllUserShops(userId: number): Promise<void> {
-    try {
-      await db
-        .delete(userShops)
-        .where(eq(userShops.userId, userId));
-    } catch (error) {
-      console.error("Error removing all user shops:", error);
-      throw error;
-    }
-  }
 
   async getRetailInventoryHistory(shopId: number): Promise<any[]> {
     try {
@@ -318,49 +295,6 @@ export class DatabaseStorage {
       return allShops;
     } catch (error) {
       console.error("Error getting shops:", error);
-      return [];
-    }
-  }
-
-  async getUserShops(userId: number): Promise<Shop[]> {
-    try {
-      console.log("Getting shops for user:", userId);
-
-      // First get the user to check their role
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, userId));
-
-      console.log("User role:", user?.role);
-
-      // For roasteryOwner and owner roles, return all active shops
-      if (user?.role === "roasteryOwner" || user?.role === "owner") {
-        return this.getShops();
-      }
-
-      // For other roles, get assigned shops
-      const userShopsData = await db
-        .select({
-          id: shops.id,
-          name: shops.name,
-          location: shops.location,
-          isActive: shops.isActive,
-          desiredSmallBags: shops.desiredSmallBags,
-          desiredLargeBags: shops.desiredLargeBags,
-          createdAt: shops.createdAt
-        })
-        .from(userShops)
-        .innerJoin(shops, eq(userShops.shopId, shops.id))
-        .where(and(
-          eq(userShops.userId, userId),
-          eq(shops.isActive, true)
-        ));
-
-      console.log("Found user assigned shops:", userShopsData);
-      return userShopsData;
-    } catch (error) {
-      console.error("Error getting user shops:", error);
       return [];
     }
   }
@@ -891,48 +825,6 @@ export class DatabaseStorage {
     } catch (error) {
       console.error("Error getting users by role:", error);
       return [];
-    }
-  }
-  async getUserShopIds(userId: number): Promise<number[]> {
-    try {
-      console.log("Getting shop IDs for user:", userId);
-
-      // First get the user to check their role
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, userId));
-
-      // For roasteryOwner, return all active shop IDs
-      if (user?.role === "roasteryOwner") {
-        const shops = await this.getShops();
-        return shops.map(shop => shop.id);
-      }
-
-      // For other roles, get assigned shop IDs
-      const assignments = await db
-        .select({ shopId: userShops.shopId })
-        .from(userShops)
-        .where(eq(userShops.userId, userId));
-
-      const shopIds = assignments.map(a => a.shopId);
-      console.log("Found assigned shop IDs:", shopIds);
-      return shopIds;
-    } catch (error) {
-      console.error("Error getting user shop IDs:", error);
-      return [];
-    }
-  }
-
-  async assignUserToShop(userId: number, shopId: number): Promise<void> {
-    try {
-      await db
-        .insert(userShops)
-        .values({ userId, shopId })
-        .onConflictDoNothing();
-    } catch (error) {
-      console.error("Error assigning user to shop:", error);
-      throw error;
     }
   }
 }
