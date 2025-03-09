@@ -36,9 +36,9 @@ export function RetailInventoryFormDialog({
         <RetailInventoryForm
           shopId={shopId}
           coffeeId={coffeeId}
+          coffeeName={coffeeName}
           currentSmallBags={currentSmallBags}
           currentLargeBags={currentLargeBags}
-          coffeeName={coffeeName}
           onSuccess={onSuccess}
         />
       </DialogContent>
