@@ -487,7 +487,7 @@ export class DatabaseStorage {
         JOIN shops s ON ri.shop_id = s.id
         JOIN green_coffee gc ON ri.green_coffee_id = gc.id
         LEFT JOIN users u ON ri.updated_by_id = u.id
-        WHERE s.is_active = true AND gc.is_active = true
+        WHERE s.is_active = true
         ORDER BY s.name, gc.name`;
 
       const result = await db.execute(query);
@@ -497,16 +497,10 @@ export class DatabaseStorage {
         sampleRow: result.rows?.[0]
       });
 
-      // Ensure we always return an array
-      if (!result.rows) {
-        console.log("No rows found in query result");
-        return [];
-      }
-
-      return result.rows;
+      return result.rows || [];
     } catch (error) {
       console.error("Error in getAllRetailInventories:", error);
-      return []; // Return empty array instead of throwing
+      return [];
     }
   }
 
@@ -891,7 +885,7 @@ export class DatabaseStorage {
           receivedSmallBags: data.receivedSmallBags,
           receivedLargeBags: data.receivedLargeBags,
           confirmedById: data.confirmedById,
-          status: "confirmed",
+          status: "confirmed" as const,
           confirmedAt: new Date()
         })
         .where(eq(dispatchedCoffeeConfirmation.id, id))
