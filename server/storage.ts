@@ -1,4 +1,4 @@
-import { type RoastingBatch, type InsertRoastingBatch, roastingBatches, users, type User, type Shop, type InsertShop, shops, userShops, type GreenCoffee, type InsertGreenCoffee, greenCoffee, type Order, type InsertOrder, orders, retailInventory } from "@shared/schema";
+import { type RoastingBatch, type InsertRoastingBatch, roastingBatches, users, type User, type Shop, type InsertShop, shops, userShops, type GreenCoffee, type InsertGreenCoffee, greenCoffee, type Order, type InsertOrder, orders, retailInventory, retailInventoryHistory } from "@shared/schema";
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
 import session from "express-session";
@@ -210,15 +210,23 @@ export class DatabaseStorage {
         SELECT 
           ri.*,
           u.username as updated_by_username,
-          gc.name as coffee_name
+          gc.name as coffee_name,
+          gc.producer,
+          gc.grade
         FROM retail_inventory_history ri
         LEFT JOIN users u ON ri.updated_by_id = u.id
         LEFT JOIN green_coffee gc ON ri.green_coffee_id = gc.id
         WHERE ri.shop_id = ${shopId}
+          AND ri.updated_at >= NOW() - INTERVAL '30 days'
         ORDER BY ri.updated_at DESC`;
 
       const result = await db.execute(query);
-      return result.rows;
+      console.log("Retrieved inventory history:", {
+        shopId,
+        count: result.rows?.length,
+        sampleRow: result.rows?.[0]
+      });
+      return result.rows || [];
     } catch (error) {
       console.error("Error getting retail inventory history:", error);
       return [];
@@ -232,15 +240,22 @@ export class DatabaseStorage {
           ri.*,
           u.username as updated_by_username,
           gc.name as coffee_name,
-          s.name as shop_name
+          s.name as shop_name,
+          gc.producer,
+          gc.grade
         FROM retail_inventory_history ri
         LEFT JOIN users u ON ri.updated_by_id = u.id
         LEFT JOIN green_coffee gc ON ri.green_coffee_id = gc.id
         LEFT JOIN shops s ON ri.shop_id = s.id
+        WHERE ri.updated_at >= NOW() - INTERVAL '30 days'
         ORDER BY ri.updated_at DESC`;
 
       const result = await db.execute(query);
-      return result.rows;
+      console.log("Retrieved all inventory history:", {
+        count: result.rows?.length,
+        sampleRow: result.rows?.[0]
+      });
+      return result.rows || [];
     } catch (error) {
       console.error("Error getting all retail inventory history:", error);
       return [];
@@ -526,63 +541,79 @@ export class DatabaseStorage {
     smallBags: number;
     largeBags: number;
     updatedById: number;
+    updateType?: "manual" | "dispatch";
+    notes?: string;
   }): Promise<any> {
     try {
       console.log("Updating retail inventory with data:", data);
 
-      // First verify if shop exists and is active
-      const [shop] = await db
-        .select()
-        .from(shops)
-        .where(and(eq(shops.id, data.shopId), eq(shops.isActive, true)));
+      return await db.transaction(async (tx) => {
+        // First get current inventory
+        const [currentInventory] = await tx
+          .select()
+          .from(retailInventory)
+          .where(
+            and(
+              eq(retailInventory.shopId, data.shopId),
+              eq(retailInventory.greenCoffeeId, data.greenCoffeeId)
+            )
+          );
 
-      if (!shop) {
-        throw new Error(`Shop ${data.shopId} not found or inactive`);
-      }
+        // Create history record
+        if (currentInventory) {
+          await tx.insert(retailInventoryHistory).values({
+            shopId: data.shopId,
+            greenCoffeeId: data.greenCoffeeId,
+            previousSmallBags: currentInventory.smallBags,
+            previousLargeBags: currentInventory.largeBags,
+            newSmallBags: data.smallBags,
+            newLargeBags: data.largeBags,
+            updatedById: data.updatedById,
+            updateType: data.updateType || "manual",
+            notes: data.notes,
+            updatedAt: new Date()
+          });
+        }
 
-      // Verify if coffee exists
-      const [coffee] = await db
-        .select()
-        .from(greenCoffee)
-        .where(eq(greenCoffee.id, data.greenCoffeeId));
+        // Then update or insert inventory
+        const query = sql`
+          INSERT INTO retail_inventory (
+            shop_id,
+            green_coffee_id,
+            small_bags,
+            large_bags,
+            updated_by_id,
+            updated_at,
+            update_type,
+            notes
+          )
+          VALUES (
+            ${data.shopId},
+            ${data.greenCoffeeId},
+            ${data.smallBags},
+            ${data.largeBags},
+            ${data.updatedById},
+            NOW(),
+            ${data.updateType || "manual"},
+            ${data.notes}
+          )
+          ON CONFLICT (shop_id, green_coffee_id)
+          DO UPDATE SET
+            small_bags = ${data.smallBags},
+            large_bags = ${data.largeBags},
+            updated_by_id = ${data.updatedById},
+            updated_at = NOW(),
+            update_type = ${data.updateType || "manual"},
+            notes = ${data.notes}
+          RETURNING *`;
 
-      if (!coffee) {
-        throw new Error(`Coffee ${data.greenCoffeeId} not found`);
-      }
+        const result = await tx.execute(query);
+        if (!result.rows?.[0]) {
+          throw new Error("Failed to update retail inventory");
+        }
 
-      const query = sql`
-        INSERT INTO retail_inventory (
-          shop_id,
-          green_coffee_id,
-          small_bags,
-          large_bags,
-          updated_by_id,
-          updated_at
-        )
-        VALUES (
-          ${data.shopId},
-          ${data.greenCoffeeId},
-          ${data.smallBags},
-          ${data.largeBags},
-          ${data.updatedById},
-          NOW()
-        )
-        ON CONFLICT (shop_id, green_coffee_id)
-        DO UPDATE SET
-          small_bags = retail_inventory.small_bags + ${data.smallBags},
-          large_bags = retail_inventory.large_bags + ${data.largeBags},
-          updated_by_id = ${data.updatedById},
-          updated_at = NOW()
-        RETURNING *`;
-
-      const result = await db.execute(query);
-      console.log("Updated retail inventory:", result.rows?.[0]);
-
-      if (!result.rows?.[0]) {
-        throw new Error("Failed to update retail inventory");
-      }
-
-      return result.rows[0];
+        return result.rows[0];
+      });
     } catch (error) {
       console.error("Error updating retail inventory:", error);
       throw error;

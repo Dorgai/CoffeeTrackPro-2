@@ -51,6 +51,22 @@ export const retailInventory = pgTable("retail_inventory", {
   largeBags: integer("large_bags").notNull().default(0),
   updatedById: integer("updated_by_id").references(() => users.id),
   updatedAt: timestamp("updated_at").defaultNow(),
+  updateType: text("update_type", { enum: ["manual", "dispatch"] }).notNull(),
+  notes: text("notes"),
+});
+
+export const retailInventoryHistory = pgTable("retail_inventory_history", {
+  id: serial("id").primaryKey(),
+  shopId: integer("shop_id").notNull().references(() => shops.id),
+  greenCoffeeId: integer("green_coffee_id").notNull().references(() => greenCoffee.id),
+  previousSmallBags: integer("previous_small_bags").notNull(),
+  previousLargeBags: integer("previous_large_bags").notNull(),
+  newSmallBags: integer("new_small_bags").notNull(),
+  newLargeBags: integer("new_large_bags").notNull(),
+  updatedById: integer("updated_by_id").references(() => users.id),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  updateType: text("update_type", { enum: ["manual", "dispatch"] }).notNull(),
+  notes: text("notes"),
 });
 
 export const orders = pgTable("orders", {
@@ -98,6 +114,7 @@ export const insertGreenCoffeeSchema = z.object({
   isActive: z.boolean().default(true)
 });
 export const insertRetailInventorySchema = createInsertSchema(retailInventory);
+export const insertRetailInventoryHistorySchema = createInsertSchema(retailInventoryHistory);
 export const insertOrderSchema = createInsertSchema(orders);
 export const insertUserShopSchema = createInsertSchema(userShops);
 
@@ -105,12 +122,14 @@ export type User = typeof users.$inferSelect;
 export type Shop = typeof shops.$inferSelect;
 export type GreenCoffee = typeof greenCoffee.$inferSelect;
 export type RetailInventory = typeof retailInventory.$inferSelect;
+export type RetailInventoryHistory = typeof retailInventoryHistory.$inferSelect;
 export type Order = typeof orders.$inferSelect;
 export type RoastingBatch = typeof roastingBatches.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertShop = z.infer<typeof insertShopSchema>;
 export type InsertGreenCoffee = z.infer<typeof insertGreenCoffeeSchema>;
 export type InsertRetailInventory = z.infer<typeof insertRetailInventorySchema>;
+export type InsertRetailInventoryHistory = z.infer<typeof insertRetailInventoryHistorySchema>;
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type InsertRoastingBatch = z.infer<typeof insertRoastingBatchSchema>;
 export type InsertUserShop = z.infer<typeof insertUserShopSchema>;

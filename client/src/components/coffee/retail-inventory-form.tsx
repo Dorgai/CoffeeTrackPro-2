@@ -2,7 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { GreenCoffee } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 import {
   Form,
@@ -14,48 +14,76 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 
 // Define schema for retail inventory form
 const retailInventorySchema = z.object({
+  shopId: z.number(),
   greenCoffeeId: z.number(),
   smallBags: z.coerce.number().min(0, "Cannot be negative"),
   largeBags: z.coerce.number().min(0, "Cannot be negative"),
-  shopId: z.number().optional(),
+  notes: z.string().optional(),
 });
 
 type InventoryFormValues = z.infer<typeof retailInventorySchema>;
 
-export function RetailInventoryForm({
-  coffee,
-  currentInventory,
-  onSuccess,
-  onUpdate,
-}: {
-  coffee: GreenCoffee;
-  currentInventory?: {
-    smallBags: number;
-    largeBags: number;
-    id?: number;
-  };
+interface RetailInventoryFormProps {
+  shopId: number;
+  coffeeId: number;
+  currentSmallBags: number;
+  currentLargeBags: number;
+  coffeeName: string;
   onSuccess?: () => void;
-  onUpdate: (coffeeId: number, smallBags: number, largeBags: number) => void;
-}) {
+}
+
+export function RetailInventoryForm({
+  shopId,
+  coffeeId,
+  currentSmallBags,
+  currentLargeBags,
+  coffeeName,
+  onSuccess,
+}: RetailInventoryFormProps) {
   const { toast } = useToast();
 
   const form = useForm<InventoryFormValues>({
     resolver: zodResolver(retailInventorySchema),
     defaultValues: {
-      greenCoffeeId: coffee.id,
-      smallBags: currentInventory?.smallBags || 0,
-      largeBags: currentInventory?.largeBags || 0,
+      shopId,
+      greenCoffeeId: coffeeId,
+      smallBags: currentSmallBags,
+      largeBags: currentLargeBags,
+      notes: "",
     },
   });
 
+  const updateInventoryMutation = async (data: InventoryFormValues) => {
+    const response = await apiRequest("POST", "/api/retail-inventory", {
+      ...data,
+      updateType: "manual",
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || "Failed to update inventory");
+    }
+
+    return response.json();
+  };
+
   const onSubmit = form.handleSubmit(async (data) => {
     try {
-      await onUpdate(coffee.id, data.smallBags, data.largeBags);
+      await updateInventoryMutation(data);
+
+      // Invalidate queries to refresh data
+      await queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory/history"] });
+
+      toast({
+        title: "Success",
+        description: "Inventory updated successfully",
+      });
+
       if (onSuccess) onSuccess();
     } catch (error) {
       toast({
@@ -67,59 +95,65 @@ export function RetailInventoryForm({
   });
 
   return (
-    <>
-      <CardHeader>
-        <CardTitle>Update Inventory</CardTitle>
-        <CardDescription>
-          Update current inventory for {coffee.name}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={onSubmit} className="space-y-4">
-            <input type="hidden" name="greenCoffeeId" value={coffee.id} />
+    <Form {...form}>
+      <form onSubmit={onSubmit} className="space-y-4">
+        <h3 className="text-lg font-medium">{coffeeName}</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="smallBags"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Small Bags (200g)</FormLabel>
+                <FormControl>
+                  <Input type="number" min="0" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="smallBags"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Small Bags (200g)</FormLabel>
-                    <FormControl>
-                      <Input type="number" min="0" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+          <FormField
+            control={form.control}
+            name="largeBags"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Large Bags (1kg)</FormLabel>
+                <FormControl>
+                  <Input type="number" min="0" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
-              <FormField
-                control={form.control}
-                name="largeBags"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Large Bags (1kg)</FormLabel>
-                    <FormControl>
-                      <Input type="number" min="0" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+        <FormField
+          control={form.control}
+          name="notes"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Notes (optional)</FormLabel>
+              <FormControl>
+                <Textarea
+                  placeholder="Add any notes about this inventory update"
+                  className="resize-none"
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-            <Separator />
-
-            <Button 
-              type="submit" 
-              className="w-full"
-            >
-              Update Inventory
-            </Button>
-          </form>
-        </Form>
-      </CardContent>
-    </>
+        <Button 
+          type="submit" 
+          className="w-full"
+          disabled={form.formState.isSubmitting}
+        >
+          Update Inventory
+        </Button>
+      </form>
+    </Form>
   );
 }

@@ -837,7 +837,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           // Shop manager can only mark orders as delivered
           if (req.user?.role === "shopManager" && status !== "delivered") {
             return res.status(403).json({
-              message: "Shop managers can only mark orders as delivered"
+              message: "Shopmanagers can only mark orders as delivered"
             });
           }
 
