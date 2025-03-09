@@ -59,10 +59,15 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
 
       const res = await apiRequest("GET", url);
       if (!res.ok) {
-        throw new Error("Failed to fetch confirmations");
+        const error = await res.json();
+        throw new Error(error.message || "Failed to fetch confirmations");
       }
 
       const data = await res.json();
+      if (!Array.isArray(data)) {
+        console.error("Unexpected response format:", data);
+        return [];
+      }
       return data.filter((conf: DispatchConfirmation) => conf.status === "pending");
     },
     enabled: Boolean(user)
@@ -145,7 +150,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
     confirmMutation.mutate({
       confirmationId: selectedConfirmation.id,
       receivedSmallBags: receivedQuantities.smallBags,
-      receivedLargeBags: receivedQuantities.largeBags
+      receivedLargeBags: receivedQuantities.largeBags,
     });
   };
 
