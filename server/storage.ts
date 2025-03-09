@@ -889,9 +889,11 @@ export class DatabaseStorage {
         .where(eq(dispatchedCoffeeConfirmation.id, id))
         .returning();
 
-      console.log("Updated confirmation:", updatedConfirmation);
+      if (!updatedConfirmation) {
+        throw new Error("Failed to update confirmation");
+      }
 
-      // Now update the retail inventory
+      // Update the retail inventory
       await this.updateRetailInventory({
         shopId: existingConfirmation.shopId,
         greenCoffeeId: existingConfirmation.greenCoffeeId,

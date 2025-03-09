@@ -90,14 +90,12 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
       );
 
       if (!res.ok) {
-        const error = await res.json().catch(() => ({ message: "Failed to process confirmation" }));
+        const error = await res.json();
         console.error("Confirmation error response:", error);
-        throw new Error(error.message);
+        throw new Error(error.message || "Failed to process confirmation");
       }
 
-      const confirmation = await res.json();
-      console.log("Received confirmation response:", confirmation);
-      return confirmation;
+      return res.json();
     },
     onSuccess: () => {
       setSelectedConfirmation(null);
