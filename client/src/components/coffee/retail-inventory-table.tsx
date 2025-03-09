@@ -5,7 +5,7 @@ import { useActiveShop } from "@/hooks/use-active-shop";
 import { apiRequest } from "@/lib/queryClient";
 import { cn, formatDate } from "@/lib/utils";
 import { Loader2, Package, Edit } from "lucide-react";
-import { RetailInventoryFormDialog } from "./retail-inventory-form-dialog";
+import { RetailInventoryForm } from "./retail-inventory-form";
 import {
   Card,
   CardContent,
@@ -21,6 +21,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { StockStatus } from "./stock-status";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -184,24 +190,26 @@ export function RetailInventoryTable({ onEditSuccess }: Props) {
         </CardContent>
       </Card>
 
-      {selectedItem && (
-        <RetailInventoryFormDialog
-          open={isDialogOpen}
-          onOpenChange={(open) => {
-            setIsDialogOpen(open);
-            if (!open) setSelectedItem(null);
-          }}
-          shopId={activeShop.id}
-          coffeeId={selectedItem.coffeeId}
-          currentSmallBags={selectedItem.smallBags}
-          currentLargeBags={selectedItem.largeBags}
-          coffeeName={selectedItem.coffeeName}
-          onSuccess={() => {
-            setIsDialogOpen(false);
-            if (onEditSuccess) onEditSuccess();
-          }}
-        />
-      )}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Inventory</DialogTitle>
+          </DialogHeader>
+          {selectedItem && (
+            <RetailInventoryForm
+              shopId={activeShop.id}
+              coffeeId={selectedItem.coffeeId}
+              currentSmallBags={selectedItem.smallBags}
+              currentLargeBags={selectedItem.largeBags}
+              coffeeName={selectedItem.coffeeName}
+              onSuccess={() => {
+                setIsDialogOpen(false);
+                if (onEditSuccess) onEditSuccess();
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
