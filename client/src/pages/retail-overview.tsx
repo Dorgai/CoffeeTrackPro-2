@@ -107,7 +107,7 @@ export default function RetailOverview() {
     );
   }
 
-  // Group inventory by shop with less restrictive filtering
+  // Group inventory by shop
   const shopData = inventory.reduce<Record<number, {
     shopName: string;
     shopLocation: string;
@@ -121,8 +121,8 @@ export default function RetailOverview() {
       return acc;
     }
 
-    // For roasteryOwner and owner, show all shops
-    if (user?.role === "roasteryOwner" || user?.role === "owner" || userShops?.some(s => s.id === shopId)) {
+    // For roasteryOwner, show all shops
+    if (user?.role === "roasteryOwner" || userShops?.some(s => s.id === shopId)) {
       if (!acc[shopId]) {
         acc[shopId] = {
           shopName,

@@ -1,8 +1,8 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { GreenCoffee } from "@shared/schema";
 import { Loader2, PackagePlus } from "lucide-react";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useActiveShop } from "@/hooks/use-active-shop";
@@ -97,6 +97,7 @@ export default function Retail() {
               <div key={coffee.id} className="mb-4">
                 <OrderForm
                   coffee={coffee}
+                  availableBags={{ smallBags: 0, largeBags: 0 }}
                   onSuccess={() => setIsOrderDialogOpen(false)}
                 />
               </div>
