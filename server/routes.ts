@@ -843,7 +843,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       // Verify shop access
       if (!await checkShopAccess(req.user!.id, shopId)) {
-        return        return res.status(403).json({ message: "User does not have access to this shop" });
+        return res.status(403).json({ message: "User does not have access to this shop" });
       }
 
       let query = db
