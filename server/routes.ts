@@ -59,8 +59,8 @@ function requireShopAccess(allowedRoles: string[]) {
       params: req.params
     });
 
-    // Admin roles (owner, roasteryOwner, retailOwner) always have access
-    if (["owner", "roasteryOwner", "retailOwner"].includes(req.user.role)) {
+    // Admin roles (owner, roasteryOwner) always have access
+    if (["owner", "roasteryOwner"].includes(req.user.role)) {
       console.log("Granting full access for admin role:", req.user.role);
       return next();
     }
@@ -102,14 +102,21 @@ async function checkShopAccess(userId: number, shopId: number): Promise<boolean>
     }
 
     // Admin roles always have access
-    if (["owner", "roasteryOwner", "retailOwner"].includes(user.role)) {
+    if (["owner", "roasteryOwner"].includes(user.role)) {
       console.log("Full access granted for admin role:", user.role);
       return true;
     }
 
     // For other roles, check userShops table
     const userShops = await storage.getUserShops(userId);
-    return userShops.some(shop => shop.id === shopId);
+    const hasAccess = userShops.some(shop => shop.id === shopId);
+    console.log("Shop access check result:", {
+      userId,
+      shopId,
+      hasAccess,
+      assignedShops: userShops.length
+    });
+    return hasAccess;
   } catch (error) {
     console.error("Error checking shop access:", error);
     return false;
@@ -318,14 +325,12 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       let shops;
       // For admin roles (roasteryOwner, owner, retailOwner), return all active shops
-      if (["roasteryOwner", "owner", "retailOwner"].includes(req.user.role)) {
+      if (["roasteryOwner", "owner"].includes(req.user.role)) {
         console.log("Fetching all shops for admin role");
         shops = await storage.getShops();
-        console.log("Found total shops:", shops.length);
       } else {
         console.log("Fetching assigned shops for non-admin user");
         shops = await storage.getUserShops(req.user.id);
-        console.log("Found assigned shops:", shops.length);
       }
 
       // Filter to only active shops and sort by name
@@ -350,7 +355,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       const shopId = parseInt(req.params.id);
 
       // For non-roasteryOwner users, verify shop access
-      if (req.user?.role !== "roasteryOwner" && req.user?.role !== "owner" && req.user?.role !== "retailOwner") {
+      if (req.user?.role !== "roasteryOwner" && req.user?.role !== "owner") {
         const hasAccess = await checkShopAccess(req.user!.id, shopId);
         if (!hasAccess) {
           return res.status(403).json({ message: "User does not have access to this shop" });
@@ -372,7 +377,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.get("/api/shops", requireShopAccess(["shopManager", "barista"]), async (req, res) => {
     try {
       let shops;
-      if (req.user?.role === "roasteryOwner" || req.user?.role === "owner" || req.user?.role === "retailOwner") {
+      if (req.user?.role === "roasteryOwner" || req.user?.role === "owner") {
         shops = await storage.getShops();
       } else {
         shops = await storage.getUserShops(req.user!.id);
@@ -838,7 +843,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       // Verify shop access
       if (!await checkShopAccess(req.user!.id, shopId)) {
-        return res.status(403).json({ message: "User does not have access to this shop" });
+        return        return res.status(403).json({ message: "User does not have access to this shop" });
       }
 
       let query = db

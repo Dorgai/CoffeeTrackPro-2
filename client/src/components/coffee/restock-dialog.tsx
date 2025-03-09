@@ -102,6 +102,21 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
     });
   };
 
+  const sortedCoffees = coffees?.slice().sort((a, b) => {
+    const aInventory = currentInventory?.find(inv => inv.greenCoffeeId === a.id);
+    const bInventory = currentInventory?.find(inv => inv.greenCoffeeId === b.id);
+
+    const aTotal = (aInventory?.smallBags || 0) + (aInventory?.largeBags || 0);
+    const bTotal = (bInventory?.smallBags || 0) + (bInventory?.largeBags || 0);
+
+    // First sort by whether there's any stock
+    if (aTotal > 0 && bTotal === 0) return -1;
+    if (aTotal === 0 && bTotal > 0) return 1;
+
+    // Then sort by total stock in descending order
+    return bTotal - aTotal;
+  });
+
   const isLoading = loadingCoffees || loadingInventory;
 
   return (
@@ -140,7 +155,7 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {coffees?.map((coffee) => {
+                  {sortedCoffees?.map((coffee) => {
                     const currentStock = currentInventory?.find(inv => inv.greenCoffeeId === coffee.id);
                     return (
                       <TableRow key={coffee.id}>

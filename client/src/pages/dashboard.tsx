@@ -700,39 +700,66 @@ export default function Dashboard() {
             <CardDescription>Overall performance data</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {!selectedShopId ? (
-                <p className="text-center text-muted-foreground">Please select a shop to view inventory</p>
-              ) : !retailInventory?.length ? (
-                <p className="text-center text-muted-foreground">No inventory data available for selected shop</p>
-              ) : (
-                <div key={selectedShopId} className="space-y-4">
-                  {allShops?.map(shop => {
-                    const shopInventory = allInventory?.filter(inv => inv.shopId === shop.id) || [];
-                    const totalItems = shopInventory.length;
-                    const healthyItems = shopInventory.filter(item =>
-                      (item.smallBags || 0) >= (shop.desiredSmallBags || 20) / 2 &&
-                      (item.largeBags || 0) >= (shop.desiredLargeBags || 10) / 2
-                    ).length;
+            {!allShops?.length ? (
+              <div className="text-center text-muted-foreground py-8">
+                No shops available
+              </div>
+            ) : (
+              <div className="space-y-8">
+                {allShops.map(shop => {
+                  const shopInventory = allInventory?.filter(inv => inv.shopId === shop.id) || [];
+                  const totalItems = shopInventory.length;
+                  const healthyItems = shopInventory.filter(item =>
+                    (item.smallBags || 0) >= (shop.desiredSmallBags || 20) / 2 &&
+                    (item.largeBags || 0) >= (shop.desiredLargeBags || 10) / 2
+                  ).length;
 
-                    return (
-                      <div key={shop.id} className="mb-6 last:mb-0">
-                        <div className="flex items-center justify-between mb-2">
-                          <h3 className="font-medium">{shop.name}</h3>
+                  return (
+                    <div key={shop.id}>
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h3 className="text-lg font-medium">{shop.name}</h3>
+                          <p className="text-sm text-muted-foreground">{shop.location}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
                           <Badge variant={healthyItems < totalItems ? "destructive" : "outline"}>
                             {healthyItems < totalItems ? `${totalItems - healthyItems} Low Stock` : "Stock OK"}
                           </Badge>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedShopId(shop.id);
+                              setIsRestockOpen(true);
+                            }}
+                          >
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Restock
+                          </Button>
                         </div>
-                        <StockProgress
-                          current={healthyItems}
-                          desired={totalItems}
-                          label="Stock Health"
-                        />
+                      </div>
+
+                      <StockProgress
+                        current={healthyItems}
+                        desired={totalItems}
+                        label="Overall Stock Health"
+                      />
+
+                      <div className="mt-4 space-y-4">
                         {shopInventory.map(inv => {
                           const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
+                          if (!coffee) return null;
+
                           return (
-                            <div key={`${shop.id}-${inv.greenCoffeeId}`} className="mt-4 p-2 bg-muted rounded">
-                              <div className="text-sm font-medium mb-2">{coffee?.name}</div>
+                            <div key={`${shop.id}-${inv.greenCoffeeId}`} className="p-4 bg-muted rounded-lg">
+                              <div className="flex justify-between items-start mb-2">
+                                <div>
+                                  <div className="font-medium">{coffee.name}</div>
+                                  <div className="text-sm text-muted-foreground">
+                                    Producer: {coffee.producer}
+                                  </div>
+                                </div>
+                              </div>
                               <div className="space-y-2">
                                 <StockProgress
                                   current={inv.smallBags || 0}
@@ -749,11 +776,11 @@ export default function Dashboard() {
                           );
                         })}
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -774,32 +801,40 @@ export default function Dashboard() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {allOrders?.slice(0, 5).map(order => {
-                  const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
-                  const orderShop = allShops?.find(s => s.id === order.shopId);
-                  return (
-                    <TableRow key={order.id}>
-                      <TableCell>{orderShop?.name}</TableCell>
-                      <TableCell>{coffee?.name}</TableCell>
-                      <TableCell>
-                        {order.smallBags > 0 && `${order.smallBags} small`}
-                        {order.smallBags > 0 && order.largeBags > 0 && ', '}
-                        {order.largeBags > 0 && `${order.largeBags} large`}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={
-                          order.status === 'pending' ? 'outline' :
-                          order.status === 'roasted' ? 'secondary' :
-                          order.status === 'dispatched' ? 'default' :
-                          'default'
-                        }>
-                          {order.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{formatDate(order.createdAt)}</TableCell>
-                    </TableRow>
-                  );
-                })}
+                {!allOrders?.length ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                      No recent orders found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  allOrders.slice(0, 5).map(order => {
+                    const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
+                    const orderShop = allShops?.find(s => s.id === order.shopId);
+                    return (
+                      <TableRow key={order.id}>
+                        <TableCell>{orderShop?.name}</TableCell>
+                        <TableCell>{coffee?.name}</TableCell>
+                        <TableCell>
+                          {order.smallBags > 0 && `${order.smallBags} small`}
+                          {order.smallBags > 0 && order.largeBags > 0 && ', '}
+                          {order.largeBags > 0 && `${order.largeBags} large`}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={
+                            order.status === 'pending' ? 'outline' :
+                            order.status === 'roasted' ? 'secondary' :
+                            order.status === 'dispatched' ? 'default' :
+                            'default'
+                          }>
+                            {order.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{formatDate(order.createdAt)}</TableCell>
+                      </TableRow>
+                    )
+                  })
+                )}
               </TableBody>
             </Table>
             <div className="mt-4 flex justify-end">
