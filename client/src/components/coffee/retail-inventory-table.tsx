@@ -195,12 +195,12 @@ export function RetailInventoryTable({ onEditSuccess }: Props) {
         </CardContent>
       </Card>
 
-      {selectedItem && (
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Update Inventory</DialogTitle>
-            </DialogHeader>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Update Inventory</DialogTitle>
+          </DialogHeader>
+          {selectedItem && (
             <RetailInventoryForm
               shopId={activeShop.id}
               coffeeId={selectedItem.coffeeId}
@@ -209,9 +209,9 @@ export function RetailInventoryTable({ onEditSuccess }: Props) {
               coffeeName={selectedItem.coffeeName}
               onSuccess={handleUpdateSuccess}
             />
-          </DialogContent>
-        </Dialog>
-      )}
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
