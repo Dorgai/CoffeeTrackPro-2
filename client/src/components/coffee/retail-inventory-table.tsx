@@ -25,6 +25,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { StockStatus } from "./stock-status";
@@ -168,9 +169,11 @@ export function RetailInventoryTable() {
                 {canEditInventory && (
                   <TableCell>
                     <Dialog>
-                      <Button variant="ghost" size="icon" asChild>
-                        <Edit className="h-4 w-4" />
-                      </Button>
+                      <DialogTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
                           <DialogTitle>Update Inventory</DialogTitle>
