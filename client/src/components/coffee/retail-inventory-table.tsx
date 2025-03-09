@@ -5,7 +5,6 @@ import { useActiveShop } from "@/hooks/use-active-shop";
 import { apiRequest } from "@/lib/queryClient";
 import { cn, formatDate } from "@/lib/utils";
 import { Loader2, Package, Edit } from "lucide-react";
-import { RetailInventoryFormDialog } from "./retail-inventory-form-dialog";
 import {
   Card,
   CardContent,
@@ -25,6 +24,13 @@ import { Button } from "@/components/ui/button";
 import { StockStatus } from "./stock-status";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { RetailInventoryForm } from "./retail-inventory-form";
 
 interface Props {
   onEditSuccess?: () => void;
@@ -52,7 +58,7 @@ export function RetailInventoryTable({ onEditSuccess }: Props) {
   const { user } = useAuth();
   const { activeShop } = useActiveShop();
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [open, setOpen] = useState(false);
 
   const canEditInventory = ["owner", "shopManager", "retailOwner", "barista"].includes(user?.role || "");
 
@@ -170,7 +176,7 @@ export function RetailInventoryTable({ onEditSuccess }: Props) {
                         size="icon"
                         onClick={() => {
                           setSelectedItem(item);
-                          setIsDialogOpen(true);
+                          setOpen(true);
                         }}
                       >
                         <Edit className="h-4 w-4" />
@@ -184,21 +190,26 @@ export function RetailInventoryTable({ onEditSuccess }: Props) {
         </CardContent>
       </Card>
 
-      {selectedItem && (
-        <RetailInventoryFormDialog
-          open={isDialogOpen}
-          onOpenChange={setIsDialogOpen}
-          shopId={activeShop.id}
-          coffeeId={selectedItem.coffeeId}
-          coffeeName={selectedItem.coffeeName}
-          currentSmallBags={selectedItem.smallBags}
-          currentLargeBags={selectedItem.largeBags}
-          onSuccess={() => {
-            setIsDialogOpen(false);
-            if (onEditSuccess) onEditSuccess();
-          }}
-        />
-      )}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Update Inventory</DialogTitle>
+          </DialogHeader>
+          {selectedItem && (
+            <RetailInventoryForm
+              shopId={activeShop.id}
+              coffeeId={selectedItem.coffeeId}
+              coffeeName={selectedItem.coffeeName}
+              currentSmallBags={selectedItem.smallBags}
+              currentLargeBags={selectedItem.largeBags}
+              onSuccess={() => {
+                setOpen(false);
+                if (onEditSuccess) onEditSuccess();
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
