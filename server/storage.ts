@@ -779,19 +779,19 @@ export class DatabaseStorage {
             VALUES (
               ${currentOrder.shopId},
               ${currentOrder.greenCoffeeId},
-              COALESCE(${data.smallBags}, ${currentOrder.smallBags}),
-              COALESCE(${data.largeBags}, ${currentOrder.largeBags}),
+              ${Number(data.smallBags || currentOrder.smallBags)},
+              ${Number(data.largeBags || currentOrder.largeBags)},
               ${data.updatedById},
               NOW(),
               'dispatch'
             )
             ON CONFLICT (shop_id, green_coffee_id)
             DO UPDATE SET
-              small_bags = retail_inventory.small_bags + EXCLUDED.small_bags,
-              large_bags = retail_inventory.large_bags + EXCLUDED.large_bags,
-              updated_by_id = EXCLUDED.updated_by_id,
-              updated_at = EXCLUDED.updated_at,
-              update_type = EXCLUDED.update_type;
+              small_bags = COALESCE(retail_inventory.small_bags, 0) + ${Number(data.smallBags || currentOrder.smallBags)},
+              large_bags = COALESCE(retail_inventory.large_bags, 0) + ${Number(data.largeBags || currentOrder.largeBags)},
+              updated_by_id = ${data.updatedById},
+              updated_at = NOW(),
+              update_type = 'dispatch';
           `;
 
           await tx.execute(query);
