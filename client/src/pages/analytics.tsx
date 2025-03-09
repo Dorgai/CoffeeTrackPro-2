@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { DateRange } from "react-day-picker";
-import { addDays, format, subDays, startOfDay } from "date-fns";
+import { addDays, format, subDays, startOfDay, endOfMonth, startOfMonth, subMonths } from "date-fns";
 
 import {
   Card,
@@ -41,14 +41,55 @@ import {
 
 type DatePreset = {
   label: string;
-  days: number;
+  getDates: () => { from: Date; to: Date };
 };
 
 const datePresets: DatePreset[] = [
-  { label: "Last 7 Days", days: 7 },
-  { label: "Last 14 Days", days: 14 },
-  { label: "Last 30 Days", days: 30 },
-  { label: "Last 90 Days", days: 90 },
+  { 
+    label: "Last 7 Days", 
+    getDates: () => ({ 
+      from: subDays(new Date(), 7), 
+      to: new Date() 
+    })
+  },
+  { 
+    label: "Last 14 Days", 
+    getDates: () => ({ 
+      from: subDays(new Date(), 14), 
+      to: new Date() 
+    })
+  },
+  { 
+    label: "Last 30 Days", 
+    getDates: () => ({ 
+      from: subDays(new Date(), 30), 
+      to: new Date() 
+    })
+  },
+  { 
+    label: "Last 90 Days", 
+    getDates: () => ({ 
+      from: subDays(new Date(), 90), 
+      to: new Date() 
+    })
+  },
+  {
+    label: "This Month",
+    getDates: () => ({
+      from: startOfMonth(new Date()),
+      to: endOfMonth(new Date())
+    })
+  },
+  {
+    label: "Last Month",
+    getDates: () => {
+      const lastMonth = subMonths(new Date(), 1);
+      return {
+        from: startOfMonth(lastMonth),
+        to: endOfMonth(lastMonth)
+      };
+    }
+  }
 ];
 
 export default function Analytics() {
@@ -60,10 +101,10 @@ export default function Analytics() {
   const [showSmallBags, setShowSmallBags] = useState(true);
   const [showLargeBags, setShowLargeBags] = useState(true);
 
-  const handlePresetClick = (days: number) => {
-    const to = new Date();
-    const from = subDays(to, days);
-    setDateRange({ from, to });
+  const handlePresetClick = (preset: DatePreset) => {
+    const range = preset.getDates();
+    console.log("Setting date range:", range);
+    setDateRange(range);
   };
 
   // Fetch orders data
@@ -73,6 +114,8 @@ export default function Analytics() {
       const fromDate = dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : "";
       const toDate = dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : "";
 
+      console.log("Fetching orders with date range:", { fromDate, toDate });
+
       const res = await apiRequest(
         "GET", 
         `/api/orders?from=${fromDate}&to=${toDate}`
@@ -80,9 +123,11 @@ export default function Analytics() {
       if (!res.ok) {
         throw new Error("Failed to fetch orders");
       }
-      return res.json();
+      const data = await res.json();
+      console.log("Received orders data:", data);
+      return data;
     },
-    enabled: !!dateRange?.from && !!dateRange?.to,
+    enabled: Boolean(dateRange?.from && dateRange?.to),
   });
 
   if (isLoading) {
@@ -95,7 +140,7 @@ export default function Analytics() {
 
   // Filter and group orders by shop and date
   const groupedOrders = orders?.reduce((acc: any, order: any) => {
-    const shopName = order.shop?.name || 'Unassigned';
+    const shopName = order.shopName || 'Unassigned';
     const dateKey = format(new Date(order.createdAt), "yyyy-MM-dd");
 
     if (!acc[shopName]) {
@@ -125,6 +170,8 @@ export default function Analytics() {
 
     return acc;
   }, {});
+
+  console.log("Grouped orders:", groupedOrders);
 
   // Prepare data for the charts
   const shopData = Object.entries(groupedOrders || {}).map(([shop, data]: [string, any]) => ({
@@ -168,9 +215,9 @@ export default function Analytics() {
                 <div className="flex flex-wrap gap-2">
                   {datePresets.map((preset) => (
                     <Button
-                      key={preset.days}
+                      key={preset.label}
                       variant="outline"
-                      onClick={() => handlePresetClick(preset.days)}
+                      onClick={() => handlePresetClick(preset)}
                     >
                       {preset.label}
                     </Button>

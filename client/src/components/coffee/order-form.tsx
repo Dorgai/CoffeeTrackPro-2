@@ -18,7 +18,6 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Loader2 } from "lucide-react";
 
@@ -103,77 +102,76 @@ export function OrderForm({
     }
   });
 
-  if (!activeShop) {
-    return (
-      <div className="text-muted-foreground text-center py-4">
-        Please select a shop to place orders
-      </div>
-    );
-  }
-
   return (
-    <Card>
-      <CardContent className="pt-6">
-        <div className="font-medium mb-4">{coffee.name}</div>
-        <Form {...form}>
-          <form onSubmit={onSubmit} className="space-y-4">
-            <input type="hidden" name="greenCoffeeId" value={coffee.id} />
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-lg font-medium">{coffee.name}</h3>
+        <div className="text-sm text-muted-foreground">
+          <p>Producer: {coffee.producer}</p>
+          <p>Grade: {coffee.grade}</p>
+        </div>
+      </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="smallBags"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex justify-between">
-                      <span>Small Bags (200g)</span>
-                      <span className="text-muted-foreground">
-                        Current stock: {availableBags.smallBags}
-                      </span>
-                    </FormLabel>
-                    <FormControl>
-                      <Input type="number" min="0" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+      <Form {...form}>
+        <form onSubmit={onSubmit}>
+          <input type="hidden" name="greenCoffeeId" value={coffee.id} />
 
-              <FormField
-                control={form.control}
-                name="largeBags"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex justify-between">
-                      <span>Large Bags (1kg)</span>
-                      <span className="text-muted-foreground">
-                        Current stock: {availableBags.largeBags}
-                      </span>
-                    </FormLabel>
-                    <FormControl>
-                      <Input type="number" min="0" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <FormField
+              control={form.control}
+              name="smallBags"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Small Bags (200g)</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="number" 
+                      min="0" 
+                      {...field} 
+                      className="text-right" 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-            <Separator />
+            <FormField
+              control={form.control}
+              name="largeBags"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Large Bags (1kg)</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="number" 
+                      min="0" 
+                      {...field} 
+                      className="text-right" 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
 
-            <Button 
-              type="submit" 
-              className="w-full"
-              disabled={createOrderMutation.isPending}
-            >
-              {createOrderMutation.isPending ? (
+          <Button 
+            type="submit" 
+            className="w-full"
+            disabled={createOrderMutation.isPending}
+          >
+            {createOrderMutation.isPending ? (
+              <>
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : null}
-              Place Order
-            </Button>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+                Placing Order...
+              </>
+            ) : (
+              "Place Order"
+            )}
+          </Button>
+        </form>
+      </Form>
+    </div>
   );
 }
