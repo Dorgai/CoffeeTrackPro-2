@@ -32,10 +32,9 @@ export function ShopAssignmentDialog({
   onSuccess
 }: Props) {
   const { toast } = useToast();
-  const [selectedShops, setSelectedShops] = useState<number[]>([]);
 
   // Fetch all active shops
-  const { data: shops = [], isLoading: loadingShops } = useQuery<Shop[]>({
+  const { data: allShops = [], isLoading: loadingShops } = useQuery<Shop[]>({
     queryKey: ["/api/shops"],
     enabled: open,
   });
@@ -81,10 +80,10 @@ export function ShopAssignmentDialog({
     },
   });
 
-  // Handle save
-  const handleSave = () => {
-    assignShops.mutate(selectedShops);
-  };
+  // Get unassigned shops
+  const unassignedShops = allShops.filter(
+    shop => shop.isActive && !userShops.some(us => us.id === shop.id)
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -97,79 +96,72 @@ export function ShopAssignmentDialog({
         </DialogHeader>
 
         {(loadingShops || loadingUserShops) ? (
-          <div className="flex justify-center py-6 flex-1">
+          <div className="flex items-center justify-center flex-1">
             <Loader2 className="h-8 w-8 animate-spin" />
           </div>
         ) : (
-          <div className="space-y-4 pt-4 flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden space-y-6 py-4">
+            {/* Current Assignments */}
             <div className="space-y-2">
-              <h4 className="text-sm font-medium">Current Assignments</h4>
-              <ScrollArea className="h-[200px] rounded-md border">
-                {userShops.length > 0 ? (
-                  <div className="space-y-2 p-4">
-                    {userShops.map((shop) => (
-                      <div
-                        key={shop.id}
-                        className="flex items-center justify-between bg-muted p-2 rounded"
-                      >
-                        <div>
-                          <span className="font-medium">{shop.name}</span>
-                          <div className="text-xs text-muted-foreground">
-                            {shop.location}
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            const updatedShopIds = userShops
-                              .filter((s) => s.id !== shop.id)
-                              .map((s) => s.id);
-                            assignShops.mutate(updatedShopIds);
-                          }}
+              <h4 className="text-sm font-medium mb-2">Current Assignments</h4>
+              <ScrollArea className="h-[200px] border rounded-md">
+                <div className="p-4">
+                  {userShops.length > 0 ? (
+                    <div className="space-y-2">
+                      {userShops.map((shop) => (
+                        <div
+                          key={shop.id}
+                          className="flex items-center justify-between bg-muted/50 p-3 rounded-lg"
                         >
-                          Remove
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="p-4 text-sm text-muted-foreground">
-                    No shops currently assigned
-                  </div>
-                )}
+                          <div>
+                            <div className="font-medium">{shop.name}</div>
+                            <div className="text-sm text-muted-foreground">{shop.location}</div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const updatedShopIds = userShops
+                                .filter((s) => s.id !== shop.id)
+                                .map((s) => s.id);
+                              assignShops.mutate(updatedShopIds);
+                            }}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground text-center py-4">
+                      No shops currently assigned
+                    </div>
+                  )}
+                </div>
               </ScrollArea>
             </div>
 
+            {/* Available Shops */}
             <div className="space-y-2">
-              <h4 className="text-sm font-medium">Available Shops</h4>
-              <ScrollArea className="h-[200px] rounded-md border">
-                {shops.length ? (
-                  <div className="space-y-2 p-4">
-                    {shops
-                      .filter((shop) =>
-                        shop.isActive &&
-                        !userShops.some((us) => us.id === shop.id)
-                      )
-                      .map((shop) => (
+              <h4 className="text-sm font-medium mb-2">Available Shops</h4>
+              <ScrollArea className="h-[200px] border rounded-md">
+                <div className="p-4">
+                  {unassignedShops.length > 0 ? (
+                    <div className="space-y-2">
+                      {unassignedShops.map((shop) => (
                         <div
                           key={shop.id}
-                          className="flex items-center justify-between p-2 border rounded"
+                          className="flex items-center justify-between border p-3 rounded-lg"
                         >
                           <div>
-                            <span className="font-medium">{shop.name}</span>
-                            <div className="text-xs text-muted-foreground">
-                              {shop.location}
-                            </div>
+                            <div className="font-medium">{shop.name}</div>
+                            <div className="text-sm text-muted-foreground">{shop.location}</div>
                           </div>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                              const newShopIds = [
-                                ...userShops.map((s) => s.id),
-                                shop.id
-                              ];
+                              const newShopIds = [...userShops.map(s => s.id), shop.id];
                               assignShops.mutate(newShopIds);
                             }}
                           >
@@ -177,12 +169,13 @@ export function ShopAssignmentDialog({
                           </Button>
                         </div>
                       ))}
-                  </div>
-                ) : (
-                  <div className="p-4 text-sm text-muted-foreground">
-                    No shops available
-                  </div>
-                )}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground text-center py-4">
+                      No shops available for assignment
+                    </div>
+                  )}
+                </div>
               </ScrollArea>
             </div>
           </div>
@@ -190,7 +183,7 @@ export function ShopAssignmentDialog({
 
         <DialogFooter className="flex-shrink-0 mt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            Close
           </Button>
         </DialogFooter>
       </DialogContent>
