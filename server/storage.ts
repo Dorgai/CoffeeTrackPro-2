@@ -514,20 +514,21 @@ export class DatabaseStorage {
     try {
       console.log("Updating retail inventory with data:", data);
 
-      // First verify if shop and coffee exist and are active
+      // First verify if shop exists and is active
       const [shop] = await db
         .select()
         .from(shops)
-        .where(and(eq(shops.id, data.shopId), eq(shops.is_active, true)));
+        .where(and(eq(shops.id, data.shopId), eq(shops.isActive, true)));
 
       if (!shop) {
         throw new Error(`Shop ${data.shopId} not found or inactive`);
       }
 
+      // Verify if coffee exists
       const [coffee] = await db
         .select()
         .from(greenCoffee)
-        .where(and(eq(greenCoffee.id, data.greenCoffeeId), eq(greenCoffee.is_active, true)));
+        .where(and(eq(greenCoffee.id, data.greenCoffeeId), eq(greenCoffee.isActive, true)));
 
       if (!coffee) {
         throw new Error(`Coffee ${data.greenCoffeeId} not found or inactive`);
@@ -553,10 +554,10 @@ export class DatabaseStorage {
         )
         ON CONFLICT (shop_id, green_coffee_id)
         DO UPDATE SET
-          small_bags = EXCLUDED.small_bags,
-          large_bags = EXCLUDED.large_bags,
-          updated_by_id = EXCLUDED.updated_by_id,
-          updated_at = EXCLUDED.updated_at
+          small_bags = ${data.smallBags},
+          large_bags = ${data.largeBags},
+          updated_by_id = ${data.updatedById},
+          updated_at = NOW()
         RETURNING 
           id,
           shop_id as "shopId",
@@ -859,10 +860,7 @@ export class DatabaseStorage {
     }
   ): Promise<DispatchedCoffeeConfirmation> {
     try {
-      console.log("Starting dispatch confirmation process:", {
-        confirmationId: id,
-        data
-      });
+      console.log("Starting dispatch confirmation process for id:", id, "with data:", data);
 
       // First check if confirmation exists and is pending
       const [existingConfirmation] = await db
@@ -886,16 +884,22 @@ export class DatabaseStorage {
           receivedLargeBags: data.receivedLargeBags,
           confirmedById: data.confirmedById,
           status: "confirmed" as const,
-          confirmedAt: new Date()
+          confirmedAt: new Date().toISOString()
         })
         .where(eq(dispatchedCoffeeConfirmation.id, id))
         .returning();
 
-      if (!updatedConfirmation) {
-        throw new Error("Failed to update confirmation record");
-      }
+      console.log("Updated confirmation:", updatedConfirmation);
 
-      console.log("Successfully updated confirmation:", updatedConfirmation);
+      // Now update the retail inventory
+      await this.updateRetailInventory({
+        shopId: existingConfirmation.shopId,
+        greenCoffeeId: existingConfirmation.greenCoffeeId,
+        smallBags: data.receivedSmallBags,
+        largeBags: data.receivedLargeBags,
+        updatedById: data.confirmedById
+      });
+
       return updatedConfirmation;
     } catch (error) {
       console.error("Error in confirmDispatchedCoffee:", error);
