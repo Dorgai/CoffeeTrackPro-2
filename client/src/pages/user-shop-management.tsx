@@ -14,7 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type Assignment = {
   userId: number;
@@ -34,6 +34,10 @@ export default function UserShopManagement() {
   const { data: shops = [], isLoading: loadingShops } = useQuery<Shop[]>({
     queryKey: ["/api/shops"],
   });
+
+  // Separate active and inactive users
+  const activeUsers = users.filter(user => user.isActive);
+  const inactiveUsers = users.filter(user => !user.isActive);
 
   // Update assignments mutation
   const updateAssignments = useMutation({
@@ -91,6 +95,52 @@ export default function UserShopManagement() {
     updateAssignments.mutate(newAssignments);
   };
 
+  // Render assignment table for a given set of users
+  const renderUserTable = (userList: User[]) => (
+    <div className="border rounded-lg overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>User</TableHead>
+            {shops
+              .filter(shop => shop.isActive)
+              .map(shop => (
+                <TableHead key={shop.id} className="text-center">
+                  {shop.name}
+                  <div className="text-xs text-muted-foreground">{shop.location}</div>
+                </TableHead>
+              ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {userList.map(user => (
+            <TableRow key={user.id}>
+              <TableCell>
+                <div>
+                  <div className="font-medium">{user.username}</div>
+                  <Badge variant="outline" className="mt-1">
+                    {user.role}
+                  </Badge>
+                </div>
+              </TableCell>
+              {shops
+                .filter(shop => shop.isActive)
+                .map(shop => (
+                  <TableCell key={shop.id} className="text-center">
+                    <Checkbox
+                      checked={user.role === "roasteryOwner" || isAssigned(user.id, shop.id)}
+                      disabled={user.role === "roasteryOwner"}
+                      onCheckedChange={() => toggleAssignment(user.id, shop.id)}
+                    />
+                  </TableCell>
+                ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+
   if (loadingUsers || loadingShops) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -108,48 +158,18 @@ export default function UserShopManagement() {
         </p>
       </div>
 
-      <div className="border rounded-lg overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>User</TableHead>
-              {shops
-                .filter(shop => shop.isActive)
-                .map(shop => (
-                  <TableHead key={shop.id} className="text-center">
-                    {shop.name}
-                    <div className="text-xs text-muted-foreground">{shop.location}</div>
-                  </TableHead>
-                ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {users.map(user => (
-              <TableRow key={user.id}>
-                <TableCell>
-                  <div>
-                    <div className="font-medium">{user.username}</div>
-                    <Badge variant="outline" className="mt-1">
-                      {user.role}
-                    </Badge>
-                  </div>
-                </TableCell>
-                {shops
-                  .filter(shop => shop.isActive)
-                  .map(shop => (
-                    <TableCell key={shop.id} className="text-center">
-                      <Checkbox
-                        checked={user.role === "roasteryOwner" || isAssigned(user.id, shop.id)}
-                        disabled={user.role === "roasteryOwner"}
-                        onCheckedChange={() => toggleAssignment(user.id, shop.id)}
-                      />
-                    </TableCell>
-                  ))}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      <Tabs defaultValue="active" className="w-full">
+        <TabsList>
+          <TabsTrigger value="active">Active Users ({activeUsers.length})</TabsTrigger>
+          <TabsTrigger value="inactive">Inactive Users ({inactiveUsers.length})</TabsTrigger>
+        </TabsList>
+        <TabsContent value="active" className="mt-6">
+          {renderUserTable(activeUsers)}
+        </TabsContent>
+        <TabsContent value="inactive" className="mt-6">
+          {renderUserTable(inactiveUsers)}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
