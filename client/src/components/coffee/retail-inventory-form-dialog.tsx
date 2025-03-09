@@ -2,7 +2,7 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { RetailInventoryForm } from "./retail-inventory-form";
 
@@ -31,7 +31,7 @@ export function RetailInventoryFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Update Inventory</DialogTitle>
+          <DialogTitle>Update Inventory for {coffeeName}</DialogTitle>
         </DialogHeader>
         <RetailInventoryForm
           shopId={shopId}

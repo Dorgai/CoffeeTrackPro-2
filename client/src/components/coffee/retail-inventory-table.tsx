@@ -5,6 +5,7 @@ import { useActiveShop } from "@/hooks/use-active-shop";
 import { apiRequest } from "@/lib/queryClient";
 import { cn, formatDate } from "@/lib/utils";
 import { Loader2, Package, Edit } from "lucide-react";
+import { RetailInventoryFormDialog } from "./retail-inventory-form-dialog";
 import {
   Card,
   CardContent,
@@ -24,13 +25,6 @@ import { Button } from "@/components/ui/button";
 import { StockStatus } from "./stock-status";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { RetailInventoryForm } from "./retail-inventory-form";
 
 interface Props {
   onEditSuccess?: () => void;
@@ -190,26 +184,21 @@ export function RetailInventoryTable({ onEditSuccess }: Props) {
         </CardContent>
       </Card>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Update Inventory</DialogTitle>
-          </DialogHeader>
-          {selectedItem && (
-            <RetailInventoryForm
-              shopId={activeShop.id}
-              coffeeId={selectedItem.coffeeId}
-              coffeeName={selectedItem.coffeeName}
-              currentSmallBags={selectedItem.smallBags}
-              currentLargeBags={selectedItem.largeBags}
-              onSuccess={() => {
-                setOpen(false);
-                if (onEditSuccess) onEditSuccess();
-              }}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      {selectedItem && (
+        <RetailInventoryFormDialog
+          open={open}
+          onOpenChange={setOpen}
+          shopId={activeShop.id}
+          coffeeId={selectedItem.coffeeId}
+          coffeeName={selectedItem.coffeeName}
+          currentSmallBags={selectedItem.smallBags}
+          currentLargeBags={selectedItem.largeBags}
+          onSuccess={() => {
+            setOpen(false);
+            if (onEditSuccess) onEditSuccess();
+          }}
+        />
+      )}
     </div>
   );
 }
