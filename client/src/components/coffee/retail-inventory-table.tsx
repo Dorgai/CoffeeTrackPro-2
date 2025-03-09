@@ -26,7 +26,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
+  DialogPortal,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { StockStatus } from "./stock-status";
@@ -60,11 +60,13 @@ export function RetailInventoryTable() {
   // Check if user can edit inventory
   const canEditInventory = ["owner", "shopManager", "retailOwner", "barista"].includes(user?.role || "");
 
-  // Only fetch inventory when we have both user and active shop
   const { data: inventory, isLoading: loadingInventory } = useQuery<InventoryItem[]>({
     queryKey: ["/api/retail-inventory", activeShop?.id],
     queryFn: async () => {
-      const res = await apiRequest("GET", `/api/retail-inventory?shopId=${activeShop?.id}`);
+      if (!activeShop?.id) {
+        return [];
+      }
+      const res = await apiRequest("GET", `/api/retail-inventory?shopId=${activeShop.id}`);
       if (!res.ok) {
         throw new Error("Failed to fetch inventory");
       }
@@ -125,11 +127,6 @@ export function RetailInventoryTable() {
   const handleEditClick = (item: InventoryItem) => {
     setSelectedItem(item);
     setDialogOpen(true);
-  };
-
-  const handleDialogClose = () => {
-    setSelectedItem(null);
-    setDialogOpen(false);
   };
 
   return (
@@ -199,21 +196,25 @@ export function RetailInventoryTable() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Update Inventory</DialogTitle>
-          </DialogHeader>
-          {selectedItem && (
-            <RetailInventoryForm
-              shopId={activeShop.id}
-              coffeeId={selectedItem.coffeeId}
-              currentSmallBags={selectedItem.smallBags}
-              currentLargeBags={selectedItem.largeBags}
-              coffeeName={selectedItem.coffeeName}
-              onSuccess={handleDialogClose}
-            />
-          )}
-        </DialogContent>
+        {dialogOpen && (
+          <DialogPortal>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Update Inventory</DialogTitle>
+              </DialogHeader>
+              {selectedItem && (
+                <RetailInventoryForm
+                  shopId={activeShop.id}
+                  coffeeId={selectedItem.coffeeId}
+                  currentSmallBags={selectedItem.smallBags}
+                  currentLargeBags={selectedItem.largeBags}
+                  coffeeName={selectedItem.coffeeName}
+                  onSuccess={() => setDialogOpen(false)}
+                />
+              )}
+            </DialogContent>
+          </DialogPortal>
+        )}
       </Dialog>
     </>
   );
