@@ -25,7 +25,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { StockStatus } from "./stock-status";
@@ -67,9 +66,9 @@ export function RetailInventoryTable() {
       }
       return res.json();
     },
-    enabled: Boolean(user && activeShop?.id), // Only fetch when both user and shop are available
-    staleTime: 30000, // Cache data for 30 seconds
-    retry: 1, // Only retry once to prevent excessive API calls
+    enabled: Boolean(user && activeShop?.id),
+    staleTime: 30000,
+    retry: 1,
   });
 
   // Show loading skeleton during initial load
@@ -169,11 +168,9 @@ export function RetailInventoryTable() {
                 {canEditInventory && (
                   <TableCell>
                     <Dialog>
-                      <DialogTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </DialogTrigger>
+                      <Button variant="ghost" size="icon" asChild>
+                        <Edit className="h-4 w-4" />
+                      </Button>
                       <DialogContent>
                         <DialogHeader>
                           <DialogTitle>Update Inventory</DialogTitle>
