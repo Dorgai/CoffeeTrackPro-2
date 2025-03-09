@@ -111,8 +111,8 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[600px] h-[90vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Create Restock Order</DialogTitle>
           <DialogDescription>
             Enter the quantities needed for each coffee type.
@@ -120,67 +120,69 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
         </DialogHeader>
 
         {!shopId && (
-          <Alert variant="destructive" className="mb-4">
+          <Alert variant="destructive" className="mb-4 flex-shrink-0">
             <AlertDescription>
               Please select a shop before creating a restock order.
             </AlertDescription>
           </Alert>
         )}
 
-        <div className="py-4">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Coffee</TableHead>
-                <TableHead>Producer</TableHead>
-                <TableHead className="text-right">Current Stock</TableHead>
-                <TableHead className="text-center">Small Bags</TableHead>
-                <TableHead className="text-center">Large Bags</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {coffees?.map((coffee) => {
-                const currentStock = currentInventory?.find(inv => inv.greenCoffeeId === coffee.id);
-                return (
-                  <TableRow key={coffee.id}>
-                    <TableCell className="font-medium">{coffee.name}</TableCell>
-                    <TableCell>{coffee.producer}</TableCell>
-                    <TableCell className="text-right">
-                      <div>Small: {currentStock?.smallBags || 0}</div>
-                      <div>Large: {currentStock?.largeBags || 0}</div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Input
-                        type="number"
-                        min="0"
-                        value={quantities[coffee.id]?.small || 0}
-                        onChange={(e) => setQuantities(prev => ({
-                          ...prev,
-                          [coffee.id]: { ...prev[coffee.id], small: parseInt(e.target.value) || 0 }
-                        }))}
-                        className="w-20 mx-auto"
-                      />
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Input
-                        type="number"
-                        min="0"
-                        value={quantities[coffee.id]?.large || 0}
-                        onChange={(e) => setQuantities(prev => ({
-                          ...prev,
-                          [coffee.id]: { ...prev[coffee.id], large: parseInt(e.target.value) || 0 }
-                        }))}
-                        className="w-20 mx-auto"
-                      />
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+        <div className="flex-1 overflow-y-auto pr-2 -mr-2">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="sticky top-0 bg-background">
+                <TableRow>
+                  <TableHead className="w-[200px]">Coffee</TableHead>
+                  <TableHead className="w-[200px]">Producer</TableHead>
+                  <TableHead className="text-right w-[150px]">Current Stock</TableHead>
+                  <TableHead className="text-center w-[120px]">Small Bags</TableHead>
+                  <TableHead className="text-center w-[120px]">Large Bags</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {coffees?.map((coffee) => {
+                  const currentStock = currentInventory?.find(inv => inv.greenCoffeeId === coffee.id);
+                  return (
+                    <TableRow key={coffee.id}>
+                      <TableCell className="font-medium">{coffee.name}</TableCell>
+                      <TableCell>{coffee.producer}</TableCell>
+                      <TableCell className="text-right">
+                        <div>Small: {currentStock?.smallBags || 0}</div>
+                        <div>Large: {currentStock?.largeBags || 0}</div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Input
+                          type="number"
+                          min="0"
+                          value={quantities[coffee.id]?.small || 0}
+                          onChange={(e) => setQuantities(prev => ({
+                            ...prev,
+                            [coffee.id]: { ...prev[coffee.id], small: parseInt(e.target.value) || 0 }
+                          }))}
+                          className="w-20 mx-auto"
+                        />
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Input
+                          type="number"
+                          min="0"
+                          value={quantities[coffee.id]?.large || 0}
+                          onChange={(e) => setQuantities(prev => ({
+                            ...prev,
+                            [coffee.id]: { ...prev[coffee.id], large: parseInt(e.target.value) || 0 }
+                          }))}
+                          className="w-20 mx-auto"
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-shrink-0 mt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
