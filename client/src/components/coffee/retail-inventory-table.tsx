@@ -57,8 +57,15 @@ type InventoryItem = {
 export function RetailInventoryTable({ onEditSuccess }: Props) {
   const { user } = useAuth();
   const { activeShop } = useActiveShop();
-  const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
-  const [open, setOpen] = useState(false);
+
+  // State for the edit dialog
+  const [editDialogState, setEditDialogState] = useState<{
+    isOpen: boolean;
+    item: InventoryItem | null;
+  }>({
+    isOpen: false,
+    item: null,
+  });
 
   const canEditInventory = ["owner", "shopManager", "retailOwner", "barista"].includes(user?.role || "");
 
@@ -121,9 +128,11 @@ export function RetailInventoryTable({ onEditSuccess }: Props) {
     );
   }
 
-  const handleUpdateSuccess = () => {
-    setOpen(false);
-    if (onEditSuccess) onEditSuccess();
+  const handleEditComplete = () => {
+    setEditDialogState({ isOpen: false, item: null });
+    if (onEditSuccess) {
+      onEditSuccess();
+    }
   };
 
   return (
@@ -179,10 +188,10 @@ export function RetailInventoryTable({ onEditSuccess }: Props) {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => {
-                          setSelectedItem(item);
-                          setOpen(true);
-                        }}
+                        onClick={() => setEditDialogState({
+                          isOpen: true,
+                          item: item,
+                        })}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -195,19 +204,26 @@ export function RetailInventoryTable({ onEditSuccess }: Props) {
         </CardContent>
       </Card>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+      <Dialog 
+        open={editDialogState.isOpen} 
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditDialogState({ isOpen: false, item: null });
+          }
+        }}
+      >
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Update Inventory</DialogTitle>
           </DialogHeader>
-          {selectedItem && (
+          {editDialogState.item && (
             <RetailInventoryForm
               shopId={activeShop.id}
-              coffeeId={selectedItem.coffeeId}
-              currentSmallBags={selectedItem.smallBags}
-              currentLargeBags={selectedItem.largeBags}
-              coffeeName={selectedItem.coffeeName}
-              onSuccess={handleUpdateSuccess}
+              coffeeId={editDialogState.item.coffeeId}
+              currentSmallBags={editDialogState.item.smallBags}
+              currentLargeBags={editDialogState.item.largeBags}
+              coffeeName={editDialogState.item.coffeeName}
+              onSuccess={handleEditComplete}
             />
           )}
         </DialogContent>
