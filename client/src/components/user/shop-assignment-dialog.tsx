@@ -34,35 +34,24 @@ export function ShopAssignmentDialog({
   const { toast } = useToast();
   const [selectedShops, setSelectedShops] = useState<number[]>([]);
 
-  // Fetch all shops
-  const { data: allShops, isLoading: loadingShops } = useQuery<Shop[]>({
+  // Fetch all active shops
+  const { data: shops, isLoading: loadingShops } = useQuery<Shop[]>({
     queryKey: ["/api/shops"],
+    select: (data) => data.filter(shop => shop.isActive)
   });
 
   // Fetch user's current shop assignments
-  const { data: userShops, isLoading: loadingUserShops } = useQuery<number[]>({
+  const { data: userShopIds, isLoading: loadingUserShops } = useQuery<number[]>({
     queryKey: ["/api/users", userId, "shops"],
-    queryFn: async () => {
-      console.log("Fetching shops for user:", userId);
-      const response = await apiRequest("GET", `/api/users/${userId}/shops`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch user's shops");
-      }
-      const data = await response.json();
-      console.log("Received user shops:", data);
-      return data;
-    },
-    onSettled: (data) => {
-      console.log("Setting initial shop selection:", data);
-      if (data) {
-        setSelectedShops(data);
-      }
+    enabled: open, // Only fetch when dialog is open
+    onSuccess: (data) => {
+      setSelectedShops(data);
     }
   });
 
+  // Mutation for assigning shops
   const assignShopsMutation = useMutation({
     mutationFn: async (shopIds: number[]) => {
-      console.log("Assigning shops:", shopIds, "to user:", userId);
       const response = await apiRequest(
         "POST",
         `/api/users/${userId}/shops`,
@@ -87,7 +76,6 @@ export function ShopAssignmentDialog({
       onOpenChange(false);
     },
     onError: (error: Error) => {
-      console.error("Error assigning shops:", error);
       toast({
         title: "Error",
         description: error.message,
@@ -97,7 +85,6 @@ export function ShopAssignmentDialog({
   });
 
   const handleToggleShop = (shopId: number) => {
-    console.log("Toggling shop:", shopId);
     setSelectedShops(prev => {
       if (prev.includes(shopId)) {
         return prev.filter(id => id !== shopId);
@@ -108,7 +95,6 @@ export function ShopAssignmentDialog({
   };
 
   const handleSave = () => {
-    console.log("Saving shop assignments:", selectedShops);
     assignShopsMutation.mutate(selectedShops);
   };
 
@@ -128,16 +114,20 @@ export function ShopAssignmentDialog({
           <div className="flex justify-center py-4">
             <Loader2 className="h-6 w-6 animate-spin" />
           </div>
+        ) : !shops?.length ? (
+          <div className="py-4 text-center text-muted-foreground">
+            No active shops available
+          </div>
         ) : (
-          <div className="space-y-4 py-4">
-            {allShops?.map(shop => (
+          <div className="grid gap-4 py-4">
+            {shops.map(shop => (
               <div key={shop.id} className="flex items-center space-x-2">
                 <Checkbox
                   id={`shop-${shop.id}`}
                   checked={selectedShops.includes(shop.id)}
                   onCheckedChange={() => handleToggleShop(shop.id)}
                 />
-                <Label htmlFor={`shop-${shop.id}`}>
+                <Label htmlFor={`shop-${shop.id}`} className="flex-1">
                   {shop.name}
                   <span className="text-muted-foreground ml-2">
                     ({shop.location})

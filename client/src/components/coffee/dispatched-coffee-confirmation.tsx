@@ -21,7 +21,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface DispatchedCoffeeProps {
   shopId?: number;
@@ -33,21 +34,21 @@ type PendingConfirmation = {
   producer: string;
   dispatchedSmallBags: number;
   dispatchedLargeBags: number;
-  status: string;
+  status: "pending" | "confirmed";
+  orderId: number;
 };
 
 export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  // State for dialog and form
   const [selectedConfirmation, setSelectedConfirmation] = useState<PendingConfirmation | null>(null);
   const [receivedQuantities, setReceivedQuantities] = useState({
     smallBags: 0,
     largeBags: 0
   });
 
-  // Fetch pending confirmations
+  // Fetch pending confirmations with proper filtering
   const { data: confirmations, isLoading } = useQuery<PendingConfirmation[]>({
     queryKey: ["/api/dispatched-coffee/confirmations", shopId],
     queryFn: async () => {
@@ -67,7 +68,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
     enabled: Boolean(user)
   });
 
-  // Confirmation mutation
+  // Confirmation mutation with proper error handling
   const confirmMutation = useMutation({
     mutationFn: async (data: {
       confirmationId: number;
@@ -96,6 +97,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
       return response.json();
     },
     onSuccess: () => {
+      // Invalidate both confirmations and inventory queries
       queryClient.invalidateQueries({ queryKey: ["/api/dispatched-coffee/confirmations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory"] });
       toast({
@@ -151,6 +153,16 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
 
   const handleConfirm = () => {
     if (!selectedConfirmation) return;
+
+    // Validate quantities
+    if (receivedQuantities.smallBags < 0 || receivedQuantities.largeBags < 0) {
+      toast({
+        title: "Invalid Quantities",
+        description: "Received quantities cannot be negative",
+        variant: "destructive"
+      });
+      return;
+    }
 
     confirmMutation.mutate({
       confirmationId: selectedConfirmation.id,
@@ -238,6 +250,18 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
                   }))}
                 />
               </div>
+
+              {selectedConfirmation && (
+                receivedQuantities.smallBags !== selectedConfirmation.dispatchedSmallBags ||
+                receivedQuantities.largeBags !== selectedConfirmation.dispatchedLargeBags
+              ) && (
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    The quantities entered differ from what was dispatched. This will create a discrepancy report.
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
 
             <DialogFooter>
