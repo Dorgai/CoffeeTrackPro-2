@@ -1,9 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Shop } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useActiveShop } from "@/hooks/use-active-shop";
 import {
   Dialog,
   DialogContent,
@@ -11,13 +9,18 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { RefreshCw } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+
+type RestockDialogProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  shopId: number | null;
+};
 
 type CoffeeWithQuantity = {
   id: number;
@@ -32,24 +35,22 @@ type InventoryItem = {
   largeBags: number;
 };
 
-export function RestockDialog() {
+export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps) {
   const { toast } = useToast();
-  const { activeShop } = useActiveShop();
-  const [isOpen, setIsOpen] = useState(false);
   const [quantities, setQuantities] = useState<Record<number, { small: number; large: number }>>({});
 
   // Fetch available coffees
   const { data: coffees } = useQuery<CoffeeWithQuantity[]>({
     queryKey: ["/api/green-coffee"],
-    enabled: isOpen,
+    enabled: open,
   });
 
   // Fetch current inventory
   const { data: currentInventory } = useQuery<InventoryItem[]>({
-    queryKey: ["/api/retail-inventory", activeShop?.id],
-    enabled: isOpen && !!activeShop,
+    queryKey: ["/api/retail-inventory", shopId],
+    enabled: open && !!shopId,
     queryFn: async () => {
-      const res = await apiRequest("GET", `/api/retail-inventory?shopId=${activeShop?.id}`);
+      const res = await apiRequest("GET", `/api/retail-inventory?shopId=${shopId}`);
       if (!res.ok) throw new Error("Failed to fetch inventory");
       return res.json();
     },
@@ -64,12 +65,12 @@ export function RestockDialog() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", activeShop?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shopId] });
       toast({
         title: "Success",
         description: "Restock order created successfully",
       });
-      setIsOpen(false);
+      onOpenChange(false);
     },
     onError: (error: Error) => {
       toast({
@@ -81,13 +82,13 @@ export function RestockDialog() {
   });
 
   const handleSubmit = () => {
-    if (!activeShop) return;
+    if (!shopId) return;
 
     // Create an order for each coffee with a quantity > 0
     Object.entries(quantities).forEach(([coffeeId, { small, large }]) => {
       if (small > 0 || large > 0) {
         createOrderMutation.mutate({
-          shopId: activeShop.id,
+          shopId: shopId,
           greenCoffeeId: parseInt(coffeeId),
           smallBags: small,
           largeBags: large,
@@ -99,7 +100,7 @@ export function RestockDialog() {
 
   // Initialize quantities when dialog opens
   const initializeQuantities = () => {
-    if (coffees && currentInventory) {
+    if (coffees) {
       const initialQuantities = coffees.reduce((acc, coffee) => {
         acc[coffee.id] = { small: 0, large: 0 };
         return acc;
@@ -109,27 +110,16 @@ export function RestockDialog() {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => {
-      setIsOpen(open);
-      if (open) {
-        initializeQuantities();
-      }
-    }}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Restock
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>Restock Order for {activeShop?.name}</DialogTitle>
+          <DialogTitle>Create Restock Order</DialogTitle>
           <DialogDescription>
-            Create a restock order for {activeShop?.name || "your shop"}. Adjust quantities as needed.
+            Enter the quantities needed for each coffee type.
           </DialogDescription>
         </DialogHeader>
 
-        {!activeShop && (
+        {!shopId && (
           <Alert variant="destructive" className="mb-4">
             <AlertDescription>
               Please select a shop before creating a restock order.
@@ -191,12 +181,12 @@ export function RestockDialog() {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => setIsOpen(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button 
             onClick={handleSubmit}
-            disabled={createOrderMutation.isPending || !activeShop}
+            disabled={createOrderMutation.isPending || !shopId}
           >
             Submit Order
           </Button>
