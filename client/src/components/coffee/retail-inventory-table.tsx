@@ -32,6 +32,10 @@ import { StockStatus } from "./stock-status";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 
+interface Props {
+  onEditSuccess?: () => void;
+}
+
 type InventoryItem = {
   id: number;
   shopId: number;
@@ -50,7 +54,7 @@ type InventoryItem = {
   notes: string | null;
 };
 
-export function RetailInventoryTable() {
+export function RetailInventoryTable({ onEditSuccess }: Props) {
   const { user } = useAuth();
   const { activeShop } = useActiveShop();
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
@@ -116,6 +120,11 @@ export function RetailInventoryTable() {
       </Card>
     );
   }
+
+  const handleUpdateSuccess = () => {
+    setOpen(false);
+    if (onEditSuccess) onEditSuccess();
+  };
 
   return (
     <div className="space-y-4">
@@ -186,29 +195,23 @@ export function RetailInventoryTable() {
         </CardContent>
       </Card>
 
-      <Dialog 
-        open={open} 
-        onOpenChange={(isOpen) => {
-          setOpen(isOpen);
-          if (!isOpen) setSelectedItem(null);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Update Inventory</DialogTitle>
-          </DialogHeader>
-          {selectedItem && (
+      {selectedItem && (
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Update Inventory</DialogTitle>
+            </DialogHeader>
             <RetailInventoryForm
               shopId={activeShop.id}
               coffeeId={selectedItem.coffeeId}
               currentSmallBags={selectedItem.smallBags}
               currentLargeBags={selectedItem.largeBags}
               coffeeName={selectedItem.coffeeName}
-              onSuccess={() => setOpen(false)}
+              onSuccess={handleUpdateSuccess}
             />
-          )}
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
