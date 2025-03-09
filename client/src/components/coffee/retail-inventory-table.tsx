@@ -23,9 +23,12 @@ import {
 } from "@/components/ui/table";
 import {
   Dialog,
+  DialogTrigger,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogOverlay,
+  DialogPortal,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { StockStatus } from "./stock-status";
@@ -117,8 +120,25 @@ export function RetailInventoryTable() {
     );
   }
 
+  const handleOpenChange = (open: boolean) => {
+    setIsDialogOpen(open);
+    if (!open) {
+      setSelectedItem(null);
+    }
+  };
+
+  const handleEditClick = (item: InventoryItem) => {
+    setSelectedItem(item);
+    setIsDialogOpen(true);
+  };
+
+  const handleDialogClose = () => {
+    setIsDialogOpen(false);
+    setSelectedItem(null);
+  };
+
   return (
-    <>
+    <div className="space-y-4">
       <Card>
         <CardHeader>
           <CardTitle>Current Inventory</CardTitle>
@@ -170,10 +190,7 @@ export function RetailInventoryTable() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => {
-                          setSelectedItem(item);
-                          setIsDialogOpen(true);
-                        }}
+                        onClick={() => handleEditClick(item)}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -186,31 +203,26 @@ export function RetailInventoryTable() {
         </CardContent>
       </Card>
 
-      <Dialog 
-        open={isDialogOpen} 
-        onOpenChange={(open) => {
-          if (!open) {
-            setSelectedItem(null);
-          }
-          setIsDialogOpen(open);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Update Inventory</DialogTitle>
-          </DialogHeader>
-          {selectedItem && (
-            <RetailInventoryForm
-              shopId={activeShop.id}
-              coffeeId={selectedItem.coffeeId}
-              currentSmallBags={selectedItem.smallBags}
-              currentLargeBags={selectedItem.largeBags}
-              coffeeName={selectedItem.coffeeName}
-              onSuccess={() => setIsDialogOpen(false)}
-            />
-          )}
-        </DialogContent>
+      <Dialog open={isDialogOpen} onOpenChange={handleOpenChange}>
+        <DialogPortal>
+          <DialogOverlay />
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Update Inventory</DialogTitle>
+            </DialogHeader>
+            {selectedItem && (
+              <RetailInventoryForm
+                shopId={activeShop.id}
+                coffeeId={selectedItem.coffeeId}
+                currentSmallBags={selectedItem.smallBags}
+                currentLargeBags={selectedItem.largeBags}
+                coffeeName={selectedItem.coffeeName}
+                onSuccess={handleDialogClose}
+              />
+            )}
+          </DialogContent>
+        </DialogPortal>
       </Dialog>
-    </>
+    </div>
   );
 }
