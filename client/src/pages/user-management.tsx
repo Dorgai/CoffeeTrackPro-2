@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -32,23 +33,7 @@ import {
 import { AlertCircle, Key, Building2, UserCheck, UserX, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-
-type FilterStatus = "all" | "pending" | "active" | "inactive";
-
-interface Shop {
-  id: number;
-  name: string;
-  location: string;
-  isActive: boolean;
-}
 
 export default function UserManagement() {
   const { user: currentUser } = useAuth();
@@ -59,61 +44,16 @@ export default function UserManagement() {
   const [userToDeactivate, setUserToDeactivate] = useState<User | null>(null);
   const [selectedUserForShops, setSelectedUserForShops] = useState<User | null>(null);
   const [isShopAssignmentOpen, setIsShopAssignmentOpen] = useState(false);
-  const [filter, setFilter] = useState<FilterStatus>("all");
+
 
   // Queries
-  const { data: users, isLoading } = useQuery<User[]>({
+  const { data: users = [], isLoading } = useQuery<User[]>({
     queryKey: ["/api/users"],
   });
 
-  const { data: shops } = useQuery<Shop[]>({
-    queryKey: ["/api/shops"],
-    enabled: !!currentUser && currentUser.role === "roasteryOwner",
-  });
-
-  const { data: userShops } = useQuery<Shop[]>({
-    queryKey: ["/api/users", selectedUserForShops?.id, "shops"],
-    enabled: !!selectedUserForShops?.id,
-  });
-
-  // Update shop assignments mutation
-  const updateShopAssignmentsMutation = useMutation({
-    mutationFn: async ({ userId, shopIds }: { userId: number; shopIds: number[] }) => {
-      console.log("Updating shop assignments:", { userId, shopIds });
-      const res = await apiRequest(
-        "POST",
-        `/api/users/${userId}/shops`,
-        { shopIds }
-      );
-      if (!res.ok) {
-        const error = await res.text();
-        throw new Error(error || "Failed to update shop assignments");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      // Invalidate both queries to ensure fresh data
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      if (selectedUserForShops) {
-        queryClient.invalidateQueries({ 
-          queryKey: ["/api/users", selectedUserForShops.id, "shops"]
-        });
-      }
-      toast({
-        title: "Success",
-        description: "Shop assignments have been updated",
-      });
-      setIsShopAssignmentOpen(false);
-    },
-    onError: (error: Error) => {
-      console.error("Shop assignment error:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update shop assignments",
-        variant: "destructive",
-      });
-    },
-  });
+  // Split users into active and inactive
+  const activeUsers = users.filter(user => user.isActive);
+  const inactiveUsers = users.filter(user => !user.isActive);
 
   const updatePasswordMutation = useMutation({
     mutationFn: async ({ userId, password }: { userId: number; password: string }) => {
@@ -175,6 +115,130 @@ export default function UserManagement() {
     },
   });
 
+  // Render the user table for a given list of users
+  const renderUserTable = (userList: User[]) => (
+    <Card>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Username</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Created</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {userList.map((user) => (
+              <TableRow key={user.id}>
+                <TableCell className="font-medium">{user.username}</TableCell>
+                <TableCell>{user.role}</TableCell>
+                <TableCell>
+                  <Badge
+                    variant={
+                      user.isPendingApproval
+                        ? "outline"
+                        : user.isActive
+                          ? "default"
+                          : "destructive"
+                    }
+                  >
+                    {user.isPendingApproval ? "Pending Approval" : user.isActive ? "Active" : "Inactive"}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  {user.createdAt && new Date(user.createdAt).toLocaleDateString()}
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedUser(user);
+                        setIsPasswordDialogOpen(true);
+                      }}
+                    >
+                      <Key className="h-4 w-4 mr-2" />
+                      Reset Password
+                    </Button>
+
+                    <Button
+                      variant={user.isActive ? "destructive" : "outline"}
+                      size="sm"
+                      onClick={() => setUserToDeactivate(user)}
+                    >
+                      {user.isActive ? (
+                        <>
+                          <UserX className="h-4 w-4 mr-2" />
+                          Deactivate
+                        </>
+                      ) : (
+                        <>
+                          <UserCheck className="h-4 w-4 mr-2" />
+                          Activate
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+
+  const { data: shops } = useQuery<Shop[]>({
+    queryKey: ["/api/shops"],
+    enabled: !!currentUser && currentUser.role === "roasteryOwner",
+  });
+
+  const { data: userShops } = useQuery<Shop[]>({
+    queryKey: ["/api/users", selectedUserForShops?.id, "shops"],
+    enabled: !!selectedUserForShops?.id,
+  });
+
+  const updateShopAssignmentsMutation = useMutation({
+    mutationFn: async ({ userId, shopIds }: { userId: number; shopIds: number[] }) => {
+      console.log("Updating shop assignments:", { userId, shopIds });
+      const res = await apiRequest(
+        "POST",
+        `/api/users/${userId}/shops`,
+        { shopIds }
+      );
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error || "Failed to update shop assignments");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      // Invalidate both queries to ensure fresh data
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      if (selectedUserForShops) {
+        queryClient.invalidateQueries({
+          queryKey: ["/api/users", selectedUserForShops.id, "shops"]
+        });
+      }
+      toast({
+        title: "Success",
+        description: "Shop assignments have been updated",
+      });
+      setIsShopAssignmentOpen(false);
+    },
+    onError: (error: Error) => {
+      console.error("Shop assignment error:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update shop assignments",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleShopAssignment = (userId: number, shopIds: number[]) => {
     console.log("Assigning shops:", { userId, shopIds });
     updateShopAssignmentsMutation.mutate({ userId, shopIds });
@@ -201,19 +265,6 @@ export default function UserManagement() {
     );
   }
 
-  const filteredUsers = users?.filter(user => {
-    switch (filter) {
-      case "pending":
-        return user.isPendingApproval;
-      case "active":
-        return !user.isPendingApproval && user.isActive;
-      case "inactive":
-        return !user.isPendingApproval && !user.isActive;
-      default:
-        return true;
-    }
-  });
-
   return (
     <div className="container mx-auto py-8 space-y-8">
       <div>
@@ -223,110 +274,18 @@ export default function UserManagement() {
         </p>
       </div>
 
-      <div className="flex justify-end gap-2">
-        <Select value={filter} onValueChange={(value: FilterStatus) => setFilter(value)}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filter by status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Users</SelectItem>
-            <SelectItem value="pending">Pending Approval</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="inactive">Inactive</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Users</CardTitle>
-          <CardDescription>
-            Manage user accounts and their access to the system
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Username</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredUsers?.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell className="font-medium">{user.username}</TableCell>
-                  <TableCell>{user.role}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        user.isPendingApproval
-                          ? "outline"
-                          : user.isActive
-                            ? "default"
-                            : "destructive"
-                      }
-                    >
-                      {user.isPendingApproval ? "Pending Approval" : user.isActive ? "Active" : "Inactive"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {user.createdAt && new Date(user.createdAt).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedUserForShops(user);
-                          setIsShopAssignmentOpen(true);
-                        }}
-                      >
-                        <Building2 className="h-4 w-4 mr-2" />
-                        Manage Shops
-                      </Button>
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedUser(user);
-                          setIsPasswordDialogOpen(true);
-                        }}
-                      >
-                        <Key className="h-4 w-4 mr-2" />
-                        Reset Password
-                      </Button>
-
-                      <Button
-                        variant={user.isActive ? "destructive" : "outline"}
-                        size="sm"
-                        onClick={() => setUserToDeactivate(user)}
-                      >
-                        {user.isActive ? (
-                          <>
-                            <UserX className="h-4 w-4 mr-2" />
-                            Deactivate
-                          </>
-                        ) : (
-                          <>
-                            <UserCheck className="h-4 w-4 mr-2" />
-                            Activate
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="active" className="w-full">
+        <TabsList>
+          <TabsTrigger value="active">Active Users ({activeUsers.length})</TabsTrigger>
+          <TabsTrigger value="inactive">Inactive Users ({inactiveUsers.length})</TabsTrigger>
+        </TabsList>
+        <TabsContent value="active" className="mt-6">
+          {renderUserTable(activeUsers)}
+        </TabsContent>
+        <TabsContent value="inactive" className="mt-6">
+          {renderUserTable(inactiveUsers)}
+        </TabsContent>
+      </Tabs>
 
       <Dialog
         open={isPasswordDialogOpen}
@@ -399,7 +358,6 @@ export default function UserManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
       <Dialog
         open={isShopAssignmentOpen}
         onOpenChange={(open) => {
@@ -460,8 +418,8 @@ export default function UserManagement() {
               {shops?.length ? (
                 <div className="space-y-2">
                   {shops
-                    .filter((shop) => 
-                      shop.isActive && 
+                    .filter((shop) =>
+                      shop.isActive &&
                       !userShops?.some((us) => us.id === shop.id)
                     )
                     .map((shop) => (
@@ -502,4 +460,11 @@ export default function UserManagement() {
       </Dialog>
     </div>
   );
+}
+
+interface Shop {
+  id: number;
+  name: string;
+  location: string;
+  isActive: boolean;
 }

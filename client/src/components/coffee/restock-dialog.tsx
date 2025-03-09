@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { RefreshCw } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 type RestockDialogProps = {
@@ -40,13 +40,13 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
   const [quantities, setQuantities] = useState<Record<number, { small: number; large: number }>>({});
 
   // Fetch available coffees
-  const { data: coffees } = useQuery<CoffeeWithQuantity[]>({
+  const { data: coffees, isLoading: loadingCoffees } = useQuery<CoffeeWithQuantity[]>({
     queryKey: ["/api/green-coffee"],
     enabled: open,
   });
 
   // Fetch current inventory
-  const { data: currentInventory } = useQuery<InventoryItem[]>({
+  const { data: currentInventory, isLoading: loadingInventory } = useQuery<InventoryItem[]>({
     queryKey: ["/api/retail-inventory", shopId],
     enabled: open && !!shopId,
     queryFn: async () => {
@@ -60,7 +60,10 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
   const createOrderMutation = useMutation({
     mutationFn: async (orderData: any) => {
       const res = await apiRequest("POST", "/api/orders", orderData);
-      if (!res.ok) throw new Error("Failed to create order");
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || "Failed to create order");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -71,6 +74,7 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
         description: "Restock order created successfully",
       });
       onOpenChange(false);
+      setQuantities({}); // Reset quantities
     },
     onError: (error: Error) => {
       toast({
@@ -88,7 +92,7 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
     Object.entries(quantities).forEach(([coffeeId, { small, large }]) => {
       if (small > 0 || large > 0) {
         createOrderMutation.mutate({
-          shopId: shopId,
+          shopId,
           greenCoffeeId: parseInt(coffeeId),
           smallBags: small,
           largeBags: large,
@@ -98,16 +102,7 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
     });
   };
 
-  // Initialize quantities when dialog opens
-  const initializeQuantities = () => {
-    if (coffees) {
-      const initialQuantities = coffees.reduce((acc, coffee) => {
-        acc[coffee.id] = { small: 0, large: 0 };
-        return acc;
-      }, {} as Record<number, { small: number; large: number }>);
-      setQuantities(initialQuantities);
-    }
-  };
+  const isLoading = loadingCoffees || loadingInventory;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -115,7 +110,7 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
         <DialogHeader className="flex-shrink-0">
           <DialogTitle>Create Restock Order</DialogTitle>
           <DialogDescription>
-            Enter the quantities needed for each coffee type.
+            Enter the quantities needed for each coffee type
           </DialogDescription>
         </DialogHeader>
 
@@ -127,60 +122,66 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
           </Alert>
         )}
 
-        <div className="flex-1 overflow-y-auto pr-2 -mr-2">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="sticky top-0 bg-background">
-                <TableRow>
-                  <TableHead className="w-[200px]">Coffee</TableHead>
-                  <TableHead className="w-[200px]">Producer</TableHead>
-                  <TableHead className="text-right w-[150px]">Current Stock</TableHead>
-                  <TableHead className="text-center w-[120px]">Small Bags</TableHead>
-                  <TableHead className="text-center w-[120px]">Large Bags</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {coffees?.map((coffee) => {
-                  const currentStock = currentInventory?.find(inv => inv.greenCoffeeId === coffee.id);
-                  return (
-                    <TableRow key={coffee.id}>
-                      <TableCell className="font-medium">{coffee.name}</TableCell>
-                      <TableCell>{coffee.producer}</TableCell>
-                      <TableCell className="text-right">
-                        <div>Small: {currentStock?.smallBags || 0}</div>
-                        <div>Large: {currentStock?.largeBags || 0}</div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Input
-                          type="number"
-                          min="0"
-                          value={quantities[coffee.id]?.small || 0}
-                          onChange={(e) => setQuantities(prev => ({
-                            ...prev,
-                            [coffee.id]: { ...prev[coffee.id], small: parseInt(e.target.value) || 0 }
-                          }))}
-                          className="w-20 mx-auto"
-                        />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Input
-                          type="number"
-                          min="0"
-                          value={quantities[coffee.id]?.large || 0}
-                          onChange={(e) => setQuantities(prev => ({
-                            ...prev,
-                            [coffee.id]: { ...prev[coffee.id], large: parseInt(e.target.value) || 0 }
-                          }))}
-                          className="w-20 mx-auto"
-                        />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin" />
           </div>
-        </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto pr-2 -mr-2">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="sticky top-0 bg-background">
+                  <TableRow>
+                    <TableHead className="w-[200px]">Coffee</TableHead>
+                    <TableHead className="w-[200px]">Producer</TableHead>
+                    <TableHead className="text-right w-[150px]">Current Stock</TableHead>
+                    <TableHead className="text-center w-[120px]">Small Bags</TableHead>
+                    <TableHead className="text-center w-[120px]">Large Bags</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {coffees?.map((coffee) => {
+                    const currentStock = currentInventory?.find(inv => inv.greenCoffeeId === coffee.id);
+                    return (
+                      <TableRow key={coffee.id}>
+                        <TableCell className="font-medium">{coffee.name}</TableCell>
+                        <TableCell>{coffee.producer}</TableCell>
+                        <TableCell className="text-right">
+                          <div>Small: {currentStock?.smallBags || 0}</div>
+                          <div>Large: {currentStock?.largeBags || 0}</div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Input
+                            type="number"
+                            min="0"
+                            value={quantities[coffee.id]?.small || 0}
+                            onChange={(e) => setQuantities(prev => ({
+                              ...prev,
+                              [coffee.id]: { ...prev[coffee.id], small: parseInt(e.target.value) || 0 }
+                            }))}
+                            className="w-20 mx-auto"
+                          />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Input
+                            type="number"
+                            min="0"
+                            value={quantities[coffee.id]?.large || 0}
+                            onChange={(e) => setQuantities(prev => ({
+                              ...prev,
+                              [coffee.id]: { ...prev[coffee.id], large: parseInt(e.target.value) || 0 }
+                            }))}
+                            className="w-20 mx-auto"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        )}
 
         <DialogFooter className="flex-shrink-0 mt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -190,6 +191,9 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
             onClick={handleSubmit}
             disabled={createOrderMutation.isPending || !shopId}
           >
+            {createOrderMutation.isPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : null}
             Submit Order
           </Button>
         </DialogFooter>
