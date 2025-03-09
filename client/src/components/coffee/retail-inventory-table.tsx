@@ -5,7 +5,7 @@ import { useActiveShop } from "@/hooks/use-active-shop";
 import { apiRequest } from "@/lib/queryClient";
 import { cn, formatDate } from "@/lib/utils";
 import { Loader2, Package, Edit } from "lucide-react";
-import { RetailInventoryForm } from "./retail-inventory-form";
+import { RetailInventoryFormDialog } from "./retail-inventory-form-dialog";
 import {
   Card,
   CardContent,
@@ -21,12 +21,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { StockStatus } from "./stock-status";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -57,15 +51,8 @@ type InventoryItem = {
 export function RetailInventoryTable({ onEditSuccess }: Props) {
   const { user } = useAuth();
   const { activeShop } = useActiveShop();
-
-  // State for the edit dialog
-  const [editDialogState, setEditDialogState] = useState<{
-    isOpen: boolean;
-    item: InventoryItem | null;
-  }>({
-    isOpen: false,
-    item: null,
-  });
+  const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const canEditInventory = ["owner", "shopManager", "retailOwner", "barista"].includes(user?.role || "");
 
@@ -129,7 +116,8 @@ export function RetailInventoryTable({ onEditSuccess }: Props) {
   }
 
   const handleEditComplete = () => {
-    setEditDialogState({ isOpen: false, item: null });
+    setDialogOpen(false);
+    setSelectedItem(null);
     if (onEditSuccess) {
       onEditSuccess();
     }
@@ -188,10 +176,10 @@ export function RetailInventoryTable({ onEditSuccess }: Props) {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => setEditDialogState({
-                          isOpen: true,
-                          item: item,
-                        })}
+                        onClick={() => {
+                          setSelectedItem(item);
+                          setDialogOpen(true);
+                        }}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -204,30 +192,18 @@ export function RetailInventoryTable({ onEditSuccess }: Props) {
         </CardContent>
       </Card>
 
-      <Dialog 
-        open={editDialogState.isOpen} 
-        onOpenChange={(open) => {
-          if (!open) {
-            setEditDialogState({ isOpen: false, item: null });
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Update Inventory</DialogTitle>
-          </DialogHeader>
-          {editDialogState.item && (
-            <RetailInventoryForm
-              shopId={activeShop.id}
-              coffeeId={editDialogState.item.coffeeId}
-              currentSmallBags={editDialogState.item.smallBags}
-              currentLargeBags={editDialogState.item.largeBags}
-              coffeeName={editDialogState.item.coffeeName}
-              onSuccess={handleEditComplete}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      {selectedItem && (
+        <RetailInventoryFormDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          shopId={activeShop.id}
+          coffeeId={selectedItem.coffeeId}
+          currentSmallBags={selectedItem.smallBags}
+          currentLargeBags={selectedItem.largeBags}
+          coffeeName={selectedItem.coffeeName}
+          onSuccess={handleEditComplete}
+        />
+      )}
     </div>
   );
 }
