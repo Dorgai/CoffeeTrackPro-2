@@ -2,8 +2,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import { DispatchedCoffeeConfirmation } from "@/components/coffee/dispatched-coffee-confirmation";
 import { InventoryDiscrepancyView } from "@/components/coffee/inventory-discrepancy-view";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ShopSelector } from "@/components/layout/shop-selector";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 import { useActiveShop } from "@/hooks/use-active-shop";
@@ -13,7 +11,7 @@ export default function RetailNewArrivals() {
   const { activeShop } = useActiveShop();
 
   // Check if user has admin privileges
-  const isAdminRole = user && ["roasteryOwner", "retailOwner", "owner"].includes(user.role);
+  const isAdminRole = user && ["roasteryOwner", "owner"].includes(user.role);
 
   // Non-admin users need proper shop access
   const { data: userShops, isLoading: isLoadingShops } = useQuery({
@@ -40,35 +38,25 @@ export default function RetailNewArrivals() {
   }
 
   return (
-    <div className="container mx-auto py-8">
-      {!isAdminRole && (
-        <div className="mb-6">
-          <ShopSelector />
-        </div>
-      )}
+    <div className="container mx-auto py-8 space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">New Inventory Arrivals</h1>
+        <p className="text-muted-foreground">
+          Confirm and update inventory quantities for newly received coffee shipments
+        </p>
+      </div>
 
-      {!activeShop && !isAdminRole ? (
+      {!isAdminRole && !activeShop ? (
         <Alert>
           <AlertDescription>
             Please select a shop to view new arrivals.
           </AlertDescription>
         </Alert>
       ) : (
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>New Inventory Arrivals</CardTitle>
-              <CardDescription>
-                Confirm and update inventory quantities for newly received coffee shipments
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <DispatchedCoffeeConfirmation shopId={isAdminRole ? undefined : activeShop?.id} />
-            </CardContent>
-          </Card>
-
+        <>
+          <DispatchedCoffeeConfirmation shopId={isAdminRole ? undefined : activeShop?.id} />
           {isAdminRole && <InventoryDiscrepancyView />}
-        </div>
+        </>
       )}
     </div>
   );

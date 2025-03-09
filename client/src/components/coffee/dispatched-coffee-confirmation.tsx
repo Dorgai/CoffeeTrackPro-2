@@ -50,7 +50,7 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
     largeBags: 0
   });
 
-  const { data: confirmations, isLoading, refetch } = useQuery<DispatchConfirmation[]>({
+  const { data: confirmations, isLoading } = useQuery<DispatchConfirmation[]>({
     queryKey: ["/api/dispatched-coffee/confirmations", shopId],
     queryFn: async () => {
       const url = shopId
@@ -104,7 +104,6 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
       });
       setSelectedConfirmation(null);
       setReceivedQuantities({ smallBags: 0, largeBags: 0 });
-      refetch();
     },
     onError: (error: Error) => {
       toast({
@@ -117,14 +116,27 @@ export function DispatchedCoffeeConfirmation({ shopId }: DispatchedCoffeeProps) 
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
   if (!confirmations || confirmations.length === 0) {
-    return null;
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>No New Arrivals</CardTitle>
+          <CardDescription>
+            There are currently no pending coffee shipments to confirm.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
   }
 
   const handleConfirm = () => {
