@@ -1,4 +1,4 @@
-import { type RoastingBatch, type InsertRoastingBatch, roastingBatches, users, type User, type Shop, type InsertShop, shops, userShops, type GreenCoffee, type InsertGreenCoffee, greenCoffee, type Order, type InsertOrder, orders, type DispatchedCoffeeConfirmation, type InsertDispatchedCoffeeConfirmation, dispatchedCoffeeConfirmation, type InsertUser } from "@shared/schema";
+import { type RoastingBatch, type InsertRoastingBatch, roastingBatches, users, type User, type Shop, type InsertShop, shops, userShops, type GreenCoffee, type InsertGreenCoffee, greenCoffee, type Order, type InsertOrder, orders, type DispatchedCoffeeConfirmation, type InsertDispatchedCoffeeConfirmation, dispatchedCoffeeConfirmation, type InsertUser, retailInventory } from "@shared/schema";
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
 import session from "express-session";
@@ -148,14 +148,32 @@ export class DatabaseStorage {
     }
   }
 
-  async assignUserToShop(userId: number, shopId: number): Promise<void> {
+  async assignUserToShops(userId: number, shopIds: number[]): Promise<void> {
     try {
-      await db
-        .insert(userShops)
-        .values({ userId, shopId })
-        .onConflictDoNothing();
+      console.log(`Assigning shops ${shopIds.join(', ')} to user ${userId}`);
+
+      return await db.transaction(async (tx) => {
+        // First remove all existing assignments
+        await tx
+          .delete(userShops)
+          .where(eq(userShops.userId, userId));
+
+        // Then add new assignments
+        if (shopIds.length > 0) {
+          await tx
+            .insert(userShops)
+            .values(
+              shopIds.map(shopId => ({
+                userId,
+                shopId
+              }))
+            );
+        }
+
+        console.log("Shop assignments completed successfully");
+      });
     } catch (error) {
-      console.error("Error assigning user to shop:", error);
+      console.error("Error assigning shops to user:", error);
       throw error;
     }
   }
@@ -175,7 +193,6 @@ export class DatabaseStorage {
   }
 
 
-  // Add missing methods that routes.ts needs
   async removeAllUserShops(userId: number): Promise<void> {
     try {
       await db
@@ -856,64 +873,62 @@ export class DatabaseStorage {
     }
   ): Promise<DispatchedCoffeeConfirmation> {
     try {
-      // First check if confirmation exists and is pending
-      const [existingConfirmation] = await db
-        .select()
-        .from(dispatchedCoffeeConfirmation)
-        .where(eq(dispatchedCoffeeConfirmation.id, id));
+      // Begin transaction
+      return await db.transaction(async (tx) => {
+        // 1. Get and validate the confirmation
+        const [confirmation] = await tx
+          .select()
+          .from(dispatchedCoffeeConfirmation)
+          .where(eq(dispatchedCoffeeConfirmation.id, id));
 
-      if (!existingConfirmation) {
-        throw new Error("Confirmation not found");
-      }
+        if (!confirmation) {
+          throw new Error("Confirmation not found");
+        }
 
-      if (existingConfirmation.status !== "pending") {
-        throw new Error("Confirmation is not in pending status");
-      }
+        if (confirmation.status !== "pending") {
+          throw new Error("Confirmation is not in pending status");
+        }
 
-      // First update retail inventory
-      const retailInventoryQuery = sql`
-        INSERT INTO retail_inventory (
-          shop_id,
-          green_coffee_id,
-          small_bags,
-          large_bags,
-          updated_by_id,
-          updated_at
-        ) VALUES (
-          ${existingConfirmation.shopId},
-          ${existingConfirmation.greenCoffeeId},
-          ${data.receivedSmallBags},
-          ${data.receivedLargeBags},
-          ${data.confirmedById},
-          NOW()
-        )
-        ON CONFLICT (shop_id, green_coffee_id) 
-        DO UPDATE SET
-          small_bags = EXCLUDED.small_bags,
-          large_bags = EXCLUDED.large_bags,
-          updated_by_id = EXCLUDED.updated_by_id,
-          updated_at = EXCLUDED.updated_at`;
+        // 2. Update inventory first
+        await tx
+          .insert(retailInventory)
+          .values({
+            shopId: confirmation.shopId,
+            greenCoffeeId: confirmation.greenCoffeeId,
+            smallBags: data.receivedSmallBags,
+            largeBags: data.receivedLargeBags,
+            updatedById: data.confirmedById,
+            updatedAt: new Date()
+          })
+          .onConflictDoUpdate({
+            target: [retailInventory.shopId, retailInventory.greenCoffeeId],
+            set: {
+              smallBags: data.receivedSmallBags,
+              largeBags: data.receivedLargeBags,
+              updatedById: data.confirmedById,
+              updatedAt: new Date()
+            }
+          });
 
-      await db.execute(retailInventoryQuery);
+        // 3. Update confirmation status
+        const [updatedConfirmation] = await tx
+          .update(dispatchedCoffeeConfirmation)
+          .set({
+            receivedSmallBags: data.receivedSmallBags,
+            receivedLargeBags: data.receivedLargeBags,
+            confirmedById: data.confirmedById,
+            status: "confirmed" as const,
+            confirmedAt: new Date()
+          })
+          .where(eq(dispatchedCoffeeConfirmation.id, id))
+          .returning();
 
-      // Then update the confirmation status
-      const [updatedConfirmation] = await db
-        .update(dispatchedCoffeeConfirmation)
-        .set({
-          receivedSmallBags: data.receivedSmallBags,
-          receivedLargeBags: data.receivedLargeBags,
-          confirmedById: data.confirmedById,
-          status: "confirmed" as const,
-          confirmedAt: new Date()
-        })
-        .where(eq(dispatchedCoffeeConfirmation.id, id))
-        .returning();
+        if (!updatedConfirmation) {
+          throw new Error("Failed to update confirmation");
+        }
 
-      if (!updatedConfirmation) {
-        throw new Error("Failed to update confirmation");
-      }
-
-      return updatedConfirmation;
+        return updatedConfirmation;
+      });
     } catch (error) {
       console.error("Error in confirmDispatchedCoffee:", error);
       throw error;
@@ -969,6 +984,48 @@ export class DatabaseStorage {
     } catch (error) {
       console.error("Error getting users by role:", error);
       return [];
+    }
+  }
+  async getUserShopIds(userId: number): Promise<number[]> {
+    try {
+      console.log("Getting shop IDs for user:", userId);
+
+      // First get the user to check their role
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, userId));
+
+      // For roasteryOwner, return all active shop IDs
+      if (user?.role === "roasteryOwner") {
+        const shops = await this.getShops();
+        return shops.map(shop => shop.id);
+      }
+
+      // For other roles, get assigned shop IDs
+      const assignments = await db
+        .select({ shopId: userShops.shopId })
+        .from(userShops)
+        .where(eq(userShops.userId, userId));
+
+      const shopIds = assignments.map(a => a.shopId);
+      console.log("Found assigned shop IDs:", shopIds);
+      return shopIds;
+    } catch (error) {
+      console.error("Error getting user shop IDs:", error);
+      return [];
+    }
+  }
+
+  async assignUserToShop(userId: number, shopId: number): Promise<void> {
+    try {
+      await db
+        .insert(userShops)
+        .values({ userId, shopId })
+        .onConflictDoNothing();
+    } catch (error) {
+      console.error("Error assigning user to shop:", error);
+      throw error;
     }
   }
 }

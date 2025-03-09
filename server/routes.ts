@@ -205,6 +205,12 @@ export async function registerRoutes(app: Express): Promise<void> {
       const userId = parseInt(req.params.id);
       const { shopIds } = req.body;
 
+      console.log("Processing shop assignment request:", {
+        userId,
+        shopIds,
+        requestedBy: req.user?.username
+      });
+
       if (!Array.isArray(shopIds)) {
         return res.status(400).json({ message: "Shop IDs must be an array" });
       }
@@ -217,21 +223,26 @@ export async function registerRoutes(app: Express): Promise<void> {
       // Get only active shops
       const activeShops = await storage.getShops();
       const validShopIds = activeShops
-        .filter(shop => shop.is_active)
+        .filter(shop => shop.isActive)
         .map(shop => shop.id);
 
       // Filter out inactive shops
       const shopIdsToAssign = shopIds.filter(id => validShopIds.includes(id));
 
-      // Remove existing assignments
-      await storage.removeAllUserShops(userId);
+      console.log("Filtered shop IDs to assign:", {
+        original: shopIds,
+        valid: shopIdsToAssign
+      });
 
-      // Add new assignments only for active shops
-      for (const shopId of shopIdsToAssign) {
-        await storage.assignUserToShop(userId, shopId);
-      }
+      // Assign shops using transaction
+      await storage.assignUserToShops(userId, shopIdsToAssign);
 
       const updatedShops = await storage.getUserShops(userId);
+      console.log("Successfully updated user shops:", {
+        userId,
+        assignedShops: updatedShops.length
+      });
+
       res.json(updatedShops);
     } catch (error) {
       console.error("Error in shop assignment:", error);
@@ -248,23 +259,10 @@ export async function registerRoutes(app: Express): Promise<void> {
       const userId = parseInt(req.params.id);
       console.log("Fetching shops for user:", userId);
 
-      const userShops = await storage.getUserShops(userId);
+      const userShops = await storage.getUserShopIds(userId);
+      console.log("Retrieved shop IDs:", userShops);
 
-      // Only return active shops
-      const activeShops = userShops.filter(shop => shop.isActive);
-
-      console.log("Fetched shops for user:", {
-        userId,
-        totalShops: userShops.length,
-        activeShops: activeShops.length,
-        shopDetails: activeShops.map(shop => ({
-          id: shop.id,
-          name: shop.name,
-          isActive: shop.isActive
-        }))
-      });
-
-      res.json(activeShops);
+      res.json(userShops);
     } catch (error) {
       console.error("Error fetching user's shops:", error);
       res.status(500).json({ message: "Failed to fetch user's shops" });
@@ -276,6 +274,12 @@ export async function registerRoutes(app: Express): Promise<void> {
     try {
       const userId = parseInt(req.params.id);
       const shopId = parseInt(req.params.shopId);
+
+      console.log("Removing shop assignment:", {
+        userId,
+        shopId,
+        requestedBy: req.user?.username
+      });
 
       await storage.removeUserFromShop(userId, shopId);
       res.json({ message: "User removed from shop successfully" });
@@ -455,7 +459,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         console.log("Creating new green coffee request received by:", req.user?.username, "with role:", req.user?.role);
         console.log("Request body:", req.body);
 
-        // Process and validate the data
+        // Ensure stock values are strings
         const data = {
           ...req.body,
           currentStock: String(req.body.currentStock || 0),
@@ -497,16 +501,21 @@ export async function registerRoutes(app: Express): Promise<void> {
           return res.status(404).json({ message: "Coffee not found" });
         }
 
-        // Log the update attempt
+        // Ensure stock values are strings
+        const data = {
+          ...req.body,
+          currentStock: String(req.body.currentStock || coffee.currentStock),
+          minThreshold: String(req.body.minThreshold || coffee.minThreshold)
+        };
+
         console.log("Updating green coffee:", {
           coffeeId,
           updatedBy: req.user?.username,
           role: req.user?.role,
-          updates: req.body
+          updates: data
         });
 
-        // Use updateGreenCoffeeStock for both roaster and roasteryOwner
-        const updatedCoffee = await storage.updateGreenCoffeeStock(coffeeId, req.body);
+        const updatedCoffee = await storage.updateGreenCoffeeStock(coffeeId, data);
 
         console.log("Successfully updated coffee:", updatedCoffee);
         res.json(updatedCoffee);
@@ -823,8 +832,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           if (smallBags > order.smallBags || largeBags > order.largeBags) {
             return res.status(400).json({
               message: "Updated quantities cannot exceed original order quantities"
-            });
-          }
+            });          }
         } else {
           // Shop manager can only mark orders as delivered
           if (req.user?.role === "shopManager" && status !== "delivered") {
@@ -834,7 +842,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           }
 
           // Roaster can only change status to roasted or dispatched
-          if (req.user?.role=== "roaster" && !["roasted", "dispatched"].includes(status)) {
+          if (req.user?.role === "roaster" && !["roasted", "dispatched"].includes(status)) {
             return res.status(403).json({
               message: "Roasters can only change status to 'roasted' or 'dispatched'"
             });

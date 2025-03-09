@@ -22,8 +22,8 @@ type FormValues = {
   name: string;
   producer: string;
   country: string;
-  currentStock: number;
-  minThreshold: number;
+  currentStock: string;
+  minThreshold: string;
   grade: typeof coffeeGrades[number];
 };
 
@@ -39,12 +39,16 @@ export function GreenCoffeeForm({
 
   const form = useForm<FormValues>({
     resolver: zodResolver(insertGreenCoffeeSchema),
-    defaultValues: coffee || {
+    defaultValues: coffee ? {
+      ...coffee,
+      currentStock: String(coffee.currentStock),
+      minThreshold: String(coffee.minThreshold)
+    } : {
       name: "",
       producer: "",
       country: "",
-      currentStock: 0,
-      minThreshold: 0,
+      currentStock: "0",
+      minThreshold: "0",
       grade: "Premium"
     }
   });
@@ -180,8 +184,8 @@ export function GreenCoffeeForm({
                       <Input
                         type="number"
                         step="0.01"
+                        min="0"
                         {...field}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
                       />
                     </FormControl>
                     <FormMessage />
@@ -199,8 +203,8 @@ export function GreenCoffeeForm({
                       <Input
                         type="number"
                         step="0.01"
+                        min="0"
                         {...field}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
                       />
                     </FormControl>
                     <FormMessage />
