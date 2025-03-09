@@ -13,8 +13,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 type RestockDialogProps = {
   open: boolean;
@@ -30,6 +32,8 @@ type CoffeeWithQuantity = {
 };
 
 type InventoryItem = {
+  id: number;
+  shopId: number;
   greenCoffeeId: number;
   smallBags: number;
   largeBags: number;
@@ -39,24 +43,48 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
   const { toast } = useToast();
   const [quantities, setQuantities] = useState<Record<number, { small: number; large: number }>>({});
 
+  // Fetch current inventory for the selected shop
+  const { data: currentInventory, isLoading: loadingInventory } = useQuery<InventoryItem[]>({
+    queryKey: ["/api/retail-inventory", shopId],
+    enabled: open && !!shopId,
+    queryFn: async () => {
+      const url = `/api/retail-inventory?shopId=${shopId}`;
+      console.log("Fetching inventory for shop:", shopId);
+      const res = await apiRequest("GET", url);
+      if (!res.ok) throw new Error("Failed to fetch inventory");
+      const data = await res.json();
+      console.log("Received inventory data:", data);
+      return data;
+    },
+  });
+
   // Fetch available coffees
   const { data: coffees, isLoading: loadingCoffees } = useQuery<CoffeeWithQuantity[]>({
     queryKey: ["/api/green-coffee"],
     enabled: open,
   });
 
-  // Fetch current inventory
-  const { data: currentInventory, isLoading: loadingInventory } = useQuery<InventoryItem[]>({
-    queryKey: ["/api/retail-inventory", shopId],
-    enabled: open && !!shopId,
-    queryFn: async () => {
-      const res = await apiRequest("GET", `/api/retail-inventory?shopId=${shopId}`);
-      if (!res.ok) throw new Error("Failed to fetch inventory");
-      return res.json();
-    },
+  // Sort coffees by current stock
+  const sortedCoffees = coffees?.slice().sort((a, b) => {
+    const aInventory = currentInventory?.find(inv => inv.greenCoffeeId === a.id);
+    const bInventory = currentInventory?.find(inv => inv.greenCoffeeId === b.id);
+
+    const aTotal = (aInventory?.smallBags || 0) + (aInventory?.largeBags || 0);
+    const bTotal = (bInventory?.smallBags || 0) + (bInventory?.largeBags || 0);
+
+    // First sort by whether there's any stock
+    if (aTotal > 0 && bTotal === 0) return -1;
+    if (aTotal === 0 && bTotal > 0) return 1;
+
+    // Then sort by total stock in descending order
+    return bTotal - aTotal;
   });
 
-  // Create order mutation
+  const isStockLow = (smallBags: number, largeBags: number) => {
+    // Consider stock low if total bags is less than 10
+    return (smallBags + largeBags) < 10;
+  };
+
   const createOrderMutation = useMutation({
     mutationFn: async (orderData: any) => {
       const res = await apiRequest("POST", "/api/orders", orderData);
@@ -102,21 +130,6 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
     });
   };
 
-  const sortedCoffees = coffees?.slice().sort((a, b) => {
-    const aInventory = currentInventory?.find(inv => inv.greenCoffeeId === a.id);
-    const bInventory = currentInventory?.find(inv => inv.greenCoffeeId === b.id);
-
-    const aTotal = (aInventory?.smallBags || 0) + (aInventory?.largeBags || 0);
-    const bTotal = (bInventory?.smallBags || 0) + (bInventory?.largeBags || 0);
-
-    // First sort by whether there's any stock
-    if (aTotal > 0 && bTotal === 0) return -1;
-    if (aTotal === 0 && bTotal > 0) return 1;
-
-    // Then sort by total stock in descending order
-    return bTotal - aTotal;
-  });
-
   const isLoading = loadingCoffees || loadingInventory;
 
   return (
@@ -157,13 +170,31 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
                 <TableBody>
                   {sortedCoffees?.map((coffee) => {
                     const currentStock = currentInventory?.find(inv => inv.greenCoffeeId === coffee.id);
+                    const isLowStock = isStockLow(currentStock?.smallBags || 0, currentStock?.largeBags || 0);
+
                     return (
                       <TableRow key={coffee.id}>
                         <TableCell className="font-medium">{coffee.name}</TableCell>
                         <TableCell>{coffee.producer}</TableCell>
                         <TableCell className="text-right">
-                          <div>Small: {currentStock?.smallBags || 0}</div>
-                          <div>Large: {currentStock?.largeBags || 0}</div>
+                          <div className={cn(
+                            "flex flex-col items-end",
+                            isLowStock && "text-red-500"
+                          )}>
+                            <div className="flex items-center gap-2">
+                              {isLowStock && (
+                                <AlertTriangle className="h-4 w-4" />
+                              )}
+                              <Badge variant={isLowStock ? "destructive" : "secondary"}>
+                                Small: {currentStock?.smallBags || 0}
+                              </Badge>
+                            </div>
+                            <div className="mt-1">
+                              <Badge variant={isLowStock ? "destructive" : "secondary"}>
+                                Large: {currentStock?.largeBags || 0}
+                              </Badge>
+                            </div>
+                          </div>
                         </TableCell>
                         <TableCell className="text-center">
                           <Input
@@ -204,11 +235,8 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
           </Button>
           <Button 
             onClick={handleSubmit}
-            disabled={createOrderMutation.isPending || !shopId}
+            disabled={!shopId}
           >
-            {createOrderMutation.isPending ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : null}
             Submit Order
           </Button>
         </DialogFooter>

@@ -3,6 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useActiveShop } from "@/hooks/use-active-shop";
 
 import {
   Form,
@@ -28,7 +29,7 @@ const retailInventorySchema = z.object({
 type InventoryFormValues = z.infer<typeof retailInventorySchema>;
 
 interface RetailInventoryFormProps {
-  shopId: number;
+  shopId?: number;
   coffeeId: number;
   currentSmallBags: number;
   currentLargeBags: number;
@@ -37,7 +38,7 @@ interface RetailInventoryFormProps {
 }
 
 export function RetailInventoryForm({
-  shopId,
+  shopId: propShopId,
   coffeeId,
   currentSmallBags,
   currentLargeBags,
@@ -45,6 +46,26 @@ export function RetailInventoryForm({
   onSuccess,
 }: RetailInventoryFormProps) {
   const { toast } = useToast();
+  const { activeShop } = useActiveShop();
+
+  // Use either the prop shopId or activeShop.id
+  const shopId = propShopId || activeShop?.id;
+
+  console.log("RetailInventoryForm render:", {
+    propShopId,
+    activeShopId: activeShop?.id,
+    resultingShopId: shopId,
+    coffeeId
+  });
+
+  if (!shopId) {
+    console.error("Missing shop ID in RetailInventoryForm");
+    return (
+      <div className="text-center text-muted-foreground p-4">
+        Please select a shop to edit inventory
+      </div>
+    );
+  }
 
   const form = useForm<InventoryFormValues>({
     resolver: zodResolver(retailInventorySchema),
@@ -58,6 +79,7 @@ export function RetailInventoryForm({
   });
 
   const updateInventoryMutation = async (data: InventoryFormValues) => {
+    console.log("Updating inventory with data:", data);
     const response = await apiRequest("POST", "/api/retail-inventory", {
       ...data,
       updateType: "manual",
@@ -95,65 +117,82 @@ export function RetailInventoryForm({
   });
 
   return (
-    <Form {...form}>
-      <form onSubmit={onSubmit} className="space-y-4">
+    <div className="space-y-4">
+      <div>
         <h3 className="text-lg font-medium">{coffeeName}</h3>
-        <div className="grid grid-cols-2 gap-4">
+      </div>
+
+      <Form {...form}>
+        <form onSubmit={onSubmit}>
+          <input type="hidden" name="shopId" value={shopId} />
+          <input type="hidden" name="greenCoffeeId" value={coffeeId} />
+
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <FormField
+              control={form.control}
+              name="smallBags"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Small Bags (200g)</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="number" 
+                      min="0" 
+                      {...field} 
+                      className="text-right" 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="largeBags"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Large Bags (1kg)</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="number" 
+                      min="0" 
+                      {...field} 
+                      className="text-right" 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
           <FormField
             control={form.control}
-            name="smallBags"
+            name="notes"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Small Bags (200g)</FormLabel>
+                <FormLabel>Notes (optional)</FormLabel>
                 <FormControl>
-                  <Input type="number" min="0" {...field} />
+                  <Textarea
+                    placeholder="Add any notes about this inventory update"
+                    className="resize-none"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
 
-          <FormField
-            control={form.control}
-            name="largeBags"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Large Bags (1kg)</FormLabel>
-                <FormControl>
-                  <Input type="number" min="0" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
-        <FormField
-          control={form.control}
-          name="notes"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Notes (optional)</FormLabel>
-              <FormControl>
-                <Textarea
-                  placeholder="Add any notes about this inventory update"
-                  className="resize-none"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <Button 
-          type="submit" 
-          className="w-full"
-          disabled={form.formState.isSubmitting}
-        >
-          Update Inventory
-        </Button>
-      </form>
-    </Form>
+          <Button 
+            type="submit" 
+            className="w-full mt-4"
+          >
+            Update Inventory
+          </Button>
+        </form>
+      </Form>
+    </div>
   );
 }

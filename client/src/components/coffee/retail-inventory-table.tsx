@@ -81,14 +81,20 @@ export function RetailInventoryTable() {
     queryKey: ["/api/retail-inventory", activeShop?.id],
     queryFn: async () => {
       console.log("Fetching retail inventory for shop:", activeShop?.id);
-      const url = activeShop?.id ? `/api/retail-inventory?shopId=${activeShop.id}` : "/api/retail-inventory";
+      if (!activeShop?.id) {
+        console.log("No active shop selected");
+        return [];
+      }
+      const url = `/api/retail-inventory?shopId=${activeShop.id}`;
       const res = await apiRequest("GET", url);
       if (!res.ok) {
         throw new Error("Failed to fetch inventory");
       }
-      return res.json();
+      const data = await res.json();
+      console.log("Fetched inventory data:", data);
+      return data;
     },
-    enabled: Boolean(user)
+    enabled: Boolean(user && activeShop?.id) // Only fetch when both user and activeShop are available
   });
 
   const { data: history, isLoading: loadingHistory } = useQuery<HistoryItem[]>({
@@ -144,7 +150,7 @@ export function RetailInventoryTable() {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  const recentHistory = history?.filter(h => 
+  const recentHistory = history?.filter(h =>
     new Date(h.updatedAt) > thirtyDaysAgo
   ) || [];
 
@@ -197,7 +203,7 @@ export function RetailInventoryTable() {
                             );
                           })()}
                         </TableCell>
-                        {canEditInventory && (
+                        {canEditInventory && activeShop?.id && (
                           <TableCell>
                             <Dialog>
                               <DialogTrigger asChild>
@@ -209,8 +215,8 @@ export function RetailInventoryTable() {
                                 <DialogHeader>
                                   <DialogTitle>Update Inventory</DialogTitle>
                                 </DialogHeader>
-                                <RetailInventoryForm 
-                                  shopId={item.shopId}
+                                <RetailInventoryForm
+                                  shopId={activeShop.id} // Pass the active shop ID explicitly
                                   coffeeId={item.coffeeId}
                                   currentSmallBags={item.smallBags}
                                   currentLargeBags={item.largeBags}
@@ -259,7 +265,7 @@ export function RetailInventoryTable() {
                                 <TableCell>
                                   <span className={cn(
                                     "capitalize px-2 py-1 rounded-full text-xs",
-                                    h.updateType === "manual" 
+                                    h.updateType === "manual"
                                       ? "bg-blue-100 text-blue-700"
                                       : "bg-green-100 text-green-700"
                                   )}>
