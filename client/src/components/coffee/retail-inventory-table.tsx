@@ -1,11 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
-import { useActiveShop, useAutoSelectShop } from "@/hooks/use-active-shop";
+import { useActiveShop } from "@/hooks/use-active-shop";
 import { apiRequest } from "@/lib/queryClient";
 import { cn, formatDate } from "@/lib/utils";
 import { Loader2, Package, Edit } from "lucide-react";
 import { RetailInventoryForm } from "./retail-inventory-form";
-import { useToast } from "@/hooks/use-toast";
 import {
   Card,
   CardContent,
@@ -31,8 +30,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { StockStatus } from "./stock-status";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {Accordion, AccordionContent, AccordionItem, AccordionTrigger} from "@/components/ui/accordion";
-
+import { Skeleton } from "@/components/ui/skeleton";
 
 type InventoryItem = {
   id: number;
@@ -55,39 +53,31 @@ type InventoryItem = {
 export function RetailInventoryTable() {
   const { user } = useAuth();
   const { activeShop } = useActiveShop();
-  const { toast } = useToast();
-  useAutoSelectShop(); // Auto-select shop for barista users
 
   // Check if user can edit inventory
   const canEditInventory = ["owner", "shopManager", "retailOwner", "barista"].includes(user?.role || "");
 
-  // Fetch inventory data
+  // Only fetch inventory when we have both user and active shop
   const { data: inventory, isLoading: loadingInventory } = useQuery<InventoryItem[]>({
     queryKey: ["/api/retail-inventory", activeShop?.id],
     queryFn: async () => {
-      console.log("Fetching retail inventory for shop:", activeShop?.id);
-
-      if (!activeShop?.id) {
-        console.log("No active shop selected");
-        return [];
-      }
-
-      const res = await apiRequest("GET", `/api/retail-inventory?shopId=${activeShop.id}`);
+      const res = await apiRequest("GET", `/api/retail-inventory?shopId=${activeShop?.id}`);
       if (!res.ok) {
         throw new Error("Failed to fetch inventory");
       }
-
-      const data = await res.json();
-      console.log("Fetched inventory data:", data);
-      return data;
+      return res.json();
     },
-    enabled: Boolean(user && activeShop?.id)
+    enabled: Boolean(user && activeShop?.id), // Only fetch when both user and shop are available
+    staleTime: 30000, // Cache data for 30 seconds
+    retry: 1, // Only retry once to prevent excessive API calls
   });
 
-  if (loadingInventory) {
+  // Show loading skeleton during initial load
+  if (!user) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-[400px] w-full" />
       </div>
     );
   }
@@ -102,13 +92,21 @@ export function RetailInventoryTable() {
     );
   }
 
+  if (loadingInventory) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
   if (!inventory?.length) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>No Inventory Data</CardTitle>
           <CardDescription>
-            No coffee inventory found for the selected shop
+            No coffee inventory found for {activeShop.name}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -126,7 +124,7 @@ export function RetailInventoryTable() {
       <CardHeader>
         <CardTitle>Current Inventory</CardTitle>
         <CardDescription>
-          Manage coffee stock levels for {activeShop.shopName}
+          Manage coffee stock levels for {activeShop.name}
         </CardDescription>
       </CardHeader>
       <CardContent>
