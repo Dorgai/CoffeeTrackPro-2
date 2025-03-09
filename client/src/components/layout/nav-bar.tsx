@@ -83,23 +83,6 @@ export function NavBar() {
             </MenubarMenu>
           )}
 
-          {/* Green Coffee Menu */}
-          {canAccessGreenCoffee && (
-            <MenubarMenu>
-              <MenubarTrigger>
-                <Coffee className="h-4 w-4 mr-2" />
-                Green Coffee
-              </MenubarTrigger>
-              <MenubarContent>
-                <MenubarItem>
-                  <Link href="/inventory" className="flex w-full">
-                    Inventory
-                  </Link>
-                </MenubarItem>
-              </MenubarContent>
-            </MenubarMenu>
-          )}
-
           {/* Management Menu */}
           {canManageShops && (
             <MenubarMenu>
@@ -113,20 +96,16 @@ export function NavBar() {
                     Shop Management
                   </Link>
                 </MenubarItem>
-                {canManageUsers && (
-                  <>
-                    <MenubarItem>
-                      <Link href="/user-management" className="flex w-full">
-                        User Management
-                      </Link>
-                    </MenubarItem>
-                    <MenubarItem>
-                      <Link href="/user-shop-management" className="flex w-full">
-                        User-Shop Assignment
-                      </Link>
-                    </MenubarItem>
-                  </>
-                )}
+                <MenubarItem>
+                  <Link href="/user-management" className="flex w-full">
+                    User Management
+                  </Link>
+                </MenubarItem>
+                <MenubarItem>
+                  <Link href="/user-shop-management" className="flex w-full">
+                    User-Shop Assignment
+                  </Link>
+                </MenubarItem>
               </MenubarContent>
             </MenubarMenu>
           )}
