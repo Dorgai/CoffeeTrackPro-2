@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useActiveShop } from "@/hooks/use-active-shop";
 import { apiRequest } from "@/lib/queryClient";
@@ -53,6 +54,8 @@ type InventoryItem = {
 export function RetailInventoryTable() {
   const { user } = useAuth();
   const { activeShop } = useActiveShop();
+  const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   // Check if user can edit inventory
   const canEditInventory = ["owner", "shopManager", "retailOwner", "barista"].includes(user?.role || "");
@@ -119,81 +122,99 @@ export function RetailInventoryTable() {
     );
   }
 
+  const handleEditClick = (item: InventoryItem) => {
+    setSelectedItem(item);
+    setDialogOpen(true);
+  };
+
+  const handleDialogClose = () => {
+    setSelectedItem(null);
+    setDialogOpen(false);
+  };
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Current Inventory</CardTitle>
-        <CardDescription>
-          Manage coffee stock levels for {activeShop.name}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Coffee</TableHead>
-              <TableHead>Producer</TableHead>
-              <TableHead>Grade</TableHead>
-              <TableHead>Stock Levels</TableHead>
-              <TableHead>Last Updated</TableHead>
-              <TableHead>Updated By</TableHead>
-              <TableHead>Method</TableHead>
-              {canEditInventory && <TableHead>Actions</TableHead>}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {inventory.map((item) => (
-              <TableRow key={`${item.shopId}-${item.coffeeId}`}>
-                <TableCell className="font-medium">{item.coffeeName}</TableCell>
-                <TableCell>{item.producer}</TableCell>
-                <TableCell>{item.grade}</TableCell>
-                <TableCell>
-                  <StockStatus
-                    smallBags={item.smallBags}
-                    largeBags={item.largeBags}
-                    isVertical={false}
-                  />
-                </TableCell>
-                <TableCell>{formatDate(item.updatedAt)}</TableCell>
-                <TableCell>{item.updatedByUsername}</TableCell>
-                <TableCell>
-                  <span className={cn(
-                    "capitalize px-2 py-1 rounded-full text-xs",
-                    item.updateType === "manual"
-                      ? "bg-blue-100 text-blue-700"
-                      : "bg-green-100 text-green-700"
-                  )}>
-                    {item.updateType || "manual"}
-                  </span>
-                </TableCell>
-                {canEditInventory && (
-                  <TableCell>
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Update Inventory</DialogTitle>
-                        </DialogHeader>
-                        <RetailInventoryForm
-                          shopId={activeShop.id}
-                          coffeeId={item.coffeeId}
-                          currentSmallBags={item.smallBags}
-                          currentLargeBags={item.largeBags}
-                          coffeeName={item.coffeeName}
-                        />
-                      </DialogContent>
-                    </Dialog>
-                  </TableCell>
-                )}
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Current Inventory</CardTitle>
+          <CardDescription>
+            Manage coffee stock levels for {activeShop.name}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Coffee</TableHead>
+                <TableHead>Producer</TableHead>
+                <TableHead>Grade</TableHead>
+                <TableHead>Stock Levels</TableHead>
+                <TableHead>Last Updated</TableHead>
+                <TableHead>Updated By</TableHead>
+                <TableHead>Method</TableHead>
+                {canEditInventory && <TableHead>Actions</TableHead>}
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+            </TableHeader>
+            <TableBody>
+              {inventory.map((item) => (
+                <TableRow key={`${item.shopId}-${item.coffeeId}`}>
+                  <TableCell className="font-medium">{item.coffeeName}</TableCell>
+                  <TableCell>{item.producer}</TableCell>
+                  <TableCell>{item.grade}</TableCell>
+                  <TableCell>
+                    <StockStatus
+                      smallBags={item.smallBags}
+                      largeBags={item.largeBags}
+                      isVertical={false}
+                    />
+                  </TableCell>
+                  <TableCell>{formatDate(item.updatedAt)}</TableCell>
+                  <TableCell>{item.updatedByUsername}</TableCell>
+                  <TableCell>
+                    <span className={cn(
+                      "capitalize px-2 py-1 rounded-full text-xs",
+                      item.updateType === "manual"
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-green-100 text-green-700"
+                    )}>
+                      {item.updateType || "manual"}
+                    </span>
+                  </TableCell>
+                  {canEditInventory && (
+                    <TableCell>
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={() => handleEditClick(item)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Inventory</DialogTitle>
+          </DialogHeader>
+          {selectedItem && (
+            <RetailInventoryForm
+              shopId={activeShop.id}
+              coffeeId={selectedItem.coffeeId}
+              currentSmallBags={selectedItem.smallBags}
+              currentLargeBags={selectedItem.largeBags}
+              coffeeName={selectedItem.coffeeName}
+              onSuccess={handleDialogClose}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
