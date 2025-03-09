@@ -601,9 +601,10 @@ export default function Dashboard() {
                     <div className="mt-4 space-y-2">
                       {shopInventory.map(inv => {
                         const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
+                        const coffeeName = coffee?.name || 'Unknown Coffee';
                         return (
                           <div key={`${shop.id}-${inv.greenCoffeeId}`} className="p-2 bg-muted rounded">
-                            <div className="text-sm font-medium mb-2">{coffee?.name}</div>
+                            <div className="text-sm font-medium mb-2">{coffeeName}</div>
                             <div className="space-y-2">
                               <StockProgress
                                 current={inv.smallBags || 0}
