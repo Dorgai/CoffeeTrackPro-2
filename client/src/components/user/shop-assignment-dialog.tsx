@@ -37,15 +37,16 @@ export function ShopAssignmentDialog({
   // Fetch all active shops
   const { data: shops, isLoading: loadingShops } = useQuery<Shop[]>({
     queryKey: ["/api/shops"],
-    select: (data) => data.filter(shop => shop.isActive)
+    enabled: open,
+    select: (data) => data.filter(shop => shop.isActive).sort((a, b) => a.name.localeCompare(b.name))
   });
 
   // Fetch user's current shop assignments
-  const { data: userShopIds, isLoading: loadingUserShops } = useQuery<number[]>({
+  const { isLoading: loadingUserShops } = useQuery<number[]>({
     queryKey: ["/api/users", userId, "shops"],
-    enabled: open, // Only fetch when dialog is open
+    enabled: open,
     onSuccess: (data) => {
-      setSelectedShops(data);
+      setSelectedShops(data || []);
     }
   });
 
@@ -84,6 +85,8 @@ export function ShopAssignmentDialog({
     },
   });
 
+  const isLoading = loadingShops || loadingUserShops;
+
   const handleToggleShop = (shopId: number) => {
     setSelectedShops(prev => {
       if (prev.includes(shopId)) {
@@ -97,8 +100,6 @@ export function ShopAssignmentDialog({
   const handleSave = () => {
     assignShopsMutation.mutate(selectedShops);
   };
-
-  const isLoading = loadingShops || loadingUserShops;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -119,15 +120,15 @@ export function ShopAssignmentDialog({
             No active shops available
           </div>
         ) : (
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-4 py-4 max-h-[400px] overflow-y-auto">
             {shops.map(shop => (
-              <div key={shop.id} className="flex items-center space-x-2">
+              <div key={shop.id} className="flex items-center space-x-2 p-2 hover:bg-muted rounded-lg">
                 <Checkbox
                   id={`shop-${shop.id}`}
                   checked={selectedShops.includes(shop.id)}
                   onCheckedChange={() => handleToggleShop(shop.id)}
                 />
-                <Label htmlFor={`shop-${shop.id}`} className="flex-1">
+                <Label htmlFor={`shop-${shop.id}`} className="flex-1 cursor-pointer">
                   {shop.name}
                   <span className="text-muted-foreground ml-2">
                     ({shop.location})
@@ -142,6 +143,7 @@ export function ShopAssignmentDialog({
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
+            disabled={assignShopsMutation.isPending}
           >
             Cancel
           </Button>
