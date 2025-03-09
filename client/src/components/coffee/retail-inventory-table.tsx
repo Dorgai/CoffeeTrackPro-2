@@ -26,7 +26,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogPortal,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { StockStatus } from "./stock-status";
@@ -55,21 +54,16 @@ export function RetailInventoryTable() {
   const { user } = useAuth();
   const { activeShop } = useActiveShop();
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  // Check if user can edit inventory
   const canEditInventory = ["owner", "shopManager", "retailOwner", "barista"].includes(user?.role || "");
 
   const { data: inventory, isLoading: loadingInventory } = useQuery<InventoryItem[]>({
     queryKey: ["/api/retail-inventory", activeShop?.id],
     queryFn: async () => {
-      if (!activeShop?.id) {
-        return [];
-      }
+      if (!activeShop?.id) return [];
       const res = await apiRequest("GET", `/api/retail-inventory?shopId=${activeShop.id}`);
-      if (!res.ok) {
-        throw new Error("Failed to fetch inventory");
-      }
+      if (!res.ok) throw new Error("Failed to fetch inventory");
       return res.json();
     },
     enabled: Boolean(user && activeShop?.id),
@@ -77,7 +71,6 @@ export function RetailInventoryTable() {
     retry: 1,
   });
 
-  // Show loading skeleton during initial load
   if (!user) {
     return (
       <div className="space-y-4">
@@ -123,11 +116,6 @@ export function RetailInventoryTable() {
       </Card>
     );
   }
-
-  const handleEditClick = (item: InventoryItem) => {
-    setSelectedItem(item);
-    setDialogOpen(true);
-  };
 
   return (
     <>
@@ -179,10 +167,13 @@ export function RetailInventoryTable() {
                   </TableCell>
                   {canEditInventory && (
                     <TableCell>
-                      <Button 
-                        variant="ghost" 
+                      <Button
+                        variant="ghost"
                         size="icon"
-                        onClick={() => handleEditClick(item)}
+                        onClick={() => {
+                          setSelectedItem(item);
+                          setIsDialogOpen(true);
+                        }}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -195,26 +186,30 @@ export function RetailInventoryTable() {
         </CardContent>
       </Card>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        {dialogOpen && (
-          <DialogPortal>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Update Inventory</DialogTitle>
-              </DialogHeader>
-              {selectedItem && (
-                <RetailInventoryForm
-                  shopId={activeShop.id}
-                  coffeeId={selectedItem.coffeeId}
-                  currentSmallBags={selectedItem.smallBags}
-                  currentLargeBags={selectedItem.largeBags}
-                  coffeeName={selectedItem.coffeeName}
-                  onSuccess={() => setDialogOpen(false)}
-                />
-              )}
-            </DialogContent>
-          </DialogPortal>
-        )}
+      <Dialog 
+        open={isDialogOpen} 
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedItem(null);
+          }
+          setIsDialogOpen(open);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Inventory</DialogTitle>
+          </DialogHeader>
+          {selectedItem && (
+            <RetailInventoryForm
+              shopId={activeShop.id}
+              coffeeId={selectedItem.coffeeId}
+              currentSmallBags={selectedItem.smallBags}
+              currentLargeBags={selectedItem.largeBags}
+              coffeeName={selectedItem.coffeeName}
+              onSuccess={() => setIsDialogOpen(false)}
+            />
+          )}
+        </DialogContent>
       </Dialog>
     </>
   );
