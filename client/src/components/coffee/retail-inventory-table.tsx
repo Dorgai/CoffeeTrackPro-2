@@ -1,7 +1,7 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
-import { useActiveShop } from "@/hooks/use-active-shop";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useActiveShop, useAutoSelectShop } from "@/hooks/use-active-shop";
+import { apiRequest } from "@/lib/queryClient";
 import { cn, formatDate } from "@/lib/utils";
 import { Loader2, Package, Edit } from "lucide-react";
 import { RetailInventoryForm } from "./retail-inventory-form";
@@ -22,12 +22,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -35,6 +29,10 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { StockStatus } from "./stock-status";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {Accordion, AccordionContent, AccordionItem, AccordionTrigger} from "@/components/ui/accordion";
+
 
 type InventoryItem = {
   id: number;
@@ -54,69 +52,53 @@ type InventoryItem = {
   notes: string | null;
 };
 
-type HistoryItem = {
-  id: number;
-  shopId: number;
-  greenCoffeeId: number;
-  previousSmallBags: number;
-  previousLargeBags: number;
-  newSmallBags: number;
-  newLargeBags: number;
-  updatedAt: string;
-  updateType: "manual" | "dispatch";
-  updatedByUsername: string;
-  coffeeName: string;
-  notes: string | null;
-};
-
 export function RetailInventoryTable() {
   const { user } = useAuth();
   const { activeShop } = useActiveShop();
   const { toast } = useToast();
+  useAutoSelectShop(); // Auto-select shop for barista users
 
   // Check if user can edit inventory
   const canEditInventory = ["owner", "shopManager", "retailOwner", "barista"].includes(user?.role || "");
 
+  // Fetch inventory data
   const { data: inventory, isLoading: loadingInventory } = useQuery<InventoryItem[]>({
     queryKey: ["/api/retail-inventory", activeShop?.id],
     queryFn: async () => {
       console.log("Fetching retail inventory for shop:", activeShop?.id);
+
       if (!activeShop?.id) {
         console.log("No active shop selected");
         return [];
       }
-      const url = `/api/retail-inventory?shopId=${activeShop.id}`;
-      const res = await apiRequest("GET", url);
+
+      const res = await apiRequest("GET", `/api/retail-inventory?shopId=${activeShop.id}`);
       if (!res.ok) {
         throw new Error("Failed to fetch inventory");
       }
+
       const data = await res.json();
       console.log("Fetched inventory data:", data);
       return data;
     },
-    enabled: Boolean(user && activeShop?.id) // Only fetch when both user and activeShop are available
+    enabled: Boolean(user && activeShop?.id)
   });
 
-  const { data: history, isLoading: loadingHistory } = useQuery<HistoryItem[]>({
-    queryKey: ["/api/retail-inventory/history", activeShop?.id],
-    queryFn: async () => {
-      const url = activeShop?.id
-        ? `/api/retail-inventory/history?shopId=${activeShop.id}`
-        : "/api/retail-inventory/history";
-      const res = await apiRequest("GET", url);
-      if (!res.ok) {
-        throw new Error("Failed to fetch history");
-      }
-      return res.json();
-    },
-    enabled: Boolean(user)
-  });
-
-  if (loadingInventory || loadingHistory) {
+  if (loadingInventory) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center p-8">
         <Loader2 className="h-8 w-8 animate-spin" />
       </div>
+    );
+  }
+
+  if (!activeShop?.id) {
+    return (
+      <Alert>
+        <AlertDescription>
+          Please select a shop to view and manage inventory.
+        </AlertDescription>
+      </Alert>
     );
   }
 
@@ -139,153 +121,81 @@ export function RetailInventoryTable() {
     );
   }
 
-  const shopInventory = inventory.reduce<Record<number, InventoryItem[]>>((acc, item) => {
-    if (!acc[item.shopId]) {
-      acc[item.shopId] = [];
-    }
-    acc[item.shopId].push(item);
-    return acc;
-  }, {});
-
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-  const recentHistory = history?.filter(h =>
-    new Date(h.updatedAt) > thirtyDaysAgo
-  ) || [];
-
   return (
-    <div className="space-y-8">
-      {Object.entries(shopInventory).map(([shopId, items]) => {
-        const shopHistory = recentHistory.filter(h => h.shopId === parseInt(shopId));
-        const shop = items[0];
-
-        return (
-          <Card key={shopId}>
-            <CardHeader>
-              <CardTitle>{shop.shopName}</CardTitle>
-              <CardDescription>{shop.shopLocation}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Coffee</TableHead>
-                      <TableHead>Producer</TableHead>
-                      <TableHead>Grade</TableHead>
-                      <TableHead>Small Bags (200g)</TableHead>
-                      <TableHead>Large Bags (1kg)</TableHead>
-                      <TableHead>Last Updated</TableHead>
-                      <TableHead>Updated By</TableHead>
-                      <TableHead>Update Method</TableHead>
-                      {canEditInventory && <TableHead>Actions</TableHead>}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {items.map((item) => (
-                      <TableRow key={`${item.shopId}-${item.coffeeId}`}>
-                        <TableCell className="font-medium">{item.coffeeName}</TableCell>
-                        <TableCell>{item.producer}</TableCell>
-                        <TableCell>{item.grade}</TableCell>
-                        <TableCell>{item.smallBags}</TableCell>
-                        <TableCell>{item.largeBags}</TableCell>
-                        <TableCell>{formatDate(item.updatedAt)}</TableCell>
-                        <TableCell>{item.updatedByUsername}</TableCell>
-                        <TableCell>
-                          {(() => {
-                            const method = item.updateType || "manual";
-                            const bgColor = method === "manual" ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700";
-                            return (
-                              <span className={cn("capitalize px-2 py-1 rounded-full text-xs", bgColor)}>
-                                {method}
-                              </span>
-                            );
-                          })()}
-                        </TableCell>
-                        {canEditInventory && activeShop?.id && (
-                          <TableCell>
-                            <Dialog>
-                              <DialogTrigger asChild>
-                                <Button variant="ghost" size="icon">
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                              </DialogTrigger>
-                              <DialogContent>
-                                <DialogHeader>
-                                  <DialogTitle>Update Inventory</DialogTitle>
-                                </DialogHeader>
-                                <RetailInventoryForm
-                                  shopId={activeShop.id} // Pass the active shop ID explicitly
-                                  coffeeId={item.coffeeId}
-                                  currentSmallBags={item.smallBags}
-                                  currentLargeBags={item.largeBags}
-                                  coffeeName={item.coffeeName}
-                                />
-                              </DialogContent>
-                            </Dialog>
-                          </TableCell>
-                        )}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-
-                {shopHistory.length > 0 && (
-                  <Accordion type="single" collapsible>
-                    <AccordionItem value="history">
-                      <AccordionTrigger>
-                        Recent Changes (Last 30 Days)
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Date</TableHead>
-                              <TableHead>Coffee</TableHead>
-                              <TableHead>Previous Stock</TableHead>
-                              <TableHead>New Stock</TableHead>
-                              <TableHead>Updated By</TableHead>
-                              <TableHead>Update Method</TableHead>
-                              <TableHead>Notes</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {shopHistory.map((h) => (
-                              <TableRow key={h.id}>
-                                <TableCell>{formatDate(h.updatedAt)}</TableCell>
-                                <TableCell>{h.coffeeName}</TableCell>
-                                <TableCell>
-                                  {h.previousSmallBags} small, {h.previousLargeBags} large
-                                </TableCell>
-                                <TableCell>
-                                  {h.newSmallBags} small, {h.newLargeBags} large
-                                </TableCell>
-                                <TableCell>{h.updatedByUsername}</TableCell>
-                                <TableCell>
-                                  <span className={cn(
-                                    "capitalize px-2 py-1 rounded-full text-xs",
-                                    h.updateType === "manual"
-                                      ? "bg-blue-100 text-blue-700"
-                                      : "bg-green-100 text-green-700"
-                                  )}>
-                                    {h.updateType}
-                                  </span>
-                                </TableCell>
-                                <TableCell>{h.notes || '-'}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </AccordionContent>
-                    </AccordionItem>
-                  </Accordion>
+    <Card>
+      <CardHeader>
+        <CardTitle>Current Inventory</CardTitle>
+        <CardDescription>
+          Manage coffee stock levels for {activeShop.shopName}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Coffee</TableHead>
+              <TableHead>Producer</TableHead>
+              <TableHead>Grade</TableHead>
+              <TableHead>Stock Levels</TableHead>
+              <TableHead>Last Updated</TableHead>
+              <TableHead>Updated By</TableHead>
+              <TableHead>Method</TableHead>
+              {canEditInventory && <TableHead>Actions</TableHead>}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {inventory.map((item) => (
+              <TableRow key={`${item.shopId}-${item.coffeeId}`}>
+                <TableCell className="font-medium">{item.coffeeName}</TableCell>
+                <TableCell>{item.producer}</TableCell>
+                <TableCell>{item.grade}</TableCell>
+                <TableCell>
+                  <StockStatus
+                    smallBags={item.smallBags}
+                    largeBags={item.largeBags}
+                    isVertical={false}
+                  />
+                </TableCell>
+                <TableCell>{formatDate(item.updatedAt)}</TableCell>
+                <TableCell>{item.updatedByUsername}</TableCell>
+                <TableCell>
+                  <span className={cn(
+                    "capitalize px-2 py-1 rounded-full text-xs",
+                    item.updateType === "manual"
+                      ? "bg-blue-100 text-blue-700"
+                      : "bg-green-100 text-green-700"
+                  )}>
+                    {item.updateType || "manual"}
+                  </span>
+                </TableCell>
+                {canEditInventory && (
+                  <TableCell>
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Update Inventory</DialogTitle>
+                        </DialogHeader>
+                        <RetailInventoryForm
+                          shopId={activeShop.id}
+                          coffeeId={item.coffeeId}
+                          currentSmallBags={item.smallBags}
+                          currentLargeBags={item.largeBags}
+                          coffeeName={item.coffeeName}
+                        />
+                      </DialogContent>
+                    </Dialog>
+                  </TableCell>
                 )}
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
-    </div>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   );
 }

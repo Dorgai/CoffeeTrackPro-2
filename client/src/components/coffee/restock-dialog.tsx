@@ -13,22 +13,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { StockStatus } from "./stock-status";
 
 type RestockDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   shopId: number | null;
-};
-
-type CoffeeWithQuantity = {
-  id: number;
-  name: string;
-  producer: string;
-  quantity: number;
 };
 
 type InventoryItem = {
@@ -37,6 +29,13 @@ type InventoryItem = {
   greenCoffeeId: number;
   smallBags: number;
   largeBags: number;
+};
+
+type CoffeeWithQuantity = {
+  id: number;
+  name: string;
+  producer: string;
+  quantity: number;
 };
 
 export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps) {
@@ -48,10 +47,15 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
     queryKey: ["/api/retail-inventory", shopId],
     enabled: open && !!shopId,
     queryFn: async () => {
-      const url = `/api/retail-inventory?shopId=${shopId}`;
+      if (!shopId) return [];
+
       console.log("Fetching inventory for shop:", shopId);
-      const res = await apiRequest("GET", url);
-      if (!res.ok) throw new Error("Failed to fetch inventory");
+      const res = await apiRequest("GET", `/api/retail-inventory?shopId=${shopId}`);
+
+      if (!res.ok) {
+        throw new Error("Failed to fetch inventory");
+      }
+
       const data = await res.json();
       console.log("Received inventory data:", data);
       return data;
@@ -63,27 +67,6 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
     queryKey: ["/api/green-coffee"],
     enabled: open,
   });
-
-  // Sort coffees by current stock
-  const sortedCoffees = coffees?.slice().sort((a, b) => {
-    const aInventory = currentInventory?.find(inv => inv.greenCoffeeId === a.id);
-    const bInventory = currentInventory?.find(inv => inv.greenCoffeeId === b.id);
-
-    const aTotal = (aInventory?.smallBags || 0) + (aInventory?.largeBags || 0);
-    const bTotal = (bInventory?.smallBags || 0) + (bInventory?.largeBags || 0);
-
-    // First sort by whether there's any stock
-    if (aTotal > 0 && bTotal === 0) return -1;
-    if (aTotal === 0 && bTotal > 0) return 1;
-
-    // Then sort by total stock in descending order
-    return bTotal - aTotal;
-  });
-
-  const isStockLow = (smallBags: number, largeBags: number) => {
-    // Consider stock low if total bags is less than 10
-    return (smallBags + largeBags) < 10;
-  };
 
   const createOrderMutation = useMutation({
     mutationFn: async (orderData: any) => {
@@ -130,73 +113,76 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
     });
   };
 
+  // Sort coffees by current stock levels
+  const sortedCoffees = coffees?.slice().sort((a, b) => {
+    const aInventory = currentInventory?.find(inv => inv.greenCoffeeId === a.id);
+    const bInventory = currentInventory?.find(inv => inv.greenCoffeeId === b.id);
+
+    const aTotal = (aInventory?.smallBags || 0) + (aInventory?.largeBags || 0);
+    const bTotal = (bInventory?.largeBags || 0) + (bInventory?.smallBags || 0);
+
+    if (aTotal === 0 && bTotal > 0) return 1;
+    if (aTotal > 0 && bTotal === 0) return -1;
+    return bTotal - aTotal;
+  });
+
+  if (!shopId) {
+    return (
+      <DialogContent>
+        <Alert variant="destructive">
+          <AlertDescription>
+            Please select a shop before creating a restock order.
+          </AlertDescription>
+        </Alert>
+      </DialogContent>
+    );
+  }
+
   const isLoading = loadingCoffees || loadingInventory;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] h-[90vh] flex flex-col">
-        <DialogHeader className="flex-shrink-0">
-          <DialogTitle>Create Restock Order</DialogTitle>
-          <DialogDescription>
-            Enter the quantities needed for each coffee type
-          </DialogDescription>
-        </DialogHeader>
+    <DialogContent className="sm:max-w-[700px] h-[90vh] flex flex-col">
+      <DialogHeader>
+        <DialogTitle>Create Restock Order</DialogTitle>
+        <DialogDescription>
+          Review current stock levels and enter quantities needed for each coffee type
+        </DialogDescription>
+      </DialogHeader>
 
-        {!shopId && (
-          <Alert variant="destructive" className="mb-4 flex-shrink-0">
-            <AlertDescription>
-              Please select a shop before creating a restock order.
-            </AlertDescription>
-          </Alert>
-        )}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto pr-2 -mr-2">
+          <Table>
+            <TableHeader className="sticky top-0 bg-background">
+              <TableRow>
+                <TableHead className="w-[200px]">Coffee</TableHead>
+                <TableHead className="w-[200px]">Producer</TableHead>
+                <TableHead className="w-[150px]">Current Stock</TableHead>
+                <TableHead className="text-center">Order</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedCoffees?.map((coffee) => {
+                const currentStock = currentInventory?.find(inv => inv.greenCoffeeId === coffee.id);
 
-        {isLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin" />
-          </div>
-        ) : (
-          <div className="flex-1 overflow-y-auto pr-2 -mr-2">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader className="sticky top-0 bg-background">
-                  <TableRow>
-                    <TableHead className="w-[200px]">Coffee</TableHead>
-                    <TableHead className="w-[200px]">Producer</TableHead>
-                    <TableHead className="text-right w-[150px]">Current Stock</TableHead>
-                    <TableHead className="text-center w-[120px]">Small Bags</TableHead>
-                    <TableHead className="text-center w-[120px]">Large Bags</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedCoffees?.map((coffee) => {
-                    const currentStock = currentInventory?.find(inv => inv.greenCoffeeId === coffee.id);
-                    const isLowStock = isStockLow(currentStock?.smallBags || 0, currentStock?.largeBags || 0);
-
-                    return (
-                      <TableRow key={coffee.id}>
-                        <TableCell className="font-medium">{coffee.name}</TableCell>
-                        <TableCell>{coffee.producer}</TableCell>
-                        <TableCell className="text-right">
-                          <div className={cn(
-                            "flex flex-col items-end",
-                            isLowStock && "text-red-500"
-                          )}>
-                            <div className="flex items-center gap-2">
-                              {isLowStock && (
-                                <AlertTriangle className="h-4 w-4" />
-                              )}
-                              <Badge variant={isLowStock ? "destructive" : "secondary"}>
-                                Small: {currentStock?.smallBags || 0}
-                              </Badge>
-                            </div>
-                            <div className="mt-1">
-                              <Badge variant={isLowStock ? "destructive" : "secondary"}>
-                                Large: {currentStock?.largeBags || 0}
-                              </Badge>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center">
+                return (
+                  <TableRow key={coffee.id}>
+                    <TableCell className="font-medium">{coffee.name}</TableCell>
+                    <TableCell>{coffee.producer}</TableCell>
+                    <TableCell>
+                      <StockStatus
+                        smallBags={currentStock?.smallBags || 0}
+                        largeBags={currentStock?.largeBags || 0}
+                        showWarning={true}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-4">
+                        <div className="flex-1">
+                          <div className="text-sm font-medium mb-1">Small Bags (200g)</div>
                           <Input
                             type="number"
                             min="0"
@@ -205,10 +191,10 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
                               ...prev,
                               [coffee.id]: { ...prev[coffee.id], small: parseInt(e.target.value) || 0 }
                             }))}
-                            className="w-20 mx-auto"
                           />
-                        </TableCell>
-                        <TableCell className="text-center">
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-sm font-medium mb-1">Large Bags (1kg)</div>
                           <Input
                             type="number"
                             min="0"
@@ -217,30 +203,32 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
                               ...prev,
                               [coffee.id]: { ...prev[coffee.id], large: parseInt(e.target.value) || 0 }
                             }))}
-                            className="w-20 mx-auto"
                           />
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-        )}
+                        </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
-        <DialogFooter className="flex-shrink-0 mt-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleSubmit}
-            disabled={!shopId}
-          >
-            Submit Order
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      <DialogFooter className="mt-4">
+        <Button variant="outline" onClick={() => onOpenChange(false)}>
+          Cancel
+        </Button>
+        <Button 
+          onClick={handleSubmit}
+          disabled={!shopId || createOrderMutation.isPending}
+        >
+          {createOrderMutation.isPending ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : null}
+          Submit Order
+        </Button>
+      </DialogFooter>
+    </DialogContent>
   );
 }

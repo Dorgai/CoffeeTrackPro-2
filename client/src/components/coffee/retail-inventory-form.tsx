@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // Define schema for retail inventory form
 const retailInventorySchema = z.object({
@@ -61,9 +62,11 @@ export function RetailInventoryForm({
   if (!shopId) {
     console.error("Missing shop ID in RetailInventoryForm");
     return (
-      <div className="text-center text-muted-foreground p-4">
-        Please select a shop to edit inventory
-      </div>
+      <Alert>
+        <AlertDescription>
+          Please select a shop to edit inventory. If you are a barista, try refreshing the page.
+        </AlertDescription>
+      </Alert>
     );
   }
 
@@ -78,24 +81,18 @@ export function RetailInventoryForm({
     },
   });
 
-  const updateInventoryMutation = async (data: InventoryFormValues) => {
-    console.log("Updating inventory with data:", data);
-    const response = await apiRequest("POST", "/api/retail-inventory", {
-      ...data,
-      updateType: "manual",
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || "Failed to update inventory");
-    }
-
-    return response.json();
-  };
-
   const onSubmit = form.handleSubmit(async (data) => {
     try {
-      await updateInventoryMutation(data);
+      console.log("Submitting inventory update:", data);
+      const response = await apiRequest("POST", "/api/retail-inventory", {
+        ...data,
+        updateType: "manual",
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to update inventory");
+      }
 
       // Invalidate queries to refresh data
       await queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory"] });
@@ -108,6 +105,7 @@ export function RetailInventoryForm({
 
       if (onSuccess) onSuccess();
     } catch (error) {
+      console.error("Error updating inventory:", error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to update inventory",
@@ -139,7 +137,6 @@ export function RetailInventoryForm({
                       type="number" 
                       min="0" 
                       {...field} 
-                      className="text-right" 
                     />
                   </FormControl>
                   <FormMessage />
@@ -158,7 +155,6 @@ export function RetailInventoryForm({
                       type="number" 
                       min="0" 
                       {...field} 
-                      className="text-right" 
                     />
                   </FormControl>
                   <FormMessage />
@@ -188,6 +184,7 @@ export function RetailInventoryForm({
           <Button 
             type="submit" 
             className="w-full mt-4"
+            disabled={form.formState.isSubmitting}
           >
             Update Inventory
           </Button>
