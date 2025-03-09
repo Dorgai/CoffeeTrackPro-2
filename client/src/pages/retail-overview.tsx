@@ -3,8 +3,7 @@ import { Loader2, Package, ShoppingCart } from "lucide-react";
 import { Shop } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/queryClient";
-import { DispatchedCoffeeConfirmation } from "@/components/coffee/dispatched-coffee-confirmation";
-import { InventoryDiscrepancyView } from "@/components/coffee/inventory-discrepancy-view";
+import { RetailInventoryList } from "@/components/coffee/retail-inventory-list";
 import { ShopSelector } from "@/components/layout/shop-selector";
 import { useActiveShop } from "@/hooks/use-active-shop";
 import {
@@ -158,8 +157,6 @@ export default function RetailOverview() {
         <ShopSelector />
       </div>
 
-      {user?.role === "roasteryOwner" && <InventoryDiscrepancyView />}
-
       {Object.entries(shopData).length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
           {activeShop?.id ? "No data available for selected shop" : "No shop data available"}
@@ -169,10 +166,6 @@ export default function RetailOverview() {
           <div key={shopId} className="space-y-6 pb-8 border-b last:border-0">
             <h2 className="text-2xl font-semibold">{data.shopName}</h2>
             <p className="text-muted-foreground">{data.shopLocation}</p>
-
-            {["owner", "roasteryOwner", "shopManager", "barista"].includes(user?.role || "") && (
-              <DispatchedCoffeeConfirmation shopId={parseInt(shopId)} />
-            )}
 
             <Card>
               <CardHeader>

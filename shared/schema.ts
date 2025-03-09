@@ -49,7 +49,8 @@ export const retailInventory = pgTable("retail_inventory", {
   greenCoffeeId: integer("green_coffee_id").notNull().references(() => greenCoffee.id),
   smallBags: integer("small_bags").notNull().default(0),
   largeBags: integer("large_bags").notNull().default(0),
-  createdAt: timestamp("created_at").defaultNow(),
+  updatedById: integer("updated_by_id").references(() => users.id),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const orders = pgTable("orders", {
@@ -113,23 +114,3 @@ export type InsertRetailInventory = z.infer<typeof insertRetailInventorySchema>;
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type InsertRoastingBatch = z.infer<typeof insertRoastingBatchSchema>;
 export type InsertUserShop = z.infer<typeof insertUserShopSchema>;
-
-// Add the dispatched coffee confirmation table and types
-export const dispatchedCoffeeConfirmation = pgTable("dispatched_coffee_confirmation", {
-  id: serial("id").primaryKey(),
-  shopId: integer("shop_id").notNull().references(() => shops.id),
-  greenCoffeeId: integer("green_coffee_id").notNull().references(() => greenCoffee.id),
-  dispatchedSmallBags: integer("dispatched_small_bags").notNull(),
-  dispatchedLargeBags: integer("dispatched_large_bags").notNull(),
-  receivedSmallBags: integer("received_small_bags"),
-  receivedLargeBags: integer("received_large_bags"),
-  status: text("status", { enum: ["pending", "confirmed"] }).notNull(),
-  confirmedById: integer("confirmed_by_id").references(() => users.id),
-  confirmedAt: timestamp("confirmed_at"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const insertDispatchedCoffeeConfirmationSchema = createInsertSchema(dispatchedCoffeeConfirmation);
-
-export type DispatchedCoffeeConfirmation = typeof dispatchedCoffeeConfirmation.$inferSelect;
-export type InsertDispatchedCoffeeConfirmation = z.infer<typeof insertDispatchedCoffeeConfirmationSchema>;

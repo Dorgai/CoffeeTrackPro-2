@@ -1,4 +1,4 @@
-import { type RoastingBatch, type InsertRoastingBatch, roastingBatches, users, type User, type Shop, type InsertShop, shops, userShops, type GreenCoffee, type InsertGreenCoffee, greenCoffee, type Order, type InsertOrder, orders, type DispatchedCoffeeConfirmation, type InsertDispatchedCoffeeConfirmation, dispatchedCoffeeConfirmation, type InsertUser, retailInventory } from "@shared/schema";
+import { type RoastingBatch, type InsertRoastingBatch, roastingBatches, users, type User, type Shop, type InsertShop, shops, userShops, type GreenCoffee, type InsertGreenCoffee, greenCoffee, type Order, type InsertOrder, orders, retailInventory } from "@shared/schema";
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
 import session from "express-session";
@@ -10,7 +10,7 @@ const PostgresSessionStore = connectPg(session);
 
 export class DatabaseStorage {
   sessionStore: session.Store;
-  db = db; // Expose db instance for direct queries
+  db = db;
 
   constructor() {
     this.sessionStore = new PostgresSessionStore({
@@ -201,19 +201,6 @@ export class DatabaseStorage {
     } catch (error) {
       console.error("Error removing all user shops:", error);
       throw error;
-    }
-  }
-
-  async getDispatchConfirmation(id: number): Promise<DispatchedCoffeeConfirmation | undefined> {
-    try {
-      const [confirmation] = await db
-        .select()
-        .from(dispatchedCoffeeConfirmation)
-        .where(eq(dispatchedCoffeeConfirmation.id, id));
-      return confirmation;
-    } catch (error) {
-      console.error("Error getting dispatch confirmation:", error);
-      return undefined;
     }
   }
 
@@ -700,68 +687,54 @@ export class DatabaseStorage {
     try {
       console.log("Updating order status:", id, "with data:", data);
 
-      // Get the current user's role
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, data.updatedById));
+      return await db.transaction(async (tx) => {
+        // Get the current order to compare with new status
+        const [currentOrder] = await tx
+          .select()
+          .from(orders)
+          .where(eq(orders.id, id));
 
-      // Check permissions based on role and status
-      if (!user) {
-        throw new Error("User not found");
-      }
+        if (!currentOrder) {
+          throw new Error("Order not found");
+        }
 
-      // RoasteryOwners can update to any status
-      if (user.role === "roasteryOwner") {
-        const [order] = await db
+        // Update order status
+        const [updatedOrder] = await tx
           .update(orders)
           .set(data)
           .where(eq(orders.id, id))
           .returning();
-        console.log("Updated order:", order);
-        return order;
-      }
 
-      // Get current order status
-      const [currentOrder] = await db
-        .select()
-        .from(orders)
-        .where(eq(orders.id, id));
+        // If status is being changed to "dispatched", update retail inventory
+        if (data.status === "dispatched" && currentOrder.status !== "dispatched") {
+          console.log("Updating retail inventory for dispatched order");
 
-      if (!currentOrder) {
-        throw new Error("Order not found");
-      }
+          // Update or insert into retail inventory
+          await tx
+            .insert(retailInventory)
+            .values({
+              shopId: currentOrder.shopId,
+              greenCoffeeId: currentOrder.greenCoffeeId,
+              smallBags: data.smallBags || currentOrder.smallBags,
+              largeBags: data.largeBags || currentOrder.largeBags,
+              updatedById: data.updatedById,
+              updatedAt: new Date()
+            })
+            .onConflictDoUpdate({
+              target: [retailInventory.shopId, retailInventory.greenCoffeeId],
+              set: {
+                smallBags: sql`retail_inventory.small_bags + ${data.smallBags || currentOrder.smallBags}`,
+                largeBags: sql`retail_inventory.large_bags + ${data.largeBags || currentOrder.largeBags}`,
+                updatedById: data.updatedById,
+                updatedAt: new Date()
+              }
+            });
 
-      // Roasters can update pending orders to roasted, and roasted orders to dispatched
-      if (user.role === "roaster") {
-        if (
-          (currentOrder.status === "pending" && data.status === "roasted") ||
-          (currentOrder.status === "roasted" && data.status === "dispatched")
-        ) {
-          const [order] = await db
-            .update(orders)
-            .set(data)
-            .where(eq(orders.id, id))
-            .returning();
-          return order;
+          console.log("Successfully updated retail inventory");
         }
-        throw new Error("Invalid status transition for roaster");
-      }
 
-      // Shop managers can only mark dispatched orders as delivered
-      if (user.role === "shopManager") {
-        if (currentOrder.status === "dispatched" && data.status === "delivered") {
-          const [order] = await db
-            .update(orders)
-            .set(data)
-            .where(eq(orders.id, id))
-            .returning();
-          return order;
-        }
-        throw new Error("Shop managers can only mark dispatched orders as delivered");
-      }
-
-      throw new Error("Insufficient permissions to update order status");
+        return updatedOrder;
+      });
     } catch (error) {
       console.error("Error updating order status:", error);
       throw error;
@@ -810,167 +783,6 @@ export class DatabaseStorage {
     }
   }
 
-  // Add dispatched coffee confirmation methods
-  async getDispatchedCoffeeConfirmations(shopId: number): Promise<any[]> {
-    try {
-      console.log("Fetching confirmations for shop:", shopId);
-      const query = sql`
-        SELECT 
-          dc.id,
-          dc.shop_id as "shopId",
-          dc.green_coffee_id as "greenCoffeeId",
-          dc.dispatched_small_bags as "dispatchedSmallBags",
-          dc.dispatched_large_bags as "dispatchedLargeBags",
-          dc.received_small_bags as "receivedSmallBags",
-          dc.received_large_bags as "receivedLargeBags",
-          dc.status,
-          dc.confirmed_at as "confirmedAt",
-          dc.created_at as "createdAt",
-          s.name as "shopName",
-          s.location as "shopLocation",
-          gc.name as "coffeeName",
-          gc.producer,
-          u.username as "confirmedBy"
-        FROM dispatched_coffee_confirmation dc
-        LEFT JOIN shops s ON dc.shop_id = s.id
-        LEFT JOIN green_coffee gc ON dc.green_coffee_id = gc.id
-        LEFT JOIN users u ON dc.confirmed_by_id = u.id
-        WHERE dc.shop_id = ${shopId}
-        AND dc.status = 'pending'
-        ORDER BY dc.created_at DESC`;
-
-      const result = await db.execute(query);
-      console.log("Found confirmations:", result.rows.length);
-      if (result.rows.length > 0) {
-        console.log("Sample confirmation:", result.rows[0]);
-      }
-      return result.rows;
-    } catch (error) {
-      console.error("Error getting dispatched coffee confirmations:", error);
-      return [];
-    }
-  }
-
-  async createDispatchedCoffeeConfirmation(data: InsertDispatchedCoffeeConfirmation): Promise<DispatchedCoffeeConfirmation> {
-    try {
-      const [confirmation] = await db
-        .insert(dispatchedCoffeeConfirmation)
-        .values(data)
-        .returning();
-      return confirmation;
-    } catch (error) {
-      console.error("Error creating dispatch confirmation:", error);
-      throw error;
-    }
-  }
-
-  async confirmDispatchedCoffee(
-    id: number,
-    data: {
-      receivedSmallBags: number;
-      receivedLargeBags: number;
-      confirmedById: number;
-    }
-  ): Promise<DispatchedCoffeeConfirmation> {
-    try {
-      // Begin transaction
-      return await db.transaction(async (tx) => {
-        // 1. Get and validate the confirmation
-        const [confirmation] = await tx
-          .select()
-          .from(dispatchedCoffeeConfirmation)
-          .where(eq(dispatchedCoffeeConfirmation.id, id));
-
-        if (!confirmation) {
-          throw new Error("Confirmation not found");
-        }
-
-        if (confirmation.status !== "pending") {
-          throw new Error("Confirmation is not in pending status");
-        }
-
-        // 2. Update inventory first
-        await tx
-          .insert(retailInventory)
-          .values({
-            shopId: confirmation.shopId,
-            greenCoffeeId: confirmation.greenCoffeeId,
-            smallBags: data.receivedSmallBags,
-            largeBags: data.receivedLargeBags,
-            updatedById: data.confirmedById,
-            updatedAt: new Date()
-          })
-          .onConflictDoUpdate({
-            target: [retailInventory.shopId, retailInventory.greenCoffeeId],
-            set: {
-              smallBags: data.receivedSmallBags,
-              largeBags: data.receivedLargeBags,
-              updatedById: data.confirmedById,
-              updatedAt: new Date()
-            }
-          });
-
-        // 3. Update confirmation status
-        const [updatedConfirmation] = await tx
-          .update(dispatchedCoffeeConfirmation)
-          .set({
-            receivedSmallBags: data.receivedSmallBags,
-            receivedLargeBags: data.receivedLargeBags,
-            confirmedById: data.confirmedById,
-            status: "confirmed" as const,
-            confirmedAt: new Date()
-          })
-          .where(eq(dispatchedCoffeeConfirmation.id, id))
-          .returning();
-
-        if (!updatedConfirmation) {
-          throw new Error("Failed to update confirmation");
-        }
-
-        return updatedConfirmation;
-      });
-    } catch (error) {
-      console.error("Error in confirmDispatchedCoffee:", error);
-      throw error;
-    }
-  }
-  async getAllDispatchedCoffeeConfirmations(): Promise<any[]> {
-    try {
-      console.log("Fetching all dispatched coffee confirmations");
-      const query = sql`
-        SELECT 
-          dc.id,
-          dc.shop_id as "shopId",
-          dc.green_coffee_id as "greenCoffeeId",
-          dc.dispatched_small_bags as "dispatchedSmallBags",
-          dc.dispatched_large_bags as "dispatchedLargeBags",
-          dc.received_small_bags as "receivedSmallBags",
-          dc.received_large_bags as "receivedLargeBags",
-          dc.status,
-          dc.confirmed_at as "confirmedAt",
-          dc.created_at as "createdAt",
-          s.name as "shopName",
-          s.location as "shopLocation",
-          gc.name as "coffeeName",
-          gc.producer,
-          u.username as "confirmedBy"
-        FROM dispatched_coffee_confirmation dc
-        LEFT JOIN shops s ON dc.shop_id = s.id
-        LEFT JOIN green_coffee gc ON dc.green_coffee_id = gc.id
-        LEFT JOIN users u ON dc.confirmed_by_id = u.id
-        ORDER BY dc.created_at DESC`;
-
-      const result = await db.execute(query);
-      console.log("Found confirmations:", result.rows.length);
-      if (result.rows.length > 0) {
-        console.log("Sample confirmation:", result.rows[0]);
-      }
-      return result.rows;
-    } catch (error) {
-      console.error("Error getting all dispatched coffee confirmations:", error);
-      return [];
-    }
-  }
   async getUsersByRole(role: string): Promise<User[]> {
     try {
       console.log("Fetching users with role:", role);

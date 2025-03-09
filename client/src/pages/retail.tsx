@@ -19,16 +19,12 @@ import { RetailInventoryForm } from "@/components/coffee/retail-inventory-form";
 import { OrderForm } from "@/components/coffee/order-form";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Link } from "wouter";
-import { formatDate } from "@/lib/utils";
-import { DispatchedCoffeeConfirmation } from "@/components/coffee/dispatched-coffee-confirmation";
 import { RetailInventoryList } from "@/components/coffee/retail-inventory-list";
 
 export default function Retail() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { activeShop } = useActiveShop();
-  const [selectedCoffee, setSelectedCoffee] = useState<GreenCoffee | null>(null);
-  const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
 
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
@@ -82,12 +78,6 @@ export default function Retail() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {["roasteryOwner", "shopManager", "barista"].includes(user?.role || "") && (
-              <div className="mb-6">
-                <DispatchedCoffeeConfirmation shopId={activeShop.id} />
-              </div>
-            )}
-
             <RetailInventoryList shopId={activeShop.id} />
           </CardContent>
         </Card>
