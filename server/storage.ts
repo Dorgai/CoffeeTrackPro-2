@@ -488,38 +488,51 @@ export class DatabaseStorage {
       console.log("Starting getAllRetailInventories");
 
       const query = sql`
-        WITH latest_inventory AS (
+        WITH inventory_base AS (
+          -- Get all combinations of active shops and coffee
+          SELECT 
+            s.id as shop_id,
+            s.name as shop_name,
+            s.location as shop_location,
+            gc.id as coffee_id,
+            gc.name as coffee_name,
+            gc.producer,
+            gc.grade
+          FROM shops s
+          CROSS JOIN green_coffee gc
+          WHERE s.is_active = true
+        ),
+        latest_inventory AS (
+          -- Get the latest inventory update for each shop and coffee
           SELECT DISTINCT ON (shop_id, green_coffee_id)
-            id,
             shop_id,
             green_coffee_id,
             small_bags,
             large_bags,
             updated_at,
-            updated_by_id
+            updated_by_id,
+            update_type
           FROM retail_inventory
           ORDER BY shop_id, green_coffee_id, updated_at DESC
         )
         SELECT 
-          li.id,
-          li.shop_id as "shopId",
-          li.green_coffee_id as "coffeeId",
-          li.small_bags as "smallBags",
-          li.large_bags as "largeBags",
+          ib.shop_id as "shopId",
+          ib.coffee_id as "coffeeId",
+          COALESCE(li.small_bags, 0) as "smallBags",
+          COALESCE(li.large_bags, 0) as "largeBags",
           li.updated_at as "updatedAt",
           li.updated_by_id as "updatedById",
-          s.name as "shopName",
-          s.location as "shopLocation",
-          gc.name as "coffeeName",
-          gc.producer,
-          gc.grade,
+          li.update_type as "updateType",
+          ib.shop_name as "shopName",
+          ib.shop_location as "shopLocation",
+          ib.coffee_name as "coffeeName",
+          ib.producer,
+          ib.grade,
           u.username as "updatedByUsername"
-        FROM latest_inventory li
-        JOIN shops s ON li.shop_id = s.id
-        JOIN green_coffee gc ON li.green_coffee_id = gc.id
+        FROM inventory_base ib
+        LEFT JOIN latest_inventory li ON ib.shop_id = li.shop_id AND ib.coffee_id = li.green_coffee_id
         LEFT JOIN users u ON li.updated_by_id = u.id
-        WHERE s.is_active = true
-        ORDER BY s.name, gc.name`;
+        ORDER BY ib.shop_name, ib.coffee_name`;
 
       console.log("Executing retail inventory query");
       const result = await db.execute(query);
@@ -557,9 +570,11 @@ export class DatabaseStorage {
               eq(retailInventory.shopId, data.shopId),
               eq(retailInventory.greenCoffeeId, data.greenCoffeeId)
             )
-          );
+          )
+          .orderBy(sql`updated_at DESC`)
+          .limit(1);
 
-        // Create history record
+        // Create history record if there's existing inventory
         if (currentInventory) {
           await tx.insert(retailInventoryHistory).values({
             shopId: data.shopId,
@@ -597,14 +612,6 @@ export class DatabaseStorage {
             ${data.updateType || "manual"},
             ${data.notes}
           )
-          ON CONFLICT (shop_id, green_coffee_id)
-          DO UPDATE SET
-            small_bags = ${data.smallBags},
-            large_bags = ${data.largeBags},
-            updated_by_id = ${data.updatedById},
-            updated_at = NOW(),
-            update_type = ${data.updateType || "manual"},
-            notes = ${data.notes}
           RETURNING *`;
 
         const result = await tx.execute(query);
@@ -612,6 +619,7 @@ export class DatabaseStorage {
           throw new Error("Failed to update retail inventory");
         }
 
+        console.log("Updated retail inventory:", result.rows[0]);
         return result.rows[0];
       });
     } catch (error) {
