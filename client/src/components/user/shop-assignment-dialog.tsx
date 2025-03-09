@@ -105,8 +105,8 @@ export function ShopAssignmentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[500px] h-[90vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Assign Shops to {username}</DialogTitle>
           <DialogDescription>
             Select the shops this user should have access to
@@ -114,20 +114,20 @@ export function ShopAssignmentDialog({
         </DialogHeader>
 
         {loadingShops ? (
-          <div className="flex justify-center py-6">
+          <div className="flex justify-center py-6 flex-1">
             <Loader2 className="h-8 w-8 animate-spin" />
           </div>
         ) : !shops.length ? (
-          <div className="py-6 text-center text-muted-foreground">
+          <div className="py-6 text-center text-muted-foreground flex-1">
             No active shops available
           </div>
         ) : (
-          <ScrollArea className="h-[300px] pr-4">
-            <div className="space-y-4">
+          <ScrollArea className="flex-1 pr-4">
+            <div className="space-y-2">
               {shops.map(shop => (
                 <label
                   key={shop.id}
-                  className="flex items-center space-x-3 p-2 rounded-lg hover:bg-accent cursor-pointer"
+                  className="flex items-center space-x-3 p-3 rounded-lg hover:bg-accent cursor-pointer transition-colors"
                 >
                   <Checkbox
                     checked={selectedShops.includes(shop.id)}
@@ -145,7 +145,7 @@ export function ShopAssignmentDialog({
           </ScrollArea>
         )}
 
-        <DialogFooter>
+        <DialogFooter className="flex-shrink-0 mt-4">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
