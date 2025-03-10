@@ -75,7 +75,7 @@ export default function Inventory() {
         </div>
 
         <div className="flex items-center gap-4">
-          {user?.role === "roasteryOwner" && (
+          {(user?.role === "roasteryOwner" || user?.role === "retailOwner") && (
             <>
               <ShopSelector
                 value={selectedShopId}
@@ -89,19 +89,21 @@ export default function Inventory() {
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Restock Shop
               </Button>
-              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button>Add New Coffee</Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[600px]">
-                  <GreenCoffeeForm 
-                    onSuccess={() => {
-                      setIsAddDialogOpen(false);
-                    }}
-                  />
-                </DialogContent>
-              </Dialog>
             </>
+          )}
+          {user?.role === "roasteryOwner" && (
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>Add New Coffee</Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[600px]">
+                <GreenCoffeeForm 
+                  onSuccess={() => {
+                    setIsAddDialogOpen(false);
+                  }}
+                />
+              </DialogContent>
+            </Dialog>
           )}
         </div>
       </div>

@@ -94,7 +94,6 @@ export default function Dashboard() {
       });
       return;
     }
-    console.log("Opening restock dialog for shop:", shopId);
     setRestockTargetShopId(shopId);
     setIsRestockOpen(true);
   };
@@ -287,6 +286,14 @@ export default function Dashboard() {
                                     Producer: {coffee.producer}
                                   </div>
                                 </div>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleRestock(shop.id)}
+                                >
+                                  <RefreshCw className="h-4 w-4 mr-2" />
+                                  Restock
+                                </Button>
                               </div>
                               <div className="space-y-2">
                                 <StockProgress
