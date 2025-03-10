@@ -47,21 +47,25 @@ export default function UserShopManagement() {
 
   const updateAssignmentsMutation = useMutation({
     mutationFn: async (assignments: Assignment[]) => {
-      const response = await apiRequest(
-        "POST",
-        "/api/bulk-user-shop-assignments",
-        { assignments }
-      );
+      setIsUpdating(true);
+      try {
+        const response = await apiRequest(
+          "POST",
+          "/api/bulk-user-shop-assignments",
+          { assignments }
+        );
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Failed to update assignments");
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText || "Failed to update assignments");
+        }
+
+        return response.json();
+      } catch (error) {
+        throw error;
       }
-
-      return response.json();
     },
     onMutate: async (newAssignments) => {
-      setIsUpdating(true);
       // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: ["/api/user-shop-assignments"] });
 
@@ -94,6 +98,7 @@ export default function UserShopManagement() {
       });
     },
     onSettled: () => {
+      // Always refetch after error or success
       queryClient.invalidateQueries({ queryKey: ["/api/user-shop-assignments"] });
     },
   });
@@ -129,6 +134,14 @@ export default function UserShopManagement() {
       console.error("Failed to submit assignments:", error);
     }
   };
+
+  if (loadingUsers || loadingShops || loadingAssignments) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
 
   const activeUsers = users.filter(user => user.isActive);
   const inactiveUsers = users.filter(user => !user.isActive);
@@ -178,21 +191,13 @@ export default function UserShopManagement() {
     </div>
   );
 
-  if (loadingUsers || loadingShops || loadingAssignments) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
-
   return (
     <div className="container mx-auto py-8 space-y-8">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">User-Shop Management</h1>
           <p className="text-muted-foreground">
-            Manage user access to shops using the checkboxes below. Roastery owners automatically have access to all shops.
+            Manage user access to shops using the checkboxes below. Click Save Changes to apply your changes.
           </p>
         </div>
         <Button
