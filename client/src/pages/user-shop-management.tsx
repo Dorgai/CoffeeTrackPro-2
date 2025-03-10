@@ -47,39 +47,54 @@ export default function UserShopManagement() {
 
   const updateAssignmentsMutation = useMutation({
     mutationFn: async (assignments: Assignment[]) => {
-      setIsUpdating(true);
-      try {
-        const response = await apiRequest(
-          "POST",
-          "/api/bulk-user-shop-assignments",
-          { assignments }
-        );
+      const response = await apiRequest(
+        "POST",
+        "/api/bulk-user-shop-assignments",
+        { assignments }
+      );
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(errorText || "Failed to update assignments");
-        }
-
-        return response.json();
-      } finally {
-        setIsUpdating(false);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to update assignments");
       }
+
+      return response.json();
+    },
+    onMutate: async (newAssignments) => {
+      setIsUpdating(true);
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["/api/user-shop-assignments"] });
+
+      // Save the previous assignments
+      const previousAssignments = queryClient.getQueryData(["/api/user-shop-assignments"]);
+
+      // Optimistically update to the new value
+      queryClient.setQueryData(["/api/user-shop-assignments"], newAssignments);
+
+      return { previousAssignments };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user-shop-assignments"] });
       setHasChanges(false);
+      setIsUpdating(false);
       toast({
         title: "Success",
         description: "Shop assignments updated successfully",
       });
     },
-    onError: (error: Error) => {
+    onError: (error, newAssignments, context) => {
+      // Revert back to the previous assignments
+      queryClient.setQueryData(["/api/user-shop-assignments"], context?.previousAssignments);
+      setPendingAssignments(currentAssignments);
+      setIsUpdating(false);
       toast({
         title: "Error updating assignments",
-        description: error.message,
+        description: error instanceof Error ? error.message : "Failed to update assignments",
         variant: "destructive",
       });
-      setPendingAssignments(currentAssignments);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user-shop-assignments"] });
     },
   });
 
