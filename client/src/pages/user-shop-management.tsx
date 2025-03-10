@@ -24,9 +24,10 @@ type Assignment = {
 
 export default function UserShopManagement() {
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [pendingChanges, setPendingChanges] = useState<Assignment[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
+  // Fetch users and shops
   const { data: users = [], isLoading: loadingUsers } = useQuery<User[]>({
     queryKey: ["/api/users"],
   });
@@ -35,18 +36,20 @@ export default function UserShopManagement() {
     queryKey: ["/api/shops"],
   });
 
+  // Fetch current assignments
   const { data: currentAssignments = [], isLoading: loadingAssignments } = useQuery<Assignment[]>({
     queryKey: ["/api/user-shop-assignments"],
     onSuccess: (data) => {
-      // Only initialize pending changes if they're empty
-      if (pendingChanges.length === 0) {
-        setPendingChanges(data);
+      // Initialize assignments state with current data
+      if (assignments.length === 0) {
+        setAssignments(data);
       }
     },
   });
 
-  const handleToggleAssignment = (userId: number, shopId: number) => {
-    if (isSubmitting) return;
+  // Handle checkbox changes
+  const handleToggle = (userId: number, shopId: number) => {
+    if (isSaving) return;
 
     const user = users.find(u => u.id === userId);
     if (user?.role === "roasteryOwner") {
@@ -57,12 +60,9 @@ export default function UserShopManagement() {
       return;
     }
 
-    setPendingChanges(current => {
-      const isCurrentlyAssigned = current.some(
-        a => a.userId === userId && a.shopId === shopId
-      );
-
-      if (isCurrentlyAssigned) {
+    setAssignments(current => {
+      const isAssigned = current.some(a => a.userId === userId && a.shopId === shopId);
+      if (isAssigned) {
         return current.filter(a => !(a.userId === userId && a.shopId === shopId));
       } else {
         return [...current, { userId, shopId }];
@@ -70,20 +70,21 @@ export default function UserShopManagement() {
     });
   };
 
-  const handleSaveChanges = async () => {
-    setIsSubmitting(true);
+  // Save changes
+  const handleSave = async () => {
+    setIsSaving(true);
     try {
       const response = await apiRequest(
         "POST",
         "/api/bulk-user-shop-assignments",
-        { assignments: pendingChanges }
+        { assignments }
       );
 
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error || "Failed to save assignments");
+        throw new Error(await response.text() || "Failed to save assignments");
       }
 
+      // Refetch data after successful save
       await queryClient.invalidateQueries({ queryKey: ["/api/user-shop-assignments"] });
 
       toast({
@@ -91,20 +92,20 @@ export default function UserShopManagement() {
         description: "Shop assignments saved successfully",
       });
     } catch (error) {
-      console.error("Failed to save assignments:", error);
-      // Revert to current assignments
-      setPendingChanges(currentAssignments);
+      console.error("Save error:", error);
+
+      // Revert to server state
+      setAssignments(currentAssignments);
+
       toast({
-        title: "Error saving assignments",
-        description: error instanceof Error ? error.message : "Failed to update assignments",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save assignments",
         variant: "destructive",
       });
     } finally {
-      setIsSubmitting(false);
+      setIsSaving(false);
     }
   };
-
-  const hasChanges = JSON.stringify(pendingChanges) !== JSON.stringify(currentAssignments);
 
   if (loadingUsers || loadingShops || loadingAssignments) {
     return (
@@ -118,48 +119,48 @@ export default function UserShopManagement() {
   const inactiveUsers = users.filter(user => !user.isActive);
   const activeShops = shops.filter(shop => shop.isActive);
 
+  const hasChanges = JSON.stringify(assignments) !== JSON.stringify(currentAssignments);
+
   const renderUserTable = (userList: User[]) => (
-    <div className="border rounded-lg overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>User</TableHead>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>User</TableHead>
+          {activeShops.map(shop => (
+            <TableHead key={shop.id} className="text-center">
+              {shop.name}
+              <div className="text-xs text-muted-foreground">{shop.location}</div>
+            </TableHead>
+          ))}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {userList.map(user => (
+          <TableRow key={user.id}>
+            <TableCell>
+              <div>
+                <div className="font-medium">{user.username}</div>
+                <Badge variant="outline" className="mt-1">
+                  {user.role}
+                </Badge>
+              </div>
+            </TableCell>
             {activeShops.map(shop => (
-              <TableHead key={shop.id} className="text-center">
-                {shop.name}
-                <div className="text-xs text-muted-foreground">{shop.location}</div>
-              </TableHead>
+              <TableCell key={shop.id} className="text-center">
+                <Checkbox
+                  checked={
+                    user.role === "roasteryOwner" ||
+                    assignments.some(a => a.userId === user.id && a.shopId === shop.id)
+                  }
+                  disabled={user.role === "roasteryOwner" || isSaving}
+                  onCheckedChange={() => handleToggle(user.id, shop.id)}
+                />
+              </TableCell>
             ))}
           </TableRow>
-        </TableHeader>
-        <TableBody>
-          {userList.map(user => (
-            <TableRow key={user.id}>
-              <TableCell>
-                <div>
-                  <div className="font-medium">{user.username}</div>
-                  <Badge variant="outline" className="mt-1">
-                    {user.role}
-                  </Badge>
-                </div>
-              </TableCell>
-              {activeShops.map(shop => (
-                <TableCell key={shop.id} className="text-center">
-                  <Checkbox
-                    checked={
-                      user.role === "roasteryOwner" ||
-                      pendingChanges.some(a => a.userId === user.id && a.shopId === shop.id)
-                    }
-                    disabled={user.role === "roasteryOwner" || isSubmitting}
-                    onCheckedChange={() => handleToggleAssignment(user.id, shop.id)}
-                  />
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+        ))}
+      </TableBody>
+    </Table>
   );
 
   return (
@@ -168,15 +169,15 @@ export default function UserShopManagement() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">User-Shop Management</h1>
           <p className="text-muted-foreground">
-            Manage user access to shops using the checkboxes below. Click Save Changes to apply your changes.
+            Use the checkboxes below to manage user access to shops. Click Save Changes when done.
           </p>
         </div>
         <Button
-          onClick={handleSaveChanges}
-          disabled={!hasChanges || isSubmitting}
+          onClick={handleSave}
+          disabled={!hasChanges || isSaving}
           className="min-w-[120px]"
         >
-          {isSubmitting ? (
+          {isSaving ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <>
@@ -187,18 +188,20 @@ export default function UserShopManagement() {
         </Button>
       </div>
 
-      <Tabs defaultValue="active" className="w-full">
-        <TabsList>
-          <TabsTrigger value="active">Active Users ({activeUsers.length})</TabsTrigger>
-          <TabsTrigger value="inactive">Inactive Users ({inactiveUsers.length})</TabsTrigger>
-        </TabsList>
-        <TabsContent value="active" className="mt-6">
-          {renderUserTable(activeUsers)}
-        </TabsContent>
-        <TabsContent value="inactive" className="mt-6">
-          {renderUserTable(inactiveUsers)}
-        </TabsContent>
-      </Tabs>
+      <div className="border rounded-lg">
+        <Tabs defaultValue="active" className="w-full">
+          <TabsList className="border-b">
+            <TabsTrigger value="active">Active Users ({activeUsers.length})</TabsTrigger>
+            <TabsTrigger value="inactive">Inactive Users ({inactiveUsers.length})</TabsTrigger>
+          </TabsList>
+          <TabsContent value="active" className="p-4">
+            {renderUserTable(activeUsers)}
+          </TabsContent>
+          <TabsContent value="inactive" className="p-4">
+            {renderUserTable(inactiveUsers)}
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }
