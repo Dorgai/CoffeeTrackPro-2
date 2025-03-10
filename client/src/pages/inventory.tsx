@@ -2,17 +2,23 @@ import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { GreenCoffee } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
-import { Loader2 } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 import { InventoryGrid } from "@/components/coffee/inventory-grid";
 import { GreenCoffeeForm } from "@/components/coffee/green-coffee-form";
 import { InventoryDiscrepancyView } from "@/components/coffee/inventory-discrepancy-view";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useState } from "react";
+import { ShopSelector } from "@/components/layout/shop-selector";
+import { RestockDialog } from "@/components/coffee/restock-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Inventory() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isRestockOpen, setIsRestockOpen] = useState(false);
+  const [selectedShopId, setSelectedShopId] = useState<number | null>(null);
 
   const { data: coffees, isLoading, error } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
@@ -25,6 +31,18 @@ export default function Inventory() {
       return res.json();
     },
   });
+
+  const handleRestock = () => {
+    if (!selectedShopId) {
+      toast({
+        title: "Error",
+        description: "Please select a shop first",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsRestockOpen(true);
+  };
 
   if (isLoading) {
     return (
@@ -56,20 +74,36 @@ export default function Inventory() {
           </p>
         </div>
 
-        {user?.role === "roasteryOwner" && (
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>Add New Coffee</Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px]">
-              <GreenCoffeeForm 
-                onSuccess={() => {
-                  setIsAddDialogOpen(false);
-                }}
+        <div className="flex items-center gap-4">
+          {user?.role === "roasteryOwner" && (
+            <>
+              <ShopSelector
+                value={selectedShopId}
+                onChange={setSelectedShopId}
               />
-            </DialogContent>
-          </Dialog>
-        )}
+              <Button
+                variant="outline"
+                onClick={handleRestock}
+                disabled={!selectedShopId}
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Restock Shop
+              </Button>
+              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button>Add New Coffee</Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[600px]">
+                  <GreenCoffeeForm 
+                    onSuccess={() => {
+                      setIsAddDialogOpen(false);
+                    }}
+                  />
+                </DialogContent>
+              </Dialog>
+            </>
+          )}
+        </div>
       </div>
 
       <InventoryGrid
@@ -81,6 +115,12 @@ export default function Inventory() {
           <InventoryDiscrepancyView />
         </div>
       )}
+
+      <RestockDialog 
+        open={isRestockOpen} 
+        onOpenChange={setIsRestockOpen} 
+        shopId={selectedShopId} 
+      />
     </div>
   );
 }

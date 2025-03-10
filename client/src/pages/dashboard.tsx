@@ -452,7 +452,10 @@ export default function Dashboard() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleRestock(undefined, shop.id)}
+                            onClick={() => {
+                              setSelectedShopId(shop.id);
+                              setIsRestockOpen(true);
+                            }}
                           >
                             <RefreshCw className="h-4 w-4 mr-2" />
                             Restock
