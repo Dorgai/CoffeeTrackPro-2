@@ -20,10 +20,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { formatDate } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { OrderForm } from "@/components/coffee/order-form";
+import { ShopSelector } from "@/components/layout/shop-selector";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 type OrderWithUser = {
   id: number;
@@ -43,7 +45,7 @@ type OrderWithUser = {
 
 export default function RetailOrders() {
   const { user } = useAuth();
-  const { activeShop } = useActiveShop();
+  const { activeShop, setActiveShop } = useActiveShop();
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
 
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
@@ -59,16 +61,6 @@ export default function RetailOrders() {
     },
     enabled: !!activeShop?.id,
   });
-
-  if (!activeShop?.id) {
-    return (
-      <div className="container mx-auto py-8">
-        <div className="bg-destructive/10 text-destructive px-4 py-2 rounded">
-          Please select a shop from the dropdown in the navigation bar.
-        </div>
-      </div>
-    );
-  }
 
   if (loadingCoffees || loadingOrders) {
     return (
@@ -87,59 +79,73 @@ export default function RetailOrders() {
             View and manage your shop's coffee orders
           </p>
         </div>
-        <Button onClick={() => setIsOrderDialogOpen(true)}>
-          <PackagePlus className="h-4 w-4 mr-2" />
-          Place Order
-        </Button>
+        <div className="flex items-center gap-4">
+          <ShopSelector />
+          <Button 
+            onClick={() => setIsOrderDialogOpen(true)}
+            disabled={!activeShop?.id}
+          >
+            <PackagePlus className="h-4 w-4 mr-2" />
+            Place Order
+          </Button>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Orders</CardTitle>
-          <CardDescription>
-            All orders placed by your shop
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {orders && orders.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Order Date</TableHead>
-                  <TableHead>Coffee</TableHead>
-                  <TableHead>Small Bags (200g)</TableHead>
-                  <TableHead>Large Bags (1kg)</TableHead>
-                  <TableHead>Total Weight</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Ordered By</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {orders.map((order) => {
-                  const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
-                  const totalWeight = (order.smallBags * 0.2) + (order.largeBags * 1);
+      {!activeShop?.id ? (
+        <Alert>
+          <AlertDescription>
+            Please select a shop to view orders and place new orders.
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Orders</CardTitle>
+            <CardDescription>
+              All orders placed by {activeShop.name}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {orders && orders.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Order Date</TableHead>
+                    <TableHead>Coffee</TableHead>
+                    <TableHead>Small Bags (200g)</TableHead>
+                    <TableHead>Large Bags (1kg)</TableHead>
+                    <TableHead>Total Weight</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Ordered By</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {orders.map((order) => {
+                    const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
+                    const totalWeight = (order.smallBags * 0.2) + (order.largeBags * 1);
 
-                  return (
-                    <TableRow key={order.id}>
-                      <TableCell>{formatDate(order.createdAt)}</TableCell>
-                      <TableCell className="font-medium">{coffee?.name || 'Unknown'}</TableCell>
-                      <TableCell>{order.smallBags}</TableCell>
-                      <TableCell>{order.largeBags}</TableCell>
-                      <TableCell>{totalWeight.toFixed(2)} kg</TableCell>
-                      <TableCell className="capitalize">{order.status}</TableCell>
-                      <TableCell>{order.user?.username || '-'}</TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              No orders have been placed yet
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                    return (
+                      <TableRow key={order.id}>
+                        <TableCell>{formatDate(order.createdAt)}</TableCell>
+                        <TableCell className="font-medium">{coffee?.name || 'Unknown'}</TableCell>
+                        <TableCell>{order.smallBags}</TableCell>
+                        <TableCell>{order.largeBags}</TableCell>
+                        <TableCell>{totalWeight.toFixed(2)} kg</TableCell>
+                        <TableCell className="capitalize">{order.status}</TableCell>
+                        <TableCell>{order.user?.username || '-'}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No orders have been placed yet
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Dialog
         open={isOrderDialogOpen}

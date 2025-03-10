@@ -12,6 +12,7 @@ import { useState } from "react";
 import { ShopSelector } from "@/components/layout/shop-selector";
 import { RestockDialog } from "@/components/coffee/restock-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function Inventory() {
   const { user } = useAuth();
@@ -62,6 +63,8 @@ export default function Inventory() {
     );
   }
 
+  const showRestockControls = ["roasteryOwner", "retailOwner"].includes(user?.role || "");
+
   return (
     <div className="container mx-auto py-8 space-y-8">
       <div className="flex justify-between items-center">
@@ -75,7 +78,7 @@ export default function Inventory() {
         </div>
 
         <div className="flex items-center gap-4">
-          {(user?.role === "roasteryOwner" || user?.role === "retailOwner") && (
+          {showRestockControls && (
             <>
               <ShopSelector
                 value={selectedShopId}
@@ -107,6 +110,14 @@ export default function Inventory() {
           )}
         </div>
       </div>
+
+      {showRestockControls && !selectedShopId && (
+        <Alert>
+          <AlertDescription>
+            Please select a shop to manage inventory and restock.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <InventoryGrid coffees={coffees || []} />
 
