@@ -20,6 +20,7 @@ import StockProgress from "@/components/stock-progress";
 import { formatDate } from "@/lib/utils";
 import { Link } from "wouter";
 import {Alert, AlertDescription} from "@/components/ui/alert";
+import { useToast } from "@/hooks/use-toast";
 
 // Placeholder for apiRequest function - needs to be implemented separately
 const apiRequest = async (method: string, url: string) => {
@@ -33,6 +34,7 @@ export default function Dashboard() {
   const [selectedShopId, setSelectedShopId] = useState<number | null>(null);
   const [isRestockOpen, setIsRestockOpen] = useState(false);
   const [, navigate] = useLocation();
+  const { toast } = useToast();
 
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
@@ -640,66 +642,28 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Orders Overview</CardTitle>
-            <CardDescription>Recent order status and activities</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableHead>Shop</TableHead>
-                  <TableHead>Coffee</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Date</TableHead>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {allOrders?.slice(0, 5).map(order => {
-                  const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
-                  const orderShop = allShops?.find(s => s.id === order.shopId);
-                  return (
-                    <TableRow key={order.id}>
-                      <TableCell>{orderShop?.name}</TableCell>
-                      <TableCell>{coffee?.name}</TableCell>
-                      <TableCell>
-                        {order.smallBags > 0 && `${order.smallBags} small`}
-                        {order.smallBags > 0 && order.largeBags > 0 && ', '}
-                        {order.largeBags > 0 && `${order.largeBags} large`}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={
-                          order.status === 'pending' ? 'outline' :
-                          order.status === 'roasted' ? 'secondary' :
-                          order.status === 'dispatched' ? 'default' :
-                          'default'
-                        }>
-                          {order.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{formatDate(order.createdAt)}</TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-            <div className="mt-4 flex justify-end">
-              <Button asChild variant="outline" size="sm">
-                <Link href="/roasting/orders">View All Orders</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     );
   }
 
   if (user?.role === "retailOwner") {
+    const { toast } = useToast();
     const shopInventory = allInventory?.filter(inv => inv.shopId === selectedShopId) || [];
     const selectedShop = allShops?.find(shop => shop.id === selectedShopId);
+
+    // Handle inventory updates
+    const handleRestock = async (coffeeId: number) => {
+      if (!selectedShopId) {
+        toast({
+          title: "Error",
+          description: "Please select a shop first",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setIsRestockOpen(true);
+    };
 
     return (
       <div className="container mx-auto py-8 space-y-8">
@@ -734,17 +698,17 @@ export default function Dashboard() {
           <>
             <div className="grid gap-4 md:grid-cols-3">
               <StatsCard
+                title="Shop Status"
+                value={selectedShop?.isActive ? "Active" : "Inactive"}
+                icon={Store}
+                description={selectedShop?.location || "Location"}
+              />
+              <StatsCard
                 title="Order Fulfillment"
                 value={`${allOrders?.length ? Math.round((allOrders?.filter(o => o.status === 'delivered' && o.shopId === selectedShopId).length / allOrders?.filter(o => o.shopId === selectedShopId).length) * 100) : 0}%`}
                 icon={Package}
                 onClick={() => navigate("/retail/orders")}
                 description="Manage Orders"
-              />
-              <StatsCard
-                title="Shop Status"
-                value={selectedShop?.isActive ? "Active" : "Inactive"}
-                icon={Store}
-                description={selectedShop?.location || "Location"}
               />
               <StatsCard
                 title="Low Stock Items"
@@ -887,6 +851,8 @@ export default function Dashboard() {
       </div>
     );
   }
+
+  // Default return for users without specific role
   return (
     <div className="container mx-auto py-8">
       <div className="text-center">
