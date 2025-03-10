@@ -3,18 +3,33 @@ import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-const Dialog = ({ children, ...props }: DialogPrimitive.DialogProps) => {
-  console.log("Dialog rendering with props:", props);
-  return <DialogPrimitive.Root {...props}>{children}</DialogPrimitive.Root>;
-}
+const DialogRoot = DialogPrimitive.Root;
+const DialogTrigger = DialogPrimitive.Trigger;
 
-const DialogTrigger = DialogPrimitive.Trigger
+// Create a context to track dialog nesting
+const DialogContext = React.createContext(false);
+
+const Dialog = ({ children, ...props }: DialogPrimitive.DialogProps) => {
+  console.log("Dialog Root rendering", { props });
+  return (
+    <DialogContext.Provider value={true}>
+      <DialogRoot {...props}>{children}</DialogRoot>
+    </DialogContext.Provider>
+  );
+};
 
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
 >(({ className, children, ...props }, ref) => {
-  console.log("DialogContent rendering");
+  const hasDialogContext = React.useContext(DialogContext);
+  console.log("DialogContent rendering", { hasDialogContext });
+
+  if (!hasDialogContext) {
+    console.error("DialogContent rendered without Dialog context!");
+    return null;
+  }
+
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay
@@ -35,9 +50,9 @@ const DialogContent = React.forwardRef<
         </DialogPrimitive.Close>
       </DialogPrimitive.Content>
     </DialogPrimitive.Portal>
-  )
-})
-DialogContent.displayName = DialogPrimitive.Content.displayName
+  );
+});
+DialogContent.displayName = DialogPrimitive.Content.displayName;
 
 const DialogHeader = ({
   className,
@@ -50,8 +65,8 @@ const DialogHeader = ({
     )}
     {...props}
   />
-)
-DialogHeader.displayName = "DialogHeader"
+);
+DialogHeader.displayName = "DialogHeader";
 
 const DialogFooter = ({
   className,
@@ -64,8 +79,8 @@ const DialogFooter = ({
     )}
     {...props}
   />
-)
-DialogFooter.displayName = "DialogFooter"
+);
+DialogFooter.displayName = "DialogFooter";
 
 const DialogTitle = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Title>,
@@ -76,8 +91,8 @@ const DialogTitle = React.forwardRef<
     className={cn("text-lg font-semibold leading-none tracking-tight", className)}
     {...props}
   />
-))
-DialogTitle.displayName = DialogPrimitive.Title.displayName
+));
+DialogTitle.displayName = DialogPrimitive.Title.displayName;
 
 const DialogDescription = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Description>,
@@ -88,8 +103,8 @@ const DialogDescription = React.forwardRef<
     className={cn("text-sm text-muted-foreground", className)}
     {...props}
   />
-))
-DialogDescription.displayName = DialogPrimitive.Description.displayName
+));
+DialogDescription.displayName = DialogPrimitive.Description.displayName;
 
 export {
   Dialog,
@@ -99,4 +114,4 @@ export {
   DialogFooter,
   DialogTitle,
   DialogDescription,
-}
+};

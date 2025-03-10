@@ -288,8 +288,8 @@ export default function UserManagement() {
   );
 
   const renderActivationDialog = () => (
-    <AlertDialog 
-      open={dialogState.type === 'activation'} 
+    <AlertDialog
+      open={dialogState.type === 'activation'}
       onOpenChange={(open) => {
         if (!open) setDialogState(prev => ({ ...prev, isOpen: false, type: null, user: null }));
       }}
@@ -367,6 +367,7 @@ export default function UserManagement() {
         </TabsContent>
       </Tabs>
 
+      {/* Render dialogs */}
       {renderPasswordDialog()}
       {renderActivationDialog()}
 
