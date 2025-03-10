@@ -1,4 +1,4 @@
-import { useState, useEffect as ReactuseEffect } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -13,9 +13,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { StockStatus } from "./stock-status";
+import { Badge } from "@/components/ui/badge";
 
 type RestockDialogProps = {
   open: boolean;
@@ -23,17 +24,19 @@ type RestockDialogProps = {
   shopId: number | null;
 };
 
+type Quantities = Record<number, { small: number; large: number }>;
+
 export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps) {
   const { toast } = useToast();
-  const [quantities, setQuantities] = useState<Record<number, { small: number; large: number }>>({});
+  const [quantities, setQuantities] = useState<Quantities>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Reset quantities when dialog opens/closes
-  ReactuseEffect(() => {
-    if (!open) {
+  // Reset quantities when dialog opens/closes or shop changes
+  useEffect(() => {
+    if (!open || !shopId) {
       setQuantities({});
     }
-  }, [open]);
+  }, [open, shopId]);
 
   // Fetch current inventory for the selected shop
   const { data: inventory, isLoading: loadingInventory } = useQuery({
@@ -47,6 +50,21 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
     enabled: open,
   });
 
+  const handleQuantityChange = (
+    coffeeId: number,
+    type: 'small' | 'large',
+    value: string
+  ) => {
+    const numValue = Math.max(0, parseInt(value) || 0);
+    setQuantities(prev => ({
+      ...prev,
+      [coffeeId]: {
+        ...prev[coffeeId] || { small: 0, large: 0 },
+        [type]: numValue
+      }
+    }));
+  };
+
   const handleSubmit = async () => {
     if (!shopId) {
       toast({
@@ -57,19 +75,29 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
       return;
     }
 
+    const ordersToCreate = Object.entries(quantities)
+      .filter(([_, { small, large }]) => small > 0 || large > 0);
+
+    if (ordersToCreate.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please specify quantities for at least one coffee type",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      // Filter out coffees with zero quantities
-      const ordersToCreate = Object.entries(quantities)
-        .filter(([_, { small, large }]) => small > 0 || large > 0)
-        .map(async ([coffeeId, { small, large }]) => {
+      const results = await Promise.all(
+        ordersToCreate.map(async ([coffeeId, { small, large }]) => {
           const response = await apiRequest("POST", "/api/orders", {
             shopId,
             greenCoffeeId: parseInt(coffeeId),
             smallBags: small,
             largeBags: large,
-            status: "pending",
+            status: "pending"
           });
 
           if (!response.ok) {
@@ -77,13 +105,8 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
           }
 
           return response.json();
-        });
-
-      if (ordersToCreate.length === 0) {
-        throw new Error("Please specify quantities for at least one coffee type");
-      }
-
-      await Promise.all(ordersToCreate);
+        })
+      );
 
       // Invalidate relevant queries
       await queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
@@ -91,10 +114,9 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
 
       toast({
         title: "Success",
-        description: "Restock orders created successfully",
+        description: `Created ${results.length} restock order${results.length > 1 ? 's' : ''}`,
       });
 
-      // Close dialog and reset state
       onOpenChange(false);
       setQuantities({});
     } catch (error) {
@@ -113,6 +135,7 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
     return (
       <DialogContent>
         <Alert>
+          <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
             Please select a shop to create a restock order.
           </AlertDescription>
@@ -124,11 +147,11 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
   const isLoading = loadingInventory || loadingCoffees;
 
   return (
-    <DialogContent className="sm:max-w-[700px]">
+    <DialogContent className="sm:max-w-[800px]">
       <DialogHeader>
         <DialogTitle>Create Restock Order</DialogTitle>
         <DialogDescription>
-          Enter quantities needed for each coffee type
+          Enter quantities needed for each coffee type. Current stock levels are shown for reference.
         </DialogDescription>
       </DialogHeader>
 
@@ -149,13 +172,21 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
             <TableBody>
               {coffees?.map((coffee) => {
                 const currentStock = inventory?.find(inv => inv.greenCoffeeId === coffee.id);
+                const isLowStock = (currentStock?.smallBags || 0) < 10 || (currentStock?.largeBags || 0) < 5;
 
                 return (
                   <TableRow key={coffee.id}>
-                    <TableCell className="font-medium">
-                      {coffee.name}
-                      <div className="text-sm text-muted-foreground">
-                        Producer: {coffee.producer}
+                    <TableCell>
+                      <div className="flex items-start gap-2">
+                        <div>
+                          <div className="font-medium">{coffee.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            Producer: {coffee.producer}
+                          </div>
+                        </div>
+                        {isLowStock && (
+                          <Badge variant="destructive" className="mt-0.5">Low Stock</Badge>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -173,13 +204,8 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
                             type="number"
                             min="0"
                             value={quantities[coffee.id]?.small || 0}
-                            onChange={(e) => setQuantities(prev => ({
-                              ...prev,
-                              [coffee.id]: { 
-                                ...prev[coffee.id] || {},
-                                small: Math.max(0, parseInt(e.target.value) || 0)
-                              }
-                            }))}
+                            onChange={(e) => handleQuantityChange(coffee.id, 'small', e.target.value)}
+                            className="w-full"
                           />
                         </div>
                         <div>
@@ -188,13 +214,8 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
                             type="number"
                             min="0"
                             value={quantities[coffee.id]?.large || 0}
-                            onChange={(e) => setQuantities(prev => ({
-                              ...prev,
-                              [coffee.id]: {
-                                ...prev[coffee.id] || {},
-                                large: Math.max(0, parseInt(e.target.value) || 0)
-                              }
-                            }))}
+                            onChange={(e) => handleQuantityChange(coffee.id, 'large', e.target.value)}
+                            className="w-full"
                           />
                         </div>
                       </div>
@@ -213,7 +234,7 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
         </Button>
         <Button 
           onClick={handleSubmit}
-          disabled={!shopId || isSubmitting}
+          disabled={isSubmitting}
         >
           {isSubmitting ? (
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
