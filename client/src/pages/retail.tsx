@@ -1,5 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { GreenCoffee } from "@shared/schema";
 import { Loader2, PackagePlus, RefreshCw, Search } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
@@ -110,7 +110,7 @@ export default function Retail() {
 
       {!activeShop?.id ? (
         <div className="bg-destructive/10 text-destructive px-4 py-2 rounded">
-          Please select a shop from the dropdown above to manage inventory.
+          Please select a shop to manage inventory.
         </div>
       ) : (
         <RetailInventoryTable />
