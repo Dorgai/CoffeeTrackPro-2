@@ -22,19 +22,12 @@ import { Link } from "wouter";
 import {Alert, AlertDescription} from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 
-// Placeholder for apiRequest function - needs to be implemented separately
-const apiRequest = async (method: string, url: string) => {
-  const response = await fetch(url, { method });
-  return response;
-};
-
-
 export default function Dashboard() {
   const { user, logoutMutation } = useAuth();
+  const { toast } = useToast();
   const [selectedShopId, setSelectedShopId] = useState<number | null>(null);
   const [isRestockOpen, setIsRestockOpen] = useState(false);
   const [, navigate] = useLocation();
-  const { toast } = useToast();
 
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
@@ -79,7 +72,7 @@ export default function Dashboard() {
     queryKey: ["/api/roasting-batches"],
     queryFn: async () => {
       console.log("Fetching roasting history, user role:", user?.role);
-      const res = await apiRequest("GET", "/api/roasting-batches");
+      const res = await fetch("/api/roasting-batches");
       if (!res.ok) throw new Error('Failed to fetch roasting history');
       const data = await res.json();
       console.log("Received roasting history:", data);
@@ -90,6 +83,18 @@ export default function Dashboard() {
 
   const isLoading = loadingCoffees || loadingAllShops || loadingInventory ||
     loadingAllInventory || loadingAllOrders || loadingShopOrders || loadingRoastingHistory;
+
+  const handleRestock = async (coffeeId: number) => {
+    if (!selectedShopId) {
+      toast({
+        title: "Error",
+        description: "Please select a shop first",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsRestockOpen(true);
+  };
 
   if (isLoading) {
     return (
@@ -103,567 +108,9 @@ export default function Dashboard() {
     Number(coffee.currentStock) <= Number(coffee.minThreshold)
   ) || [];
 
-  if (user?.role === "shopManager" || user?.role === "barista") {
-    const shopInventory = retailInventory || [];
-    const totalItems = shopInventory.length;
-    const lowStockItems = shopInventory.filter(item =>
-      (item.smallBags || 0) < 20 / 2 ||
-      (item.largeBags || 0) < 10 / 2
-    ).length;
-    const stockHealth = totalItems ? Math.round(((totalItems - lowStockItems) / totalItems) * 100) : 0;
-
-    return (
-      <div className="container mx-auto py-8 space-y-8">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user.username}</h1>
-            <p className="text-muted-foreground">Manage your coffee shop inventory</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <ShopSelector
-              value={selectedShopId}
-              onChange={(shopId) => {
-                console.log("Shop selected:", shopId);
-                setSelectedShopId(shopId);
-              }}
-            />
-            <Button
-              variant="outline"
-              onClick={() => logoutMutation.mutate()}
-              disabled={logoutMutation.isPending}
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          </div>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Orders Overview</CardTitle>
-              <CardDescription>Recent order status and activities</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableHead>Coffee</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Date</TableHead>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {!shopOrders?.length ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground">
-                        No recent orders found
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    shopOrders.slice(0, 5).map(order => {
-                      const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
-                      return (
-                        <TableRow key={order.id}>
-                          <TableCell>{coffee?.name}</TableCell>
-                          <TableCell>
-                            {order.smallBags > 0 && `${order.smallBags} small`}
-                            {order.smallBags > 0 && order.largeBags > 0 && ', '}
-                            {order.largeBags > 0 && `${order.largeBags} large`}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={
-                              order.status === 'pending' ? 'outline' :
-                              order.status === 'roasted' ? 'secondary' :
-                              order.status === 'dispatched' ? 'default' :
-                              'default'
-                            }>
-                              {order.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{formatDate(order.createdAt)}</TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-              <div className="mt-4 flex justify-end">
-                <Button asChild variant="outline" size="sm">
-                  <Link href="/retail/orders">View All Orders</Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Shop Performance</CardTitle>
-              <CardDescription>Stock levels and status</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {!selectedShopId ? (
-                <p className="text-center text-muted-foreground">Please select a shop to view performance</p>
-              ) : !retailInventory?.length ? (
-                <p className="text-center text-muted-foreground">No inventory data available</p>
-              ) : (
-                <div key={selectedShopId} className="space-y-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-medium">{shop?.name}</h3>
-                    <Badge variant={lowStockItems > 0 ? "destructive" : "outline"}>
-                      {lowStockItems > 0 ? `${lowStockItems} Low Stock` : "Stock OK"}
-                    </Badge>
-                  </div>
-                  <div className="mt-4 space-y-2">
-                    {retailInventory.map(inv => {
-                      const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
-                      return (
-                        <div key={`${selectedShopId}-${inv.greenCoffeeId}`} className="p-2 bg-muted rounded">
-                          <div className="flex justify-between items-start mb-2">
-                            <div>
-                              <div className="text-sm font-medium">{coffee?.name}</div>
-                              <div className="text-xs text-muted-foreground">
-                                Last updated: {formatDate(inv.lastUpdated)}
-                                {inv.updatedBy && <span> by {inv.updatedBy}</span>}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <div className="text-sm">
-                              <span className="font-medium">Small Bags (200g):</span> {inv.smallBags || 0}
-                            </div>
-                            <StockProgress
-                              current={inv.smallBags || 0}
-                              desired={shop?.desiredSmallBags || 20}
-                              label="Small Bags (200g)"
-                            />
-                            <div className="text-sm">
-                              <span className="font-medium">Large Bags (1kg):</span> {inv.largeBags || 0}
-                            </div>
-                            <StockProgress
-                              current={inv.largeBags || 0}
-                              desired={shop?.desiredLargeBags || 10}
-                              label="Large Bags (1kg)"
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {retailInventory.length > 5 && (
-                      <div className="text-center text-sm text-muted-foreground pt-2">
-                        Showing 5 of {retailInventory.length} items
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-        {user.role === "shopManager" && (
-          <RestockDialog open={isRestockOpen} onOpenChange={setIsRestockOpen} shopId={selectedShopId} />
-        )}
-      </div>
-    );
-  }
-
-  if (user?.role === "roaster") {
-    return (
-      <div className="container mx-auto py-8 space-y-8">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user.username}</h1>
-            <p className="text-muted-foreground">Coffee roasting operations</p>
-          </div>
-          <Button
-            variant="outline"
-            onClick={() => logoutMutation.mutate()}
-            disabled={logoutMutation.isPending}
-          >
-            <LogOut className="h-4 w-4 mr-2" />
-            Logout
-          </Button>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-3">
-          <StatsCard
-            title="Coffee Types"
-            value={coffees?.length || 0}
-            icon={Coffee}
-            description="Available coffee varieties"
-          />
-          <StatsCard
-            title="Low Stock Items"
-            value={lowStockCoffees.length}
-            icon={AlertTriangle}
-            description="Items Below Threshold"
-          />
-          <StatsCard
-            title="Available Stock"
-            value={`${coffees?.reduce((total, coffee) => total + Number(coffee.currentStock), 0) || 0}kg`}
-            icon={Package}
-            onClick={() => navigate("/inventory")}
-            description="View Inventory"
-          />
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Green Coffee Inventory</CardTitle>
-            <CardDescription>Available coffee for roasting</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!coffees?.length ? (
-              <p className="text-center text-muted-foreground">No coffee inventory available</p>
-            ) : (
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableHead>Coffee</TableHead>
-                    <TableHead>Producer</TableHead>
-                    <TableHead>Origin</TableHead>
-                    <TableHead className="text-right">Stock</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {coffees.map(coffee => (
-                    <TableRow key={coffee.id}>
-                      <TableCell className="font-medium">{coffee.name}</TableCell>
-                      <TableCell>{coffee.producer}</TableCell>
-                      <TableCell>{coffee.country}</TableCell>
-                      <TableCell className="text-right">{coffee.currentStock}kg</TableCell>
-                      <TableCell>
-                        {Number(coffee.currentStock) <= Number(coffee.minThreshold) ? (
-                          <Badge variant="destructive">Low Stock</Badge>
-                        ) : (
-                          <Badge variant="outline">In Stock</Badge>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Roasting Batches</CardTitle>
-            <CardDescription>Latest roasting activities</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Coffee</TableHead>
-                  <TableHead>Small Bags</TableHead>
-                  <TableHead>Large Bags</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {!roastingHistory?.length ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground">
-                      No recent batches found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  roastingHistory.slice(0, 5).map(order => {
-                    const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
-                    return (
-                      <TableRow key={order.id}>
-                        <TableCell>{formatDate(order.createdAt)}</TableCell>
-                        <TableCell>{coffee?.name}</TableCell>
-                        <TableCell>{order.smallBags}</TableCell>
-                        <TableCell>{order.largeBags}</TableCell>
-                        <TableCell>
-                          <Badge variant={
-                            order.status === 'pending' ? 'outline' :
-                            order.status === 'roasted' ? 'secondary' :
-                            order.status === 'dispatched' ? 'default' :
-                            'default'
-                          }>
-                            {order.status}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-            <div className="mt-4 flex justify-end">
-              <Button asChild variant="outline" size="sm">
-                <Link href="/roasting/orders">View All Batches</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (user?.role === "roasteryOwner") {
-    return (
-      <div className="container mx-auto py-8 space-y-8">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user?.username}</h1>
-            <p className="text-muted-foreground">Coffee roasting operations overview</p>
-          </div>
-          <div className="flex gap-2">
-            <ShopSelector
-              value={selectedShopId}
-              onChange={(shopId) => {
-                console.log("Selected shop:", shopId);
-                setSelectedShopId(shopId);
-              }}
-            />
-            <Button
-              variant="outline"
-              onClick={() => logoutMutation.mutate()}
-              disabled={logoutMutation.isPending}
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          </div>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-3">
-          <StatsCard
-            title="Order Fulfillment"
-            value={`${allOrders?.length ? Math.round((allOrders?.filter(o => o.status === 'delivered').length / allOrders?.length) * 100) : 0}%`}
-            icon={Package}
-            onClick={() => navigate("/roasting/orders")}
-            description="Manage Orders"
-          />
-          <StatsCard
-            title="Active Shops"
-            value={allShops?.length || 0}
-            icon={Store}
-            description="Total managed locations"
-          />
-          <StatsCard
-            title="Low Stock Items"
-            value={lowStockCoffees.length}
-            icon={AlertTriangle}
-            onClick={() => setIsRestockOpen(true)}
-            description="View Restock Options"
-          />
-        </div>
-
-        <RestockDialog open={isRestockOpen} onOpenChange={setIsRestockOpen} shopId={selectedShopId} />
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Green Coffee Inventory</CardTitle>
-            <CardDescription>Current stock levels and details</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Producer</TableHead>
-                  <TableHead>Country</TableHead>
-                  <TableHead>Current Stock</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {coffees?.map(coffee => (
-                  <TableRow key={coffee.id}>
-                    <TableCell className="font-medium">{coffee.name}</TableCell>
-                    <TableCell>{coffee.producer}</TableCell>
-                    <TableCell>{coffee.country}</TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{coffee.currentStock}kg</div>
-                        <StockProgress
-                          current={Number(coffee.currentStock)}
-                          desired={Number(coffee.minThreshold) * 2}
-                          label="Stock Level"
-                        />
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {Number(coffee.currentStock) <= Number(coffee.minThreshold) ? (
-                        <Badge variant="destructive">Low Stock</Badge>
-                      ) : (
-                        <Badge variant="outline">In Stock</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigate(`/coffee/${coffee.id}`)}
-                      >
-                        View Details
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Orders Overview</CardTitle>
-            <CardDescription>Recent order status and activities</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableHead>Shop</TableHead>
-                  <TableHead>Coffee</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Date</TableHead>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {allOrders?.slice(0, 5).map(order => {
-                  const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
-                  const orderShop = allShops?.find(s => s.id === order.shopId);
-                  return (
-                    <TableRow key={order.id}>
-                      <TableCell>{orderShop?.name}</TableCell>
-                      <TableCell>{coffee?.name}</TableCell>
-                      <TableCell>
-                        {order.smallBags > 0 && `${order.smallBags} small`}
-                        {order.smallBags > 0 && order.largeBags > 0 && ', '}
-                        {order.largeBags > 0 && `${order.largeBags} large`}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={
-                          order.status === 'pending' ? 'outline' :
-                          order.status === 'roasted' ? 'secondary' :
-                          order.status === 'dispatched' ? 'default' :
-                          'default'
-                        }>
-                          {order.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{formatDate(order.createdAt)}</TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-            <div className="mt-4 flex justify-end">
-              <Button asChild variant="outline" size="sm">
-                <Link href="/roasting/orders">View All Orders</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Shop Performance</CardTitle>
-            <CardDescription>Overall performance data</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!allShops?.length ? (
-              <div className="text-center text-muted-foreground py-8">
-                No shops available
-              </div>
-            ) : (
-              allShops.map(shop => {
-                const shopInventory = allInventory?.filter(inv => inv.shopId === shop.id) || [];
-                const totalItems = shopInventory.length;
-                const healthyItems = shopInventory.filter(item =>
-                  (item.smallBags || 0) >= (shop.desiredSmallBags || 20) / 2 &&
-                  (item.largeBags || 0) >= (shop.desiredLargeBags || 10) / 2
-                ).length;
-
-                return (
-                  <div key={shop.id} className="mb-6 last:mb-0">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-medium">{shop.name}</h3>
-                      <div className="flex items-center gap-2">
-                        <Badge variant={healthyItems < totalItems ? "destructive" : "outline"}>
-                          {healthyItems < totalItems ? `${totalItems - healthyItems} Low Stock` : "Stock OK"}
-                        </Badge>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedShopId(shop.id);
-                            setIsRestockOpen(true);
-                          }}
-                        >
-                          <RefreshCw className="h-4 w-4 mr-2" />
-                          Restock
-                        </Button>
-                      </div>
-                    </div>
-                    <StockProgress
-                      current={healthyItems}
-                      desired={totalItems}
-                      label="Stock Health"
-                    />
-                    <div className="mt-4 space-y-2">
-                      {shopInventory.map(inv => {
-                        const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
-                        return (
-                          <div key={`${shop.id}-${inv.greenCoffeeId}`} className="p-2 bg-muted rounded">
-                            <div className="text-sm font-medium mb-2">{coffee?.name || 'Unknown Coffee'}</div>
-                            <div className="space-y-2">
-                              <StockProgress
-                                current={inv.smallBags || 0}
-                                desired={shop.desiredSmallBags || 20}
-                                label="Small Bags (200g)"
-                              />
-                              <StockProgress
-                                current={inv.largeBags || 0}
-                                desired={shop.desiredLargeBags || 10}
-                                label="Large Bags (1kg)"
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   if (user?.role === "retailOwner") {
-    const { toast } = useToast();
     const shopInventory = allInventory?.filter(inv => inv.shopId === selectedShopId) || [];
     const selectedShop = allShops?.find(shop => shop.id === selectedShopId);
-
-    // Handle inventory updates
-    const handleRestock = async (coffeeId: number) => {
-      if (!selectedShopId) {
-        toast({
-          title: "Error",
-          description: "Please select a shop first",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      setIsRestockOpen(true);
-    };
 
     return (
       <div className="container mx-auto py-8 space-y-8">
@@ -848,6 +295,171 @@ export default function Dashboard() {
             </Card>
           </>
         )}
+      </div>
+    );
+  }
+
+  if (user?.role === "roasteryOwner") {
+    // Removed duplicate orders section
+    return (
+      <div className="container mx-auto py-8 space-y-8">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user?.username}</h1>
+            <p className="text-muted-foreground">Coffee roasting operations overview</p>
+          </div>
+          <div className="flex gap-2">
+            <ShopSelector
+              value={selectedShopId}
+              onChange={(shopId) => {
+                console.log("Selected shop:", shopId);
+                setSelectedShopId(shopId);
+              }}
+            />
+            <Button
+              variant="outline"
+              onClick={() => logoutMutation.mutate()}
+              disabled={logoutMutation.isPending}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <StatsCard
+            title="Order Fulfillment"
+            value={`${allOrders?.length ? Math.round((allOrders?.filter(o => o.status === 'delivered').length / allOrders?.length) * 100) : 0}%`}
+            icon={Package}
+            onClick={() => navigate("/roasting/orders")}
+            description="Manage Orders"
+          />
+          <StatsCard
+            title="Active Shops"
+            value={allShops?.length || 0}
+            icon={Store}
+            description="Total managed locations"
+          />
+          <StatsCard
+            title="Low Stock Items"
+            value={lowStockCoffees.length}
+            icon={AlertTriangle}
+            onClick={() => setIsRestockOpen(true)}
+            description="View Restock Options"
+          />
+        </div>
+
+        <RestockDialog open={isRestockOpen} onOpenChange={setIsRestockOpen} shopId={selectedShopId} />
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Green Coffee Inventory</CardTitle>
+            <CardDescription>Current stock levels and details</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Producer</TableHead>
+                  <TableHead>Country</TableHead>
+                  <TableHead>Current Stock</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {coffees?.map(coffee => (
+                  <TableRow key={coffee.id}>
+                    <TableCell className="font-medium">{coffee.name}</TableCell>
+                    <TableCell>{coffee.producer}</TableCell>
+                    <TableCell>{coffee.country}</TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{coffee.currentStock}kg</div>
+                        <StockProgress
+                          current={Number(coffee.currentStock)}
+                          desired={Number(coffee.minThreshold) * 2}
+                          label="Stock Level"
+                        />
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {Number(coffee.currentStock) <= Number(coffee.minThreshold) ? (
+                        <Badge variant="destructive">Low Stock</Badge>
+                      ) : (
+                        <Badge variant="outline">In Stock</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/coffee/${coffee.id}`)}
+                      >
+                        View Details
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Orders Overview</CardTitle>
+            <CardDescription>Recent order status and activities</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableHead>Shop</TableHead>
+                  <TableHead>Coffee</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Date</TableHead>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {allOrders?.slice(0, 5).map(order => {
+                  const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
+                  const orderShop = allShops?.find(s => s.id === order.shopId);
+                  return (
+                    <TableRow key={order.id}>
+                      <TableCell>{orderShop?.name}</TableCell>
+                      <TableCell>{coffee?.name}</TableCell>
+                      <TableCell>
+                        {order.smallBags > 0 && `${order.smallBags} small`}
+                        {order.smallBags > 0 && order.largeBags > 0 && ', '}
+                        {order.largeBags > 0 && `${order.largeBags} large`}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={
+                          order.status === 'pending' ? 'outline' :
+                          order.status === 'roasted' ? 'secondary' :
+                          order.status === 'dispatched' ? 'default' :
+                          'default'
+                        }>
+                          {order.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{formatDate(order.createdAt)}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+            <div className="mt-4 flex justify-end">
+              <Button asChild variant="outline" size="sm">
+                <Link href="/roasting/orders">View All Orders</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
