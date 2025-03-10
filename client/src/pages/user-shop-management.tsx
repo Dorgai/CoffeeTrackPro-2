@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { User, Shop } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -24,11 +24,9 @@ type Assignment = {
 
 export default function UserShopManagement() {
   const { toast } = useToast();
-  const [pendingAssignments, setPendingAssignments] = useState<Assignment[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [hasChanges, setHasChanges] = useState(false);
+  const [pendingChanges, setPendingChanges] = useState<Assignment[]>([]);
 
-  // Fetch data
   const { data: users = [], isLoading: loadingUsers } = useQuery<User[]>({
     queryKey: ["/api/users"],
   });
@@ -40,60 +38,14 @@ export default function UserShopManagement() {
   const { data: currentAssignments = [], isLoading: loadingAssignments } = useQuery<Assignment[]>({
     queryKey: ["/api/user-shop-assignments"],
     onSuccess: (data) => {
-      if (!hasChanges) {
-        setPendingAssignments(data);
+      // Only initialize pending changes if they're empty
+      if (pendingChanges.length === 0) {
+        setPendingChanges(data);
       }
     },
   });
 
-  // Update mutation
-  const submitAssignments = useMutation({
-    mutationFn: async (assignments: Assignment[]) => {
-      setIsSubmitting(true);
-      try {
-        const response = await apiRequest(
-          "POST",
-          "/api/bulk-user-shop-assignments",
-          { assignments }
-        );
-
-        if (!response.ok) {
-          const error = await response.text();
-          throw new Error(error || "Failed to update assignments");
-        }
-
-        const result = await response.json();
-        return result;
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/user-shop-assignments"] });
-      setHasChanges(false);
-      toast({
-        title: "Success",
-        description: "Shop assignments saved successfully",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error saving assignments",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
-        variant: "destructive",
-      });
-      // Revert to current assignments on error
-      setPendingAssignments(currentAssignments);
-    },
-  });
-
-  // Check if a user is assigned to a shop
-  const isAssigned = (userId: number, shopId: number) => {
-    return pendingAssignments.some(a => a.userId === userId && a.shopId === shopId);
-  };
-
-  // Handle checkbox changes
-  const toggleAssignment = (userId: number, shopId: number) => {
+  const handleToggleAssignment = (userId: number, shopId: number) => {
     if (isSubmitting) return;
 
     const user = users.find(u => u.id === userId);
@@ -105,22 +57,54 @@ export default function UserShopManagement() {
       return;
     }
 
-    const newAssignments = isAssigned(userId, shopId)
-      ? pendingAssignments.filter(a => !(a.userId === userId && a.shopId === shopId))
-      : [...pendingAssignments, { userId, shopId }];
+    setPendingChanges(current => {
+      const isCurrentlyAssigned = current.some(
+        a => a.userId === userId && a.shopId === shopId
+      );
 
-    setPendingAssignments(newAssignments);
-    setHasChanges(true);
+      if (isCurrentlyAssigned) {
+        return current.filter(a => !(a.userId === userId && a.shopId === shopId));
+      } else {
+        return [...current, { userId, shopId }];
+      }
+    });
   };
 
-  // Handle save button click
-  const handleSave = async () => {
+  const handleSaveChanges = async () => {
+    setIsSubmitting(true);
     try {
-      await submitAssignments.mutateAsync(pendingAssignments);
+      const response = await apiRequest(
+        "POST",
+        "/api/bulk-user-shop-assignments",
+        { assignments: pendingChanges }
+      );
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error || "Failed to save assignments");
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ["/api/user-shop-assignments"] });
+
+      toast({
+        title: "Success",
+        description: "Shop assignments saved successfully",
+      });
     } catch (error) {
       console.error("Failed to save assignments:", error);
+      // Revert to current assignments
+      setPendingChanges(currentAssignments);
+      toast({
+        title: "Error saving assignments",
+        description: error instanceof Error ? error.message : "Failed to update assignments",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
+  const hasChanges = JSON.stringify(pendingChanges) !== JSON.stringify(currentAssignments);
 
   if (loadingUsers || loadingShops || loadingAssignments) {
     return (
@@ -132,6 +116,7 @@ export default function UserShopManagement() {
 
   const activeUsers = users.filter(user => user.isActive);
   const inactiveUsers = users.filter(user => !user.isActive);
+  const activeShops = shops.filter(shop => shop.isActive);
 
   const renderUserTable = (userList: User[]) => (
     <div className="border rounded-lg overflow-x-auto">
@@ -139,14 +124,12 @@ export default function UserShopManagement() {
         <TableHeader>
           <TableRow>
             <TableHead>User</TableHead>
-            {shops
-              .filter(shop => shop.isActive)
-              .map(shop => (
-                <TableHead key={shop.id} className="text-center">
-                  {shop.name}
-                  <div className="text-xs text-muted-foreground">{shop.location}</div>
-                </TableHead>
-              ))}
+            {activeShops.map(shop => (
+              <TableHead key={shop.id} className="text-center">
+                {shop.name}
+                <div className="text-xs text-muted-foreground">{shop.location}</div>
+              </TableHead>
+            ))}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -160,17 +143,18 @@ export default function UserShopManagement() {
                   </Badge>
                 </div>
               </TableCell>
-              {shops
-                .filter(shop => shop.isActive)
-                .map(shop => (
-                  <TableCell key={shop.id} className="text-center">
-                    <Checkbox
-                      checked={user.role === "roasteryOwner" || isAssigned(user.id, shop.id)}
-                      disabled={user.role === "roasteryOwner" || isSubmitting}
-                      onCheckedChange={() => toggleAssignment(user.id, shop.id)}
-                    />
-                  </TableCell>
-                ))}
+              {activeShops.map(shop => (
+                <TableCell key={shop.id} className="text-center">
+                  <Checkbox
+                    checked={
+                      user.role === "roasteryOwner" ||
+                      pendingChanges.some(a => a.userId === user.id && a.shopId === shop.id)
+                    }
+                    disabled={user.role === "roasteryOwner" || isSubmitting}
+                    onCheckedChange={() => handleToggleAssignment(user.id, shop.id)}
+                  />
+                </TableCell>
+              ))}
             </TableRow>
           ))}
         </TableBody>
@@ -184,11 +168,11 @@ export default function UserShopManagement() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">User-Shop Management</h1>
           <p className="text-muted-foreground">
-            Manage user access to shops using the checkboxes below. Click Save Changes when you're done.
+            Manage user access to shops using the checkboxes below. Click Save Changes to apply your changes.
           </p>
         </div>
         <Button
-          onClick={handleSave}
+          onClick={handleSaveChanges}
           disabled={!hasChanges || isSubmitting}
           className="min-w-[120px]"
         >
