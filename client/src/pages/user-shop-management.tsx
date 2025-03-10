@@ -41,11 +41,10 @@ export default function UserShopManagement() {
     queryKey: ["/api/user-shop-assignments"],
   });
 
-  // Update local assignments when server data changes
+  // Initialize local assignments when server data changes
   useEffect(() => {
-    if (serverAssignments.length > 0) {
-      setLocalAssignments(serverAssignments);
-    }
+    console.log("Server assignments updated:", serverAssignments);
+    setLocalAssignments(serverAssignments);
   }, [serverAssignments]);
 
   // Handle checkbox changes
@@ -62,21 +61,26 @@ export default function UserShopManagement() {
     }
 
     setLocalAssignments(current => {
-      const isCurrentlyAssigned = current.some(
+      const newAssignments = [...current];
+      const existingIndex = newAssignments.findIndex(
         a => a.userId === userId && a.shopId === shopId
       );
 
-      if (isCurrentlyAssigned) {
-        return current.filter(a => !(a.userId === userId && a.shopId === shopId));
+      if (existingIndex >= 0) {
+        newAssignments.splice(existingIndex, 1);
       } else {
-        return [...current, { userId, shopId }];
+        newAssignments.push({ userId, shopId });
       }
+
+      console.log("Updated local assignments:", newAssignments);
+      return newAssignments;
     });
   };
 
   // Save changes mutation
   const saveMutation = useMutation({
     mutationFn: async (assignments: Assignment[]) => {
+      console.log("Saving assignments:", assignments);
       const response = await apiRequest(
         "POST",
         "/api/bulk-user-shop-assignments",
@@ -90,6 +94,22 @@ export default function UserShopManagement() {
 
       return response.json();
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user-shop-assignments"] });
+      toast({
+        title: "Success",
+        description: "Shop assignments saved successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+      // Revert to server state
+      setLocalAssignments(serverAssignments);
+    },
   });
 
   // Handle save changes
@@ -97,25 +117,6 @@ export default function UserShopManagement() {
     try {
       setIsSaving(true);
       await saveMutation.mutateAsync(localAssignments);
-
-      // Invalidate and refetch queries
-      await queryClient.invalidateQueries({ queryKey: ["/api/user-shop-assignments"] });
-      await queryClient.refetchQueries({ queryKey: ["/api/user-shop-assignments"] });
-
-      toast({
-        title: "Success",
-        description: "Shop assignments saved successfully",
-      });
-    } catch (error) {
-      console.error("Save error:", error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to save assignments",
-        variant: "destructive",
-      });
-
-      // Revert to server state
-      setLocalAssignments(serverAssignments);
     } finally {
       setIsSaving(false);
     }
@@ -133,7 +134,11 @@ export default function UserShopManagement() {
   const inactiveUsers = users.filter(user => !user.isActive);
   const activeShops = shops.filter(shop => shop.isActive);
 
-  const hasChanges = JSON.stringify(localAssignments) !== JSON.stringify(serverAssignments);
+  const hasChanges = JSON.stringify(localAssignments.sort()) !== JSON.stringify(serverAssignments.sort());
+
+  const isAssigned = (userId: number, shopId: number) => {
+    return localAssignments.some(a => a.userId === userId && a.shopId === shopId);
+  };
 
   const renderUserTable = (userList: User[]) => (
     <Table>
@@ -164,7 +169,7 @@ export default function UserShopManagement() {
                 <Checkbox
                   checked={
                     user.role === "roasteryOwner" ||
-                    localAssignments.some(a => a.userId === user.id && a.shopId === shop.id)
+                    isAssigned(user.id, shop.id)
                   }
                   disabled={user.role === "roasteryOwner" || isSaving}
                   onCheckedChange={() => handleToggle(user.id, shop.id)}

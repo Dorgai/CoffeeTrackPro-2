@@ -867,16 +867,15 @@ export class DatabaseStorage {
 
   async updateBulkUserShopAssignments(assignments: { userId: number; shopId: number; }[]): Promise<void> {
     try {
-      console.log("Starting bulk user-shop assignment update");
+      console.log("Starting bulk user-shop assignment update with:", assignments);
 
       return await db.transaction(async (tx) => {
-        // Get all roastery owners
+        // Get all roastery owners and active shops
         const owners = await tx
           .select()
           .from(users)
           .where(eq(users.role, "roasteryOwner"));
 
-        // Get all active shops
         const activeShops = await tx
           .select()
           .from(shops)
@@ -885,7 +884,7 @@ export class DatabaseStorage {
         console.log("Found roastery owners:", owners.length);
         console.log("Found active shops:", activeShops.length);
 
-        // Clear existing assignments except for roastery owners
+        // Delete all existing non-owner assignments first
         await tx
           .delete(userShops)
           .where(
@@ -895,7 +894,7 @@ export class DatabaseStorage {
             )
           );
 
-        // Prepare all assignments including roastery owner assignments
+        // Create owner assignments - they get access to all shops
         const ownerAssignments = owners.flatMap(owner =>
           activeShops.map(shop => ({
             userId: owner.id,
@@ -903,22 +902,28 @@ export class DatabaseStorage {
           }))
         );
 
-        const allAssignments = [
-          ...ownerAssignments,
-          ...assignments.filter(a =>
-            !owners.some(owner => owner.id === a.userId)
-          )
-        ];
+        console.log("Owner assignments:", ownerAssignments);
+
+        // Filter out any assignments for owners since they already have full access
+        const filteredAssignments = assignments.filter(a => 
+          !owners.some(owner => owner.id === a.userId)
+        );
+
+        console.log("Filtered assignments:", filteredAssignments);
+
+        // Combine all assignments
+        const allAssignments = [...ownerAssignments, ...filteredAssignments];
 
         if (allAssignments.length > 0) {
-          // Insert new assignments
+          console.log("Inserting assignments:", allAssignments);
+          // Insert all assignments
           await tx
             .insert(userShops)
             .values(allAssignments)
             .onConflictDoNothing();
         }
 
-        console.log("Successfully updated user-shop assignments:", allAssignments.length);
+        console.log(`Successfully updated ${allAssignments.length} user-shop assignments`);
       });
     } catch (error) {
       console.error("Error updating bulk user-shop assignments:", error);
@@ -941,8 +946,6 @@ export class DatabaseStorage {
       return [];
     }
   }
-
-
 }
 
 export const storage = new DatabaseStorage();
