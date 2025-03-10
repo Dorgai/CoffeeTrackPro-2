@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { User, Shop } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Save } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 
 type Assignment = {
   userId: number;
@@ -23,8 +24,9 @@ type Assignment = {
 
 export default function UserShopManagement() {
   const { toast } = useToast();
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [pendingAssignments, setPendingAssignments] = useState<Assignment[]>([]);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
 
   const { data: users = [], isLoading: loadingUsers } = useQuery<User[]>({
     queryKey: ["/api/users"],
@@ -37,19 +39,20 @@ export default function UserShopManagement() {
   const { data: currentAssignments = [], isLoading: loadingAssignments } = useQuery<Assignment[]>({
     queryKey: ["/api/user-shop-assignments"],
     onSuccess: (data) => {
-      setAssignments(data);
+      if (!hasChanges) {
+        setPendingAssignments(data);
+      }
     },
-    refetchInterval: 5000, // Refetch every 5 seconds to keep data in sync
   });
 
   const updateAssignmentsMutation = useMutation({
-    mutationFn: async (newAssignments: Assignment[]) => {
+    mutationFn: async (assignments: Assignment[]) => {
       setIsUpdating(true);
       try {
         const response = await apiRequest(
           "POST",
           "/api/bulk-user-shop-assignments",
-          { assignments: newAssignments }
+          { assignments }
         );
 
         if (!response.ok) {
@@ -57,36 +60,34 @@ export default function UserShopManagement() {
           throw new Error(errorText || "Failed to update assignments");
         }
 
-        const result = await response.json();
-        return result;
+        return response.json();
       } finally {
         setIsUpdating(false);
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user-shop-assignments"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      setHasChanges(false);
       toast({
         title: "Success",
         description: "Shop assignments updated successfully",
       });
     },
     onError: (error: Error) => {
-      console.error("Failed to update assignments:", error);
-      setAssignments(currentAssignments);
       toast({
         title: "Error updating assignments",
         description: error.message,
         variant: "destructive",
       });
+      setPendingAssignments(currentAssignments);
     },
   });
 
   const isAssigned = (userId: number, shopId: number) => {
-    return assignments.some(a => a.userId === userId && a.shopId === shopId);
+    return pendingAssignments.some(a => a.userId === userId && a.shopId === shopId);
   };
 
-  const toggleAssignment = async (userId: number, shopId: number) => {
+  const toggleAssignment = (userId: number, shopId: number) => {
     if (isUpdating) return;
 
     const user = users.find(u => u.id === userId);
@@ -98,14 +99,19 @@ export default function UserShopManagement() {
       return;
     }
 
-    try {
-      const newAssignments = isAssigned(userId, shopId)
-        ? assignments.filter(a => !(a.userId === userId && a.shopId === shopId))
-        : [...assignments, { userId, shopId }];
+    const newAssignments = isAssigned(userId, shopId)
+      ? pendingAssignments.filter(a => !(a.userId === userId && a.shopId === shopId))
+      : [...pendingAssignments, { userId, shopId }];
 
-      await updateAssignmentsMutation.mutateAsync(newAssignments);
+    setPendingAssignments(newAssignments);
+    setHasChanges(true);
+  };
+
+  const handleSubmit = async () => {
+    try {
+      await updateAssignmentsMutation.mutateAsync(pendingAssignments);
     } catch (error) {
-      console.error("Toggle assignment failed:", error);
+      console.error("Failed to submit assignments:", error);
     }
   };
 
@@ -167,11 +173,27 @@ export default function UserShopManagement() {
 
   return (
     <div className="container mx-auto py-8 space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">User-Shop Management</h1>
-        <p className="text-muted-foreground">
-          Manage user access to shops using the checkboxes below. Roastery owners automatically have access to all shops.
-        </p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">User-Shop Management</h1>
+          <p className="text-muted-foreground">
+            Manage user access to shops using the checkboxes below. Roastery owners automatically have access to all shops.
+          </p>
+        </div>
+        <Button
+          onClick={handleSubmit}
+          disabled={!hasChanges || isUpdating}
+          className="min-w-[120px]"
+        >
+          {isUpdating ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <>
+              <Save className="h-4 w-4 mr-2" />
+              Save Changes
+            </>
+          )}
+        </Button>
       </div>
 
       <Tabs defaultValue="active" className="w-full">
