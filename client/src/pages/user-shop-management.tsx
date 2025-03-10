@@ -26,19 +26,29 @@ export default function UserShopManagement() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // Fetch all users
+  // Fetch users
   const { data: users = [], isLoading: loadingUsers } = useQuery<User[]>({
     queryKey: ["/api/users"],
   });
 
-  // Fetch all shops
+  // Fetch shops
   const { data: shops = [], isLoading: loadingShops } = useQuery<Shop[]>({
     queryKey: ["/api/shops"],
   });
 
-  // Fetch current assignments
+  // Fetch current assignments with proper error handling
   const { data: currentAssignments = [], isLoading: loadingAssignments } = useQuery<Assignment[]>({
     queryKey: ["/api/user-shop-assignments"],
+    onSuccess: (data) => {
+      setAssignments(data);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error loading assignments",
+        description: error instanceof Error ? error.message : "Failed to load assignments",
+        variant: "destructive",
+      });
+    },
   });
 
   // Keep local state in sync with server state
@@ -47,10 +57,6 @@ export default function UserShopManagement() {
       setAssignments(currentAssignments);
     }
   }, [currentAssignments]);
-
-  // Separate active and inactive users
-  const activeUsers = users.filter(user => user.isActive);
-  const inactiveUsers = users.filter(user => !user.isActive);
 
   // Update assignments mutation
   const updateAssignments = useMutation({
@@ -72,7 +78,6 @@ export default function UserShopManagement() {
       }
     },
     onSuccess: () => {
-      // Invalidate relevant queries to refetch fresh data
       queryClient.invalidateQueries({ queryKey: ["/api/user-shop-assignments"] });
       toast({
         title: "Success",
@@ -80,8 +85,7 @@ export default function UserShopManagement() {
       });
     },
     onError: (error: Error) => {
-      // Revert local state on error
-      setAssignments(currentAssignments);
+      setAssignments(currentAssignments); // Revert on error
       toast({
         title: "Error updating assignments",
         description: error.message,
@@ -95,6 +99,8 @@ export default function UserShopManagement() {
   };
 
   const toggleAssignment = async (userId: number, shopId: number) => {
+    if (isUpdating) return; // Prevent multiple simultaneous updates
+
     const user = users.find(u => u.id === userId);
     if (user?.role === "roasteryOwner") {
       toast({
@@ -117,10 +123,14 @@ export default function UserShopManagement() {
       setAssignments(newAssignments); // Optimistic update
       await updateAssignments.mutateAsync(newAssignments);
     } catch (error) {
-      // Error handling is done in mutation callbacks
       console.error("Failed to update assignments:", error);
+      // Error handling is done in mutation callbacks
     }
   };
+
+  // Separate active and inactive users
+  const activeUsers = users.filter(user => user.isActive);
+  const inactiveUsers = users.filter(user => !user.isActive);
 
   // Render assignment table for a given set of users
   const renderUserTable = (userList: User[]) => (

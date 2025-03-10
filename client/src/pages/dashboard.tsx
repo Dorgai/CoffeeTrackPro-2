@@ -27,6 +27,7 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [selectedShopId, setSelectedShopId] = useState<number | null>(null);
   const [isRestockOpen, setIsRestockOpen] = useState(false);
+  const [restockShopId, setRestockShopId] = useState<number | null>(null);
   const [, navigate] = useLocation();
 
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
@@ -85,15 +86,7 @@ export default function Dashboard() {
     loadingAllInventory || loadingAllOrders || loadingShopOrders || loadingRoastingHistory;
 
   const handleRestock = (shopId: number) => {
-    if (!shopId) {
-      toast({
-        title: "Error",
-        description: "Please select a shop first",
-        variant: "destructive",
-      });
-      return;
-    }
-    setSelectedShopId(shopId);
+    setRestockShopId(shopId);
     setIsRestockOpen(true);
   };
 
@@ -156,10 +149,10 @@ export default function Dashboard() {
           />
         </div>
 
-        <RestockDialog 
-          open={isRestockOpen} 
-          onOpenChange={setIsRestockOpen} 
-          shopId={selectedShopId} 
+        <RestockDialog
+          open={isRestockOpen}
+          onOpenChange={setIsRestockOpen}
+          shopId={restockShopId}
         />
 
         <Card>
@@ -337,9 +330,9 @@ export default function Dashboard() {
                       <TableCell>
                         <Badge variant={
                           order.status === 'pending' ? 'outline' :
-                          order.status === 'roasted' ? 'secondary' :
-                          order.status === 'dispatched' ? 'default' :
-                          'default'
+                            order.status === 'roasted' ? 'secondary' :
+                              order.status === 'dispatched' ? 'default' :
+                                'default'
                         }>
                           {order.status}
                         </Badge>
@@ -422,10 +415,10 @@ export default function Dashboard() {
               />
             </div>
 
-            <RestockDialog 
-              open={isRestockOpen} 
-              onOpenChange={setIsRestockOpen} 
-              shopId={selectedShopId} 
+            <RestockDialog
+              open={isRestockOpen}
+              onOpenChange={setIsRestockOpen}
+              shopId={restockShopId}
             />
 
             <Card>
@@ -518,9 +511,9 @@ export default function Dashboard() {
                             <TableCell>
                               <Badge variant={
                                 order.status === 'pending' ? 'outline' :
-                                order.status === 'roasted' ? 'secondary' :
-                                order.status === 'dispatched' ? 'default' :
-                                'default'
+                                  order.status === 'roasted' ? 'secondary' :
+                                    order.status === 'dispatched' ? 'default' :
+                                      'default'
                               }>
                                 {order.status}
                               </Badge>
