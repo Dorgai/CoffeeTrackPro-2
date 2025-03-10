@@ -1,10 +1,9 @@
 import { type RoastingBatch, type InsertRoastingBatch, roastingBatches, users, type User, type Shop, type InsertShop, shops, userShops, type GreenCoffee, greenCoffee, type Order, type InsertOrder, orders, type RetailInventory, retailInventory, type RetailInventoryHistory, retailInventoryHistory } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, notInArray } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
-import { sql } from 'drizzle-orm';
 
 const PostgresSessionStore = connectPg(session);
 
@@ -187,7 +186,7 @@ export class DatabaseStorage {
     try {
       console.log("Getting shops for user:", userId);
 
-      // First get all user's shop assignments
+      // Get all user's shop assignments
       const assignments = await db
         .select({
           shopId: userShops.shopId
@@ -208,7 +207,7 @@ export class DatabaseStorage {
         .where(
           and(
             eq(shops.isActive, true),
-            this.db.inArray(
+            inArray(
               shops.id,
               assignments.map(a => a.shopId)
             )
@@ -224,6 +223,86 @@ export class DatabaseStorage {
     }
   }
 
+
+  async getAllUserShopAssignments(): Promise<Array<{ userId: number; shopId: number }>> {
+    try {
+      console.log("Getting all user-shop assignments");
+
+      const assignments = await db
+        .select({
+          userId: userShops.userId,
+          shopId: userShops.shopId,
+        })
+        .from(userShops);
+
+      console.log("Found assignments:", assignments);
+      return assignments;
+    } catch (error) {
+      console.error("Error getting user-shop assignments:", error);
+      return [];
+    }
+  }
+
+  async updateBulkUserShopAssignments(assignments: { userId: number; shopId: number; }[]): Promise<void> {
+    try {
+      console.log("Starting bulk user-shop assignment update with:", assignments);
+
+      await db.transaction(async (tx) => {
+        // Get all roastery owners
+        const owners = await tx
+          .select()
+          .from(users)
+          .where(eq(users.role, "roasteryOwner"));
+
+        // Get all active shops
+        const activeShops = await tx
+          .select()
+          .from(shops)
+          .where(eq(shops.isActive, true));
+
+        console.log("Found roastery owners:", owners.length);
+        console.log("Found active shops:", activeShops.length);
+
+        // First delete all existing assignments except for roasteryOwners
+        await tx
+          .delete(userShops)
+          .where(
+            sql`user_id NOT IN (${sql.join(owners.map(o => o.id))})`
+          );
+
+        // Create assignments for roasteryOwners (they get all shops)
+        const ownerAssignments = owners.flatMap(owner =>
+          activeShops.map(shop => ({
+            userId: owner.id,
+            shopId: shop.id
+          }))
+        );
+
+        // Filter out any assignments for owners since they already have full access
+        const nonOwnerAssignments = assignments.filter(a => 
+          !owners.some(owner => owner.id === a.userId)
+        );
+
+        // Insert all assignments at once
+        const allAssignments = [...ownerAssignments, ...nonOwnerAssignments];
+
+        if (allAssignments.length > 0) {
+          await tx
+            .insert(userShops)
+            .values(allAssignments);
+        }
+
+        console.log("Successfully updated user-shop assignments:", {
+          ownerAssignments: ownerAssignments.length,
+          nonOwnerAssignments: nonOwnerAssignments.length,
+          total: allAssignments.length
+        });
+      });
+    } catch (error) {
+      console.error("Error updating bulk user-shop assignments:", error);
+      throw error;
+    }
+  }
 
   async getRetailInventoryHistory(shopId: number): Promise<any[]> {
     try {
@@ -902,10 +981,7 @@ export class DatabaseStorage {
         await tx
           .delete(userShops)
           .where(
-            notInArray(
-              userShops.userId,
-              owners.map(o => o.id)
-            )
+            sql`user_id NOT IN (${sql.join(owners.map(o => o.id))})`
           );
 
         // Create assignments for roasteryOwners (they get all shops)
@@ -929,9 +1005,13 @@ export class DatabaseStorage {
             .insert(userShops)
             .values(allAssignments);
         }
-      });
 
-      console.log("Successfully updated user-shop assignments");
+        console.log("Successfully updated user-shop assignments:", {
+          ownerAssignments: ownerAssignments.length,
+          nonOwnerAssignments: nonOwnerAssignments.length,
+          total: allAssignments.length
+        });
+      });
     } catch (error) {
       console.error("Error updating bulk user-shop assignments:", error);
       throw error;

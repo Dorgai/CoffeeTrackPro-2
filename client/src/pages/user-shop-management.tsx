@@ -36,15 +36,43 @@ export default function UserShopManagement() {
     queryKey: ["/api/shops"],
   });
 
-  const { data: currentAssignments = [], isLoading: loadingAssignments } = useQuery<Assignment[]>({
+  const { data: serverAssignments = [], isLoading: loadingAssignments } = useQuery<Assignment[]>({
     queryKey: ["/api/user-shop-assignments"],
   });
 
-  // Keep local state in sync with server data
+  // Initialize local assignments when server data changes
   useEffect(() => {
-    console.log("Updating local assignments from server:", currentAssignments);
-    setLocalAssignments(currentAssignments);
-  }, [currentAssignments]);
+    console.log("Server assignments updated:", serverAssignments);
+    setLocalAssignments(serverAssignments);
+  }, [serverAssignments]);
+
+  // Handle checkbox changes
+  const handleToggle = (userId: number, shopId: number) => {
+    if (isSaving) return;
+
+    const user = users.find(u => u.id === userId);
+    if (user?.role === "roasteryOwner") {
+      toast({
+        title: "Info",
+        description: "Roastery owners automatically have access to all shops",
+      });
+      return;
+    }
+
+    setLocalAssignments(current => {
+      const existingIndex = current.findIndex(
+        a => a.userId === userId && a.shopId === shopId
+      );
+
+      if (existingIndex >= 0) {
+        const newAssignments = [...current];
+        newAssignments.splice(existingIndex, 1);
+        return newAssignments;
+      } else {
+        return [...current, { userId, shopId }];
+      }
+    });
+  };
 
   // Save assignments mutation
   const saveMutation = useMutation({
@@ -65,6 +93,7 @@ export default function UserShopManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user-shop-assignments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       toast({
         title: "Success",
         description: "Shop assignments have been updated successfully",
@@ -78,35 +107,9 @@ export default function UserShopManagement() {
         variant: "destructive",
       });
       // Revert to server state
-      setLocalAssignments(currentAssignments);
+      setLocalAssignments(serverAssignments);
     },
   });
-
-  // Handle checkbox changes
-  const handleToggle = (userId: number, shopId: number) => {
-    if (isSaving) return;
-
-    const user = users.find(u => u.id === userId);
-    if (user?.role === "roasteryOwner") {
-      toast({
-        title: "Info",
-        description: "Roastery owners automatically have access to all shops",
-      });
-      return;
-    }
-
-    setLocalAssignments(current => {
-      const isCurrentlyAssigned = current.some(
-        a => a.userId === userId && a.shopId === shopId
-      );
-
-      if (isCurrentlyAssigned) {
-        return current.filter(a => !(a.userId === userId && a.shopId === shopId));
-      } else {
-        return [...current, { userId, shopId }];
-      }
-    });
-  };
 
   // Handle save
   const handleSave = async () => {
@@ -131,7 +134,7 @@ export default function UserShopManagement() {
   const activeShops = shops.filter(shop => shop.isActive);
 
   const hasChanges = JSON.stringify([...localAssignments].sort()) !== 
-                    JSON.stringify([...currentAssignments].sort());
+                    JSON.stringify([...serverAssignments].sort());
 
   const isAssigned = (userId: number, shopId: number) => {
     return localAssignments.some(a => a.userId === userId && a.shopId === shopId);
