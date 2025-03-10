@@ -40,10 +40,20 @@ export default function UserManagement() {
   const { toast } = useToast();
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [newPassword, setNewPassword] = useState("");
-  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [userToDeactivate, setUserToDeactivate] = useState<User | null>(null);
   const [selectedUserForShops, setSelectedUserForShops] = useState<User | null>(null);
   const [isShopAssignmentOpen, setIsShopAssignmentOpen] = useState(false);
+
+  // Dialog state management
+  const [dialogState, setDialogState] = useState<{
+    isOpen: boolean;
+    type: 'password' | 'shopAssignment' | 'activation' | null;
+    user: User | null;
+  }>({
+    isOpen: false,
+    type: null,
+    user: null
+  });
 
 
   // Queries
@@ -69,7 +79,7 @@ export default function UserManagement() {
       return res.json();
     },
     onSuccess: () => {
-      setIsPasswordDialogOpen(false);
+      setDialogState(prev => ({ ...prev, isOpen: false, type: null, user: null }));
       setNewPassword("");
       toast({
         title: "Success",
@@ -104,7 +114,7 @@ export default function UserManagement() {
         title: "Success",
         description: "User activation status has been updated",
       });
-      setUserToDeactivate(null);
+      setDialogState(prev => ({ ...prev, isOpen: false, type: null, user: null }));
     },
     onError: (error: Error) => {
       toast({
@@ -156,8 +166,7 @@ export default function UserManagement() {
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        setSelectedUser(user);
-                        setIsPasswordDialogOpen(true);
+                        setDialogState({ isOpen: true, type: 'password', user });
                       }}
                     >
                       <Key className="h-4 w-4 mr-2" />
@@ -167,7 +176,7 @@ export default function UserManagement() {
                     <Button
                       variant={user.isActive ? "destructive" : "outline"}
                       size="sm"
-                      onClick={() => setUserToDeactivate(user)}
+                      onClick={() => setDialogState({ isOpen: true, type: 'activation', user })}
                     >
                       {user.isActive ? (
                         <>
@@ -244,6 +253,77 @@ export default function UserManagement() {
     updateShopAssignmentsMutation.mutate({ userId, shopIds });
   };
 
+  const renderPasswordDialog = () => (
+    <Dialog open={dialogState.type === 'password'} onOpenChange={(open) => {
+      if (!open) setDialogState(prev => ({ ...prev, isOpen: false, type: null, user: null }));
+    }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Reset Password for {dialogState.user?.username}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 pt-4">
+          <Input
+            type="password"
+            placeholder="Enter new password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+          />
+          <Button
+            className="w-full"
+            onClick={() => {
+              if (dialogState.user) {
+                updatePasswordMutation.mutate({
+                  userId: dialogState.user.id,
+                  password: newPassword,
+                });
+              }
+            }}
+            disabled={!newPassword || !dialogState.user}
+          >
+            Update Password
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
+  const renderActivationDialog = () => (
+    <AlertDialog 
+      open={dialogState.type === 'activation'} 
+      onOpenChange={(open) => {
+        if (!open) setDialogState(prev => ({ ...prev, isOpen: false, type: null, user: null }));
+      }}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            {dialogState.user?.isActive ? "Deactivate" : "Activate"} User
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to {dialogState.user?.isActive ? "deactivate" : "activate"} {dialogState.user?.username}?
+            {dialogState.user?.isActive && " This will prevent them from accessing the system."}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => {
+              if (dialogState.user) {
+                toggleActivationMutation.mutate({
+                  userId: dialogState.user.id,
+                  isActive: !dialogState.user.isActive,
+                });
+              }
+            }}
+            className={dialogState.user?.isActive ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
+          >
+            {dialogState.user?.isActive ? "Deactivate" : "Activate"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+
   if (currentUser?.role !== "roasteryOwner") {
     return (
       <div className="container mx-auto py-8">
@@ -287,77 +367,9 @@ export default function UserManagement() {
         </TabsContent>
       </Tabs>
 
-      <Dialog
-        open={isPasswordDialogOpen}
-        onOpenChange={(open) => {
-          setIsPasswordDialogOpen(open);
-          if (!open) {
-            setSelectedUser(null);
-            setNewPassword("");
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reset Password for {selectedUser?.username}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-4">
-            <Input
-              type="password"
-              placeholder="Enter new password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-            />
-            <Button
-              className="w-full"
-              onClick={() => {
-                if (selectedUser) {
-                  updatePasswordMutation.mutate({
-                    userId: selectedUser.id,
-                    password: newPassword,
-                  });
-                }
-              }}
-              disabled={!newPassword || !selectedUser}
-            >
-              Update Password
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {renderPasswordDialog()}
+      {renderActivationDialog()}
 
-      <AlertDialog
-        open={!!userToDeactivate}
-        onOpenChange={(open) => !open && setUserToDeactivate(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {userToDeactivate?.isActive ? "Deactivate" : "Activate"} User
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to {userToDeactivate?.isActive ? "deactivate" : "activate"} {userToDeactivate?.username}?
-              {userToDeactivate?.isActive && " This will prevent them from accessing the system."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (userToDeactivate) {
-                  toggleActivationMutation.mutate({
-                    userId: userToDeactivate.id,
-                    isActive: !userToDeactivate.isActive,
-                  });
-                }
-              }}
-              className={userToDeactivate?.isActive ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
-            >
-              {userToDeactivate?.isActive ? "Deactivate" : "Activate"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
       <Dialog
         open={isShopAssignmentOpen}
         onOpenChange={(open) => {
