@@ -1,6 +1,6 @@
 import { type RoastingBatch, type InsertRoastingBatch, roastingBatches, users, type User, type Shop, type InsertShop, shops, userShops, type GreenCoffee, greenCoffee, type Order, type InsertOrder, orders, type RetailInventory, retailInventory, type RetailInventoryHistory, retailInventoryHistory } from "@shared/schema";
 import { db } from "./db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, notInArray } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -831,26 +831,71 @@ export class DatabaseStorage {
     }
   }
 
+  async getUserShopIds(userId: number): Promise<number[]> {
+    try {
+      console.log("Getting shop IDs for user:", userId);
+      const assignments = await db
+        .select()
+        .from(userShops)
+        .where(eq(userShops.userId, userId));
+
+      console.log("Found shop assignments:", assignments);
+      return assignments.map(a => a.shopId);
+    } catch (error) {
+      console.error("Error getting user shop IDs:", error);
+      return [];
+    }
+  }
+
+  async removeUserFromShop(userId: number, shopId: number): Promise<void> {
+    try {
+      console.log("Removing user from shop:", { userId, shopId });
+      await db
+        .delete(userShops)
+        .where(
+          and(
+            eq(userShops.userId, userId),
+            eq(userShops.shopId, shopId)
+          )
+        );
+      console.log("Successfully removed user from shop");
+    } catch (error) {
+      console.error("Error removing user from shop:", error);
+      throw error;
+    }
+  }
+
   async updateBulkUserShopAssignments(assignments: { userId: number; shopId: number; }[]): Promise<void> {
     try {
-      console.log("Updating bulk user-shop assignments");
+      console.log("Starting bulk user-shop assignment update");
 
       return await db.transaction(async (tx) => {
-        // First get all roasteryOwners to ensure they keep full access
+        // Get all roastery owners
         const owners = await tx
           .select()
           .from(users)
           .where(eq(users.role, "roasteryOwner"));
 
+        // Get all active shops
         const activeShops = await tx
           .select()
           .from(shops)
           .where(eq(shops.isActive, true));
 
-        // Clear existing assignments
-        await tx.delete(userShops);
+        console.log("Found roastery owners:", owners.length);
+        console.log("Found active shops:", activeShops.length);
 
-        // Create new assignments including ensuring owners have all shops
+        // Clear existing assignments except for roastery owners
+        await tx
+          .delete(userShops)
+          .where(
+            notInArray(
+              userShops.userId,
+              owners.map(o => o.id)
+            )
+          );
+
+        // Prepare all assignments including roastery owner assignments
         const ownerAssignments = owners.flatMap(owner =>
           activeShops.map(shop => ({
             userId: owner.id,
@@ -858,7 +903,6 @@ export class DatabaseStorage {
           }))
         );
 
-        // Combine owner assignments with the requested assignments
         const allAssignments = [
           ...ownerAssignments,
           ...assignments.filter(a =>
@@ -867,18 +911,21 @@ export class DatabaseStorage {
         ];
 
         if (allAssignments.length > 0) {
+          // Insert new assignments
           await tx
             .insert(userShops)
-            .values(allAssignments);
+            .values(allAssignments)
+            .onConflictDoNothing();
         }
 
-        console.log("Successfully updated user-shop assignments");
+        console.log("Successfully updated user-shop assignments:", allAssignments.length);
       });
     } catch (error) {
-      console.error("Error updating user-shop assignments:", error);
+      console.error("Error updating bulk user-shop assignments:", error);
       throw error;
     }
   }
+
   // Retail Inventory methods
   async getRetailInventories(): Promise<RetailInventory[]> {
     try {
@@ -895,7 +942,7 @@ export class DatabaseStorage {
     }
   }
 
-  
+
 }
 
 export const storage = new DatabaseStorage();

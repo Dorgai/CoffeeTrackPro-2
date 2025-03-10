@@ -77,12 +77,21 @@ export function OrderForm({
       return res.json();
     },
     onSuccess: () => {
+      // Invalidate all relevant queries
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory"] });
+      if (activeShop?.id) {
+        queryClient.invalidateQueries({ queryKey: ["/api/orders", activeShop.id] });
+        queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", activeShop.id] });
+      }
+
       if (onSuccess) onSuccess();
+
       toast({
         title: "Order Created",
         description: "Your order has been placed successfully",
       });
+
       form.reset();
     },
     onError: (error: Error) => {
@@ -159,7 +168,7 @@ export function OrderForm({
           <Button 
             type="submit" 
             className="w-full"
-            disabled={createOrderMutation.isPending}
+            disabled={createOrderMutation.isPending || !activeShop?.id}
           >
             {createOrderMutation.isPending ? (
               <>

@@ -23,6 +23,8 @@ import { RestockDialog } from "@/components/coffee/restock-dialog";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription } from "@/components/ui/alert"; // Added import for Alert component
+
 
 export default function Retail() {
   const { toast } = useToast();
@@ -45,10 +47,10 @@ export default function Retail() {
   }
 
   // Check if user can place orders and restock
-  const canManageInventory = ["owner", "retailOwner", "shopManager", "barista"].includes(user?.role || "");
+  const canManageInventory = ["owner", "retailOwner", "shopManager", "barista", "roasteryOwner"].includes(user?.role || "");
 
   // Filter coffees based on search query
-  const filteredCoffees = coffees?.filter(coffee => 
+  const filteredCoffees = coffees?.filter(coffee =>
     coffee.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     coffee.producer.toLowerCase().includes(searchQuery.toLowerCase()) ||
     coffee.grade.toLowerCase().includes(searchQuery.toLowerCase())
@@ -109,9 +111,11 @@ export default function Retail() {
       </div>
 
       {!activeShop?.id ? (
-        <div className="bg-destructive/10 text-destructive px-4 py-2 rounded">
-          Please select a shop to manage inventory.
-        </div>
+        <Alert>
+          <AlertDescription>
+            Please select a shop to manage inventory.
+          </AlertDescription>
+        </Alert>
       ) : (
         <RetailInventoryTable />
       )}

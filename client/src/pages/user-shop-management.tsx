@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { User, Shop } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -39,11 +39,14 @@ export default function UserShopManagement() {
   // Fetch current assignments
   const { data: serverAssignments = [], isLoading: loadingAssignments } = useQuery<Assignment[]>({
     queryKey: ["/api/user-shop-assignments"],
-    onSuccess: (data) => {
-      // Initialize local state with server data
-      setLocalAssignments(data);
-    },
   });
+
+  // Update local assignments when server data changes
+  useEffect(() => {
+    if (serverAssignments.length > 0) {
+      setLocalAssignments(serverAssignments);
+    }
+  }, [serverAssignments]);
 
   // Handle checkbox changes
   const handleToggle = (userId: number, shopId: number) => {
@@ -58,27 +61,26 @@ export default function UserShopManagement() {
       return;
     }
 
-    const isCurrentlyAssigned = localAssignments.some(
-      a => a.userId === userId && a.shopId === shopId
-    );
-
-    if (isCurrentlyAssigned) {
-      setLocalAssignments(current => 
-        current.filter(a => !(a.userId === userId && a.shopId === shopId))
+    setLocalAssignments(current => {
+      const isCurrentlyAssigned = current.some(
+        a => a.userId === userId && a.shopId === shopId
       );
-    } else {
-      setLocalAssignments(current => [...current, { userId, shopId }]);
-    }
+
+      if (isCurrentlyAssigned) {
+        return current.filter(a => !(a.userId === userId && a.shopId === shopId));
+      } else {
+        return [...current, { userId, shopId }];
+      }
+    });
   };
 
-  // Save changes
-  const handleSave = async () => {
-    setIsSaving(true);
-    try {
+  // Save changes mutation
+  const saveMutation = useMutation({
+    mutationFn: async (assignments: Assignment[]) => {
       const response = await apiRequest(
         "POST",
         "/api/bulk-user-shop-assignments",
-        { assignments: localAssignments }
+        { assignments }
       );
 
       if (!response.ok) {
@@ -86,10 +88,18 @@ export default function UserShopManagement() {
         throw new Error(errorText || "Failed to save assignments");
       }
 
-      // Force a refetch of the data
-      await queryClient.invalidateQueries({ queryKey: ["/api/user-shop-assignments"] });
+      return response.json();
+    },
+  });
 
-      // Wait for the new data to be fetched
+  // Handle save changes
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      await saveMutation.mutateAsync(localAssignments);
+
+      // Invalidate and refetch queries
+      await queryClient.invalidateQueries({ queryKey: ["/api/user-shop-assignments"] });
       await queryClient.refetchQueries({ queryKey: ["/api/user-shop-assignments"] });
 
       toast({
@@ -98,15 +108,14 @@ export default function UserShopManagement() {
       });
     } catch (error) {
       console.error("Save error:", error);
-
-      // Revert to server state
-      setLocalAssignments(serverAssignments);
-
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to save assignments",
         variant: "destructive",
       });
+
+      // Revert to server state
+      setLocalAssignments(serverAssignments);
     } finally {
       setIsSaving(false);
     }
@@ -179,10 +188,10 @@ export default function UserShopManagement() {
         </div>
         <Button
           onClick={handleSave}
-          disabled={!hasChanges || isSaving}
+          disabled={!hasChanges || isSaving || saveMutation.isPending}
           className="min-w-[120px]"
         >
-          {isSaving ? (
+          {isSaving || saveMutation.isPending ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <>
