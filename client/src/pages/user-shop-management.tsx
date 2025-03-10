@@ -24,6 +24,7 @@ type Assignment = {
 export default function UserShopManagement() {
   const { toast } = useToast();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   // Fetch all users
   const { data: users = [], isLoading: loadingUsers } = useQuery<User[]>({
@@ -35,6 +36,14 @@ export default function UserShopManagement() {
     queryKey: ["/api/shops"],
   });
 
+  // Fetch current assignments
+  const { data: currentAssignments = [], isLoading: loadingAssignments } = useQuery<Assignment[]>({
+    queryKey: ["/api/user-shop-assignments"],
+    onSuccess: (data) => {
+      setAssignments(data);
+    },
+  });
+
   // Separate active and inactive users
   const activeUsers = users.filter(user => user.isActive);
   const inactiveUsers = users.filter(user => !user.isActive);
@@ -42,18 +51,25 @@ export default function UserShopManagement() {
   // Update assignments mutation
   const updateAssignments = useMutation({
     mutationFn: async (assignments: Assignment[]) => {
-      const response = await apiRequest(
-        "POST",
-        "/api/bulk-user-shop-assignments",
-        { assignments }
-      );
-      if (!response.ok) {
-        throw new Error("Failed to update assignments");
+      setIsUpdating(true);
+      try {
+        const response = await apiRequest(
+          "POST",
+          "/api/bulk-user-shop-assignments",
+          { assignments }
+        );
+        if (!response.ok) {
+          throw new Error("Failed to update assignments");
+        }
+        return response.json();
+      } finally {
+        setIsUpdating(false);
       }
-      return response.json();
     },
     onSuccess: () => {
+      // Invalidate relevant queries to refetch fresh data
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user-shop-assignments"] });
       toast({
         title: "Success",
         description: "Shop assignments updated successfully",
@@ -61,7 +77,7 @@ export default function UserShopManagement() {
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: "Error updating assignments",
         description: error.message,
         variant: "destructive",
       });
@@ -72,7 +88,7 @@ export default function UserShopManagement() {
     return assignments.some(a => a.userId === userId && a.shopId === shopId);
   };
 
-  const toggleAssignment = (userId: number, shopId: number) => {
+  const toggleAssignment = async (userId: number, shopId: number) => {
     const user = users.find(u => u.id === userId);
     if (user?.role === "roasteryOwner") {
       toast({
@@ -92,7 +108,7 @@ export default function UserShopManagement() {
     }
 
     setAssignments(newAssignments);
-    updateAssignments.mutate(newAssignments);
+    await updateAssignments.mutate(newAssignments);
   };
 
   // Render assignment table for a given set of users
@@ -129,7 +145,7 @@ export default function UserShopManagement() {
                   <TableCell key={shop.id} className="text-center">
                     <Checkbox
                       checked={user.role === "roasteryOwner" || isAssigned(user.id, shop.id)}
-                      disabled={user.role === "roasteryOwner"}
+                      disabled={user.role === "roasteryOwner" || isUpdating}
                       onCheckedChange={() => toggleAssignment(user.id, shop.id)}
                     />
                   </TableCell>
@@ -141,7 +157,7 @@ export default function UserShopManagement() {
     </div>
   );
 
-  if (loadingUsers || loadingShops) {
+  if (loadingUsers || loadingShops || loadingAssignments) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin" />

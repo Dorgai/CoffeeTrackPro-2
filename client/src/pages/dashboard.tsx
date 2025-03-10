@@ -460,6 +460,97 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Add Shop Performance Section back */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Shop Performance</CardTitle>
+            <CardDescription>Overall performance data</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!allShops?.length ? (
+              <div className="text-center text-muted-foreground py-8">
+                No shops available
+              </div>
+            ) : (
+              <div className="space-y-8">
+                {allShops.map(shop => {
+                  const shopInventory = allInventory?.filter(inv => inv.shopId === shop.id) || [];
+                  const totalItems = shopInventory.length;
+                  const healthyItems = shopInventory.filter(item =>
+                    (item.smallBags || 0) >= (shop.desiredSmallBags || 20) / 2 &&
+                    (item.largeBags || 0) >= (shop.desiredLargeBags || 10) / 2
+                  ).length;
+
+                  return (
+                    <div key={shop.id}>
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h3 className="text-lg font-medium">{shop.name}</h3>
+                          <p className="text-sm text-muted-foreground">{shop.location}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={healthyItems < totalItems ? "destructive" : "outline"}>
+                            {healthyItems < totalItems ? `${totalItems - healthyItems} Low Stock` : "Stock OK"}
+                          </Badge>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedShopId(shop.id);
+                              setIsRestockOpen(true);
+                            }}
+                          >
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Restock
+                          </Button>
+                        </div>
+                      </div>
+
+                      <StockProgress
+                        current={healthyItems}
+                        desired={totalItems}
+                        label="Overall Stock Health"
+                      />
+
+                      <div className="mt-4 space-y-4">
+                        {shopInventory.map(inv => {
+                          const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
+                          if (!coffee) return null;
+
+                          return (
+                            <div key={`${shop.id}-${inv.greenCoffeeId}`} className="p-4 bg-muted rounded-lg">
+                              <div className="flex justify-between items-start mb-2">
+                                <div>
+                                  <div className="font-medium">{coffee.name}</div>
+                                  <div className="text-sm text-muted-foreground">
+                                    Producer: {coffee.producer}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                <StockProgress
+                                  current={inv.smallBags || 0}
+                                  desired={shop.desiredSmallBags || 20}
+                                  label="Small Bags (200g)"
+                                />
+                                <StockProgress
+                                  current={inv.largeBags || 0}
+                                  desired={shop.desiredLargeBags || 10}
+                                  label="Large Bags (1kg)"
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     );
   }
