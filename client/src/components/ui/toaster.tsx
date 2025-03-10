@@ -12,6 +12,7 @@ export function Toaster() {
   const { toasts } = useToast()
 
   return (
+    // Ensure ToastProvider is at the root level
     <ToastProvider>
       {toasts.map(function ({ id, title, description, action, ...props }) {
         return (

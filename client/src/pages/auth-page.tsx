@@ -41,7 +41,11 @@ export default function AuthPage() {
   });
 
   const registerForm = useForm({
-    resolver: zodResolver(insertUserSchema),
+    resolver: zodResolver(
+      insertUserSchema.extend({
+        role: insertUserSchema.shape.role,
+      })
+    ),
     defaultValues: {
       username: "",
       password: "",
