@@ -77,18 +77,6 @@ export default function Inventory() {
         <div className="flex items-center gap-4">
           {user?.role === "roasteryOwner" && (
             <>
-              <ShopSelector
-                value={selectedShopId}
-                onChange={setSelectedShopId}
-              />
-              <Button
-                variant="outline"
-                onClick={handleRestock}
-                disabled={!selectedShopId}
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Restock Shop
-              </Button>
               <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                 <DialogTrigger asChild>
                   <Button>Add New Coffee</Button>
@@ -115,12 +103,6 @@ export default function Inventory() {
           <InventoryDiscrepancyView />
         </div>
       )}
-
-      <RestockDialog 
-        open={isRestockOpen} 
-        onOpenChange={setIsRestockOpen} 
-        shopId={selectedShopId} 
-      />
     </div>
   );
 }

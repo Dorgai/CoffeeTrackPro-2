@@ -19,7 +19,7 @@ import { ShopSelector } from "@/components/layout/shop-selector";
 import StockProgress from "@/components/stock-progress";
 import { formatDate } from "@/lib/utils";
 import { Link } from "wouter";
-import {Alert, AlertDescription} from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Dashboard() {
@@ -84,7 +84,7 @@ export default function Dashboard() {
   const isLoading = loadingCoffees || loadingAllShops || loadingInventory ||
     loadingAllInventory || loadingAllOrders || loadingShopOrders || loadingRoastingHistory;
 
-  const handleRestock = async (coffeeId: number, shopId?: number) => {
+  const handleRestock = (shopId: number) => {
     if (!shopId) {
       toast({
         title: "Error",
@@ -109,197 +109,6 @@ export default function Dashboard() {
     Number(coffee.currentStock) <= Number(coffee.minThreshold)
   ) || [];
 
-  if (user?.role === "retailOwner") {
-    const shopInventory = allInventory?.filter(inv => inv.shopId === selectedShopId) || [];
-    const selectedShop = allShops?.find(shop => shop.id === selectedShopId);
-
-    return (
-      <div className="container mx-auto py-8 space-y-8">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user?.username}</h1>
-            <p className="text-muted-foreground">Retail Operations Overview</p>
-          </div>
-          <div className="flex gap-2">
-            <ShopSelector
-              value={selectedShopId}
-              onChange={setSelectedShopId}
-            />
-            <Button
-              variant="outline"
-              onClick={() => logoutMutation.mutate()}
-              disabled={logoutMutation.isPending}
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          </div>
-        </div>
-
-        {!selectedShopId ? (
-          <Alert>
-            <AlertDescription>
-              Please select a shop to view performance data and manage inventory.
-            </AlertDescription>
-          </Alert>
-        ) : (
-          <>
-            <div className="grid gap-4 md:grid-cols-3">
-              <StatsCard
-                title="Shop Status"
-                value={selectedShop?.isActive ? "Active" : "Inactive"}
-                icon={Store}
-                description={selectedShop?.location || "Location"}
-              />
-              <StatsCard
-                title="Order Fulfillment"
-                value={`${allOrders?.length ? Math.round((allOrders?.filter(o => o.status === 'delivered' && o.shopId === selectedShopId).length / allOrders?.filter(o => o.shopId === selectedShopId).length) * 100) : 0}%`}
-                icon={Package}
-                onClick={() => navigate("/retail/orders")}
-                description="Manage Orders"
-              />
-              <StatsCard
-                title="Low Stock Items"
-                value={shopInventory.filter(item =>
-                  (item.smallBags || 0) < (selectedShop?.desiredSmallBags || 20) / 2 ||
-                  (item.largeBags || 0) < (selectedShop?.desiredLargeBags || 10) / 2
-                ).length}
-                icon={AlertTriangle}
-                onClick={() => setIsRestockOpen(true)}
-                description="View Restock Options"
-              />
-            </div>
-
-            <RestockDialog 
-              open={isRestockOpen} 
-              onOpenChange={setIsRestockOpen} 
-              shopId={selectedShopId} 
-            />
-
-            {/* Shop Performance Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Shop Performance</CardTitle>
-                <CardDescription>Inventory and stock levels</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h3 className="text-lg font-medium">{selectedShop?.name}</h3>
-                      <p className="text-sm text-muted-foreground">{selectedShop?.location}</p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsRestockOpen(true)}
-                    >
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Restock
-                    </Button>
-                  </div>
-
-                  <div className="space-y-4">
-                    {shopInventory.map(inv => {
-                      const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
-                      if (!coffee) return null;
-
-                      return (
-                        <div key={`${selectedShopId}-${inv.greenCoffeeId}`} className="p-4 bg-muted rounded-lg">
-                          <div className="flex justify-between items-start mb-2">
-                            <div>
-                              <div className="font-medium">{coffee.name}</div>
-                              <div className="text-sm text-muted-foreground">
-                                Producer: {coffee.producer}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <StockProgress
-                              current={inv.smallBags || 0}
-                              desired={selectedShop?.desiredSmallBags || 20}
-                              label="Small Bags (200g)"
-                            />
-                            <StockProgress
-                              current={inv.largeBags || 0}
-                              desired={selectedShop?.desiredLargeBags || 10}
-                              label="Large Bags (1kg)"
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Recent Orders Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Orders</CardTitle>
-                <CardDescription>Latest orders for {selectedShop?.name}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableHead>Coffee</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Date</TableHead>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {allOrders
-                      ?.filter(order => order.shopId === selectedShopId)
-                      .slice(0, 5)
-                      .map(order => {
-                        const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
-                        return (
-                          <TableRow key={order.id}>
-                            <TableCell>{coffee?.name}</TableCell>
-                            <TableCell>
-                              {order.smallBags > 0 && `${order.smallBags} small`}
-                              {order.smallBags > 0 && order.largeBags > 0 && ', '}
-                              {order.largeBags > 0 && `${order.largeBags} large`}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={
-                                order.status === 'pending' ? 'outline' :
-                                order.status === 'roasted' ? 'secondary' :
-                                order.status === 'dispatched' ? 'default' :
-                                'default'
-                              }>
-                                {order.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>{formatDate(order.createdAt)}</TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    {(!allOrders?.length || !allOrders.filter(order => order.shopId === selectedShopId).length) && (
-                      <TableRow>
-                        <TableCell colSpan={4} className="text-center text-muted-foreground">
-                          No recent orders found
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-                <div className="mt-4 flex justify-end">
-                  <Button asChild variant="outline" size="sm">
-                    <Link href="/retail/orders">View All Orders</Link>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </>
-        )}
-      </div>
-    );
-  }
-
   if (user?.role === "roasteryOwner") {
     return (
       <div className="container mx-auto py-8 space-y-8">
@@ -311,10 +120,7 @@ export default function Dashboard() {
           <div className="flex gap-2">
             <ShopSelector
               value={selectedShopId}
-              onChange={(shopId) => {
-                console.log("Selected shop:", shopId);
-                setSelectedShopId(shopId);
-              }}
+              onChange={setSelectedShopId}
             />
             <Button
               variant="outline"
@@ -350,7 +156,11 @@ export default function Dashboard() {
           />
         </div>
 
-        <RestockDialog open={isRestockOpen} onOpenChange={setIsRestockOpen} shopId={selectedShopId} />
+        <RestockDialog 
+          open={isRestockOpen} 
+          onOpenChange={setIsRestockOpen} 
+          shopId={selectedShopId} 
+        />
 
         <Card>
           <CardHeader>
@@ -393,23 +203,13 @@ export default function Dashboard() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => navigate(`/coffee/${coffee.id}`)}
-                        >
-                          View Details
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleRestock(coffee.id, selectedShopId)}
-                        >
-                          <RefreshCw className="h-4 w-4 mr-2" />
-                          Restock
-                        </Button>
-                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/coffee/${coffee.id}`)}
+                      >
+                        View Details
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -452,10 +252,7 @@ export default function Dashboard() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => {
-                              setSelectedShopId(shop.id);
-                              setIsRestockOpen(true);
-                            }}
+                            onClick={() => handleRestock(shop.id)}
                           >
                             <RefreshCw className="h-4 w-4 mr-2" />
                             Restock
@@ -564,6 +361,197 @@ export default function Dashboard() {
     );
   }
 
+  if (user?.role === "retailOwner") {
+    const shopInventory = allInventory?.filter(inv => inv.shopId === selectedShopId) || [];
+    const selectedShop = allShops?.find(shop => shop.id === selectedShopId);
+
+    return (
+      <div className="container mx-auto py-8 space-y-8">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user?.username}</h1>
+            <p className="text-muted-foreground">Retail Operations Overview</p>
+          </div>
+          <div className="flex gap-2">
+            <ShopSelector
+              value={selectedShopId}
+              onChange={setSelectedShopId}
+            />
+            <Button
+              variant="outline"
+              onClick={() => logoutMutation.mutate()}
+              disabled={logoutMutation.isPending}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
+          </div>
+        </div>
+
+        {!selectedShopId ? (
+          <Alert>
+            <AlertDescription>
+              Please select a shop to view performance data and manage inventory.
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <>
+            <div className="grid gap-4 md:grid-cols-3">
+              <StatsCard
+                title="Shop Status"
+                value={selectedShop?.isActive ? "Active" : "Inactive"}
+                icon={Store}
+                description={selectedShop?.location || "Location"}
+              />
+              <StatsCard
+                title="Order Fulfillment"
+                value={`${allOrders?.length ? Math.round((allOrders?.filter(o => o.status === 'delivered' && o.shopId === selectedShopId).length / allOrders?.filter(o => o.shopId === selectedShopId).length) * 100) : 0}%`}
+                icon={Package}
+                onClick={() => navigate("/retail/orders")}
+                description="Manage Orders"
+              />
+              <StatsCard
+                title="Low Stock Items"
+                value={shopInventory.filter(item =>
+                  (item.smallBags || 0) < (selectedShop?.desiredSmallBags || 20) / 2 ||
+                  (item.largeBags || 0) < (selectedShop?.desiredLargeBags || 10) / 2
+                ).length}
+                icon={AlertTriangle}
+                onClick={() => setIsRestockOpen(true)}
+                description="View Restock Options"
+              />
+            </div>
+
+            <RestockDialog 
+              open={isRestockOpen} 
+              onOpenChange={setIsRestockOpen} 
+              shopId={selectedShopId} 
+            />
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Shop Performance</CardTitle>
+                <CardDescription>Inventory and stock levels</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-medium">{selectedShop?.name}</h3>
+                      <p className="text-sm text-muted-foreground">{selectedShop?.location}</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleRestock(selectedShopId)}
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Restock
+                    </Button>
+                  </div>
+
+                  <div className="space-y-4">
+                    {shopInventory.map(inv => {
+                      const coffee = coffees?.find(c => c.id === inv.greenCoffeeId);
+                      if (!coffee) return null;
+
+                      return (
+                        <div key={`${selectedShopId}-${inv.greenCoffeeId}`} className="p-4 bg-muted rounded-lg">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <div className="font-medium">{coffee.name}</div>
+                              <div className="text-sm text-muted-foreground">
+                                Producer: {coffee.producer}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <StockProgress
+                              current={inv.smallBags || 0}
+                              desired={selectedShop?.desiredSmallBags || 20}
+                              label="Small Bags (200g)"
+                            />
+                            <StockProgress
+                              current={inv.largeBags || 0}
+                              desired={selectedShop?.desiredLargeBags || 10}
+                              label="Large Bags (1kg)"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Recent Orders Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Orders</CardTitle>
+                <CardDescription>Latest orders for {selectedShop?.name}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableHead>Coffee</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Date</TableHead>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {allOrders
+                      ?.filter(order => order.shopId === selectedShopId)
+                      .slice(0, 5)
+                      .map(order => {
+                        const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
+                        return (
+                          <TableRow key={order.id}>
+                            <TableCell>{coffee?.name}</TableCell>
+                            <TableCell>
+                              {order.smallBags > 0 && `${order.smallBags} small`}
+                              {order.smallBags > 0 && order.largeBags > 0 && ', '}
+                              {order.largeBags > 0 && `${order.largeBags} large`}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={
+                                order.status === 'pending' ? 'outline' :
+                                order.status === 'roasted' ? 'secondary' :
+                                order.status === 'dispatched' ? 'default' :
+                                'default'
+                              }>
+                                {order.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{formatDate(order.createdAt)}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    {(!allOrders?.length || !allOrders.filter(order => order.shopId === selectedShopId).length) && (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center text-muted-foreground">
+                          No recent orders found
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+                <div className="mt-4 flex justify-end">
+                  <Button asChild variant="outline" size="sm">
+                    <Link href="/retail/orders">View All Orders</Link>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // Default return for users without specific role
   return (
     <div className="container mx-auto py-8">
       <div className="text-center">
