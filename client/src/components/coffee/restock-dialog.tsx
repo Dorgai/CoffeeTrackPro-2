@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect as ReactuseEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -28,6 +28,13 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
   const [quantities, setQuantities] = useState<Record<number, { small: number; large: number }>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Reset quantities when dialog opens/closes
+  ReactuseEffect(() => {
+    if (!open) {
+      setQuantities({});
+    }
+  }, [open]);
+
   // Fetch current inventory for the selected shop
   const { data: inventory, isLoading: loadingInventory } = useQuery({
     queryKey: ["/api/retail-inventory", shopId],
@@ -41,13 +48,22 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
   });
 
   const handleSubmit = async () => {
-    if (!shopId) return;
+    if (!shopId) {
+      toast({
+        title: "Error",
+        description: "Please select a shop first",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      // Create orders for each coffee with quantity > 0
-      const updatePromises = Object.entries(quantities).map(async ([coffeeId, { small, large }]) => {
-        if (small > 0 || large > 0) {
+      // Filter out coffees with zero quantities
+      const ordersToCreate = Object.entries(quantities)
+        .filter(([_, { small, large }]) => small > 0 || large > 0)
+        .map(async ([coffeeId, { small, large }]) => {
           const response = await apiRequest("POST", "/api/orders", {
             shopId,
             greenCoffeeId: parseInt(coffeeId),
@@ -61,23 +77,26 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
           }
 
           return response.json();
-        }
-      });
+        });
 
-      await Promise.all(updatePromises);
+      if (ordersToCreate.length === 0) {
+        throw new Error("Please specify quantities for at least one coffee type");
+      }
+
+      await Promise.all(ordersToCreate);
 
       // Invalidate relevant queries
       await queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-      await queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", shopId] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory"] });
 
       toast({
         title: "Success",
         description: "Restock orders created successfully",
       });
 
-      // Reset state and close dialog
-      setQuantities({});
+      // Close dialog and reset state
       onOpenChange(false);
+      setQuantities({});
     } catch (error) {
       console.error("Restock error:", error);
       toast({
@@ -95,7 +114,7 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
       <DialogContent>
         <Alert>
           <AlertDescription>
-            Please select a shop before creating a restock order.
+            Please select a shop to create a restock order.
           </AlertDescription>
         </Alert>
       </DialogContent>
@@ -156,7 +175,10 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
                             value={quantities[coffee.id]?.small || 0}
                             onChange={(e) => setQuantities(prev => ({
                               ...prev,
-                              [coffee.id]: { ...prev[coffee.id], small: parseInt(e.target.value) || 0 }
+                              [coffee.id]: { 
+                                ...prev[coffee.id] || {},
+                                small: Math.max(0, parseInt(e.target.value) || 0)
+                              }
                             }))}
                           />
                         </div>
@@ -168,7 +190,10 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
                             value={quantities[coffee.id]?.large || 0}
                             onChange={(e) => setQuantities(prev => ({
                               ...prev,
-                              [coffee.id]: { ...prev[coffee.id], large: parseInt(e.target.value) || 0 }
+                              [coffee.id]: {
+                                ...prev[coffee.id] || {},
+                                large: Math.max(0, parseInt(e.target.value) || 0)
+                              }
                             }))}
                           />
                         </div>
