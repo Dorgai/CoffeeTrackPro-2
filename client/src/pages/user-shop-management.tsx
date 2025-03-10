@@ -37,14 +37,14 @@ export default function UserShopManagement() {
   const { data: currentAssignments = [], isLoading: loadingAssignments } = useQuery<Assignment[]>({
     queryKey: ["/api/user-shop-assignments"],
     onSuccess: (data) => {
-      console.log("Received assignments:", data);
+      console.log("Received current assignments:", data);
       setAssignments(data);
     },
   });
 
-  const updateAssignments = useMutation({
+  const updateAssignmentsMutation = useMutation({
     mutationFn: async (newAssignments: Assignment[]) => {
-      console.log("Updating assignments:", newAssignments);
+      console.log("Sending assignment update:", newAssignments);
       setIsUpdating(true);
       try {
         const response = await apiRequest(
@@ -59,27 +59,35 @@ export default function UserShopManagement() {
         }
 
         const result = await response.json();
-        console.log("Update response:", result);
+        console.log("Server response:", result);
         return result;
+      } catch (error) {
+        console.error("Mutation error:", error);
+        throw error;
       } finally {
         setIsUpdating(false);
       }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("Successfully updated assignments:", data);
+      // Invalidate and refetch queries
       queryClient.invalidateQueries({ queryKey: ["/api/user-shop-assignments"] });
+
       toast({
         title: "Success",
         description: "Shop assignments updated successfully",
       });
     },
     onError: (error: Error) => {
-      console.error("Assignment update error:", error);
+      console.error("Failed to update assignments:", error);
+      // Revert to previous state
+      setAssignments(currentAssignments);
+
       toast({
         title: "Error updating assignments",
         description: error.message,
         variant: "destructive",
       });
-      setAssignments(currentAssignments);
     },
   });
 
@@ -99,15 +107,21 @@ export default function UserShopManagement() {
       return;
     }
 
-    const newAssignments = isAssigned(userId, shopId)
-      ? assignments.filter(a => !(a.userId === userId && a.shopId === shopId))
-      : [...assignments, { userId, shopId }];
-
     try {
+      const newAssignments = isAssigned(userId, shopId)
+        ? assignments.filter(a => !(a.userId === userId && a.shopId === shopId))
+        : [...assignments, { userId, shopId }];
+
+      // Update local state optimistically
       setAssignments(newAssignments);
-      await updateAssignments.mutateAsync(newAssignments);
+
+      // Send update to server
+      await updateAssignmentsMutation.mutateAsync(newAssignments);
+
+      console.log("Assignment toggle completed");
     } catch (error) {
-      console.error("Failed to update assignments:", error);
+      console.error("Toggle assignment failed:", error);
+      // Error handling is done in mutation callbacks
     }
   };
 

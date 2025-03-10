@@ -26,7 +26,8 @@ export default function Dashboard() {
   const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
   const [isRestockOpen, setIsRestockOpen] = useState(false);
-  const [activeShopId, setActiveShopId] = useState<number | null>(null);
+  const [selectedShopId, setSelectedShopId] = useState<number | null>(null);
+  const [restockTargetShopId, setRestockTargetShopId] = useState<number | null>(null);
   const [, navigate] = useLocation();
 
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
@@ -40,17 +41,17 @@ export default function Dashboard() {
   });
 
   const { data: retailInventory, isLoading: loadingInventory } = useQuery({
-    queryKey: ["/api/retail-inventory", activeShopId],
+    queryKey: ["/api/retail-inventory", selectedShopId],
     queryFn: async () => {
-      if (!activeShopId) return [];
-      console.log("Fetching retail inventory for shop:", activeShopId);
-      const res = await fetch(`/api/retail-inventory?shopId=${activeShopId}`);
+      if (!selectedShopId) return [];
+      console.log("Fetching retail inventory for shop:", selectedShopId);
+      const res = await fetch(`/api/retail-inventory?shopId=${selectedShopId}`);
       if (!res.ok) throw new Error('Failed to fetch inventory');
       const data = await res.json();
       console.log("Received inventory data:", data);
       return data;
     },
-    enabled: !!activeShopId,
+    enabled: !!selectedShopId,
   });
 
   const { data: allInventory, isLoading: loadingAllInventory } = useQuery<RetailInventory[]>({
@@ -64,8 +65,8 @@ export default function Dashboard() {
   });
 
   const { data: shopOrders, isLoading: loadingShopOrders } = useQuery<Order[]>({
-    queryKey: ["/api/orders", activeShopId],
-    enabled: !!activeShopId && (user?.role === "shopManager" || user?.role === "barista"),
+    queryKey: ["/api/orders", selectedShopId],
+    enabled: !!selectedShopId && (user?.role === "shopManager" || user?.role === "barista"),
   });
 
   const { data: roastingHistory, isLoading: loadingRoastingHistory } = useQuery({
@@ -85,7 +86,16 @@ export default function Dashboard() {
     loadingAllInventory || loadingAllOrders || loadingShopOrders || loadingRoastingHistory;
 
   const handleRestock = (shopId: number) => {
-    setActiveShopId(shopId);
+    if (!shopId) {
+      toast({
+        title: "Error",
+        description: "Please select a shop first",
+        variant: "destructive",
+      });
+      return;
+    }
+    console.log("Opening restock dialog for shop:", shopId);
+    setRestockTargetShopId(shopId);
     setIsRestockOpen(true);
   };
 
@@ -111,8 +121,8 @@ export default function Dashboard() {
           </div>
           <div className="flex gap-2">
             <ShopSelector
-              value={activeShopId}
-              onChange={setActiveShopId}
+              value={selectedShopId}
+              onChange={setSelectedShopId}
             />
             <Button
               variant="outline"
@@ -153,10 +163,10 @@ export default function Dashboard() {
           onOpenChange={(open) => {
             setIsRestockOpen(open);
             if (!open) {
-              setActiveShopId(null);
+              setRestockTargetShopId(null);
             }
           }}
-          shopId={activeShopId}
+          shopId={restockTargetShopId}
         />
 
         <Card>
@@ -359,8 +369,8 @@ export default function Dashboard() {
   }
 
   if (user?.role === "retailOwner") {
-    const shopInventory = allInventory?.filter(inv => inv.shopId === activeShopId) || [];
-    const selectedShop = allShops?.find(shop => shop.id === activeShopId);
+    const shopInventory = allInventory?.filter(inv => inv.shopId === selectedShopId) || [];
+    const selectedShop = allShops?.find(shop => shop.id === selectedShopId);
 
     return (
       <div className="container mx-auto py-8 space-y-8">
@@ -371,8 +381,8 @@ export default function Dashboard() {
           </div>
           <div className="flex gap-2">
             <ShopSelector
-              value={activeShopId}
-              onChange={setActiveShopId}
+              value={selectedShopId}
+              onChange={setSelectedShopId}
             />
             <Button
               variant="outline"
@@ -385,7 +395,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {!activeShopId ? (
+        {!selectedShopId ? (
           <Alert>
             <AlertDescription>
               Please select a shop to view performance data and manage inventory.
@@ -402,7 +412,7 @@ export default function Dashboard() {
               />
               <StatsCard
                 title="Order Fulfillment"
-                value={`${allOrders?.length ? Math.round((allOrders?.filter(o => o.status === 'delivered' && o.shopId === activeShopId).length / allOrders?.filter(o => o.shopId === activeShopId).length) * 100) : 0}%`}
+                value={`${allOrders?.length ? Math.round((allOrders?.filter(o => o.status === 'delivered' && o.shopId === selectedShopId).length / allOrders?.filter(o => o.shopId === selectedShopId).length) * 100) : 0}%`}
                 icon={Package}
                 onClick={() => navigate("/retail/orders")}
                 description="Manage Orders"
@@ -414,7 +424,7 @@ export default function Dashboard() {
                   (item.largeBags || 0) < (selectedShop?.desiredLargeBags || 10) / 2
                 ).length}
                 icon={AlertTriangle}
-                onClick={() => handleRestock(activeShopId)}
+                onClick={() => handleRestock(selectedShopId)}
                 description="View Restock Options"
               />
             </div>
@@ -423,9 +433,9 @@ export default function Dashboard() {
               open={isRestockOpen}
               onOpenChange={(open) => {
                 setIsRestockOpen(open);
-                if (!open) setActiveShopId(null);
+                if (!open) setSelectedShopId(null);
               }}
-              shopId={activeShopId}
+              shopId={restockTargetShopId}
             />
 
             <Card>
@@ -443,7 +453,7 @@ export default function Dashboard() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleRestock(activeShopId)}
+                      onClick={() => handleRestock(selectedShopId)}
                     >
                       <RefreshCw className="h-4 w-4 mr-2" />
                       Restock
@@ -456,7 +466,7 @@ export default function Dashboard() {
                       if (!coffee) return null;
 
                       return (
-                        <div key={`${activeShopId}-${inv.greenCoffeeId}`} className="p-4 bg-muted rounded-lg">
+                        <div key={`${selectedShopId}-${inv.greenCoffeeId}`} className="p-4 bg-muted rounded-lg">
                           <div className="flex justify-between items-start mb-2">
                             <div>
                               <div className="font-medium">{coffee.name}</div>
@@ -502,7 +512,7 @@ export default function Dashboard() {
                   </TableHead>
                   <TableBody>
                     {allOrders
-                      ?.filter(order => order.shopId === activeShopId)
+                      ?.filter(order => order.shopId === selectedShopId)
                       .slice(0, 5)
                       .map(order => {
                         const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
@@ -528,7 +538,7 @@ export default function Dashboard() {
                           </TableRow>
                         );
                       })}
-                    {(!allOrders?.length || !allOrders.filter(order => order.shopId === activeShopId).length) && (
+                    {(!allOrders?.length || !allOrders.filter(order => order.shopId === selectedShopId).length) && (
                       <TableRow>
                         <TableCell colSpan={4} className="text-center text-muted-foreground">
                           No recent orders found
