@@ -1,5 +1,5 @@
+import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { useState } from 'react';
 import { useLocation } from "wouter";
 import type { GreenCoffee, RetailInventory, Shop, Order } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
@@ -27,7 +27,7 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [selectedShopId, setSelectedShopId] = useState<number | null>(null);
   const [isRestockOpen, setIsRestockOpen] = useState(false);
-  const [restockShopId, setRestockShopId] = useState<number | null>(null);
+  const [targetShopId, setTargetShopId] = useState<number | null>(null);
   const [, navigate] = useLocation();
 
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
@@ -86,7 +86,15 @@ export default function Dashboard() {
     loadingAllInventory || loadingAllOrders || loadingShopOrders || loadingRoastingHistory;
 
   const handleRestock = (shopId: number) => {
-    setRestockShopId(shopId);
+    if (!shopId) {
+      toast({
+        title: "Error",
+        description: "Please select a shop first",
+        variant: "destructive",
+      });
+      return;
+    }
+    setTargetShopId(shopId);
     setIsRestockOpen(true);
   };
 
@@ -151,8 +159,11 @@ export default function Dashboard() {
 
         <RestockDialog
           open={isRestockOpen}
-          onOpenChange={setIsRestockOpen}
-          shopId={restockShopId}
+          onOpenChange={(open) => {
+            setIsRestockOpen(open);
+            if (!open) setTargetShopId(null);
+          }}
+          shopId={targetShopId}
         />
 
         <Card>
@@ -410,15 +421,18 @@ export default function Dashboard() {
                   (item.largeBags || 0) < (selectedShop?.desiredLargeBags || 10) / 2
                 ).length}
                 icon={AlertTriangle}
-                onClick={() => setIsRestockOpen(true)}
+                onClick={() => handleRestock(selectedShopId)}
                 description="View Restock Options"
               />
             </div>
 
             <RestockDialog
               open={isRestockOpen}
-              onOpenChange={setIsRestockOpen}
-              shopId={restockShopId}
+              onOpenChange={(open) => {
+                setIsRestockOpen(open);
+                if (!open) setTargetShopId(null);
+              }}
+              shopId={targetShopId}
             />
 
             <Card>

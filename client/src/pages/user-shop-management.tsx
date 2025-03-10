@@ -36,22 +36,12 @@ export default function UserShopManagement() {
     queryKey: ["/api/shops"],
   });
 
-  // Fetch current assignments with proper error handling
+  // Fetch current assignments
   const { data: currentAssignments = [], isLoading: loadingAssignments } = useQuery<Assignment[]>({
     queryKey: ["/api/user-shop-assignments"],
-    onSuccess: (data) => {
-      setAssignments(data);
-    },
-    onError: (error) => {
-      toast({
-        title: "Error loading assignments",
-        description: error instanceof Error ? error.message : "Failed to load assignments",
-        variant: "destructive",
-      });
-    },
   });
 
-  // Keep local state in sync with server state
+  // Keep local assignments in sync with server data
   useEffect(() => {
     if (currentAssignments) {
       setAssignments(currentAssignments);
@@ -68,10 +58,12 @@ export default function UserShopManagement() {
           "/api/bulk-user-shop-assignments",
           { assignments: newAssignments }
         );
+
         if (!response.ok) {
-          const errorData = await response.text();
-          throw new Error(errorData || "Failed to update assignments");
+          const errorText = await response.text();
+          throw new Error(errorText || "Failed to update assignments");
         }
+
         return response.json();
       } finally {
         setIsUpdating(false);
@@ -85,12 +77,13 @@ export default function UserShopManagement() {
       });
     },
     onError: (error: Error) => {
-      setAssignments(currentAssignments); // Revert on error
       toast({
         title: "Error updating assignments",
         description: error.message,
         variant: "destructive",
       });
+      // Revert to server state on error
+      setAssignments(currentAssignments);
     },
   });
 
@@ -99,7 +92,7 @@ export default function UserShopManagement() {
   };
 
   const toggleAssignment = async (userId: number, shopId: number) => {
-    if (isUpdating) return; // Prevent multiple simultaneous updates
+    if (isUpdating) return;
 
     const user = users.find(u => u.id === userId);
     if (user?.role === "roasteryOwner") {
@@ -110,14 +103,9 @@ export default function UserShopManagement() {
       return;
     }
 
-    let newAssignments: Assignment[];
-    if (isAssigned(userId, shopId)) {
-      newAssignments = assignments.filter(
-        a => !(a.userId === userId && a.shopId === shopId)
-      );
-    } else {
-      newAssignments = [...assignments, { userId, shopId }];
-    }
+    const newAssignments = isAssigned(userId, shopId)
+      ? assignments.filter(a => !(a.userId === userId && a.shopId === shopId))
+      : [...assignments, { userId, shopId }];
 
     try {
       setAssignments(newAssignments); // Optimistic update
