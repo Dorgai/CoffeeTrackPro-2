@@ -64,6 +64,18 @@ export default function Retail() {
     return acc;
   }, {} as Record<string, GreenCoffee[]>);
 
+  const handleRestock = () => {
+    if (!activeShop?.id) {
+      toast({
+        title: "Error",
+        description: "Please select a shop first",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsRestockDialogOpen(true);
+  };
+
   return (
     <div className="container mx-auto py-8 space-y-8">
       <div className="flex flex-col space-y-4">
@@ -79,7 +91,7 @@ export default function Retail() {
               <Button variant="outline" asChild>
                 <Link href="/retail/orders">View Orders</Link>
               </Button>
-              <Button variant="outline" onClick={() => setIsRestockDialogOpen(true)}>
+              <Button variant="outline" onClick={handleRestock}>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Restock
               </Button>

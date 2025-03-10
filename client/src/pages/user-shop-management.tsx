@@ -24,7 +24,7 @@ type Assignment = {
 
 export default function UserShopManagement() {
   const { toast } = useToast();
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [localAssignments, setLocalAssignments] = useState<Assignment[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
   // Fetch users and shops
@@ -37,13 +37,11 @@ export default function UserShopManagement() {
   });
 
   // Fetch current assignments
-  const { data: currentAssignments = [], isLoading: loadingAssignments } = useQuery<Assignment[]>({
+  const { data: serverAssignments = [], isLoading: loadingAssignments } = useQuery<Assignment[]>({
     queryKey: ["/api/user-shop-assignments"],
     onSuccess: (data) => {
-      // Initialize assignments state with current data
-      if (assignments.length === 0) {
-        setAssignments(data);
-      }
+      // Initialize local state with server data
+      setLocalAssignments(data);
     },
   });
 
@@ -60,14 +58,17 @@ export default function UserShopManagement() {
       return;
     }
 
-    setAssignments(current => {
-      const isAssigned = current.some(a => a.userId === userId && a.shopId === shopId);
-      if (isAssigned) {
-        return current.filter(a => !(a.userId === userId && a.shopId === shopId));
-      } else {
-        return [...current, { userId, shopId }];
-      }
-    });
+    const isCurrentlyAssigned = localAssignments.some(
+      a => a.userId === userId && a.shopId === shopId
+    );
+
+    if (isCurrentlyAssigned) {
+      setLocalAssignments(current => 
+        current.filter(a => !(a.userId === userId && a.shopId === shopId))
+      );
+    } else {
+      setLocalAssignments(current => [...current, { userId, shopId }]);
+    }
   };
 
   // Save changes
@@ -77,15 +78,19 @@ export default function UserShopManagement() {
       const response = await apiRequest(
         "POST",
         "/api/bulk-user-shop-assignments",
-        { assignments }
+        { assignments: localAssignments }
       );
 
       if (!response.ok) {
-        throw new Error(await response.text() || "Failed to save assignments");
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to save assignments");
       }
 
-      // Refetch data after successful save
+      // Force a refetch of the data
       await queryClient.invalidateQueries({ queryKey: ["/api/user-shop-assignments"] });
+
+      // Wait for the new data to be fetched
+      await queryClient.refetchQueries({ queryKey: ["/api/user-shop-assignments"] });
 
       toast({
         title: "Success",
@@ -95,7 +100,7 @@ export default function UserShopManagement() {
       console.error("Save error:", error);
 
       // Revert to server state
-      setAssignments(currentAssignments);
+      setLocalAssignments(serverAssignments);
 
       toast({
         title: "Error",
@@ -119,7 +124,7 @@ export default function UserShopManagement() {
   const inactiveUsers = users.filter(user => !user.isActive);
   const activeShops = shops.filter(shop => shop.isActive);
 
-  const hasChanges = JSON.stringify(assignments) !== JSON.stringify(currentAssignments);
+  const hasChanges = JSON.stringify(localAssignments) !== JSON.stringify(serverAssignments);
 
   const renderUserTable = (userList: User[]) => (
     <Table>
@@ -150,7 +155,7 @@ export default function UserShopManagement() {
                 <Checkbox
                   checked={
                     user.role === "roasteryOwner" ||
-                    assignments.some(a => a.userId === user.id && a.shopId === shop.id)
+                    localAssignments.some(a => a.userId === user.id && a.shopId === shop.id)
                   }
                   disabled={user.role === "roasteryOwner" || isSaving}
                   onCheckedChange={() => handleToggle(user.id, shop.id)}
