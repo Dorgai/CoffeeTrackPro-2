@@ -39,10 +39,14 @@ export default function UserShopManagement() {
   // Fetch current assignments
   const { data: currentAssignments = [], isLoading: loadingAssignments } = useQuery<Assignment[]>({
     queryKey: ["/api/user-shop-assignments"],
-    onSuccess: (data) => {
-      setAssignments(data);
-    },
   });
+
+  // Keep local state in sync with server state
+  useEffect(() => {
+    if (currentAssignments) {
+      setAssignments(currentAssignments);
+    }
+  }, [currentAssignments]);
 
   // Separate active and inactive users
   const activeUsers = users.filter(user => user.isActive);
@@ -50,16 +54,17 @@ export default function UserShopManagement() {
 
   // Update assignments mutation
   const updateAssignments = useMutation({
-    mutationFn: async (assignments: Assignment[]) => {
+    mutationFn: async (newAssignments: Assignment[]) => {
       setIsUpdating(true);
       try {
         const response = await apiRequest(
           "POST",
           "/api/bulk-user-shop-assignments",
-          { assignments }
+          { assignments: newAssignments }
         );
         if (!response.ok) {
-          throw new Error("Failed to update assignments");
+          const errorData = await response.text();
+          throw new Error(errorData || "Failed to update assignments");
         }
         return response.json();
       } finally {
@@ -68,7 +73,6 @@ export default function UserShopManagement() {
     },
     onSuccess: () => {
       // Invalidate relevant queries to refetch fresh data
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       queryClient.invalidateQueries({ queryKey: ["/api/user-shop-assignments"] });
       toast({
         title: "Success",
@@ -76,6 +80,8 @@ export default function UserShopManagement() {
       });
     },
     onError: (error: Error) => {
+      // Revert local state on error
+      setAssignments(currentAssignments);
       toast({
         title: "Error updating assignments",
         description: error.message,
@@ -107,8 +113,13 @@ export default function UserShopManagement() {
       newAssignments = [...assignments, { userId, shopId }];
     }
 
-    setAssignments(newAssignments);
-    await updateAssignments.mutate(newAssignments);
+    try {
+      setAssignments(newAssignments); // Optimistic update
+      await updateAssignments.mutateAsync(newAssignments);
+    } catch (error) {
+      // Error handling is done in mutation callbacks
+      console.error("Failed to update assignments:", error);
+    }
   };
 
   // Render assignment table for a given set of users
