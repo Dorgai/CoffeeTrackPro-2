@@ -25,9 +25,10 @@ type Assignment = {
 export default function UserShopManagement() {
   const { toast } = useToast();
   const [pendingAssignments, setPendingAssignments] = useState<Assignment[]>([]);
-  const [isUpdating, setIsUpdating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
+  // Fetch data
   const { data: users = [], isLoading: loadingUsers } = useQuery<User[]>({
     queryKey: ["/api/users"],
   });
@@ -45,9 +46,10 @@ export default function UserShopManagement() {
     },
   });
 
-  const updateAssignmentsMutation = useMutation({
+  // Update mutation
+  const submitAssignments = useMutation({
     mutationFn: async (assignments: Assignment[]) => {
-      setIsUpdating(true);
+      setIsSubmitting(true);
       try {
         const response = await apiRequest(
           "POST",
@@ -56,59 +58,43 @@ export default function UserShopManagement() {
         );
 
         if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(errorText || "Failed to update assignments");
+          const error = await response.text();
+          throw new Error(error || "Failed to update assignments");
         }
 
-        return response.json();
-      } catch (error) {
-        throw error;
+        const result = await response.json();
+        return result;
+      } finally {
+        setIsSubmitting(false);
       }
-    },
-    onMutate: async (newAssignments) => {
-      // Cancel any outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ["/api/user-shop-assignments"] });
-
-      // Save the previous assignments
-      const previousAssignments = queryClient.getQueryData(["/api/user-shop-assignments"]);
-
-      // Optimistically update to the new value
-      queryClient.setQueryData(["/api/user-shop-assignments"], newAssignments);
-
-      return { previousAssignments };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user-shop-assignments"] });
       setHasChanges(false);
-      setIsUpdating(false);
       toast({
         title: "Success",
-        description: "Shop assignments updated successfully",
+        description: "Shop assignments saved successfully",
       });
     },
-    onError: (error, newAssignments, context) => {
-      // Revert back to the previous assignments
-      queryClient.setQueryData(["/api/user-shop-assignments"], context?.previousAssignments);
-      setPendingAssignments(currentAssignments);
-      setIsUpdating(false);
+    onError: (error) => {
       toast({
-        title: "Error updating assignments",
-        description: error instanceof Error ? error.message : "Failed to update assignments",
+        title: "Error saving assignments",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
         variant: "destructive",
       });
-    },
-    onSettled: () => {
-      // Always refetch after error or success
-      queryClient.invalidateQueries({ queryKey: ["/api/user-shop-assignments"] });
+      // Revert to current assignments on error
+      setPendingAssignments(currentAssignments);
     },
   });
 
+  // Check if a user is assigned to a shop
   const isAssigned = (userId: number, shopId: number) => {
     return pendingAssignments.some(a => a.userId === userId && a.shopId === shopId);
   };
 
+  // Handle checkbox changes
   const toggleAssignment = (userId: number, shopId: number) => {
-    if (isUpdating) return;
+    if (isSubmitting) return;
 
     const user = users.find(u => u.id === userId);
     if (user?.role === "roasteryOwner") {
@@ -127,11 +113,12 @@ export default function UserShopManagement() {
     setHasChanges(true);
   };
 
-  const handleSubmit = async () => {
+  // Handle save button click
+  const handleSave = async () => {
     try {
-      await updateAssignmentsMutation.mutateAsync(pendingAssignments);
+      await submitAssignments.mutateAsync(pendingAssignments);
     } catch (error) {
-      console.error("Failed to submit assignments:", error);
+      console.error("Failed to save assignments:", error);
     }
   };
 
@@ -179,7 +166,7 @@ export default function UserShopManagement() {
                   <TableCell key={shop.id} className="text-center">
                     <Checkbox
                       checked={user.role === "roasteryOwner" || isAssigned(user.id, shop.id)}
-                      disabled={user.role === "roasteryOwner" || isUpdating}
+                      disabled={user.role === "roasteryOwner" || isSubmitting}
                       onCheckedChange={() => toggleAssignment(user.id, shop.id)}
                     />
                   </TableCell>
@@ -197,15 +184,15 @@ export default function UserShopManagement() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">User-Shop Management</h1>
           <p className="text-muted-foreground">
-            Manage user access to shops using the checkboxes below. Click Save Changes to apply your changes.
+            Manage user access to shops using the checkboxes below. Click Save Changes when you're done.
           </p>
         </div>
         <Button
-          onClick={handleSubmit}
-          disabled={!hasChanges || isUpdating}
+          onClick={handleSave}
+          disabled={!hasChanges || isSubmitting}
           className="min-w-[120px]"
         >
-          {isUpdating ? (
+          {isSubmitting ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <>
