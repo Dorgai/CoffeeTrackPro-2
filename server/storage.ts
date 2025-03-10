@@ -187,19 +187,33 @@ export class DatabaseStorage {
     try {
       console.log("Getting shops for user:", userId);
 
-      // Get all active shops - every user has access to all shops
-      const userShopsData = await db
+      // First get all user's shop assignments
+      const assignments = await db
         .select({
-          id: shops.id,
-          name: shops.name,
-          location: shops.location,
-          isActive: shops.isActive,
-          desiredSmallBags: shops.desiredSmallBags,
-          desiredLargeBags: shops.desiredLargeBags,
-          createdAt: shops.createdAt
+          shopId: userShops.shopId
         })
+        .from(userShops)
+        .where(eq(userShops.userId, userId));
+
+      console.log("Found user shop assignments:", assignments);
+
+      if (assignments.length === 0) {
+        return [];
+      }
+
+      // Then get the actual shop details
+      const userShopsData = await db
+        .select()
         .from(shops)
-        .where(eq(shops.isActive, true))
+        .where(
+          and(
+            eq(shops.isActive, true),
+            this.db.inArray(
+              shops.id,
+              assignments.map(a => a.shopId)
+            )
+          )
+        )
         .orderBy(shops.name);
 
       console.log("Found user assigned shops:", userShopsData);
@@ -209,7 +223,6 @@ export class DatabaseStorage {
       return [];
     }
   }
-
 
 
   async getRetailInventoryHistory(shopId: number): Promise<any[]> {
@@ -812,19 +825,19 @@ export class DatabaseStorage {
     }
   }
 
-  async getAllUserShopAssignments(): Promise<any[]> {
+  async getAllUserShopAssignments(): Promise<Array<{ userId: number; shopId: number }>> {
     try {
       console.log("Getting all user-shop assignments");
 
-      const result = await db
+      const assignments = await db
         .select({
           userId: userShops.userId,
           shopId: userShops.shopId,
         })
         .from(userShops);
 
-      console.log("Found assignments:", result.length);
-      return result;
+      console.log("Found assignments:", assignments);
+      return assignments;
     } catch (error) {
       console.error("Error getting user-shop assignments:", error);
       return [];
@@ -869,13 +882,14 @@ export class DatabaseStorage {
     try {
       console.log("Starting bulk user-shop assignment update with:", assignments);
 
-      return await db.transaction(async (tx) => {
-        // Get all roastery owners and active shops
+      await db.transaction(async (tx) => {
+        // Get all roastery owners
         const owners = await tx
           .select()
           .from(users)
           .where(eq(users.role, "roasteryOwner"));
 
+        // Get all active shops
         const activeShops = await tx
           .select()
           .from(shops)
@@ -884,7 +898,7 @@ export class DatabaseStorage {
         console.log("Found roastery owners:", owners.length);
         console.log("Found active shops:", activeShops.length);
 
-        // Delete all existing non-owner assignments first
+        // First delete all existing assignments except for roasteryOwners
         await tx
           .delete(userShops)
           .where(
@@ -894,7 +908,7 @@ export class DatabaseStorage {
             )
           );
 
-        // Create owner assignments - they get access to all shops
+        // Create assignments for roasteryOwners (they get all shops)
         const ownerAssignments = owners.flatMap(owner =>
           activeShops.map(shop => ({
             userId: owner.id,
@@ -902,29 +916,22 @@ export class DatabaseStorage {
           }))
         );
 
-        console.log("Owner assignments:", ownerAssignments);
-
         // Filter out any assignments for owners since they already have full access
-        const filteredAssignments = assignments.filter(a => 
+        const nonOwnerAssignments = assignments.filter(a => 
           !owners.some(owner => owner.id === a.userId)
         );
 
-        console.log("Filtered assignments:", filteredAssignments);
-
-        // Combine all assignments
-        const allAssignments = [...ownerAssignments, ...filteredAssignments];
+        // Insert all assignments at once
+        const allAssignments = [...ownerAssignments, ...nonOwnerAssignments];
 
         if (allAssignments.length > 0) {
-          console.log("Inserting assignments:", allAssignments);
-          // Insert all assignments
           await tx
             .insert(userShops)
-            .values(allAssignments)
-            .onConflictDoNothing();
+            .values(allAssignments);
         }
-
-        console.log(`Successfully updated ${allAssignments.length} user-shop assignments`);
       });
+
+      console.log("Successfully updated user-shop assignments");
     } catch (error) {
       console.error("Error updating bulk user-shop assignments:", error);
       throw error;

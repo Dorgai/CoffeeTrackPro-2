@@ -27,7 +27,7 @@ export default function UserShopManagement() {
   const [localAssignments, setLocalAssignments] = useState<Assignment[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Fetch users and shops
+  // Fetch all required data
   const { data: users = [], isLoading: loadingUsers } = useQuery<User[]>({
     queryKey: ["/api/users"],
   });
@@ -36,16 +36,51 @@ export default function UserShopManagement() {
     queryKey: ["/api/shops"],
   });
 
-  // Fetch current assignments
-  const { data: serverAssignments = [], isLoading: loadingAssignments } = useQuery<Assignment[]>({
+  const { data: currentAssignments = [], isLoading: loadingAssignments } = useQuery<Assignment[]>({
     queryKey: ["/api/user-shop-assignments"],
   });
 
-  // Initialize local assignments when server data changes
+  // Keep local state in sync with server data
   useEffect(() => {
-    console.log("Server assignments updated:", serverAssignments);
-    setLocalAssignments(serverAssignments);
-  }, [serverAssignments]);
+    console.log("Updating local assignments from server:", currentAssignments);
+    setLocalAssignments(currentAssignments);
+  }, [currentAssignments]);
+
+  // Save assignments mutation
+  const saveMutation = useMutation({
+    mutationFn: async (assignments: Assignment[]) => {
+      console.log("Saving assignments:", assignments);
+      const response = await apiRequest(
+        "POST",
+        "/api/bulk-user-shop-assignments",
+        { assignments }
+      );
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error || "Failed to save assignments");
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user-shop-assignments"] });
+      toast({
+        title: "Success",
+        description: "Shop assignments have been updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      console.error("Save error:", error);
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+      // Revert to server state
+      setLocalAssignments(currentAssignments);
+    },
+  });
 
   // Handle checkbox changes
   const handleToggle = (userId: number, shopId: number) => {
@@ -61,58 +96,19 @@ export default function UserShopManagement() {
     }
 
     setLocalAssignments(current => {
-      const newAssignments = [...current];
-      const existingIndex = newAssignments.findIndex(
+      const isCurrentlyAssigned = current.some(
         a => a.userId === userId && a.shopId === shopId
       );
 
-      if (existingIndex >= 0) {
-        newAssignments.splice(existingIndex, 1);
+      if (isCurrentlyAssigned) {
+        return current.filter(a => !(a.userId === userId && a.shopId === shopId));
       } else {
-        newAssignments.push({ userId, shopId });
+        return [...current, { userId, shopId }];
       }
-
-      console.log("Updated local assignments:", newAssignments);
-      return newAssignments;
     });
   };
 
-  // Save changes mutation
-  const saveMutation = useMutation({
-    mutationFn: async (assignments: Assignment[]) => {
-      console.log("Saving assignments:", assignments);
-      const response = await apiRequest(
-        "POST",
-        "/api/bulk-user-shop-assignments",
-        { assignments }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Failed to save assignments");
-      }
-
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/user-shop-assignments"] });
-      toast({
-        title: "Success",
-        description: "Shop assignments saved successfully",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-      // Revert to server state
-      setLocalAssignments(serverAssignments);
-    },
-  });
-
-  // Handle save changes
+  // Handle save
   const handleSave = async () => {
     try {
       setIsSaving(true);
@@ -134,53 +130,12 @@ export default function UserShopManagement() {
   const inactiveUsers = users.filter(user => !user.isActive);
   const activeShops = shops.filter(shop => shop.isActive);
 
-  const hasChanges = JSON.stringify(localAssignments.sort()) !== JSON.stringify(serverAssignments.sort());
+  const hasChanges = JSON.stringify([...localAssignments].sort()) !== 
+                    JSON.stringify([...currentAssignments].sort());
 
   const isAssigned = (userId: number, shopId: number) => {
     return localAssignments.some(a => a.userId === userId && a.shopId === shopId);
   };
-
-  const renderUserTable = (userList: User[]) => (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>User</TableHead>
-          {activeShops.map(shop => (
-            <TableHead key={shop.id} className="text-center">
-              {shop.name}
-              <div className="text-xs text-muted-foreground">{shop.location}</div>
-            </TableHead>
-          ))}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {userList.map(user => (
-          <TableRow key={user.id}>
-            <TableCell>
-              <div>
-                <div className="font-medium">{user.username}</div>
-                <Badge variant="outline" className="mt-1">
-                  {user.role}
-                </Badge>
-              </div>
-            </TableCell>
-            {activeShops.map(shop => (
-              <TableCell key={shop.id} className="text-center">
-                <Checkbox
-                  checked={
-                    user.role === "roasteryOwner" ||
-                    isAssigned(user.id, shop.id)
-                  }
-                  disabled={user.role === "roasteryOwner" || isSaving}
-                  onCheckedChange={() => handleToggle(user.id, shop.id)}
-                />
-              </TableCell>
-            ))}
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
 
   return (
     <div className="container mx-auto py-8 space-y-8">
@@ -188,13 +143,12 @@ export default function UserShopManagement() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">User-Shop Management</h1>
           <p className="text-muted-foreground">
-            Use the checkboxes below to manage user access to shops. Click Save Changes when done.
+            Manage which users have access to which shops
           </p>
         </div>
         <Button
           onClick={handleSave}
           disabled={!hasChanges || isSaving || saveMutation.isPending}
-          className="min-w-[120px]"
         >
           {isSaving || saveMutation.isPending ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -207,20 +161,98 @@ export default function UserShopManagement() {
         </Button>
       </div>
 
-      <div className="border rounded-lg">
-        <Tabs defaultValue="active" className="w-full">
-          <TabsList className="border-b">
-            <TabsTrigger value="active">Active Users ({activeUsers.length})</TabsTrigger>
-            <TabsTrigger value="inactive">Inactive Users ({inactiveUsers.length})</TabsTrigger>
-          </TabsList>
-          <TabsContent value="active" className="p-4">
-            {renderUserTable(activeUsers)}
-          </TabsContent>
-          <TabsContent value="inactive" className="p-4">
-            {renderUserTable(inactiveUsers)}
-          </TabsContent>
-        </Tabs>
-      </div>
+      <Tabs defaultValue="active" className="w-full">
+        <TabsList>
+          <TabsTrigger value="active">Active Users ({activeUsers.length})</TabsTrigger>
+          <TabsTrigger value="inactive">Inactive Users ({inactiveUsers.length})</TabsTrigger>
+        </TabsList>
+        <TabsContent value="active" className="mt-6">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>User</TableHead>
+                {activeShops.map(shop => (
+                  <TableHead key={shop.id} className="text-center">
+                    {shop.name}
+                    <div className="text-xs text-muted-foreground">
+                      {shop.location}
+                    </div>
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {activeUsers.map(user => (
+                <TableRow key={user.id}>
+                  <TableCell>
+                    <div>
+                      <div className="font-medium">{user.username}</div>
+                      <Badge variant="outline" className="mt-1">
+                        {user.role}
+                      </Badge>
+                    </div>
+                  </TableCell>
+                  {activeShops.map(shop => (
+                    <TableCell key={shop.id} className="text-center">
+                      <Checkbox
+                        checked={
+                          user.role === "roasteryOwner" ||
+                          isAssigned(user.id, shop.id)
+                        }
+                        disabled={user.role === "roasteryOwner" || isSaving}
+                        onCheckedChange={() => handleToggle(user.id, shop.id)}
+                      />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TabsContent>
+        <TabsContent value="inactive" className="mt-6">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>User</TableHead>
+                {activeShops.map(shop => (
+                  <TableHead key={shop.id} className="text-center">
+                    {shop.name}
+                    <div className="text-xs text-muted-foreground">
+                      {shop.location}
+                    </div>
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {inactiveUsers.map(user => (
+                <TableRow key={user.id}>
+                  <TableCell>
+                    <div>
+                      <div className="font-medium">{user.username}</div>
+                      <Badge variant="outline" className="mt-1">
+                        {user.role}
+                      </Badge>
+                    </div>
+                  </TableCell>
+                  {activeShops.map(shop => (
+                    <TableCell key={shop.id} className="text-center">
+                      <Checkbox
+                        checked={
+                          user.role === "roasteryOwner" ||
+                          isAssigned(user.id, shop.id)
+                        }
+                        disabled={user.role === "roasteryOwner" || isSaving}
+                        onCheckedChange={() => handleToggle(user.id, shop.id)}
+                      />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
