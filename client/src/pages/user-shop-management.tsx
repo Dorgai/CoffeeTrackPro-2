@@ -37,14 +37,13 @@ export default function UserShopManagement() {
   const { data: currentAssignments = [], isLoading: loadingAssignments } = useQuery<Assignment[]>({
     queryKey: ["/api/user-shop-assignments"],
     onSuccess: (data) => {
-      console.log("Received current assignments:", data);
       setAssignments(data);
     },
+    refetchInterval: 5000, // Refetch every 5 seconds to keep data in sync
   });
 
   const updateAssignmentsMutation = useMutation({
     mutationFn: async (newAssignments: Assignment[]) => {
-      console.log("Sending assignment update:", newAssignments);
       setIsUpdating(true);
       try {
         const response = await apiRequest(
@@ -59,20 +58,14 @@ export default function UserShopManagement() {
         }
 
         const result = await response.json();
-        console.log("Server response:", result);
         return result;
-      } catch (error) {
-        console.error("Mutation error:", error);
-        throw error;
       } finally {
         setIsUpdating(false);
       }
     },
-    onSuccess: (data) => {
-      console.log("Successfully updated assignments:", data);
-      // Invalidate and refetch queries
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user-shop-assignments"] });
-
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       toast({
         title: "Success",
         description: "Shop assignments updated successfully",
@@ -80,9 +73,7 @@ export default function UserShopManagement() {
     },
     onError: (error: Error) => {
       console.error("Failed to update assignments:", error);
-      // Revert to previous state
       setAssignments(currentAssignments);
-
       toast({
         title: "Error updating assignments",
         description: error.message,
@@ -112,16 +103,9 @@ export default function UserShopManagement() {
         ? assignments.filter(a => !(a.userId === userId && a.shopId === shopId))
         : [...assignments, { userId, shopId }];
 
-      // Update local state optimistically
-      setAssignments(newAssignments);
-
-      // Send update to server
       await updateAssignmentsMutation.mutateAsync(newAssignments);
-
-      console.log("Assignment toggle completed");
     } catch (error) {
       console.error("Toggle assignment failed:", error);
-      // Error handling is done in mutation callbacks
     }
   };
 
