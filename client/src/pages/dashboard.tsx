@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
-import type { GreenCoffee, RetailInventory, Shop } from "@shared/schema";
+import type { GreenCoffee, RetailInventory, Shop, Order } from "@shared/schema"; // Added Order type
 import { useQuery } from "@tanstack/react-query";
 import {
   Card,
@@ -20,6 +20,12 @@ import { formatDate } from "@/lib/utils";
 import { Link } from "wouter";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+
+// Placeholder for apiRequest function.  Replace with your actual implementation.
+const apiRequest = async (method: string, url: string) => {
+  const response = await fetch(url, { method });
+  return response;
+};
 
 export default function Dashboard() {
   const { user, logoutMutation } = useAuth();
@@ -47,7 +53,25 @@ export default function Dashboard() {
     enabled: ["roasteryOwner", "owner", "retailOwner"].includes(user?.role || ""),
   });
 
-  const isLoading = loadingCoffees || loadingAllShops || loadingInventory || loadingAllInventory;
+  const { data: orders, isLoading: loadingOrders } = useQuery({
+    queryKey: ["/api/orders", selectedShopId],
+    queryFn: async () => {
+      const url = selectedShopId
+        ? `/api/orders?shopId=${selectedShopId}`
+        : "/api/orders";
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch orders");
+      return res.json();
+    },
+    enabled: !!user,
+  });
+
+  const { data: recentBatches, isLoading: loadingBatches } = useQuery({
+    queryKey: ["/api/roasting-batches"],
+    enabled: user?.role === "roasteryOwner",
+  });
+
+  const isLoading = loadingCoffees || loadingAllShops || loadingInventory || loadingAllInventory || loadingOrders || loadingBatches;
 
   if (isLoading) {
     return (
@@ -104,8 +128,8 @@ export default function Dashboard() {
         </div>
 
         {selectedShopId && (
-          <StockLevelDisplay 
-            inventory={retailInventory || []} 
+          <StockLevelDisplay
+            inventory={retailInventory || []}
             desiredSmallBags={allShops?.find(s => s.id === selectedShopId)?.desiredSmallBags}
             desiredLargeBags={allShops?.find(s => s.id === selectedShopId)?.desiredLargeBags}
           />
@@ -157,6 +181,82 @@ export default function Dashboard() {
             </Table>
           </CardContent>
         </Card>
+        {orders && orders.length > 0 && (
+          <Card className="mt-4">
+            <CardHeader>
+              <CardTitle>Recent Orders</CardTitle>
+              <CardDescription>Latest coffee orders and their status</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableHead>Coffee</TableHead>
+                    <TableHead>Shop</TableHead>
+                    <TableHead>Small Bags</TableHead>
+                    <TableHead>Large Bags</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Created</TableHead>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {orders.map((order) => (
+                    <TableRow key={order.id}>
+                      <TableCell>{order.coffeeName}</TableCell>
+                      <TableCell>{order.shopName}</TableCell>
+                      <TableCell>{order.smallBags}</TableCell>
+                      <TableCell>{order.largeBags}</TableCell>
+                      <TableCell>{order.status}</TableCell>
+                      <TableCell>{formatDate(order.createdAt)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
+        <Card className="mt-4">
+          <CardHeader>
+            <CardTitle>Recent Batches</CardTitle>
+            <CardDescription>Latest roasting batches across all coffees</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loadingBatches ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+            ) : recentBatches && recentBatches.length > 0 ? (
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Coffee</TableHead>
+                    <TableHead>Planned Amount (kg)</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Small Bags</TableHead>
+                    <TableHead>Large Bags</TableHead>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {recentBatches.map((batch) => (
+                    <TableRow key={batch.id}>
+                      <TableCell>{formatDate(batch.createdAt)}</TableCell>
+                      <TableCell>{batch.coffeeName}</TableCell>
+                      <TableCell>{batch.plannedAmount}</TableCell>
+                      <TableCell>{batch.status}</TableCell>
+                      <TableCell>{batch.smallBagsProduced}</TableCell>
+                      <TableCell>{batch.largeBagsProduced}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="text-center py-4 text-muted-foreground">
+                No roasting batches found
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -196,8 +296,8 @@ export default function Dashboard() {
           </Alert>
         ) : (
           <>
-            <StockLevelDisplay 
-              inventory={shopInventory} 
+            <StockLevelDisplay
+              inventory={shopInventory}
               desiredSmallBags={selectedShop?.desiredSmallBags}
               desiredLargeBags={selectedShop?.desiredLargeBags}
             />
@@ -235,6 +335,40 @@ export default function Dashboard() {
                 </Table>
               </CardContent>
             </Card>
+            {orders && orders.length > 0 && (
+              <Card className="mt-4">
+                <CardHeader>
+                  <CardTitle>Recent Orders</CardTitle>
+                  <CardDescription>Latest coffee orders and their status</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableHead>Coffee</TableHead>
+                        <TableHead>Shop</TableHead>
+                        <TableHead>Small Bags</TableHead>
+                        <TableHead>Large Bags</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Created</TableHead>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {orders.map((order) => (
+                        <TableRow key={order.id}>
+                          <TableCell>{order.coffeeName}</TableCell>
+                          <TableCell>{order.shopName}</TableCell>
+                          <TableCell>{order.smallBags}</TableCell>
+                          <TableCell>{order.largeBags}</TableCell>
+                          <TableCell>{order.status}</TableCell>
+                          <TableCell>{formatDate(order.createdAt)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
           </>
         )}
       </div>

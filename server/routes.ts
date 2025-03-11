@@ -363,6 +363,37 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  // Add bulk update endpoint
+  app.post("/api/bulk-user-shop-assignments", requireRole(["roasteryOwner"]), async (req, res) => {
+    try {
+      const { assignments } = req.body;
+      console.log("Processing bulk user-shop assignments:", assignments);
+
+      if (!Array.isArray(assignments)) {
+        return res.status(400).json({ message: "Assignments must be an array" });
+      }
+
+      // Group assignments by user
+      const userAssignments = assignments.reduce((acc, { userId, shopId }) => {
+        if (!acc[userId]) {
+          acc[userId] = [];
+        }
+        acc[userId].push(shopId);
+        return acc;
+      }, {});
+
+      // Update assignments for each user
+      for (const [userId, shopIds] of Object.entries(userAssignments)) {
+        await storage.assignUserToShops(parseInt(userId), shopIds);
+      }
+
+      res.json({ message: "Assignments updated successfully" });
+    } catch (error) {
+      console.error("Error updating bulk assignments:", error);
+      res.status(500).json({ message: "Failed to update assignments" });
+    }
+  });
+
   // Shops Routes - accessible by roastery owner and shop manager
   app.get("/api/shops/:id", requireShopAccess(["shopManager", "barista"]), async (req, res) => {
     try {
@@ -871,7 +902,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           coffeeName: greenCoffee.name,
           producer: greenCoffee.producer,
           created_by: users.username,
-          updated_by: sql<string | null>`(SELECT username FROMusers WHERE id = ${orders.updatedById})`
+          updated_by: sql<string | null>`(SELECT username FROM users WHERE id = ${orders.updatedById})`
         })
         .from(orders)
         .leftJoin(shops, eq(orders.shopId, shops.id))
@@ -924,14 +955,14 @@ export async function registerRoutes(app: Express): Promise<void> {
         if (["owner", "retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {
           if (smallBags > order.smallBags || largeBags > order.largeBags) {
             return res.status(400).json({
-              message: "Updated quantities cannot exceed original orderquantities"
+              message: "Updated quantities cannot exceed original order quantities"
             });
           }
         } else {
           // Shop manager can only mark orders as delivered
           if (req.user?.role === "shopManager" && status !== "delivered") {
             return res.status(403).json({
-              message: "Shopmanagers can only mark orders as delivered"
+              message: "Shop managers can only mark orders as delivered"
             });
           }
 
@@ -1092,7 +1123,7 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-  //  // Add new billing routes after theexisting ones
+  //  // Add new billing routes after the existing ones
   app.get("/api/billing/lastevent", requireRole(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
     try {
       const lastEvent = await storage.getLastBillingEvent();
