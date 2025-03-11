@@ -326,9 +326,9 @@ export class DatabaseStorage {
     }
   }
 
-  async assignUserToShops(userId: number): Promise<void> {
+  async assignUserToShops(userId: number, shopIds: number[]): Promise<void> {
     try {
-      console.log("Assigning shops to user:", userId);
+      console.log("Assigning shops to user:", userId, "shops:", shopIds);
 
       return await db.transaction(async (tx) => {
         // Get the user
@@ -341,33 +341,24 @@ export class DatabaseStorage {
           throw new Error("User not found");
         }
 
-        // Get all active shops
-        const activeShops = await tx
-          .select()
-          .from(shops)
-          .where(eq(shops.isActive, true));
-
-        if (activeShops.length === 0) {
-          console.log("No active shops found");
-          return;
-        }
-
         // Remove existing assignments
         await tx
           .delete(userShops)
           .where(eq(userShops.userId, userId));
 
-        // Assign all active shops
-        await tx
-          .insert(userShops)
-          .values(
-            activeShops.map(shop => ({
-              userId,
-              shopId: shop.id
-            }))
-          );
+        // If shopIds array is provided and not empty, add new assignments
+        if (shopIds && shopIds.length > 0) {
+          await tx
+            .insert(userShops)
+            .values(
+              shopIds.map(shopId => ({
+                userId,
+                shopId
+              }))
+            );
+        }
 
-        console.log(`Assigned ${activeShops.length} shops to user ${userId}`);
+        console.log(`Updated assignments for user ${userId}: ${shopIds.length} shops`);
       });
     } catch (error) {
       console.error("Error assigning shops to user:", error);
@@ -553,6 +544,72 @@ export class DatabaseStorage {
       throw error;
     }
   }
+
+  // Add createOrder method to DatabaseStorage class
+  async createOrder(data: InsertOrder): Promise<Order> {
+    try {
+      console.log("Creating new order:", data);
+      const [order] = await db
+        .insert(orders)
+        .values({
+          shopId: data.shopId,
+          greenCoffeeId: data.greenCoffeeId,
+          smallBags: data.smallBags || 0,
+          largeBags: data.largeBags || 0,
+          status: 'pending',
+          createdById: data.createdById,
+          createdAt: new Date(),
+        })
+        .returning();
+
+      console.log("Created order:", order);
+      return order;
+    } catch (error) {
+      console.error("Error creating order:", error);
+      throw error;
+    }
+  }
+
+  // Add getOrder and updateOrderStatus methods
+  async getOrder(id: number): Promise<Order | undefined> {
+    try {
+      console.log("Getting order by ID:", id);
+      const [order] = await db
+        .select()
+        .from(orders)
+        .where(eq(orders.id, id));
+      console.log("Found order:", order ? "yes" : "no");
+      return order;
+    } catch (error) {
+      console.error("Error getting order:", error);
+      return undefined;
+    }
+  }
+
+  async updateOrderStatus(
+    id: number,
+    data: { status: string; smallBags?: number; largeBags?: number }
+  ): Promise<Order> {
+    try {
+      console.log("Updating order status:", id, "with data:", data);
+      const [order] = await db
+        .update(orders)
+        .set({
+          status: data.status,
+          ...(data.smallBags !== undefined && { smallBags: data.smallBags }),
+          ...(data.largeBags !== undefined && { largeBags: data.largeBags }),
+          updatedAt: new Date(),
+        })
+        .where(eq(orders.id, id))
+        .returning();
+      console.log("Updated order:", order);
+      return order;
+    } catch (error) {
+      console.error("Error updating order status:", error);
+      throw error;
+    }
+  }
+
 }
 
 export const storage = new DatabaseStorage();
