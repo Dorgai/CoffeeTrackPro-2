@@ -36,41 +36,24 @@ export default function UserShopManagement() {
     queryKey: ["/api/shops"],
   });
 
-  const { data: serverAssignments = [], isLoading: loadingAssignments } = useQuery<Assignment[]>({
-    queryKey: ["/api/user-shop-assignments"],
-  });
-
-  // Initialize local assignments when server data changes
+  // Initialize local assignments - all users should be assigned to all shops by default
   useEffect(() => {
-    console.log("Server assignments updated:", serverAssignments);
-    setLocalAssignments(serverAssignments);
-  }, [serverAssignments]);
-
-  // Handle checkbox changes
-  const handleToggle = (userId: number, shopId: number) => {
-    if (isSaving) return;
-
-    const user = users.find(u => u.id === userId);
-    if (user?.role === "roasteryOwner") {
-      toast({
-        title: "Info",
-        description: "Roastery owners automatically have access to all shops",
-      });
-      return;
-    }
-
-    setLocalAssignments(current => {
-      const existingIndex = current.findIndex(
-        a => a.userId === userId && a.shopId === shopId
+    if (users.length && shops.length) {
+      const allAssignments = users.flatMap(user =>
+        shops.map(shop => ({
+          userId: user.id,
+          shopId: shop.id
+        }))
       );
+      setLocalAssignments(allAssignments);
+    }
+  }, [users, shops]);
 
-      if (existingIndex >= 0) {
-        const newAssignments = [...current];
-        newAssignments.splice(existingIndex, 1);
-        return newAssignments;
-      } else {
-        return [...current, { userId, shopId }];
-      }
+  // Handle checkbox changes - but all roles should have access to all shops
+  const handleToggle = (userId: number, shopId: number) => {
+    toast({
+      title: "Info",
+      description: "All users automatically have access to all shops",
     });
   };
 
@@ -106,8 +89,6 @@ export default function UserShopManagement() {
         description: error.message,
         variant: "destructive",
       });
-      // Revert to server state
-      setLocalAssignments(serverAssignments);
     },
   });
 
@@ -121,7 +102,7 @@ export default function UserShopManagement() {
     }
   };
 
-  if (loadingUsers || loadingShops || loadingAssignments) {
+  if (loadingUsers || loadingShops) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -133,12 +114,8 @@ export default function UserShopManagement() {
   const inactiveUsers = users.filter(user => !user.isActive);
   const activeShops = shops.filter(shop => shop.isActive);
 
-  const hasChanges = JSON.stringify([...localAssignments].sort()) !== 
-                    JSON.stringify([...serverAssignments].sort());
-
-  const isAssigned = (userId: number, shopId: number) => {
-    return localAssignments.some(a => a.userId === userId && a.shopId === shopId);
-  };
+  // All users have access to all shops by default
+  const isAssigned = () => true;
 
   return (
     <div className="container mx-auto py-8 space-y-8">
@@ -146,22 +123,9 @@ export default function UserShopManagement() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">User-Shop Management</h1>
           <p className="text-muted-foreground">
-            Manage which users have access to which shops
+            All users have access to all shops by default
           </p>
         </div>
-        <Button
-          onClick={handleSave}
-          disabled={!hasChanges || isSaving || saveMutation.isPending}
-        >
-          {isSaving || saveMutation.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <>
-              <Save className="h-4 w-4 mr-2" />
-              Save Changes
-            </>
-          )}
-        </Button>
       </div>
 
       <Tabs defaultValue="active" className="w-full">
@@ -198,11 +162,8 @@ export default function UserShopManagement() {
                   {activeShops.map(shop => (
                     <TableCell key={shop.id} className="text-center">
                       <Checkbox
-                        checked={
-                          user.role === "roasteryOwner" ||
-                          isAssigned(user.id, shop.id)
-                        }
-                        disabled={user.role === "roasteryOwner" || isSaving}
+                        checked={isAssigned()}
+                        disabled={true}
                         onCheckedChange={() => handleToggle(user.id, shop.id)}
                       />
                     </TableCell>
@@ -241,11 +202,8 @@ export default function UserShopManagement() {
                   {activeShops.map(shop => (
                     <TableCell key={shop.id} className="text-center">
                       <Checkbox
-                        checked={
-                          user.role === "roasteryOwner" ||
-                          isAssigned(user.id, shop.id)
-                        }
-                        disabled={user.role === "roasteryOwner" || isSaving}
+                        checked={isAssigned()}
+                        disabled={true}
                         onCheckedChange={() => handleToggle(user.id, shop.id)}
                       />
                     </TableCell>

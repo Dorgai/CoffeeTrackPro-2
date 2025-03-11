@@ -376,7 +376,6 @@ export class DatabaseStorage {
   }
 
 
-
   async getAllUserShopAssignments(): Promise<Array<{ userId: number; shopId: number }>> {
     try {
       console.log("Getting all user-shop assignments");
