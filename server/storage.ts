@@ -366,18 +366,97 @@ export class DatabaseStorage {
     }
   }
 
-  async getRetailInventories(): Promise<RetailInventory[]> {
+  async getRetailInventories(shopId?: number): Promise<RetailInventory[]> {
     try {
-      console.log("Storage: Fetching retail inventories");
-      const inventories = await db
-        .select()
-        .from(retailInventory);
+      console.log("Storage: Fetching retail inventories", shopId ? `for shop ${shopId}` : 'for all shops');
 
-      console.log("Found retail inventories:", inventories.length);
-      return inventories;
+      let query = sql`
+        WITH inventory_base AS (
+          SELECT 
+            s.id as shop_id,
+            s.name as shop_name,
+            s.location as shop_location,
+            gc.id as coffee_id,
+            gc.name as coffee_name,
+            gc.producer,
+            gc.grade
+          FROM shops s
+          CROSS JOIN green_coffee gc
+          WHERE s.is_active = true
+          ${shopId ? sql`AND s.id = ${shopId}` : sql``}
+        ),
+        latest_inventory AS (
+          SELECT DISTINCT ON (shop_id, green_coffee_id)
+            shop_id,
+            green_coffee_id,
+            small_bags,
+            large_bags,
+            updated_at,
+            updated_by_id,
+            update_type
+          FROM retail_inventory
+          ORDER BY shop_id, green_coffee_id, updated_at DESC
+        )
+        SELECT 
+          ib.shop_id as "shopId",
+          ib.coffee_id as "coffeeId",
+          COALESCE(li.small_bags, 0) as "smallBags",
+          COALESCE(li.large_bags, 0) as "largeBags",
+          li.updated_at as "updatedAt",
+          li.updated_by_id as "updatedById",
+          li.update_type as "updateType",
+          ib.shop_name as "shopName",
+          ib.shop_location as "shopLocation",
+          ib.coffee_name as "coffeeName",
+          ib.producer,
+          ib.grade,
+          u.username as "updatedByUsername"
+        FROM inventory_base ib
+        LEFT JOIN latest_inventory li ON ib.shop_id = li.shop_id AND ib.coffee_id = li.green_coffee_id
+        LEFT JOIN users u ON li.updated_by_id = u.id
+        ORDER BY ib.shop_name, ib.coffee_name`;
+
+      const result = await db.execute(query);
+      console.log("Found retail inventories:", {
+        total: result.rows?.length,
+        shopId,
+        sampleRow: result.rows?.[0]
+      });
+
+      return result.rows || [];
     } catch (error) {
       console.error("Error getting retail inventories:", error);
       return [];
+    }
+  }
+
+  // Add back the green coffee methods
+  async getGreenCoffees(): Promise<GreenCoffee[]> {
+    try {
+      console.log("Storage: Fetching all green coffee entries");
+      const coffees = await db
+        .select()
+        .from(greenCoffee)
+        .orderBy(greenCoffee.name);
+
+      console.log("Found green coffees:", coffees.length);
+      return coffees;
+    } catch (error) {
+      console.error("Error getting green coffees:", error);
+      return [];
+    }
+  }
+
+  async getGreenCoffee(id: number): Promise<GreenCoffee | undefined> {
+    try {
+      const [coffee] = await db
+        .select()
+        .from(greenCoffee)
+        .where(eq(greenCoffee.id, id));
+      return coffee;
+    } catch (error) {
+      console.error("Error getting green coffee:", error);
+      return undefined;
     }
   }
 }
