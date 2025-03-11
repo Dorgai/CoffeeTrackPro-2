@@ -307,57 +307,48 @@ export class DatabaseStorage {
           .from(shops)
           .where(eq(shops.isActive, true));
 
-        console.log("Found roastery owners:", owners.length);
-        console.log("Found retail owners:", retailOwners.length);
-        console.log("Found active shops:", activeShops.length);
+        console.log({
+          owners: owners.length,
+          retailOwners: retailOwners.length,
+          activeShops: activeShops.length,
+          assignments: assignments.length
+        });
 
         // First delete all existing assignments except for roasteryOwners and retailOwners
         await tx
           .delete(userShops)
           .where(
-            sql`user_id NOT IN (${sql.join([
-              ...owners.map(o => o.id),
-              ...retailOwners.map(o => o.id)
-            ])})`
+            sql`user_id NOT IN (${sql.join(
+              [...owners.map(o => o.id), ...retailOwners.map(o => o.id)],
+              ','
+            )})`
           );
 
-        // Create assignments for roasteryOwners (they get all shops)
-        const ownerAssignments = owners.flatMap(owner =>
+        // Create assignments for roasteryOwners and retailOwners (they get all shops)
+        const ownerAssignments = [...owners, ...retailOwners].flatMap(owner =>
           activeShops.map(shop => ({
             userId: owner.id,
             shopId: shop.id
           }))
         );
 
-        // Create assignments for retailOwners (keep their existing assignments)
-        const retailOwnerAssignments = assignments.filter(a =>
-          retailOwners.some(owner => owner.id === a.userId)
-        );
-
-        // Filter out any assignments for owners and retail owners
+        // Filter out any assignments for owners since they already have full access
         const otherAssignments = assignments.filter(a =>
           !owners.some(owner => owner.id === a.userId) &&
           !retailOwners.some(owner => owner.id === a.userId)
         );
 
-        // Combine all assignments
-        const allAssignments = [
-          ...ownerAssignments,
-          ...retailOwnerAssignments,
-          ...otherAssignments
-        ];
-
-        if (allAssignments.length > 0) {
+        // Insert all assignments at once
+        if (ownerAssignments.length > 0 || otherAssignments.length > 0) {
           await tx
             .insert(userShops)
-            .values(allAssignments);
+            .values([...ownerAssignments, ...otherAssignments]);
         }
 
         console.log("Successfully updated user-shop assignments:", {
           ownerAssignments: ownerAssignments.length,
-          retailOwnerAssignments: retailOwnerAssignments.length,
           otherAssignments: otherAssignments.length,
-          total: allAssignments.length
+          total: ownerAssignments.length + otherAssignments.length
         });
       });
     } catch (error) {
@@ -370,51 +361,44 @@ export class DatabaseStorage {
     try {
       console.log("Storage: Fetching retail inventories", shopId ? `for shop ${shopId}` : 'for all shops');
 
-      let query = sql`
-        WITH inventory_base AS (
-          SELECT 
-            s.id as shop_id,
-            s.name as shop_name,
-            s.location as shop_location,
-            gc.id as coffee_id,
-            gc.name as coffee_name,
-            gc.producer,
-            gc.grade
-          FROM shops s
-          CROSS JOIN green_coffee gc
-          WHERE s.is_active = true
-          ${shopId ? sql`AND s.id = ${shopId}` : sql``}
-        ),
-        latest_inventory AS (
+      const query = sql`
+        WITH latest_inventory AS (
           SELECT DISTINCT ON (shop_id, green_coffee_id)
+            id,
             shop_id,
             green_coffee_id,
             small_bags,
             large_bags,
             updated_at,
             updated_by_id,
-            update_type
+            update_type,
+            notes
           FROM retail_inventory
           ORDER BY shop_id, green_coffee_id, updated_at DESC
         )
         SELECT 
-          ib.shop_id as "shopId",
-          ib.coffee_id as "coffeeId",
-          COALESCE(li.small_bags, 0) as "smallBags",
-          COALESCE(li.large_bags, 0) as "largeBags",
+          li.id,
+          li.shop_id as "shopId",
+          li.green_coffee_id as "greenCoffeeId",
+          li.small_bags as "smallBags",
+          li.large_bags as "largeBags",
           li.updated_at as "updatedAt",
           li.updated_by_id as "updatedById",
           li.update_type as "updateType",
-          ib.shop_name as "shopName",
-          ib.shop_location as "shopLocation",
-          ib.coffee_name as "coffeeName",
-          ib.producer,
-          ib.grade,
+          li.notes,
+          s.name as "shopName",
+          s.location as "shopLocation",
+          gc.name as "coffeeName",
+          gc.producer,
+          gc.grade,
           u.username as "updatedByUsername"
-        FROM inventory_base ib
-        LEFT JOIN latest_inventory li ON ib.shop_id = li.shop_id AND ib.coffee_id = li.green_coffee_id
+        FROM latest_inventory li
+        LEFT JOIN shops s ON li.shop_id = s.id
+        LEFT JOIN green_coffee gc ON li.green_coffee_id = gc.id
         LEFT JOIN users u ON li.updated_by_id = u.id
-        ORDER BY ib.shop_name, ib.coffee_name`;
+        WHERE s.is_active = true
+        ${shopId ? sql`AND li.shop_id = ${shopId}` : sql``}
+        ORDER BY s.name, gc.name`;
 
       const result = await db.execute(query);
       console.log("Found retail inventories:", {
@@ -423,7 +407,7 @@ export class DatabaseStorage {
         sampleRow: result.rows?.[0]
       });
 
-      return result.rows || [];
+      return result.rows as RetailInventory[];
     } catch (error) {
       console.error("Error getting retail inventories:", error);
       return [];
