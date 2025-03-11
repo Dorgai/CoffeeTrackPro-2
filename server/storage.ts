@@ -469,35 +469,68 @@ export class DatabaseStorage {
     }
   }
 
-  // Green coffee methods
-  async getGreenCoffees(): Promise<GreenCoffee[]> {
+  // Add roasting batch methods
+  async createRoastingBatch(batch: InsertRoastingBatch): Promise<RoastingBatch> {
     try {
-      console.log("Storage: Fetching all green coffee entries");
-      const coffees = await db
-        .select()
-        .from(greenCoffee)
-        .orderBy(greenCoffee.name);
-
-      console.log("Found green coffees:", coffees.length);
-      return coffees;
+      console.log("Creating roasting batch:", batch);
+      const [newBatch] = await db
+        .insert(roastingBatches)
+        .values(batch)
+        .returning();
+      console.log("Created roasting batch:", newBatch);
+      return newBatch;
     } catch (error) {
-      console.error("Error getting green coffees:", error);
+      console.error("Error creating roasting batch:", error);
+      throw error;
+    }
+  }
+
+  async getRoastingBatches(): Promise<RoastingBatch[]> {
+    try {
+      console.log("Fetching all roasting batches");
+      const batches = await db
+        .select()
+        .from(roastingBatches)
+        .orderBy(roastingBatches.createdAt);
+      console.log("Found roasting batches:", batches.length);
+      return batches;
+    } catch (error) {
+      console.error("Error getting roasting batches:", error);
       return [];
     }
   }
 
-  async getGreenCoffee(id: number): Promise<GreenCoffee | undefined> {
+  async getRoastingBatch(id: number): Promise<RoastingBatch | undefined> {
     try {
-      const [coffee] = await db
+      console.log("Getting roasting batch by ID:", id);
+      const [batch] = await db
         .select()
-        .from(greenCoffee)
-        .where(eq(greenCoffee.id, id));
-      return coffee;
+        .from(roastingBatches)
+        .where(eq(roastingBatches.id, id));
+      console.log("Found batch:", batch ? "yes" : "no");
+      return batch;
     } catch (error) {
-      console.error("Error getting green coffee:", error);
+      console.error("Error getting roasting batch:", error);
       return undefined;
     }
   }
+
+  async updateRoastingBatch(id: number, data: Partial<RoastingBatch>): Promise<RoastingBatch> {
+    try {
+      console.log("Updating roasting batch:", id, "with data:", data);
+      const [batch] = await db
+        .update(roastingBatches)
+        .set(data)
+        .where(eq(roastingBatches.id, id))
+        .returning();
+      console.log("Updated roasting batch:", batch);
+      return batch;
+    } catch (error) {
+      console.error("Error updating roasting batch:", error);
+      throw error;
+    }
+  }
+
 }
 
 export const storage = new DatabaseStorage();
