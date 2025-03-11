@@ -32,32 +32,233 @@ export class DatabaseStorage {
     }
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
+  // Shop operations
+  async getShops(): Promise<Shop[]> {
     try {
+      console.log("Getting all active shops");
+      const allShops = await db
+        .select()
+        .from(shops)
+        .where(eq(shops.isActive, true))
+        .orderBy(shops.name);
+      console.log("Found active shops:", allShops);
+      return allShops;
+    } catch (error) {
+      console.error("Error getting shops:", error);
+      return [];
+    }
+  }
+
+  async getUserShops(userId: number): Promise<Shop[]> {
+    try {
+      console.log("Getting shops for user:", userId);
+
+      // First get the user to check their role
       const [user] = await db
         .select()
         .from(users)
-        .where(eq(users.username, username));
-      return user;
+        .where(eq(users.id, userId));
+
+      if (!user) {
+        console.log("User not found:", userId);
+        return [];
+      }
+
+      console.log("Getting shops for user role:", user.role);
+
+      // Roastery owners and retail owners get access to all active shops
+      if (user.role === "roasteryOwner" || user.role === "retailOwner") {
+        console.log("User is roasteryOwner/retailOwner, returning all active shops");
+        return this.getShops();
+      }
+
+      // Get user's shop assignments
+      const assignments = await db
+        .select({
+          shopId: userShops.shopId
+        })
+        .from(userShops)
+        .where(eq(userShops.userId, userId));
+
+      console.log("Found user shop assignments:", assignments);
+
+      if (assignments.length === 0) {
+        return [];
+      }
+
+      // Get the actual shop details
+      const userShopsData = await db
+        .select()
+        .from(shops)
+        .where(
+          and(
+            eq(shops.isActive, true),
+            inArray(
+              shops.id,
+              assignments.map(a => a.shopId)
+            )
+          )
+        )
+        .orderBy(shops.name);
+
+      console.log("Found user assigned shops:", userShopsData);
+      return userShopsData;
     } catch (error) {
-      console.error("Error getting user by username:", error);
+      console.error("Error getting user shops:", error);
+      return [];
+    }
+  }
+
+  // Retail Inventory methods
+  async getAllRetailInventories(): Promise<RetailInventory[]> {
+    try {
+      console.log("Starting getAllRetailInventories");
+
+      const query = sql`
+        WITH inventory_base AS (
+          -- Get all combinations of active shops and coffee
+          SELECT 
+            s.id as shop_id,
+            s.name as shop_name,
+            s.location as shop_location,
+            gc.id as coffee_id,
+            gc.name as coffee_name,
+            gc.producer,
+            gc.grade
+          FROM shops s
+          CROSS JOIN green_coffee gc
+          WHERE s.is_active = true
+        ),
+        latest_inventory AS (
+          -- Get the latest inventory update for each shop and coffee
+          SELECT DISTINCT ON (shop_id, green_coffee_id)
+            shop_id,
+            green_coffee_id,
+            small_bags,
+            large_bags,
+            updated_at,
+            updated_by_id,
+            update_type
+          FROM retail_inventory
+          ORDER BY shop_id, green_coffee_id, updated_at DESC
+        )
+        SELECT 
+          ib.shop_id as "shopId",
+          ib.coffee_id as "coffeeId",
+          COALESCE(li.small_bags, 0) as "smallBags",
+          COALESCE(li.large_bags, 0) as "largeBags",
+          li.updated_at as "updatedAt",
+          li.updated_by_id as "updatedById",
+          li.update_type as "updateType",
+          ib.shop_name as "shopName",
+          ib.shop_location as "shopLocation",
+          ib.coffee_name as "coffeeName",
+          ib.producer,
+          ib.grade,
+          u.username as "updatedByUsername"
+        FROM inventory_base ib
+        LEFT JOIN latest_inventory li ON ib.shop_id = li.shop_id AND ib.coffee_id = li.green_coffee_id
+        LEFT JOIN users u ON li.updated_by_id = u.id
+        ORDER BY ib.shop_name, ib.coffee_name`;
+
+      console.log("Executing retail inventory query");
+      const result = await db.execute(query);
+      console.log("Query result:", {
+        rowCount: result.rows?.length,
+        sampleRow: result.rows?.[0]
+      });
+
+      return result.rows as RetailInventory[];
+    } catch (error) {
+      console.error("Error in getAllRetailInventories:", error);
+      return [];
+    }
+  }
+
+  async getRetailInventories(shopId?: number): Promise<RetailInventory[]> {
+    try {
+      if (!shopId) {
+        return this.getAllRetailInventories();
+      }
+
+      console.log("Storage: Fetching retail inventories for shop:", shopId);
+      const query = sql`
+        WITH latest_inventory AS (
+          SELECT DISTINCT ON (shop_id, green_coffee_id)
+            shop_id,
+            green_coffee_id,
+            small_bags,
+            large_bags,
+            updated_at,
+            updated_by_id,
+            update_type
+          FROM retail_inventory
+          WHERE shop_id = ${shopId}
+          ORDER BY shop_id, green_coffee_id, updated_at DESC
+        )
+        SELECT 
+          li.shop_id as "shopId",
+          li.green_coffee_id as "coffeeId",
+          COALESCE(li.small_bags, 0) as "smallBags",
+          COALESCE(li.large_bags, 0) as "largeBags",
+          li.updated_at as "updatedAt",
+          li.updated_by_id as "updatedById",
+          li.update_type as "updateType",
+          s.name as "shopName",
+          s.location as "shopLocation",
+          gc.name as "coffeeName",
+          gc.producer,
+          gc.grade,
+          u.username as "updatedByUsername"
+        FROM latest_inventory li
+        LEFT JOIN shops s ON li.shop_id = s.id
+        LEFT JOIN green_coffee gc ON li.green_coffee_id = gc.id
+        LEFT JOIN users u ON li.updated_by_id = u.id
+        ORDER BY gc.name`;
+
+      const result = await db.execute(query);
+      console.log("Found retail inventories:", {
+        total: result.rows?.length,
+        shopId,
+        sampleRow: result.rows?.[0]
+      });
+
+      return result.rows as RetailInventory[];
+    } catch (error) {
+      console.error("Error getting retail inventories:", error);
+      return [];
+    }
+  }
+
+  // Green coffee methods
+  async getGreenCoffees(): Promise<GreenCoffee[]> {
+    try {
+      console.log("Storage: Fetching all green coffee entries");
+      const coffees = await db
+        .select()
+        .from(greenCoffee)
+        .orderBy(greenCoffee.name);
+
+      console.log("Found green coffees:", coffees.length);
+      return coffees;
+    } catch (error) {
+      console.error("Error getting green coffees:", error);
+      return [];
+    }
+  }
+
+  async getGreenCoffee(id: number): Promise<GreenCoffee | undefined> {
+    try {
+      const [coffee] = await db
+        .select()
+        .from(greenCoffee)
+        .where(eq(greenCoffee.id, id));
+      return coffee;
+    } catch (error) {
+      console.error("Error getting green coffee:", error);
       return undefined;
     }
   }
-
-  async createUser(user: InsertUser): Promise<User> {
-    try {
-      const [newUser] = await db
-        .insert(users)
-        .values(user)
-        .returning();
-      return newUser;
-    } catch (error) {
-      console.error("Error creating user:", error);
-      throw error;
-    }
-  }
-
   async getAllUsers(): Promise<User[]> {
     try {
       console.log("Fetching all users from database");
@@ -182,88 +383,6 @@ export class DatabaseStorage {
     }
   }
 
-  async getShops(): Promise<Shop[]> {
-    try {
-      console.log("Getting all active shops");
-      const allShops = await db
-        .select()
-        .from(shops)
-        .where(eq(shops.isActive, true))
-        .orderBy(shops.name);
-      console.log("Found active shops:", allShops);
-      return allShops;
-    } catch (error) {
-      console.error("Error getting shops:", error);
-      return [];
-    }
-  }
-
-  async getUserShops(userId: number): Promise<Shop[]> {
-    try {
-      console.log("Getting shops for user:", userId);
-
-      // First get the user to check their role
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, userId));
-
-      if (!user) {
-        console.log("User not found:", userId);
-        return [];
-      }
-
-      console.log("Getting shops for user role:", user.role);
-
-      // Roastery owners get access to all active shops
-      if (user.role === "roasteryOwner") {
-        console.log("User is roasteryOwner, returning all active shops");
-        return this.getShops();
-      }
-
-      // Get user's shop assignments
-      const assignments = await db
-        .select({
-          shopId: userShops.shopId
-        })
-        .from(userShops)
-        .where(eq(userShops.userId, userId));
-
-      console.log("Found user shop assignments:", assignments);
-
-      if (assignments.length === 0) {
-        // For retail owners with no assignments, get all active shops
-        if (user.role === "retailOwner") {
-          console.log("Retail owner with no assignments, returning all active shops");
-          return this.getShops();
-        }
-        return [];
-      }
-
-      // Get the actual shop details
-      const userShopsData = await db
-        .select()
-        .from(shops)
-        .where(
-          and(
-            eq(shops.isActive, true),
-            inArray(
-              shops.id,
-              assignments.map(a => a.shopId)
-            )
-          )
-        )
-        .orderBy(shops.name);
-
-      console.log("Found user assigned shops:", userShopsData);
-      return userShopsData;
-    } catch (error) {
-      console.error("Error getting user shops:", error);
-      return [];
-    }
-  }
-
-
 
   async getAllUserShopAssignments(): Promise<Array<{ userId: number; shopId: number }>> {
     try {
@@ -357,64 +476,7 @@ export class DatabaseStorage {
     }
   }
 
-  async getRetailInventories(shopId?: number): Promise<RetailInventory[]> {
-    try {
-      console.log("Storage: Fetching retail inventories", shopId ? `for shop ${shopId}` : 'for all shops');
-
-      const query = sql`
-        WITH latest_inventory AS (
-          SELECT DISTINCT ON (shop_id, green_coffee_id)
-            id,
-            shop_id,
-            green_coffee_id,
-            small_bags,
-            large_bags,
-            updated_at,
-            updated_by_id,
-            update_type,
-            notes
-          FROM retail_inventory
-          ORDER BY shop_id, green_coffee_id, updated_at DESC
-        )
-        SELECT 
-          li.id,
-          li.shop_id as "shopId",
-          li.green_coffee_id as "greenCoffeeId",
-          li.small_bags as "smallBags",
-          li.large_bags as "largeBags",
-          li.updated_at as "updatedAt",
-          li.updated_by_id as "updatedById",
-          li.update_type as "updateType",
-          li.notes,
-          s.name as "shopName",
-          s.location as "shopLocation",
-          gc.name as "coffeeName",
-          gc.producer,
-          gc.grade,
-          u.username as "updatedByUsername"
-        FROM latest_inventory li
-        LEFT JOIN shops s ON li.shop_id = s.id
-        LEFT JOIN green_coffee gc ON li.green_coffee_id = gc.id
-        LEFT JOIN users u ON li.updated_by_id = u.id
-        WHERE s.is_active = true
-        ${shopId ? sql`AND li.shop_id = ${shopId}` : sql``}
-        ORDER BY s.name, gc.name`;
-
-      const result = await db.execute(query);
-      console.log("Found retail inventories:", {
-        total: result.rows?.length,
-        shopId,
-        sampleRow: result.rows?.[0]
-      });
-
-      return result.rows as RetailInventory[];
-    } catch (error) {
-      console.error("Error getting retail inventories:", error);
-      return [];
-    }
-  }
-
-  // Add back the green coffee methods
+  // Green coffee methods
   async getGreenCoffees(): Promise<GreenCoffee[]> {
     try {
       console.log("Storage: Fetching all green coffee entries");
