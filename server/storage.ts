@@ -9,7 +9,6 @@ const PostgresSessionStore = connectPg(session);
 
 export class DatabaseStorage {
   sessionStore: session.Store;
-  db = db;
 
   constructor() {
     this.sessionStore = new PostgresSessionStore({
@@ -18,6 +17,7 @@ export class DatabaseStorage {
     });
   }
 
+  // User operations
   async getUser(id: number): Promise<User | undefined> {
     try {
       console.log("Getting user by ID:", id);
@@ -40,7 +40,6 @@ export class DatabaseStorage {
         .select()
         .from(users)
         .where(eq(users.username, username));
-
       console.log("Found user:", user ? "yes" : "no");
       return user;
     } catch (error) {
@@ -56,7 +55,6 @@ export class DatabaseStorage {
         .insert(users)
         .values(user)
         .returning();
-
       console.log("Created user:", { id: newUser.id, username: newUser.username });
       return newUser;
     } catch (error) {
@@ -82,63 +80,32 @@ export class DatabaseStorage {
     }
   }
 
+  // Modified to return all shops for all roles
   async getUserShops(userId: number): Promise<Shop[]> {
     try {
       console.log("Getting shops for user:", userId);
-
-      // First get the user to check their role
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, userId));
-
-      if (!user) {
-        console.log("User not found:", userId);
-        return [];
-      }
-
-      console.log("Getting shops for user role:", user.role);
-
-      // Roastery owners and retail owners get access to all active shops
-      if (user.role === "roasteryOwner" || user.role === "retailOwner") {
-        console.log("User is roasteryOwner/retailOwner, returning all active shops");
-        return this.getShops();
-      }
-
-      // Get user's shop assignments
-      const assignments = await db
-        .select({
-          shopId: userShops.shopId
-        })
-        .from(userShops)
-        .where(eq(userShops.userId, userId));
-
-      console.log("Found user shop assignments:", assignments);
-
-      if (assignments.length === 0) {
-        return [];
-      }
-
-      // Get the actual shop details
-      const userShopsData = await db
-        .select()
-        .from(shops)
-        .where(
-          and(
-            eq(shops.isActive, true),
-            inArray(
-              shops.id,
-              assignments.map(a => a.shopId)
-            )
-          )
-        )
-        .orderBy(shops.name);
-
-      console.log("Found user assigned shops:", userShopsData);
-      return userShopsData;
+      // Simply return all active shops for all users
+      return this.getShops();
     } catch (error) {
       console.error("Error getting user shops:", error);
       return [];
+    }
+  }
+
+  // Shop CRUD operations
+  async updateShop(id: number, data: Partial<Shop>): Promise<Shop> {
+    try {
+      console.log("Updating shop:", id, "with data:", data);
+      const [updatedShop] = await db
+        .update(shops)
+        .set(data)
+        .where(eq(shops.id, id))
+        .returning();
+      console.log("Updated shop:", updatedShop);
+      return updatedShop;
+    } catch (error) {
+      console.error("Error updating shop:", error);
+      throw error;
     }
   }
 
@@ -146,10 +113,8 @@ export class DatabaseStorage {
   async getAllRetailInventories(): Promise<RetailInventory[]> {
     try {
       console.log("Starting getAllRetailInventories");
-
       const query = sql`
         WITH inventory_base AS (
-          -- Get all combinations of active shops and coffee
           SELECT 
             s.id as shop_id,
             s.name as shop_name,
@@ -163,7 +128,6 @@ export class DatabaseStorage {
           WHERE s.is_active = true
         ),
         latest_inventory AS (
-          -- Get the latest inventory update for each shop and coffee
           SELECT DISTINCT ON (shop_id, green_coffee_id)
             shop_id,
             green_coffee_id,
@@ -194,13 +158,7 @@ export class DatabaseStorage {
         LEFT JOIN users u ON li.updated_by_id = u.id
         ORDER BY ib.shop_name, ib.coffee_name`;
 
-      console.log("Executing retail inventory query");
       const result = await db.execute(query);
-      console.log("Query result:", {
-        rowCount: result.rows?.length,
-        sampleRow: result.rows?.[0]
-      });
-
       return result.rows as RetailInventory[];
     } catch (error) {
       console.error("Error in getAllRetailInventories:", error);
@@ -262,6 +220,7 @@ export class DatabaseStorage {
       return [];
     }
   }
+
 
   // Green coffee methods
   async getGreenCoffees(): Promise<GreenCoffee[]> {
@@ -537,146 +496,6 @@ export class DatabaseStorage {
     } catch (error) {
       console.error("Error getting green coffee:", error);
       return undefined;
-    }
-  }
-
-  // Add shop performance calculation methods
-  async getShopPerformance(shopId: number): Promise<any> {
-    try {
-      console.log("Calculating shop performance for shop:", shopId);
-
-      const query = sql`
-        WITH inventory_metrics AS (
-          -- Get latest inventory levels
-          SELECT 
-            shop_id,
-            SUM(small_bags) as total_small_bags,
-            SUM(large_bags) as total_large_bags
-          FROM (
-            SELECT DISTINCT ON (shop_id, green_coffee_id)
-              shop_id,
-              small_bags,
-              large_bags
-            FROM retail_inventory
-            WHERE shop_id = ${shopId}
-            ORDER BY shop_id, green_coffee_id, updated_at DESC
-          ) latest_inventory
-          GROUP BY shop_id
-        ),
-        order_metrics AS (
-          -- Calculate order fulfillment rate
-          SELECT
-            shop_id,
-            COUNT(*) as total_orders,
-            COUNT(CASE WHEN status = 'delivered' THEN 1 END) as delivered_orders,
-            AVG(CASE 
-              WHEN status = 'delivered' 
-              THEN EXTRACT(EPOCH FROM (updated_at - created_at))/3600 
-            END) as avg_delivery_time
-          FROM orders
-          WHERE shop_id = ${shopId}
-            AND created_at >= NOW() - INTERVAL '30 days'
-          GROUP BY shop_id
-        ),
-        shop_info AS (
-          -- Get shop details and target levels
-          SELECT
-            id,
-            name,
-            location,
-            desired_small_bags,
-            desired_large_bags
-          FROM shops
-          WHERE id = ${shopId}
-        )
-        SELECT
-          s.*,
-          COALESCE(i.total_small_bags, 0) as current_small_bags,
-          COALESCE(i.total_large_bags, 0) as current_large_bags,
-          COALESCE(o.total_orders, 0) as total_orders,
-          COALESCE(o.delivered_orders, 0) as delivered_orders,
-          CASE 
-            WHEN o.total_orders > 0 
-            THEN ROUND((o.delivered_orders::float / o.total_orders) * 100, 2)
-            ELSE 0 
-          END as fulfillment_rate,
-          COALESCE(ROUND(o.avg_delivery_time, 2), 0) as avg_delivery_time_hours,
-          CASE
-            WHEN i.total_small_bags >= s.desired_small_bags AND i.total_large_bags >= s.desired_large_bags
-            THEN 'optimal'
-            WHEN i.total_small_bags < s.desired_small_bags * 0.5 OR i.total_large_bags < s.desired_large_bags * 0.5
-            THEN 'critical'
-            ELSE 'warning'
-          END as inventory_status
-        FROM shop_info s
-        LEFT JOIN inventory_metrics i ON i.shop_id = s.id
-        LEFT JOIN order_metrics o ON o.shop_id = s.id`;
-
-      const result = await db.execute(query);
-      if (!result.rows?.[0]) {
-        throw new Error("No performance data found for shop");
-      }
-
-      return result.rows[0];
-    } catch (error) {
-      console.error("Error getting shop performance:", error);
-      throw error;
-    }
-  }
-
-  async getShopPerformanceHistory(shopId: number): Promise<any[]> {
-    try {
-      console.log("Getting shop performance history for shop:", shopId);
-
-      const query = sql`
-        WITH daily_metrics AS (
-          SELECT
-            shop_id,
-            DATE_TRUNC('day', created_at) as date,
-            COUNT(*) as orders_count,
-            COUNT(CASE WHEN status = 'delivered' THEN 1 END) as delivered_count,
-            SUM(small_bags) as small_bags_ordered,
-            SUM(large_bags) as large_bags_ordered
-          FROM orders
-          WHERE 
-            shop_id = ${shopId}
-            AND created_at >= NOW() - INTERVAL '30 days'
-          GROUP BY shop_id, DATE_TRUNC('day', created_at)
-        ),
-        inventory_snapshots AS (
-          SELECT
-            shop_id,
-            DATE_TRUNC('day', updated_at) as date,
-            SUM(small_bags) as small_bags_inventory,
-            SUM(large_bags) as large_bags_inventory
-          FROM retail_inventory
-          WHERE 
-            shop_id = ${shopId}
-            AND updated_at >= NOW() - INTERVAL '30 days'
-          GROUP BY shop_id, DATE_TRUNC('day', updated_at)
-        )
-        SELECT
-          dm.date,
-          COALESCE(dm.orders_count, 0) as total_orders,
-          COALESCE(dm.delivered_count, 0) as delivered_orders,
-          CASE 
-            WHEN dm.orders_count > 0 
-            THEN ROUND((dm.delivered_count::float / dm.orders_count) * 100, 2)
-            ELSE 0 
-          END as fulfillment_rate,
-          COALESCE(dm.small_bags_ordered, 0) as small_bags_ordered,
-          COALESCE(dm.large_bags_ordered, 0) as large_bags_ordered,
-          COALESCE(is.small_bags_inventory, 0) as small_bags_inventory,
-          COALESCE(is.large_bags_inventory, 0) as large_bags_inventory
-        FROM daily_metrics dm
-        LEFT JOIN inventory_snapshots is ON is.date = dm.date
-        ORDER BY dm.date DESC`;
-
-      const result = await db.execute(query);
-      return result.rows || [];
-    } catch (error) {
-      console.error("Error getting shop performance history:", error);
-      return [];
     }
   }
 }

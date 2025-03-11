@@ -407,32 +407,16 @@ export async function registerRoutes(app: Express): Promise<void> {
     try {
       const shopId = parseInt(req.params.id);
 
-      // Only allow shopManager to update their assigned shops
-      if (req.user?.role === "shopManager") {
-        const hasAccess = await checkShopAccess(req.user.id, shopId);
-        if (!hasAccess) {
-          return res.status(403).json({ message: "No access to this shop" });
-        }
-
-        // Limit what shopManager can update
-        const allowedUpdates = ["desiredSmallBags", "desiredLargeBags"];
-        const updates = Object.keys(req.body)
-          .filter(key => allowedUpdates.includes(key))
-          .reduce((obj, key) => ({
-            ...obj,
-            [key]: req.body[key]
-          }), {});
-
-        const updatedShop = await storage.updateShop(shopId, updates);
-        return res.json(updatedShop);
-      }
-
       // RoasteryOwner can update everything
+      console.log("Updating shop:", shopId, "with data:", req.body);
       const updatedShop = await storage.updateShop(shopId, req.body);
       res.json(updatedShop);
     } catch (error) {
       console.error("Error updating shop:", error);
-      res.status(500).json({ message: "Failed to update shop" });
+      res.status(500).json({ 
+        message: "Failed to update shop",
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
     }
   });
 
@@ -453,45 +437,6 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-
-  // Add shop performance endpoints
-  app.get("/api/shops/:id/performance", requireShopAccess(["shopManager", "barista", "retailOwner", "roasteryOwner"]), async (req, res) => {
-    try {
-      const shopId = parseInt(req.params.id);
-      if (!shopId) {
-        return res.status(400).json({ message: "Shop ID is required" });
-      }
-
-      console.log("Fetching performance data for shop:", shopId);
-      const performance = await storage.getShopPerformance(shopId);
-      res.json(performance);
-    } catch (error) {
-      console.error("Error fetching shop performance:", error);
-      res.status(500).json({
-        message: "Failed to fetch shop performance",
-        details: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
-  });
-
-  app.get("/api/shops/:id/performance/history", requireShopAccess(["shopManager", "barista", "retailOwner", "roasteryOwner"]), async (req, res) => {
-    try {
-      const shopId = parseInt(req.params.id);
-      if (!shopId) {
-        return res.status(400).json({ message: "Shop ID is required" });
-      }
-
-      console.log("Fetching performance history for shop:", shopId);
-      const history = await storage.getShopPerformanceHistory(shopId);
-      res.json(history);
-    } catch (error) {
-      console.error("Error fetching shop performance history:", error);
-      res.status(500).json({
-        message: "Failed to fetch shop performance history",
-        details: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
-  });
 
   // Green Coffee Routes - accessible by roastery owner and roaster
   app.get("/api/green-coffee", requireRole(["owner", "roasteryOwner", "roaster", "retailOwner", "shopManager", "barista"]), async (req, res) => {
@@ -902,7 +847,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           coffeeName: greenCoffee.name,
           producer: greenCoffee.producer,
           created_by: users.username,
-          updated_by: sql<string | null>`(SELECT username FROM users WHERE id = ${orders.updatedById})`
+          updated_by: sql<string | null>`(SELECT username FROMusers WHERE id = ${orders.updatedById})`
         })
         .from(orders)
         .leftJoin(shops, eq(orders.shopId, shops.id))
