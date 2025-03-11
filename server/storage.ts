@@ -539,6 +539,21 @@ export class DatabaseStorage {
     }
   }
 
+  async updateGreenCoffeeStock(id: number, data: Partial<GreenCoffee>): Promise<GreenCoffee> {
+    try {
+      console.log("Updating green coffee stock:", id, "with data:", data);
+      const [coffee] = await db
+        .update(greenCoffee)
+        .set(data)
+        .where(eq(greenCoffee.id, id))
+        .returning();
+      console.log("Updated green coffee:", coffee);
+      return coffee;
+    } catch (error) {
+      console.error("Error updating green coffee stock:", error);
+      throw error;
+    }
+  }
 }
 
 export const storage = new DatabaseStorage();
