@@ -1,4 +1,4 @@
-import { type RoastingBatch, type InsertRoastingBatch, roastingBatches, users, type User, type Shop, type InsertShop, shops, userShops, type GreenCoffee, greenCoffee, type Order, type InsertOrder, orders, type RetailInventory, retailInventory, type RetailInventoryHistory, retailInventoryHistory } from "@shared/schema";
+import { type RoastingBatch, type InsertRoastingBatch, roastingBatches, users, type User, type InsertUser, type Shop, type InsertShop, shops, userShops, type GreenCoffee, greenCoffee, type Order, type InsertOrder, orders, type RetailInventory, retailInventory, type RetailInventoryHistory, retailInventoryHistory } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import session from "express-session";
@@ -18,17 +18,50 @@ export class DatabaseStorage {
     });
   }
 
-  // User operations
   async getUser(id: number): Promise<User | undefined> {
     try {
+      console.log("Getting user by ID:", id);
       const [user] = await db
         .select()
         .from(users)
         .where(eq(users.id, id));
+      console.log("Found user:", user ? "yes" : "no");
       return user;
     } catch (error) {
       console.error("Error getting user:", error);
       return undefined;
+    }
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    try {
+      console.log("Looking up user by username:", username);
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.username, username));
+
+      console.log("Found user:", user ? "yes" : "no");
+      return user;
+    } catch (error) {
+      console.error("Error getting user by username:", error);
+      return undefined;
+    }
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    try {
+      console.log("Creating new user:", { ...user, password: "[REDACTED]" });
+      const [newUser] = await db
+        .insert(users)
+        .values(user)
+        .returning();
+
+      console.log("Created user:", { id: newUser.id, username: newUser.username });
+      return newUser;
+    } catch (error) {
+      console.error("Error creating user:", error);
+      throw error;
     }
   }
 
@@ -382,6 +415,7 @@ export class DatabaseStorage {
       throw error;
     }
   }
+
 
 
   async getAllUserShopAssignments(): Promise<Array<{ userId: number; shopId: number }>> {
