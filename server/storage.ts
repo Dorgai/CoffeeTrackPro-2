@@ -618,8 +618,8 @@ export class DatabaseStorage {
           .where(eq(orders.id, id))
           .returning();
 
-        // If order is being dispatched, update retail inventory
-        if (data.status === 'dispatched') {
+        // If order is being delivered, update retail inventory
+        if (data.status === 'delivered') {
           // Create a new inventory record
           await tx
             .insert(retailInventory)
@@ -629,8 +629,9 @@ export class DatabaseStorage {
               smallBags: order.smallBags,
               largeBags: order.largeBags,
               updatedAt: new Date(),
-              updatedById: order.createdById,
-              updateType: 'dispatch'
+              updatedById: order.updatedById || order.createdById,
+              updateType: 'dispatch',
+              notes: `Order #${order.id} delivered`
             });
         }
 

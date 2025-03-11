@@ -363,7 +363,7 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-  // Add bulk update endpoint
+  // Add bulk update endpoint with proper transaction handling
   app.post("/api/bulk-user-shop-assignments", requireRole(["roasteryOwner"]), async (req, res) => {
     try {
       const { assignments } = req.body;
@@ -373,19 +373,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         return res.status(400).json({ message: "Assignments must be an array" });
       }
 
-      // Group assignments by user
-      const userAssignments = assignments.reduce((acc, { userId, shopId }) => {
-        if (!acc[userId]) {
-          acc[userId] = [];
-        }
-        acc[userId].push(shopId);
-        return acc;
-      }, {});
-
-      // Update assignments for each user
-      for (const [userId, shopIds] of Object.entries(userAssignments)) {
-        await storage.assignUserToShops(parseInt(userId), shopIds);
-      }
+      await storage.updateBulkUserShopAssignments(assignments);
 
       res.json({ message: "Assignments updated successfully" });
     } catch (error) {
@@ -857,7 +845,7 @@ export async function registerRoutes(app: Express): Promise<void> {
             updated_by: sql<string | null>`(SELECT username FROM users WHERE id = ${orders.updatedById})`
           })
           .from(orders)
-          .leftJoin(shops, eq(orders.shopId, shops.id))
+          .leftJoin(shops, eq(orders.shopId,shops.id))
           .leftJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
           .leftJoin(users, eq(orders.createdById, users.id))
           .orderBy(sql`${orders.createdAt} DESC`);
@@ -1349,33 +1337,4 @@ export async function registerRoutes(app: Express): Promise<void> {
 
   // Add after "/api/users/:id/shops" routes
 
-  app.post("/api/bulk-user-shop-assignments", requireRole(["roasteryOwner"]), async (req, res) => {
-    try {
-      const { assignments } = req.body;
-      console.log("Processing bulk user-shop assignments:", assignments);
-
-      if (!Array.isArray(assignments)) {
-        return res.status(400).json({ message: "Assignments must be an array" });
-      }
-
-      // Group assignments by user
-      const userAssignments = assignments.reduce((acc, { userId, shopId }) => {
-        if (!acc[userId]) {
-          acc[userId] = [];
-        }
-        acc[userId].push(shopId);
-        return acc;
-      }, {});
-
-      // Update assignments for each user
-      for (const [userId, shopIds] of Object.entries(userAssignments)) {
-        await storage.assignUserToShops(parseInt(userId), shopIds);
-      }
-
-      res.json({ message: "Assignments updated successfully" });
-    } catch (error) {
-      console.error("Error updating bulk assignments:", error);
-      res.status(500).json({ message: "Failed to update assignments" });
-    }
-  });
 }

@@ -4,6 +4,7 @@ import { RoastingForm } from "@/components/coffee/roasting-form";
 import { InventoryGrid } from "@/components/coffee/inventory-grid";
 import type { GreenCoffee, RoastingBatch } from "@shared/schema";
 import { Loader2 } from "lucide-react";
+import StockProgress from "@/components/stock-progress";
 import {
   Table,
   TableBody,
@@ -12,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { apiRequest } from "@/lib/queryClient";
 
 export default function Roasting() {
@@ -48,6 +49,10 @@ export default function Roasting() {
     );
   }
 
+  // Calculate total stock and desired amounts
+  const totalStock = coffees?.reduce((sum, coffee) => sum + Number(coffee.currentStock), 0) || 0;
+  const totalDesired = coffees?.reduce((sum, coffee) => sum + Number(coffee.minThreshold), 0) || 0;
+
   return (
     <div className="container mx-auto py-8 space-y-8">
       <div>
@@ -57,78 +62,89 @@ export default function Roasting() {
         </p>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-8">
-        <div>
-          <Card>
-            <CardHeader>
-              <CardTitle>Select Coffee to Roast</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <InventoryGrid
-                coffees={coffees || []}
-                onSelect={setSelectedCoffee}
-              />
-            </CardContent>
-          </Card>
-        </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Green Coffee Inventory</CardTitle>
+          <CardDescription>Current stock levels and selection for roasting</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-4">
+            <StockProgress
+              current={totalStock}
+              desired={totalDesired}
+              label="Total Green Coffee Stock"
+            />
+          </div>
+          <InventoryGrid
+            coffees={coffees || []}
+            onSelect={setSelectedCoffee}
+          />
+        </CardContent>
+      </Card>
 
-        <div className="space-y-8">
-          {selectedCoffee && (
+      {selectedCoffee && (
+        <Card>
+          <CardHeader>
+            <CardTitle>New Roasting Batch</CardTitle>
+            <CardDescription>Record a new roasting batch for {selectedCoffee.name}</CardDescription>
+          </CardHeader>
+          <CardContent>
             <RoastingForm
               greenCoffeeId={selectedCoffee.id}
               onSuccess={() => setSelectedCoffee(null)}
             />
-          )}
+          </CardContent>
+        </Card>
+      )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Batches</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Green Coffee</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Loss</TableHead>
-                    <TableHead>Bags Produced</TableHead>
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Batches</CardTitle>
+          <CardDescription>History of roasting operations</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Green Coffee</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Bags Produced</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {batches?.map((batch) => {
+                const coffee = coffees?.find(
+                  (c) => c.id === batch.greenCoffeeId
+                );
+                return (
+                  <TableRow key={batch.id}>
+                    <TableCell>
+                      {batch.roastedAt ? new Date(batch.roastedAt).toLocaleDateString() : '-'}
+                    </TableCell>
+                    <TableCell>{coffee?.name || '-'}</TableCell>
+                    <TableCell>{batch.plannedAmount}kg</TableCell>
+                    <TableCell>{batch.status}</TableCell>
+                    <TableCell>
+                      {batch.smallBagsProduced || 0} × 200g
+                      <br />
+                      {batch.largeBagsProduced || 0} × 1kg
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {batches?.map((batch) => {
-                    const coffee = coffees?.find(
-                      (c) => c.id === batch.greenCoffeeId
-                    );
-                    return (
-                      <TableRow key={batch.id}>
-                        <TableCell>
-                          {batch.roastedAt ? new Date(batch.roastedAt).toLocaleDateString() : '-'}
-                        </TableCell>
-                        <TableCell>{coffee?.name || '-'}</TableCell>
-                        <TableCell>{batch.roastedAmount}kg</TableCell>
-                        <TableCell>{batch.roastingLoss}kg</TableCell>
-                        <TableCell>
-                          {batch.smallBagsProduced} × 200g
-                          <br />
-                          {batch.largeBagsProduced} × 1kg
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                  {(!batches || batches.length === 0) && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-4">
-                        No roasting batches recorded yet
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+                );
+              })}
+              {(!batches || batches.length === 0) && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-4">
+                    No roasting batches recorded yet
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }

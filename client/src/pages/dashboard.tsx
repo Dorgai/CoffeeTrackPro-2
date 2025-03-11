@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
-import type { GreenCoffee, RetailInventory, Shop, Order } from "@shared/schema"; // Added Order type
+import type { GreenCoffee, RetailInventory, Shop, Order } from "@shared/schema"; 
 import { useQuery } from "@tanstack/react-query";
 import {
   Card,
@@ -20,12 +20,7 @@ import { formatDate } from "@/lib/utils";
 import { Link } from "wouter";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-
-// Placeholder for apiRequest function.  Replace with your actual implementation.
-const apiRequest = async (method: string, url: string) => {
-  const response = await fetch(url, { method });
-  return response;
-};
+import { apiRequest } from "@/lib/queryClient";
 
 export default function Dashboard() {
   const { user, logoutMutation } = useAuth();
@@ -53,17 +48,18 @@ export default function Dashboard() {
     enabled: ["roasteryOwner", "owner", "retailOwner"].includes(user?.role || ""),
   });
 
+  // Update orders query to depend on selectedShopId
   const { data: orders, isLoading: loadingOrders } = useQuery({
     queryKey: ["/api/orders", selectedShopId],
     queryFn: async () => {
       const url = selectedShopId
         ? `/api/orders?shopId=${selectedShopId}`
         : "/api/orders";
-      const res = await fetch(url);
+      const res = await apiRequest("GET", url);
       if (!res.ok) throw new Error("Failed to fetch orders");
       return res.json();
     },
-    enabled: !!user,
+    enabled: !!user && (!!selectedShopId || user.role === "roasteryOwner"),
   });
 
   const { data: recentBatches, isLoading: loadingBatches } = useQuery({
@@ -181,6 +177,7 @@ export default function Dashboard() {
             </Table>
           </CardContent>
         </Card>
+
         {orders && orders.length > 0 && (
           <Card className="mt-4">
             <CardHeader>
@@ -215,10 +212,11 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         )}
-        <Card className="mt-4">
+
+        <Card>
           <CardHeader>
             <CardTitle>Recent Batches</CardTitle>
-            <CardDescription>Latest roasting batches across all coffees</CardDescription>
+            <CardDescription>Latest roasting operations</CardDescription>
           </CardHeader>
           <CardContent>
             {loadingBatches ? (
@@ -231,21 +229,23 @@ export default function Dashboard() {
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Coffee</TableHead>
-                    <TableHead>Planned Amount (kg)</TableHead>
+                    <TableHead>Planned Amount</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Small Bags</TableHead>
-                    <TableHead>Large Bags</TableHead>
+                    <TableHead>Bags Produced</TableHead>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {recentBatches.map((batch) => (
                     <TableRow key={batch.id}>
-                      <TableCell>{formatDate(batch.createdAt)}</TableCell>
+                      <TableCell>{formatDate(batch.roastedAt || batch.createdAt)}</TableCell>
                       <TableCell>{batch.coffeeName}</TableCell>
-                      <TableCell>{batch.plannedAmount}</TableCell>
+                      <TableCell>{batch.plannedAmount}kg</TableCell>
                       <TableCell>{batch.status}</TableCell>
-                      <TableCell>{batch.smallBagsProduced}</TableCell>
-                      <TableCell>{batch.largeBagsProduced}</TableCell>
+                      <TableCell>
+                        {batch.smallBagsProduced || 0} × 200g
+                        <br />
+                        {batch.largeBagsProduced || 0} × 1kg
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -335,6 +335,7 @@ export default function Dashboard() {
                 </Table>
               </CardContent>
             </Card>
+
             {orders && orders.length > 0 && (
               <Card className="mt-4">
                 <CardHeader>
