@@ -475,8 +475,16 @@ export class DatabaseStorage {
       console.log("Creating roasting batch:", batch);
       const [newBatch] = await db
         .insert(roastingBatches)
-        .values(batch)
+        .values({
+          greenCoffeeId: batch.greenCoffeeId,
+          plannedAmount: batch.plannedAmount,
+          status: batch.status || 'planned',
+          smallBagsProduced: batch.smallBagsProduced || 0,
+          largeBagsProduced: batch.largeBagsProduced || 0,
+          createdAt: new Date()
+        })
         .returning();
+
       console.log("Created roasting batch:", newBatch);
       return newBatch;
     } catch (error) {
