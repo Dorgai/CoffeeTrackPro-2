@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { User } from "@shared/schema";
+import { User, Shop } from "@shared/schema";
 import {
   Card,
   CardContent,
@@ -38,13 +38,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 export default function UserManagement() {
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [newPassword, setNewPassword] = useState("");
-  const [userToDeactivate, setUserToDeactivate] = useState<User | null>(null);
-  const [selectedUserForShops, setSelectedUserForShops] = useState<User | null>(null);
-  const [isShopAssignmentOpen, setIsShopAssignmentOpen] = useState(false);
-
-  // Dialog state management
   const [dialogState, setDialogState] = useState<{
     isOpen: boolean;
     type: 'password' | 'shopAssignment' | 'activation' | null;
@@ -55,15 +48,20 @@ export default function UserManagement() {
     user: null
   });
 
-
   // Queries
   const { data: users = [], isLoading } = useQuery<User[]>({
     queryKey: ["/api/users"],
   });
 
-  // Split users into active and inactive
-  const activeUsers = users.filter(user => user.isActive);
-  const inactiveUsers = users.filter(user => !user.isActive);
+  const { data: shops } = useQuery<Shop[]>({
+    queryKey: ["/api/shops"],
+    enabled: !!currentUser && currentUser.role === "roasteryOwner",
+  });
+
+  const { data: userShops } = useQuery<Shop[]>({
+    queryKey: ["/api/users", dialogState.user?.id, "shops"],
+    enabled: dialogState.type === 'shopAssignment' && !!dialogState.user?.id,
+  });
 
   const updatePasswordMutation = useMutation({
     mutationFn: async ({ userId, password }: { userId: number; password: string }) => {
@@ -73,14 +71,12 @@ export default function UserManagement() {
         { password }
       );
       if (!res.ok) {
-        const error = await res.text();
-        throw new Error(error || "Failed to update password");
+        throw new Error(await res.text() || "Failed to update password");
       }
       return res.json();
     },
     onSuccess: () => {
       setDialogState(prev => ({ ...prev, isOpen: false, type: null, user: null }));
-      setNewPassword("");
       toast({
         title: "Success",
         description: "Password has been updated",
@@ -103,8 +99,7 @@ export default function UserManagement() {
         { isActive }
       );
       if (!res.ok) {
-        const error = await res.text();
-        throw new Error(error || "Failed to update user activation status");
+        throw new Error(await res.text() || "Failed to update user activation status");
       }
       return res.json();
     },
@@ -125,7 +120,47 @@ export default function UserManagement() {
     },
   });
 
-  // Render the user table for a given list of users
+  const assignShopsMutation = useMutation({
+    mutationFn: async ({ userId, shopIds }: { userId: number; shopIds: number[] }) => {
+      const res = await apiRequest(
+        "POST",
+        `/api/users/${userId}/shops`,
+        { shopIds }
+      );
+      if (!res.ok) {
+        throw new Error(await res.text() || "Failed to update shop assignments");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user-shop-assignments"] });
+      if (dialogState.user?.id) {
+        queryClient.invalidateQueries({ queryKey: ["/api/users", dialogState.user.id, "shops"] });
+      }
+      toast({
+        title: "Success",
+        description: "Shop assignments have been updated",
+      });
+      setDialogState(prev => ({ ...prev, isOpen: false, type: null, user: null }));
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Split users into active and inactive
+  const activeUsers = users.filter(user => user.isActive);
+  const inactiveUsers = users.filter(user => !user.isActive);
+
+  const handleShopAssignment = (userId: number, shopIds: number[]) => {
+    assignShopsMutation.mutate({ userId, shopIds });
+  };
+
   const renderUserTable = (userList: User[]) => (
     <Card>
       <CardContent>
@@ -173,6 +208,20 @@ export default function UserManagement() {
                       Reset Password
                     </Button>
 
+                    {/* Show shop assignment button except for roastery owners */}
+                    {user.role !== "roasteryOwner" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setDialogState({ isOpen: true, type: 'shopAssignment', user });
+                        }}
+                      >
+                        <Building2 className="h-4 w-4 mr-2" />
+                        Manage Shops
+                      </Button>
+                    )}
+
                     <Button
                       variant={user.isActive ? "destructive" : "outline"}
                       size="sm"
@@ -198,130 +247,6 @@ export default function UserManagement() {
         </Table>
       </CardContent>
     </Card>
-  );
-
-  const { data: shops } = useQuery<Shop[]>({
-    queryKey: ["/api/shops"],
-    enabled: !!currentUser && currentUser.role === "roasteryOwner",
-  });
-
-  const { data: userShops } = useQuery<Shop[]>({
-    queryKey: ["/api/users", selectedUserForShops?.id, "shops"],
-    enabled: !!selectedUserForShops?.id,
-  });
-
-  const updateShopAssignmentsMutation = useMutation({
-    mutationFn: async ({ userId, shopIds }: { userId: number; shopIds: number[] }) => {
-      console.log("Updating shop assignments:", { userId, shopIds });
-      const res = await apiRequest(
-        "POST",
-        `/api/users/${userId}/shops`,
-        { shopIds }
-      );
-      if (!res.ok) {
-        const error = await res.text();
-        throw new Error(error || "Failed to update shop assignments");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      // Invalidate both queries to ensure fresh data
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      if (selectedUserForShops) {
-        queryClient.invalidateQueries({
-          queryKey: ["/api/users", selectedUserForShops.id, "shops"]
-        });
-      }
-      toast({
-        title: "Success",
-        description: "Shop assignments have been updated",
-      });
-      setIsShopAssignmentOpen(false);
-    },
-    onError: (error: Error) => {
-      console.error("Shop assignment error:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update shop assignments",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleShopAssignment = (userId: number, shopIds: number[]) => {
-    console.log("Assigning shops:", { userId, shopIds });
-    updateShopAssignmentsMutation.mutate({ userId, shopIds });
-  };
-
-  const renderPasswordDialog = () => (
-    <Dialog open={dialogState.type === 'password'} onOpenChange={(open) => {
-      if (!open) setDialogState(prev => ({ ...prev, isOpen: false, type: null, user: null }));
-    }}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Reset Password for {dialogState.user?.username}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 pt-4">
-          <Input
-            type="password"
-            placeholder="Enter new password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-          />
-          <Button
-            className="w-full"
-            onClick={() => {
-              if (dialogState.user) {
-                updatePasswordMutation.mutate({
-                  userId: dialogState.user.id,
-                  password: newPassword,
-                });
-              }
-            }}
-            disabled={!newPassword || !dialogState.user}
-          >
-            Update Password
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-
-  const renderActivationDialog = () => (
-    <AlertDialog
-      open={dialogState.type === 'activation'}
-      onOpenChange={(open) => {
-        if (!open) setDialogState(prev => ({ ...prev, isOpen: false, type: null, user: null }));
-      }}
-    >
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>
-            {dialogState.user?.isActive ? "Deactivate" : "Activate"} User
-          </AlertDialogTitle>
-          <AlertDialogDescription>
-            Are you sure you want to {dialogState.user?.isActive ? "deactivate" : "activate"} {dialogState.user?.username}?
-            {dialogState.user?.isActive && " This will prevent them from accessing the system."}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={() => {
-              if (dialogState.user) {
-                toggleActivationMutation.mutate({
-                  userId: dialogState.user.id,
-                  isActive: !dialogState.user.isActive,
-                });
-              }
-            }}
-            className={dialogState.user?.isActive ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
-          >
-            {dialogState.user?.isActive ? "Deactivate" : "Activate"}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
   );
 
   if (currentUser?.role !== "roasteryOwner") {
@@ -367,23 +292,43 @@ export default function UserManagement() {
         </TabsContent>
       </Tabs>
 
-      {/* Render dialogs */}
-      {renderPasswordDialog()}
-      {renderActivationDialog()}
+      {/* Password Reset Dialog */}
+      <Dialog open={dialogState.type === 'password'} onOpenChange={(open) => {
+        if (!open) setDialogState(prev => ({ ...prev, isOpen: false, type: null, user: null }));
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset Password for {dialogState.user?.username}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <Input
+              type="password"
+              placeholder="Enter new password"
+              onChange={(e) => {
+                const newPassword = e.target.value;
+                if (dialogState.user && newPassword) {
+                  updatePasswordMutation.mutate({
+                    userId: dialogState.user.id,
+                    password: newPassword,
+                  });
+                }
+              }}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
 
-      <Dialog
-        open={isShopAssignmentOpen}
+      {/* Shop Assignment Dialog */}
+      <Dialog 
+        open={dialogState.type === 'shopAssignment'} 
         onOpenChange={(open) => {
-          setIsShopAssignmentOpen(open);
-          if (!open) {
-            setSelectedUserForShops(null);
-          }
+          if (!open) setDialogState(prev => ({ ...prev, isOpen: false, type: null, user: null }));
         }}
       >
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>
-              Manage Shop Access for {selectedUserForShops?.username}
+              Manage Shop Access for {dialogState.user?.username}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-4">
@@ -406,11 +351,11 @@ export default function UserManagement() {
                         variant="ghost"
                         size="sm"
                         onClick={() => {
-                          if (selectedUserForShops) {
+                          if (dialogState.user) {
                             const updatedShopIds = userShops
                               .filter((s) => s.id !== shop.id)
                               .map((s) => s.id);
-                            handleShopAssignment(selectedUserForShops.id, updatedShopIds);
+                            handleShopAssignment(dialogState.user.id, updatedShopIds);
                           }
                         }}
                       >
@@ -450,12 +395,12 @@ export default function UserManagement() {
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            if (selectedUserForShops) {
+                            if (dialogState.user) {
                               const newShopIds = [
                                 ...(userShops?.map((s) => s.id) || []),
                                 shop.id
                               ];
-                              handleShopAssignment(selectedUserForShops.id, newShopIds);
+                              handleShopAssignment(dialogState.user.id, newShopIds);
                             }
                           }}
                         >
@@ -471,13 +416,42 @@ export default function UserManagement() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Activation Dialog */}
+      <AlertDialog
+        open={dialogState.type === 'activation'}
+        onOpenChange={(open) => {
+          if (!open) setDialogState(prev => ({ ...prev, isOpen: false, type: null, user: null }));
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {dialogState.user?.isActive ? "Deactivate" : "Activate"} User
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to {dialogState.user?.isActive ? "deactivate" : "activate"} {dialogState.user?.username}?
+              {dialogState.user?.isActive && " This will prevent them from accessing the system."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (dialogState.user) {
+                  toggleActivationMutation.mutate({
+                    userId: dialogState.user.id,
+                    isActive: !dialogState.user.isActive,
+                  });
+                }
+              }}
+              className={dialogState.user?.isActive ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
+            >
+              {dialogState.user?.isActive ? "Deactivate" : "Activate"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
-}
-
-interface Shop {
-  id: number;
-  name: string;
-  location: string;
-  isActive: boolean;
 }
