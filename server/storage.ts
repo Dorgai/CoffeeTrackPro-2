@@ -182,7 +182,8 @@ export class DatabaseStorage {
             large_bags,
             updated_at,
             updated_by_id,
-            update_type
+            update_type,
+            notes
           FROM retail_inventory
           WHERE shop_id = ${shopId}
           ORDER BY shop_id, green_coffee_id, updated_at DESC
@@ -195,6 +196,7 @@ export class DatabaseStorage {
           li.updated_at as "updatedAt",
           li.updated_by_id as "updatedById",
           li.update_type as "updateType",
+          li.notes as "notes",
           s.name as "shopName",
           s.location as "shopLocation",
           gc.name as "coffeeName",
@@ -205,7 +207,7 @@ export class DatabaseStorage {
         LEFT JOIN shops s ON li.shop_id = s.id
         LEFT JOIN green_coffee gc ON li.green_coffee_id = gc.id
         LEFT JOIN users u ON li.updated_by_id = u.id
-        ORDER BY gc.name`;
+        ORDER BY li.updated_at DESC`;
 
       const result = await db.execute(query);
       console.log("Found retail inventories:", {
@@ -592,24 +594,66 @@ export class DatabaseStorage {
   ): Promise<Order> {
     try {
       console.log("Updating order status:", id, "with data:", data);
-      const [order] = await db
-        .update(orders)
-        .set({
-          status: data.status,
-          ...(data.smallBags !== undefined && { smallBags: data.smallBags }),
-          ...(data.largeBags !== undefined && { largeBags: data.largeBags }),
-          updatedAt: new Date(),
-        })
-        .where(eq(orders.id, id))
-        .returning();
-      console.log("Updated order:", order);
-      return order;
+
+      return await db.transaction(async (tx) => {
+        // Get the existing order first
+        const [existingOrder] = await tx
+          .select()
+          .from(orders)
+          .where(eq(orders.id, id));
+
+        if (!existingOrder) {
+          throw new Error("Order not found");
+        }
+
+        // Update the order status
+        const [order] = await tx
+          .update(orders)
+          .set({
+            status: data.status,
+            ...(data.smallBags !== undefined && { smallBags: data.smallBags }),
+            ...(data.largeBags !== undefined && { largeBags: data.largeBags }),
+            updatedAt: new Date(),
+          })
+          .where(eq(orders.id, id))
+          .returning();
+
+        // If order is being dispatched, update retail inventory
+        if (data.status === 'dispatched') {
+          // Create a new inventory record
+          await tx
+            .insert(retailInventory)
+            .values({
+              shopId: order.shopId,
+              greenCoffeeId: order.greenCoffeeId,
+              smallBags: order.smallBags,
+              largeBags: order.largeBags,
+              updatedAt: new Date(),
+              updatedById: order.createdById,
+              updateType: 'dispatch'
+            });
+        }
+
+        console.log("Updated order:", order);
+        return order;
+      });
     } catch (error) {
       console.error("Error updating order status:", error);
       throw error;
     }
   }
 
+  async fetchUserShopAssignments(userId: number): Promise<Array<{ userId: number; shopId: number }>> {
+    try {
+      console.log(`Fetching user-shop assignments for userId: ${userId}`);
+      const assignments = await db.select({ userId: userShops.userId, shopId: userShops.shopId }).from(userShops).where(eq(userShops.userId, userId));
+      console.log(`Found ${assignments.length} assignments for userId: ${userId}`);
+      return assignments;
+    } catch (error) {
+      console.error("Error fetching user-shop assignments:", error);
+      return [];
+    }
+  }
 }
 
 export const storage = new DatabaseStorage();

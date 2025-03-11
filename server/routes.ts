@@ -350,6 +350,19 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  // Add new endpoint for fetching all user-shop assignments
+  app.get("/api/user-shop-assignments", requireRole(["roasteryOwner"]), async (req, res) => {
+    try {
+      console.log("Fetching all user-shop assignments");
+      const assignments = await storage.getAllUserShopAssignments();
+      console.log("Found assignments:", assignments.length);
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching user-shop assignments:", error);
+      res.status(500).json({ message: "Failed to fetch assignments" });
+    }
+  });
+
   // Shops Routes - accessible by roastery owner and shop manager
   app.get("/api/shops/:id", requireShopAccess(["shopManager", "barista"]), async (req, res) => {
     try {
