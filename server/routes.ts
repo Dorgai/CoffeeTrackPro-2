@@ -12,7 +12,8 @@ import {
   orders,
   shops,
   users,
-  greenCoffee
+  greenCoffee,
+  roastingBatches // Added roastingBatches import
 } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { WebSocketServer } from 'ws'; // Added WebSocketServer import
@@ -608,13 +609,22 @@ export async function registerRoutes(app: Express): Promise<void> {
     requireRole(["roasteryOwner", "roaster"]),
     async (req, res) => {
       try {
+        const greenCoffeeId = req.query.greenCoffeeId ? Number(req.query.greenCoffeeId) : undefined;
+
         console.log("Fetching roasting batches for user:", {
           userId: req.user?.id,
           username: req.user?.username,
-          role: req.user?.role
+          role: req.user?.role,
+          greenCoffeeId
         });
 
-        const batches = await storage.getRoastingBatches();
+        // If greenCoffeeId is provided, filter by it
+        const batches = await db
+          .select()
+          .from(roastingBatches)
+          .where(greenCoffeeId ? eq(roastingBatches.greenCoffeeId, greenCoffeeId) : undefined)
+          .orderBy(roastingBatches.createdAt);
+
         console.log("Found roasting batches:", batches.length);
         res.json(batches);
       } catch (error) {

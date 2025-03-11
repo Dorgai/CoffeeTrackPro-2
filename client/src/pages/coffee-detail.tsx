@@ -62,6 +62,13 @@ export default function CoffeeDetail() {
 
   const { data: batches, isLoading: loadingBatches } = useQuery<RoastingBatch[]>({
     queryKey: ["/api/roasting-batches", coffeeId],
+    queryFn: async () => {
+      console.log("Fetching roasting batches for coffee:", coffeeId);
+      const res = await fetch(`/api/roasting-batches?greenCoffeeId=${coffeeId}`);
+      if (!res.ok) throw new Error('Failed to fetch roasting batches');
+      return res.json();
+    },
+    enabled: !!coffeeId
   });
 
   const deleteMutation = useMutation({
@@ -129,9 +136,12 @@ export default function CoffeeDetail() {
   }
 
   // Calculate total roasted and total packaged amounts
-  const totalRoasted = batches?.reduce((sum, batch) => sum + Number(batch.roastedAmount), 0) || 0;
-  const totalSmallBags = batches?.reduce((sum, batch) => sum + batch.smallBagsProduced, 0) || 0;
-  const totalLargeBags = batches?.reduce((sum, batch) => sum + batch.largeBagsProduced, 0) || 0;
+  const totalRoasted = batches?.reduce((sum, batch) =>
+    sum + (batch.status === 'completed' ? Number(batch.plannedAmount) : 0), 0) || 0;
+  const totalSmallBags = batches?.reduce((sum, batch) =>
+    sum + (batch.smallBagsProduced || 0), 0) || 0;
+  const totalLargeBags = batches?.reduce((sum, batch) =>
+    sum + (batch.largeBagsProduced || 0), 0) || 0;
   const totalPackaged = (totalSmallBags * 0.2) + (totalLargeBags * 1); // In kg
 
   return (
@@ -166,7 +176,7 @@ export default function CoffeeDetail() {
             </DialogContent>
           </Dialog>
 
-          <Button 
+          <Button
             variant="destructive"
             onClick={() => {
               if (confirm("Are you sure you want to delete this coffee? This action cannot be undone.")) {
@@ -306,8 +316,7 @@ export default function CoffeeDetail() {
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Green Coffee (kg)</TableHead>
-                    <TableHead>Roasted Amount (kg)</TableHead>
-                    <TableHead>Roasting Loss</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Small Bags (200g)</TableHead>
                     <TableHead>Large Bags (1kg)</TableHead>
                   </TableRow>
@@ -315,12 +324,11 @@ export default function CoffeeDetail() {
                 <TableBody>
                   {batches.map((batch) => (
                     <TableRow key={batch.id}>
-                      <TableCell>{formatDate(batch.roastedAt || "")}</TableCell>
-                      <TableCell>{batch.greenCoffeeAmount}</TableCell>
-                      <TableCell>{batch.roastedAmount}</TableCell>
-                      <TableCell>{batch.roastingLoss} kg</TableCell>
-                      <TableCell>{batch.smallBagsProduced}</TableCell>
-                      <TableCell>{batch.largeBagsProduced}</TableCell>
+                      <TableCell>{formatDate(batch.createdAt || "")}</TableCell>
+                      <TableCell>{batch.plannedAmount}</TableCell>
+                      <TableCell>{batch.status}</TableCell>
+                      <TableCell>{batch.smallBagsProduced || 0}</TableCell>
+                      <TableCell>{batch.largeBagsProduced || 0}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
