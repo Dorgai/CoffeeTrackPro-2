@@ -49,11 +49,22 @@ export default function UserShopManagement() {
     }
   }, [users, shops]);
 
-  // Handle checkbox changes - but all roles should have access to all shops
+  // Handle checkbox changes
   const handleToggle = (userId: number, shopId: number) => {
-    toast({
-      title: "Info",
-      description: "All users automatically have access to all shops",
+    if (isSaving) return;
+
+    setLocalAssignments(current => {
+      const existingIndex = current.findIndex(
+        a => a.userId === userId && a.shopId === shopId
+      );
+
+      if (existingIndex >= 0) {
+        const newAssignments = [...current];
+        newAssignments.splice(existingIndex, 1);
+        return newAssignments;
+      } else {
+        return [...current, { userId, shopId }];
+      }
     });
   };
 
@@ -114,8 +125,9 @@ export default function UserShopManagement() {
   const inactiveUsers = users.filter(user => !user.isActive);
   const activeShops = shops.filter(shop => shop.isActive);
 
-  // All users have access to all shops by default
-  const isAssigned = () => true;
+  const isAssigned = (userId: number, shopId: number) => {
+    return localAssignments.some(a => a.userId === userId && a.shopId === shopId);
+  };
 
   return (
     <div className="container mx-auto py-8 space-y-8">
@@ -123,9 +135,22 @@ export default function UserShopManagement() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">User-Shop Management</h1>
           <p className="text-muted-foreground">
-            All users have access to all shops by default
+            Manage which users have access to which shops. By default, all users have access to all shops.
           </p>
         </div>
+        <Button
+          onClick={handleSave}
+          disabled={isSaving || saveMutation.isPending}
+        >
+          {isSaving || saveMutation.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <>
+              <Save className="h-4 w-4 mr-2" />
+              Save Changes
+            </>
+          )}
+        </Button>
       </div>
 
       <Tabs defaultValue="active" className="w-full">
@@ -162,8 +187,8 @@ export default function UserShopManagement() {
                   {activeShops.map(shop => (
                     <TableCell key={shop.id} className="text-center">
                       <Checkbox
-                        checked={isAssigned()}
-                        disabled={true}
+                        checked={isAssigned(user.id, shop.id)}
+                        disabled={isSaving}
                         onCheckedChange={() => handleToggle(user.id, shop.id)}
                       />
                     </TableCell>
@@ -202,8 +227,8 @@ export default function UserShopManagement() {
                   {activeShops.map(shop => (
                     <TableCell key={shop.id} className="text-center">
                       <Checkbox
-                        checked={isAssigned()}
-                        disabled={true}
+                        checked={isAssigned(user.id, shop.id)}
+                        disabled={isSaving}
                         onCheckedChange={() => handleToggle(user.id, shop.id)}
                       />
                     </TableCell>
