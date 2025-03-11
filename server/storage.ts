@@ -488,12 +488,21 @@ export class DatabaseStorage {
   async getRoastingBatches(): Promise<RoastingBatch[]> {
     try {
       console.log("Fetching all roasting batches");
-      const batches = await db
-        .select()
-        .from(roastingBatches)
-        .orderBy(roastingBatches.createdAt);
-      console.log("Found roasting batches:", batches.length);
-      return batches;
+
+      const query = sql`
+        SELECT 
+          rb.*,
+          gc.name as "coffeeName",
+          gc.producer
+        FROM roasting_batches rb
+        LEFT JOIN green_coffee gc ON rb.green_coffee_id = gc.id
+        ORDER BY rb.created_at DESC
+      `;
+
+      const result = await db.execute(query);
+      console.log("Found roasting batches:", result.rows?.length);
+
+      return result.rows as RoastingBatch[];
     } catch (error) {
       console.error("Error getting roasting batches:", error);
       return [];
@@ -630,7 +639,7 @@ export class DatabaseStorage {
               largeBags: order.largeBags,
               updatedAt: new Date(),
               updatedById: order.updatedById || order.createdById,
-              updateType: 'dispatch',
+              updateType: 'delivery',
               notes: `Order #${order.id} delivered`
             });
         }
