@@ -182,11 +182,44 @@ export class DatabaseStorage {
     }
   }
 
+  async getShops(): Promise<Shop[]> {
+    try {
+      console.log("Getting all active shops");
+      const allShops = await db
+        .select()
+        .from(shops)
+        .where(eq(shops.isActive, true))
+        .orderBy(shops.name);
+      console.log("Found active shops:", allShops);
+      return allShops;
+    } catch (error) {
+      console.error("Error getting shops:", error);
+      return [];
+    }
+  }
+
   async getUserShops(userId: number): Promise<Shop[]> {
     try {
       console.log("Getting shops for user:", userId);
 
-      // Get all user's shop assignments
+      // First get the user to check their role
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, userId));
+
+      if (!user) {
+        console.log("User not found:", userId);
+        return [];
+      }
+
+      // Roastery owners get access to all active shops
+      if (user.role === "roasteryOwner") {
+        console.log("User is roasteryOwner, returning all active shops");
+        return this.getShops();
+      }
+
+      // Get user's shop assignments
       const assignments = await db
         .select({
           shopId: userShops.shopId
@@ -200,7 +233,7 @@ export class DatabaseStorage {
         return [];
       }
 
-      // Then get the actual shop details
+      // Get the actual shop details
       const userShopsData = await db
         .select()
         .from(shops)
@@ -248,11 +281,17 @@ export class DatabaseStorage {
       console.log("Starting bulk user-shop assignment update with:", assignments);
 
       await db.transaction(async (tx) => {
-        // Get all roastery owners
-        const owners = await tx
-          .select()
-          .from(users)
-          .where(eq(users.role, "roasteryOwner"));
+        // Get all roastery owners and retail owners
+        const [owners, retailOwners] = await Promise.all([
+          tx
+            .select()
+            .from(users)
+            .where(eq(users.role, "roasteryOwner")),
+          tx
+            .select()
+            .from(users)
+            .where(eq(users.role, "retailOwner"))
+        ]);
 
         // Get all active shops
         const activeShops = await tx
@@ -261,13 +300,17 @@ export class DatabaseStorage {
           .where(eq(shops.isActive, true));
 
         console.log("Found roastery owners:", owners.length);
+        console.log("Found retail owners:", retailOwners.length);
         console.log("Found active shops:", activeShops.length);
 
-        // First delete all existing assignments except for roasteryOwners
+        // First delete all existing assignments except for roasteryOwners and retailOwners
         await tx
           .delete(userShops)
           .where(
-            sql`user_id NOT IN (${sql.join(owners.map(o => o.id))})`
+            sql`user_id NOT IN (${sql.join([
+              ...owners.map(o => o.id),
+              ...retailOwners.map(o => o.id)
+            ])})`
           );
 
         // Create assignments for roasteryOwners (they get all shops)
@@ -278,13 +321,23 @@ export class DatabaseStorage {
           }))
         );
 
-        // Filter out any assignments for owners since they already have full access
-        const nonOwnerAssignments = assignments.filter(a => 
-          !owners.some(owner => owner.id === a.userId)
+        // Create assignments for retailOwners (keep their existing assignments)
+        const retailOwnerAssignments = assignments.filter(a =>
+          retailOwners.some(owner => owner.id === a.userId)
         );
 
-        // Insert all assignments at once
-        const allAssignments = [...ownerAssignments, ...nonOwnerAssignments];
+        // Filter out any assignments for owners and retail owners
+        const otherAssignments = assignments.filter(a =>
+          !owners.some(owner => owner.id === a.userId) &&
+          !retailOwners.some(owner => owner.id === a.userId)
+        );
+
+        // Combine all assignments
+        const allAssignments = [
+          ...ownerAssignments,
+          ...retailOwnerAssignments,
+          ...otherAssignments
+        ];
 
         if (allAssignments.length > 0) {
           await tx
@@ -294,7 +347,8 @@ export class DatabaseStorage {
 
         console.log("Successfully updated user-shop assignments:", {
           ownerAssignments: ownerAssignments.length,
-          nonOwnerAssignments: nonOwnerAssignments.length,
+          retailOwnerAssignments: retailOwnerAssignments.length,
+          otherAssignments: otherAssignments.length,
           total: allAssignments.length
         });
       });
@@ -376,21 +430,6 @@ export class DatabaseStorage {
     }
   }
 
-  async getShops(): Promise<Shop[]> {
-    try {
-      console.log("Getting all active shops");
-      const allShops = await db
-        .select()
-        .from(shops)
-        .where(eq(shops.isActive, true))
-        .orderBy(shops.name);
-      console.log("Found active shops:", allShops);
-      return allShops;
-    } catch (error) {
-      console.error("Error getting shops:", error);
-      return [];
-    }
-  }
 
   async createShop(shop: InsertShop): Promise<Shop> {
     try {
@@ -957,16 +996,23 @@ export class DatabaseStorage {
     }
   }
 
+  //This function is updated.
   async updateBulkUserShopAssignments(assignments: { userId: number; shopId: number; }[]): Promise<void> {
     try {
       console.log("Starting bulk user-shop assignment update with:", assignments);
 
       await db.transaction(async (tx) => {
-        // Get all roastery owners
-        const owners = await tx
-          .select()
-          .from(users)
-          .where(eq(users.role, "roasteryOwner"));
+        // Get all roastery owners and retail owners
+        const [owners, retailOwners] = await Promise.all([
+          tx
+            .select()
+            .from(users)
+            .where(eq(users.role, "roasteryOwner")),
+          tx
+            .select()
+            .from(users)
+            .where(eq(users.role, "retailOwner"))
+        ]);
 
         // Get all active shops
         const activeShops = await tx
@@ -975,13 +1021,17 @@ export class DatabaseStorage {
           .where(eq(shops.isActive, true));
 
         console.log("Found roastery owners:", owners.length);
+        console.log("Found retail owners:", retailOwners.length);
         console.log("Found active shops:", activeShops.length);
 
-        // First delete all existing assignments except for roasteryOwners
+        // First delete all existing assignments except for roasteryOwners and retailOwners
         await tx
           .delete(userShops)
           .where(
-            sql`user_id NOT IN (${sql.join(owners.map(o => o.id))})`
+            sql`user_id NOT IN (${sql.join([
+              ...owners.map(o => o.id),
+              ...retailOwners.map(o => o.id)
+            ])})`
           );
 
         // Create assignments for roasteryOwners (they get all shops)
@@ -992,13 +1042,23 @@ export class DatabaseStorage {
           }))
         );
 
-        // Filter out any assignments for owners since they already have full access
-        const nonOwnerAssignments = assignments.filter(a => 
-          !owners.some(owner => owner.id === a.userId)
+        // Create assignments for retailOwners (keep their existing assignments)
+        const retailOwnerAssignments = assignments.filter(a =>
+          retailOwners.some(owner => owner.id === a.userId)
         );
 
-        // Insert all assignments at once
-        const allAssignments = [...ownerAssignments, ...nonOwnerAssignments];
+        // Filter out any assignments for owners and retail owners
+        const otherAssignments = assignments.filter(a =>
+          !owners.some(owner => owner.id === a.userId) &&
+          !retailOwners.some(owner => owner.id === a.userId)
+        );
+
+        // Combine all assignments
+        const allAssignments = [
+          ...ownerAssignments,
+          ...retailOwnerAssignments,
+          ...otherAssignments
+        ];
 
         if (allAssignments.length > 0) {
           await tx
@@ -1008,7 +1068,8 @@ export class DatabaseStorage {
 
         console.log("Successfully updated user-shop assignments:", {
           ownerAssignments: ownerAssignments.length,
-          nonOwnerAssignments: nonOwnerAssignments.length,
+          retailOwnerAssignments: retailOwnerAssignments.length,
+          otherAssignments: otherAssignments.length,
           total: allAssignments.length
         });
       });
@@ -1018,7 +1079,6 @@ export class DatabaseStorage {
     }
   }
 
-  // Retail Inventory methods
   async getRetailInventories(): Promise<RetailInventory[]> {
     try {
       console.log("Storage: Fetching retail inventories");
