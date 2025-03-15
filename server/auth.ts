@@ -16,43 +16,30 @@ declare global {
 const scryptAsync = promisify(scrypt);
 
 async function hashPassword(password: string) {
-  const salt = randomBytes(16).toString("hex");
-  const derivedKey = (await scryptAsync(password, salt, 64)) as Buffer;
-  return `${derivedKey.toString("hex")}.${salt}`;
+  // Use a consistent salt length
+  const salt = randomBytes(16);
+  // Generate a key
+  const key = (await scryptAsync(password, salt, 64)) as Buffer;
+  // Store both the key and salt as hex strings
+  return `${key.toString('hex')}.${salt.toString('hex')}`;
 }
 
 async function comparePasswords(supplied: string, stored: string) {
-  try {
-    console.log("Comparing passwords");
-    const [hashedHex, salt] = stored.split(".");
-    console.log("Password comparison details:", {
-      hashedLength: hashedHex.length,
-      saltLength: salt.length,
-      suppliedLength: supplied.length,
-      storedParts: stored.split(".").length
-    });
-
-    const hashedBuffer = Buffer.from(hashedHex, "hex");
-    const suppliedBuffer = (await scryptAsync(supplied, salt, 64)) as Buffer;
-
-    console.log("Buffer lengths:", {
-      hashedBufLength: hashedBuffer.length,
-      suppliedBufLength: suppliedBuffer.length
-    });
-
-    return timingSafeEqual(hashedBuffer, suppliedBuffer);
-  } catch (error) {
-    console.error("Error comparing passwords:", error);
+  // Split stored into key and salt
+  const [key, salt] = stored.split('.');
+  if (!key || !salt) {
     return false;
   }
-}
-
-export async function generateHashedPassword(password: string) {
-  return hashPassword(password);
+  // Convert hex strings back to buffers
+  const keyBuffer = Buffer.from(key, 'hex');
+  const saltBuffer = Buffer.from(salt, 'hex');
+  // Generate key from supplied password with same salt
+  const suppliedKey = (await scryptAsync(supplied, saltBuffer, 64)) as Buffer;
+  // Compare using timingSafeEqual
+  return timingSafeEqual(keyBuffer, suppliedKey);
 }
 
 export function setupAuth(app: Express) {
-  // Set up session before auth
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || 'development_secret',
     resave: false,
@@ -61,7 +48,7 @@ export function setupAuth(app: Express) {
     cookie: {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      maxAge: 24 * 60 * 60 * 1000,
       httpOnly: true
     }
   };
@@ -71,73 +58,39 @@ export function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Configure passport local strategy with additional checks
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
         const user = await storage.getUserByUsername(username);
-        console.log("Login attempt:", { username, found: !!user });
-
         if (!user) {
           return done(null, false, { message: "Invalid username or password" });
         }
 
-        // All admin roles (including roasteryOwner) should have unrestricted access
-        const isAdminRole = ["owner", "roasteryOwner", "retailOwner"].includes(user.role);
-
-        if (isAdminRole) {
-          const isValid = await comparePasswords(password, user.password);
-          console.log("Admin login validation:", { isValid });
-          if (!isValid) {
-            return done(null, false, { message: "Invalid username or password" });
-          }
-          return done(null, user);
-        }
-
-        // For non-admin roles, check approval and active status
-        if (user.isPendingApproval) {
-          return done(null, false, { message: "Your account is pending approval" });
-        }
-
-        if (!user.isActive) {
-          return done(null, false, { message: "Your account has been deactivated" });
-        }
-
         const isValid = await comparePasswords(password, user.password);
-        console.log("User login validation:", { isValid });
         if (!isValid) {
           return done(null, false, { message: "Invalid username or password" });
         }
 
         return done(null, user);
       } catch (error) {
-        console.error("Login error:", error);
         return done(error);
       }
     })
   );
 
-  passport.serializeUser((user, done) => {
-    console.log("Serializing user:", { id: user.id, role: user.role });
-    done(null, user.id);
-  });
-
+  passport.serializeUser((user, done) => done(null, user.id));
   passport.deserializeUser(async (id: number, done) => {
     try {
       const user = await storage.getUser(id);
       if (!user) {
-        console.log("User not found during deserialization:", id);
         return done(null, false);
       }
-      console.log("Deserialized user:", { id: user.id, role: user.role });
       done(null, user);
     } catch (error) {
-      console.error("Error during deserialization:", error);
       done(error);
     }
   });
 
-  // Authentication routes with proper error handling
   app.post("/api/register", async (req, res, next) => {
     try {
       const existingUser = await storage.getUserByUsername(req.body.username);
@@ -146,21 +99,16 @@ export function setupAuth(app: Express) {
       }
 
       const hashedPassword = await hashPassword(req.body.password);
+
       const user = await storage.createUser({
         ...req.body,
         password: hashedPassword,
-        isPendingApproval: req.body.role !== "roasteryOwner", // Roastery owners don't need approval
-        isActive: req.body.role === "roasteryOwner" // Roastery owners are active by default
+        isPendingApproval: req.body.role !== "roasteryOwner",
+        isActive: req.body.role === "roasteryOwner"
       });
 
-      // Don't automatically log in new users since they need approval (except roasteryOwner)
       const { password, ...userWithoutPassword } = user;
-      res.status(201).json({
-        ...userWithoutPassword,
-        message: user.role === "roasteryOwner"
-          ? "Registration successful. You can now log in."
-          : "Registration successful. Please wait for approval from a roastery owner."
-      });
+      res.status(201).json(userWithoutPassword);
     } catch (error) {
       next(error);
     }
@@ -174,7 +122,6 @@ export function setupAuth(app: Express) {
       }
       req.login(user, (err) => {
         if (err) return next(err);
-        // Don't send password in response
         const { password, ...userWithoutPassword } = user;
         res.json(userWithoutPassword);
       });
@@ -192,7 +139,6 @@ export function setupAuth(app: Express) {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
     }
-    // Don't send password in response
     const { password, ...userWithoutPassword } = req.user;
     res.json(userWithoutPassword);
   });
