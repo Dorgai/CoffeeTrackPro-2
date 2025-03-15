@@ -2,8 +2,7 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { Express } from "express";
 import session from "express-session";
-import { scrypt, randomBytes, timingSafeEqual } from "crypto";
-import { promisify } from "util";
+import { createHash } from "crypto";
 import { storage } from "./storage";
 import { User as SelectUser } from "@shared/schema";
 
@@ -13,35 +12,18 @@ declare global {
   }
 }
 
-const scryptAsync = promisify(scrypt);
-
-export async function hashPassword(password: string): Promise<string> {
-  try {
-    const salt = randomBytes(8).toString('hex');
-    const derivedKey = (await scryptAsync(password, salt, 32)) as Buffer;
-    return `${derivedKey.toString('hex')}.${salt}`;
-  } catch (error) {
-    console.error('Error hashing password:', error);
-    throw error;
-  }
+export function hashPassword(password: string): string {
+  return createHash('sha256').update(password).digest('hex');
 }
 
-async function comparePasswords(supplied: string, stored: string): Promise<boolean> {
-  try {
-    const [hashedPassword, salt] = stored.split('.');
-    if (!hashedPassword || !salt) {
-      console.error('Invalid stored password format');
-      return false;
-    }
-
-    const suppliedBuf = (await scryptAsync(supplied, salt, 32)) as Buffer;
-    const storedBuf = Buffer.from(hashedPassword, 'hex');
-
-    return timingSafeEqual(suppliedBuf, storedBuf);
-  } catch (error) {
-    console.error('Error comparing passwords:', error);
-    return false;
-  }
+function comparePasswords(supplied: string, stored: string): boolean {
+  const hashedSupplied = hashPassword(supplied);
+  console.log("Password comparison:", {
+    suppliedHash: hashedSupplied.substring(0, 10) + '...',
+    storedHash: stored.substring(0, 10) + '...',
+    match: hashedSupplied === stored
+  });
+  return hashedSupplied === stored;
 }
 
 export function setupAuth(app: Express) {
@@ -53,7 +35,7 @@ export function setupAuth(app: Express) {
     cookie: {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      maxAge: 24 * 60 * 60 * 1000,
       httpOnly: true
     }
   };
@@ -66,40 +48,43 @@ export function setupAuth(app: Express) {
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
-        console.log("Login attempt for username:", username);
+        console.log("[Auth] Login attempt:", { username });
 
         const user = await storage.getUserByUsername(username);
         if (!user) {
-          console.log("User not found:", username);
+          console.log("[Auth] User not found:", username);
           return done(null, false, { message: "Invalid username or password" });
         }
 
-        console.log("User found:", { id: user.id, username: user.username });
+        console.log("[Auth] User found:", { 
+          id: user.id, 
+          username: user.username,
+          hasPassword: Boolean(user.password)
+        });
 
         if (!user.password) {
-          console.log("No password set for user:", username);
+          console.log("[Auth] No password set for user:", username);
           return done(null, false, { message: "Invalid username or password" });
         }
 
-        const isValid = await comparePasswords(password, user.password);
-        console.log("Password validation result:", isValid);
+        const isValid = comparePasswords(password, user.password);
+        console.log("[Auth] Password validation:", { isValid });
 
         if (!isValid) {
-          console.log("Invalid password for user:", username);
           return done(null, false, { message: "Invalid username or password" });
         }
 
-        console.log("Authentication successful for user:", username);
+        console.log("[Auth] Login successful:", { username });
         return done(null, user);
       } catch (error) {
-        console.error("Authentication error:", error);
+        console.error("[Auth] Error during authentication:", error);
         return done(error);
       }
     })
   );
 
   passport.serializeUser((user, done) => {
-    console.log("Serializing user:", user.id);
+    console.log("[Auth] Serializing user:", user.id);
     done(null, user.id);
   });
 
@@ -107,38 +92,46 @@ export function setupAuth(app: Express) {
     try {
       const user = await storage.getUser(id);
       if (!user) {
-        console.log("User not found during deserialization:", id);
+        console.log("[Auth] User not found during deserialization:", id);
         return done(null, false);
       }
-      console.log("Deserialized user:", user.id);
+      console.log("[Auth] Deserialized user:", user.id);
       done(null, user);
     } catch (error) {
-      console.error("Deserialization error:", error);
+      console.error("[Auth] Deserialization error:", error);
       done(error);
     }
   });
 
   app.post("/api/login", (req, res, next) => {
-    console.log("Login request received for:", req.body.username);
+    console.log("[Auth] Login request received:", {
+      body: {
+        username: req.body.username,
+        hasPassword: Boolean(req.body.password)
+      },
+      headers: {
+        'content-type': req.get('content-type')
+      }
+    });
 
     passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) {
-        console.error("Login error:", err);
+        console.error("[Auth] Login error:", err);
         return next(err);
       }
 
       if (!user) {
-        console.log("Login failed:", info?.message);
+        console.log("[Auth] Login failed:", info?.message);
         return res.status(401).json({ message: info?.message || "Invalid username or password" });
       }
 
       req.login(user, (err) => {
         if (err) {
-          console.error("Session creation error:", err);
+          console.error("[Auth] Session creation error:", err);
           return next(err);
         }
 
-        console.log("Login successful for:", user.username);
+        console.log("[Auth] Login successful:", user.username);
         const { password, ...userWithoutPassword } = user;
         res.json(userWithoutPassword);
       });
@@ -147,14 +140,14 @@ export function setupAuth(app: Express) {
 
   app.post("/api/logout", (req, res, next) => {
     const username = req.user?.username;
-    console.log("Logout request received for:", username);
+    console.log("[Auth] Logout request received:", username);
 
     req.logout((err) => {
       if (err) {
-        console.error("Logout error:", err);
+        console.error("[Auth] Logout error:", err);
         return next(err);
       }
-      console.log("Logout successful for:", username);
+      console.log("[Auth] Logout successful:", username);
       res.sendStatus(200);
     });
   });

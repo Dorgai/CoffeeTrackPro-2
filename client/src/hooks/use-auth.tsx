@@ -35,7 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (res.status === 401) return null;
         return res.json();
       } catch (error) {
-        console.error("Auth error:", error);
+        console.error("[Auth] Get user error:", error);
         return null;
       }
     },
@@ -43,10 +43,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
+      console.log("[Auth] Attempting login:", { username: credentials.username });
       const res = await apiRequest("POST", "/api/login", credentials);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Login failed");
+      }
       return res.json();
     },
     onSuccess: (user: SelectUser) => {
+      console.log("[Auth] Login successful:", { username: user.username });
       queryClient.setQueryData(["/api/user"], user);
       toast({
         title: "Login successful",
@@ -54,6 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
     onError: (error: Error) => {
+      console.error("[Auth] Login error:", error);
       toast({
         title: "Login failed",
         description: error.message,
@@ -65,6 +72,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const registerMutation = useMutation({
     mutationFn: async (credentials: InsertUser) => {
       const res = await apiRequest("POST", "/api/register", credentials);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Registration failed");
+      }
       return res.json();
     },
     onSuccess: (user: SelectUser) => {
@@ -85,7 +96,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", "/api/logout");
+      const res = await apiRequest("POST", "/api/logout");
+      if (!res.ok) {
+        throw new Error("Logout failed");
+      }
     },
     onSuccess: () => {
       queryClient.setQueryData(["/api/user"], null);
