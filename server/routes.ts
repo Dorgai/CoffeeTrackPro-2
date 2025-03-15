@@ -147,7 +147,8 @@ export async function registerRoutes(app: Express): Promise<void> {
         return res.status(400).json({ message: "Username already exists" });
       }
 
-      const hashedPassword = await hashPassword(req.body.password);
+      // Remove await since hashPassword is synchronous
+      const hashedPassword = hashPassword(req.body.password);
       const userData = {
         ...req.body,
         password: hashedPassword,
@@ -854,8 +855,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         res.json(filteredInventory);
       } catch (error) {
         console.error("Error fetching retail inventory:", error);
-        res.status(500).json({
-          message: "Failed to fetch inventory",
+        res.status(500).json({message: "Failed to fetch inventory",
           details: error instanceof Error ? error.message : "Unknown error"
         });
       }
