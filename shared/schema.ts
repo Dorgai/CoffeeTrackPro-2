@@ -94,6 +94,28 @@ export const roastingBatches = pgTable("roasting_batches", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Add new billing-related tables and types
+export const billingEvents = pgTable("billing_events", {
+  id: serial("id").primaryKey(),
+  shopId: integer("shop_id").notNull().references(() => shops.id),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  status: text("status", { enum: ["pending", "processed", "failed"] }).notNull(),
+  type: text("type", { enum: ["order", "subscription", "adjustment"] }).notNull(),
+  description: text("description"),
+  processedAt: timestamp("processed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  createdById: integer("created_by_id").references(() => users.id),
+});
+
+export const gradePricing = pgTable("grade_pricing", {
+  id: serial("id").primaryKey(),
+  grade: text("grade", { enum: coffeeGrades }).notNull(),
+  pricePerKg: decimal("price_per_kg", { precision: 10, scale: 2 }).notNull(),
+  splitPercentage: decimal("split_percentage", { precision: 5, scale: 2 }).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  updatedById: integer("updated_by_id").references(() => users.id),
+});
+
 export const insertRoastingBatchSchema = z.object({
   greenCoffeeId: z.number(),
   plannedAmount: z.coerce.number().min(0, "Planned amount must be 0 or greater"),
@@ -126,6 +148,10 @@ export const insertRetailInventoryHistorySchema = createInsertSchema(retailInven
 export const insertOrderSchema = createInsertSchema(orders);
 export const insertUserShopSchema = createInsertSchema(userShops);
 
+// Add billing schemas
+export const insertBillingEventSchema = createInsertSchema(billingEvents);
+export const insertGradePricingSchema = createInsertSchema(gradePricing);
+
 export type User = typeof users.$inferSelect;
 export type Shop = typeof shops.$inferSelect;
 export type GreenCoffee = typeof greenCoffee.$inferSelect;
@@ -141,3 +167,9 @@ export type InsertRetailInventoryHistory = z.infer<typeof insertRetailInventoryH
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type InsertRoastingBatch = z.infer<typeof insertRoastingBatchSchema>;
 export type InsertUserShop = z.infer<typeof insertUserShopSchema>;
+
+// Add types for the new tables
+export type BillingEvent = typeof billingEvents.$inferSelect;
+export type GradePricing = typeof gradePricing.$inferSelect;
+export type InsertBillingEvent = z.infer<typeof insertBillingEventSchema>;
+export type InsertGradePricing = z.infer<typeof insertGradePricingSchema>;

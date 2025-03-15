@@ -698,13 +698,16 @@ export class DatabaseStorage {
       console.log("Starting retail inventory update:", data);
 
       return await db.transaction(async (tx) => {
-        // First get the current inventory record
+        // First get the current inventory record using safe query
         const query = sql`
-          SELECT * FROM retail_inventory
-          WHERE shop_id = ${data.shopId} 
-          AND green_coffee_id = ${data.greenCoffeeId}
-          ORDER BY updated_at DESC
-          LIMIT 1`;
+          WITH latest_inventory AS (
+            SELECT * FROM retail_inventory
+            WHERE shop_id = ${data.shopId} 
+            AND green_coffee_id = ${data.greenCoffeeId}
+            ORDER BY updated_at DESC
+            LIMIT 1
+          )
+          SELECT * FROM latest_inventory`;
 
         const result = await tx.execute(query);
         const currentInventory = result.rows[0];

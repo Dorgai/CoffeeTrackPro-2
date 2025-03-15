@@ -65,8 +65,8 @@ export function RetailInventoryTable({ onEditSuccess }: Props) {
       return res.json();
     },
     enabled: Boolean(user && activeShop?.id),
-    staleTime: 30000,
-    retry: 1,
+    staleTime: 30000, // Consider data fresh for 30 seconds
+    refetchOnWindowFocus: true, // Refetch when window regains focus
   });
 
   if (!user) {
