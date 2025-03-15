@@ -1,4 +1,4 @@
-import { type RoastingBatch, type InsertRoastingBatch, roastingBatches, users, type User, type InsertUser, type Shop, type InsertShop, shops, userShops, type GreenCoffee, greenCoffee, type Order, type InsertOrder, orders, type RetailInventory, retailInventory } from "@shared/schema";
+import { type RoastingBatch, type InsertRoastingBatch, roastingBatches, users, type User, type InsertUser, type Shop, type InsertShop, shops, userShops, type GreenCoffee, greenCoffee, type Order, type InsertOrder, orders, type RetailInventory, retailInventory, type RetailInventoryHistory, retailInventoryHistory } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import session from "express-session";
@@ -36,30 +36,15 @@ export class DatabaseStorage {
   async getUserByUsername(username: string): Promise<User | undefined> {
     try {
       console.log("Looking up user by username:", username);
-
-      // Execute query with detailed logging
-      const query = sql`
-        SELECT * FROM users 
-        WHERE username = ${username}
-        AND is_active = true`;
-
-      console.log("Executing query:", query.toString());
-
-      const result = await db.execute(query);
-      const user = result.rows[0];
-
-      console.log("Query result:", {
-        found: !!user,
-        username: user?.username,
-        role: user?.role,
-        isActive: user?.is_active,
-        isPendingApproval: user?.is_pending_approval
-      });
-
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.username, username));
+      console.log("Found user:", user ? "yes" : "no");
       return user;
     } catch (error) {
-      console.error("Error in getUserByUsername:", error);
-      throw error;
+      console.error("Error getting user by username:", error);
+      return undefined;
     }
   }
 
@@ -704,7 +689,7 @@ export class DatabaseStorage {
         const result = await tx.execute(query);
         const currentInventory = result.rows[0];
 
-        // If a record exists, update it; otherwise insert a new record
+        // If a record exists, update it; otherwise insert a new record.
         if (currentInventory) {
           const [updatedInventory] = await tx
             .update(retailInventory)
@@ -724,8 +709,23 @@ export class DatabaseStorage {
             )
             .returning();
 
+          // Create history record
+          await tx
+            .insert(retailInventoryHistory)
+            .values({
+              shopId: data.shopId,
+              greenCoffeeId: data.greenCoffeeId,
+              smallBags: data.smallBags,
+              largeBags: data.largeBags,
+              updatedById: data.updatedById,
+              updateType: data.updateType,
+              notes: data.notes || null,
+              createdAt: new Date()
+            });
+
           console.log("Successfully updated existing retail inventory:", updatedInventory);
           return updatedInventory;
+
         } else {
           // Insert new record if none exists
           const [inventory] = await tx
@@ -741,6 +741,20 @@ export class DatabaseStorage {
               updatedAt: new Date()
             })
             .returning();
+
+          // Create history record
+          await tx
+            .insert(retailInventoryHistory)
+            .values({
+              shopId: data.shopId,
+              greenCoffeeId: data.greenCoffeeId,
+              smallBags: data.smallBags,
+              largeBags: data.largeBags,
+              updatedById: data.updatedById,
+              updateType: data.updateType,
+              notes: data.notes || null,
+              createdAt: new Date()
+            });
 
           console.log("Successfully created new retail inventory:", inventory);
           return inventory;
