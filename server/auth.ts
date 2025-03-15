@@ -29,7 +29,6 @@ async function comparePasswords(supplied: string, stored: string) {
 }
 
 export function setupAuth(app: Express) {
-  // Set up session before auth
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || 'development_secret',
     resave: false,
@@ -48,25 +47,23 @@ export function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Configure passport local strategy with detailed logging
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
         console.log("Login attempt for username:", username);
-
         const user = await storage.getUserByUsername(username);
-        console.log("User lookup result:", user ? { 
-          id: user.id, 
-          username: user.username, 
-          role: user.role, 
-          isActive: user.isActive,
-          isPendingApproval: user.isPendingApproval
-        } : "User not found");
 
         if (!user) {
           console.log("Authentication failed: User not found");
           return done(null, false, { message: "Invalid username or password" });
         }
+
+        console.log("User found:", {
+          id: user.id,
+          username: user.username,
+          role: user.role,
+          isActive: user.isActive
+        });
 
         const isPasswordValid = await comparePasswords(password, user.password);
         console.log("Password validation result:", isPasswordValid);
@@ -76,26 +73,7 @@ export function setupAuth(app: Express) {
           return done(null, false, { message: "Invalid username or password" });
         }
 
-        // All admin roles (including retailOwner) should have unrestricted access
-        const isAdminRole = ["owner", "roasteryOwner", "retailOwner"].includes(user.role);
-
-        if (isAdminRole) {
-          console.log("Admin role detected, granting access");
-          return done(null, user);
-        }
-
-        // For non-admin roles, check approval and active status
-        if (user.isPendingApproval) {
-          console.log("Authentication failed: Account pending approval");
-          return done(null, false, { message: "Your account is pending approval" });
-        }
-
-        if (!user.isActive) {
-          console.log("Authentication failed: Account inactive");
-          return done(null, false, { message: "Your account has been deactivated" });
-        }
-
-        console.log("Authentication successful for user:", user.username);
+        console.log("Authentication successful");
         return done(null, user);
       } catch (error) {
         console.error("Authentication error:", error);
@@ -105,25 +83,18 @@ export function setupAuth(app: Express) {
   );
 
   passport.serializeUser((user, done) => {
-    console.log("Serializing user:", { id: user.id, username: user.username, role: user.role });
+    console.log("Serializing user:", { id: user.id, username: user.username });
     done(null, user.id);
   });
 
   passport.deserializeUser(async (id: number, done) => {
     try {
-      console.log("Deserializing user ID:", id);
       const user = await storage.getUser(id);
-
       if (!user) {
-        console.log("Deserialization failed: User not found:", id);
+        console.log("Deserialization failed: User not found");
         return done(null, false);
       }
-
-      console.log("Successfully deserialized user:", { 
-        id: user.id, 
-        username: user.username, 
-        role: user.role 
-      });
+      console.log("Deserialized user:", { id: user.id, username: user.username });
       done(null, user);
     } catch (error) {
       console.error("Deserialization error:", error);
@@ -131,11 +102,11 @@ export function setupAuth(app: Express) {
     }
   });
 
-  // Authentication routes with detailed logging
+  // Authentication routes
   app.post("/api/login", (req, res, next) => {
-    console.log("Login request received for username:", req.body.username);
+    console.log("Login request received:", { username: req.body.username });
 
-    passport.authenticate("local", (err, user, info) => {
+    passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) {
         console.error("Login error:", err);
         return next(err);
@@ -143,7 +114,7 @@ export function setupAuth(app: Express) {
 
       if (!user) {
         console.log("Login failed:", info?.message);
-        return res.status(401).json({ message: info?.message || "Authentication failed" });
+        return res.status(401).json({ message: info?.message || "Invalid username or password" });
       }
 
       req.login(user, (err) => {
@@ -153,7 +124,6 @@ export function setupAuth(app: Express) {
         }
 
         console.log("Login successful for user:", user.username);
-        // Don't send password in response
         const { password, ...userWithoutPassword } = user;
         res.json(userWithoutPassword);
       });
@@ -161,23 +131,23 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/logout", (req, res, next) => {
-    console.log("Logout request received for user:", req.user?.username);
+    const username = req.user?.username;
+    console.log("Logout request received for user:", username);
+
     req.logout((err) => {
       if (err) {
         console.error("Logout error:", err);
         return next(err);
       }
-      console.log("Logout successful");
+      console.log("Logout successful for user:", username);
       res.sendStatus(200);
     });
   });
 
   app.get("/api/user", (req, res) => {
-    console.log("User info request, authenticated:", req.isAuthenticated());
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
     }
-    // Don't send password in response
     const { password, ...userWithoutPassword } = req.user;
     res.json(userWithoutPassword);
   });
