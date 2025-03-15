@@ -39,7 +39,7 @@ function requireRole(roles: string[]) {
   };
 }
 
-// Update shop access middleware to better handle admin roles
+// Update shop access middleware to better handle admin roles and check body for POST requests
 function requireShopAccess(allowedRoles: string[]) {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
@@ -57,11 +57,12 @@ function requireShopAccess(allowedRoles: string[]) {
       },
       allowedRoles,
       query: req.query,
-      params: req.params
+      params: req.params,
+      body: req.method === 'POST' ? req.body : undefined
     });
 
-    // Admin roles (owner, roasteryOwner) always have access
-    if (["owner", "roasteryOwner"].includes(req.user.role)) {
+    // Admin roles (owner, roasteryOwner, retailOwner) always have access
+    if (["owner", "roasteryOwner", "retailOwner"].includes(req.user.role)) {
       console.log("Granting full access for admin role:", req.user.role);
       return next();
     }
@@ -73,7 +74,11 @@ function requireShopAccess(allowedRoles: string[]) {
     }
 
     // Then check for shopId (required for non-admin roles)
-    const shopId = parseInt(req.params.shopId || req.query.shopId as string);
+    // For POST requests, check body first
+    const shopId = req.method === 'POST' 
+      ? (req.body.shopId || parseInt(req.params.shopId || req.query.shopId as string))
+      : parseInt(req.params.shopId || req.query.shopId as string);
+
     if (!shopId) {
       console.log("Shop ID required for non-admin role:", req.user.role);
       return res.status(400).json({ message: "Shop ID is required" });
@@ -103,7 +108,7 @@ async function checkShopAccess(userId: number, shopId: number): Promise<boolean>
     }
 
     // Admin roles always have access
-    if (["owner", "roasteryOwner"].includes(user.role)) {
+    if (["owner", "roasteryOwner", "retailOwner"].includes(user.role)) {
       console.log("Full access granted for admin role:", user.role);
       return true;
     }
@@ -326,7 +331,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       let shops;
       // For admin roles (roasteryOwner, owner, retailOwner), return all active shops
-      if (["roasteryOwner", "owner"].includes(req.user.role)) {
+      if (["roasteryOwner", "owner", "retailOwner"].includes(req.user.role)) {
         console.log("Fetching all shops for admin role");
         shops = await storage.getShops();
       } else {
@@ -587,7 +592,6 @@ export async function registerRoutes(app: Express): Promise<void> {
       res.status(500).json({ message: "Failed to fetch coffee details" });
     }
   });
-
 
   // Roasting Routes - accessible by roaster
   // Update retail inventory routes
