@@ -28,6 +28,10 @@ async function comparePasswords(supplied: string, stored: string) {
   return timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
+export async function generateHashedPassword(password: string) {
+  return hashPassword(password);
+}
+
 export function setupAuth(app: Express) {
   // Set up session before auth
   const sessionSettings: session.SessionOptions = {
