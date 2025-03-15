@@ -19,8 +19,8 @@ export function hashPassword(password: string): string {
 function comparePasswords(supplied: string, stored: string): boolean {
   const hashedSupplied = hashPassword(supplied);
   console.log("Password comparison:", {
-    suppliedHash: hashedSupplied.substring(0, 10) + '...',
-    storedHash: stored.substring(0, 10) + '...',
+    suppliedHash: hashedSupplied,
+    storedHash: stored,
     match: hashedSupplied === stored
   });
   return hashedSupplied === stored;
@@ -59,7 +59,8 @@ export function setupAuth(app: Express) {
         console.log("[Auth] User found:", { 
           id: user.id, 
           username: user.username,
-          hasPassword: Boolean(user.password)
+          hasPassword: Boolean(user.password),
+          passwordHash: hashPassword(password)
         });
 
         if (!user.password) {
