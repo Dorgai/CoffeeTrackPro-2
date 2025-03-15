@@ -1,9 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { sql } from "drizzle-orm";
-import { setupAuth } from "./auth";
-import { storage } from "./storage";
-import { db } from "./db";
+import { setupAuth, hashPassword } from "./auth"; // Added explicit import for hashPassword
 import { 
   insertGreenCoffeeSchema, 
   insertRoastingBatchSchema, 
@@ -18,6 +16,8 @@ import {
 } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { WebSocketServer } from 'ws'; 
+import { storage } from "./storage";
+import { db } from "./db";
 
 function requireRole(roles: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -132,6 +132,51 @@ async function checkShopAccess(userId: number, shopId: number): Promise<boolean>
 
 export async function registerRoutes(app: Express): Promise<void> {
   setupAuth(app);
+
+  // Move registration route before other routes to avoid conflicts
+  app.post("/api/register", async (req, res) => {
+    try {
+      console.log("Registration attempt:", {
+        username: req.body.username,
+        role: req.body.role
+      });
+
+      const existingUser = await storage.getUserByUsername(req.body.username);
+      if (existingUser) {
+        console.log("Registration failed: Username exists:", req.body.username);
+        return res.status(400).json({ message: "Username already exists" });
+      }
+
+      const hashedPassword = await hashPassword(req.body.password);
+      const userData = {
+        ...req.body,
+        password: hashedPassword,
+        isActive: true,
+        isPendingApproval: req.body.role !== 'roasteryOwner' // New users need approval except roasteryOwner
+      };
+
+      console.log("Creating new user with role:", userData.role);
+      const user = await storage.createUser(userData);
+
+      // Remove password from response
+      const { password, ...userWithoutPassword } = user;
+
+      // Log the user in automatically
+      req.login(user, (err) => {
+        if (err) {
+          console.error("Auto-login failed after registration:", err);
+          return res.status(500).json({ message: "Failed to log in after registration" });
+        }
+        console.log("Registration successful:", user.username);
+        res.status(201).json(userWithoutPassword);
+      });
+    } catch (error) {
+      console.error("Registration error:", error);
+      res.status(400).json({
+        message: error instanceof Error ? error.message : "Failed to register user"
+      });
+    }
+  });
 
   // Add debug endpoint at the top of the routes registration
   app.get("/api/debug-user", (req, res) => {
@@ -477,6 +522,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   });
 
 
+
   // Green Coffee Routes - accessible by roastery owner and roaster
   app.get("/api/green-coffee", requireRole(["owner", "roasteryOwner", "roaster", "retailOwner", "shopManager", "barista"]), async (req, res) => {
     try {
@@ -489,7 +535,7 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-  // Add new green coffee route
+  // Add/update the green coffee creation endpoint
   app.post(
     "/api/green-coffee",
     requireRole(["owner", "roasteryOwner", "roaster"]),
@@ -1345,5 +1391,6 @@ export async function registerRoutes(app: Express): Promise<void> {
   });
 
   // Add after "/api/users/:id/shops" routes
+
 
 }

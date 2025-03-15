@@ -80,6 +80,25 @@ export class DatabaseStorage {
     }
   }
 
+  async createShop(data: InsertShop): Promise<Shop> {
+    try {
+      console.log("Creating shop:", data);
+      const [shop] = await db
+        .insert(shops)
+        .values({
+          ...data,
+          isActive: true,
+          createdAt: new Date()
+        })
+        .returning();
+      console.log("Created shop:", shop);
+      return shop;
+    } catch (error) {
+      console.error("Error creating shop:", error);
+      throw error;
+    }
+  }
+
   // Modified to return all shops for all roles
   async getUserShops(userId: number): Promise<Shop[]> {
     try {
@@ -222,6 +241,7 @@ export class DatabaseStorage {
       return [];
     }
   }
+
 
 
   // Green coffee methods
