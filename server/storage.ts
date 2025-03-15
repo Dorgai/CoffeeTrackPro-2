@@ -664,6 +664,96 @@ export class DatabaseStorage {
       return [];
     }
   }
+
+  async updateRetailInventory(data: {
+    shopId: number;
+    greenCoffeeId: number;
+    smallBags: number;
+    largeBags: number;
+    updatedById: number;
+    updateType: "manual" | "dispatch";
+    notes?: string;
+  }): Promise<RetailInventory> {
+    try {
+      console.log("Updating retail inventory:", data);
+
+      // Insert new inventory record
+      const [inventory] = await db
+        .insert(retailInventory)
+        .values({
+          shopId: data.shopId,
+          greenCoffeeId: data.greenCoffeeId,
+          smallBags: data.smallBags,
+          largeBags: data.largeBags,
+          updatedById: data.updatedById,
+          updateType: data.updateType,
+          notes: data.notes || null,
+          updatedAt: new Date()
+        })
+        .returning();
+
+      // Also create a history record
+      await db
+        .insert(retailInventoryHistory)
+        .values({
+          shopId: data.shopId,
+          greenCoffeeId: data.greenCoffeeId,
+          smallBags: data.smallBags,
+          largeBags: data.largeBags,
+          updatedById: data.updatedById,
+          updateType: data.updateType,
+          notes: data.notes || null,
+          createdAt: new Date()
+        });
+
+      console.log("Created retail inventory record:", inventory);
+      return inventory;
+    } catch (error) {
+      console.error("Error updating retail inventory:", error);
+      throw error;
+    }
+  }
+
+  async getRetailInventoryItem(shopId: number, greenCoffeeId: number): Promise<RetailInventory | undefined> {
+    try {
+      console.log("Getting retail inventory item for shop:", shopId, "coffee:", greenCoffeeId);
+
+      const query = sql`
+        WITH latest_inventory AS (
+          SELECT DISTINCT ON (shop_id, green_coffee_id)
+            shop_id,
+            green_coffee_id,
+            small_bags,
+            large_bags,
+            updated_at,
+            updated_by_id,
+            update_type,
+            notes
+          FROM retail_inventory
+          WHERE shop_id = ${shopId} AND green_coffee_id = ${greenCoffeeId}
+          ORDER BY shop_id, green_coffee_id, updated_at DESC
+        )
+        SELECT 
+          li.*,
+          s.name as shop_name,
+          s.location as shop_location,
+          gc.name as coffee_name,
+          gc.producer,
+          gc.grade,
+          u.username as updated_by_username
+        FROM latest_inventory li
+        LEFT JOIN shops s ON li.shop_id = s.id
+        LEFT JOIN green_coffee gc ON li.green_coffee_id = gc.id
+        LEFT JOIN users u ON li.updated_by_id = u.id
+        LIMIT 1`;
+
+      const result = await db.execute(query);
+      return result.rows[0] as RetailInventory | undefined;
+    } catch (error) {
+      console.error("Error getting retail inventory item:", error);
+      return undefined;
+    }
+  }
 }
 
 export const storage = new DatabaseStorage();
