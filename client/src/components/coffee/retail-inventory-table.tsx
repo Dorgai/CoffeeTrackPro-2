@@ -59,12 +59,12 @@ export function RetailInventoryTable({ onEditSuccess }: Props) {
   // Effect to invalidate queries when shop changes
   useEffect(() => {
     if (activeShop?.id) {
-      queryClient.invalidateQueries({ queryKey: ["retail-inventory", activeShop.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory", activeShop.id] });
     }
   }, [activeShop?.id]);
 
   const { data: inventory, isLoading: loadingInventory } = useQuery<InventoryItem[]>({
-    queryKey: ["retail-inventory", activeShop?.id],
+    queryKey: ["/api/retail-inventory", activeShop?.id],
     queryFn: async () => {
       if (!activeShop?.id) return [];
       const res = await apiRequest("GET", `/api/retail-inventory?shopId=${activeShop.id}`);

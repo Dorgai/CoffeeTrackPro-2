@@ -187,12 +187,9 @@ export class DatabaseStorage {
 
   async getRetailInventories(shopId?: number): Promise<RetailInventory[]> {
     try {
-      if (!shopId) {
-        return this.getAllRetailInventories();
-      }
-
       console.log("Storage: Fetching retail inventories for shop:", shopId);
-      const query = sql`
+
+      const baseQuery = sql`
         WITH latest_inventory AS (
           SELECT DISTINCT ON (shop_id, green_coffee_id)
             shop_id,
@@ -204,7 +201,7 @@ export class DatabaseStorage {
             update_type,
             notes
           FROM retail_inventory
-          WHERE shop_id = ${shopId}
+          ${shopId ? sql`WHERE shop_id = ${shopId}` : sql``}
           ORDER BY shop_id, green_coffee_id, updated_at DESC
         )
         SELECT 
@@ -228,7 +225,7 @@ export class DatabaseStorage {
         LEFT JOIN users u ON li.updated_by_id = u.id
         ORDER BY li.updated_at DESC`;
 
-      const result = await db.execute(query);
+      const result = await db.execute(baseQuery);
       console.log("Found retail inventories:", {
         total: result.rows?.length,
         shopId,
