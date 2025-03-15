@@ -675,39 +675,82 @@ export class DatabaseStorage {
     notes?: string;
   }): Promise<RetailInventory> {
     try {
-      console.log("Updating retail inventory:", data);
+      console.log("Starting retail inventory update:", data);
 
-      // Insert new inventory record
-      const [inventory] = await db
-        .insert(retailInventory)
-        .values({
-          shopId: data.shopId,
-          greenCoffeeId: data.greenCoffeeId,
-          smallBags: data.smallBags,
-          largeBags: data.largeBags,
-          updatedById: data.updatedById,
-          updateType: data.updateType,
-          notes: data.notes || null,
-          updatedAt: new Date()
-        })
-        .returning();
+      return await db.transaction(async (tx) => {
+        // First try to get the current inventory record
+        const query = sql`
+          SELECT * FROM retail_inventory
+          WHERE shop_id = ${data.shopId} 
+          AND green_coffee_id = ${data.greenCoffeeId}
+          ORDER BY updated_at DESC
+          LIMIT 1`;
 
-      // Also create a history record
-      await db
-        .insert(retailInventoryHistory)
-        .values({
-          shopId: data.shopId,
-          greenCoffeeId: data.greenCoffeeId,
-          smallBags: data.smallBags,
-          largeBags: data.largeBags,
-          updatedById: data.updatedById,
-          updateType: data.updateType,
-          notes: data.notes || null,
-          createdAt: new Date()
-        });
+        const result = await tx.execute(query);
+        const currentInventory = result.rows[0];
 
-      console.log("Created retail inventory record:", inventory);
-      return inventory;
+        // If a record exists, update it; otherwise insert a new record.
+        if (currentInventory) {
+          const [updatedInventory] = await tx
+            .update(retailInventory)
+            .set({
+              smallBags: data.smallBags,
+              largeBags: data.largeBags,
+              updatedById: data.updatedById,
+              updateType: data.updateType,
+              notes: data.notes || null,
+              updatedAt: new Date()
+            })
+            .where(eq(retailInventory.shopId, data.shopId).and(eq(retailInventory.greenCoffeeId, data.greenCoffeeId)))
+            .returning();
+          await tx
+            .insert(retailInventoryHistory)
+            .values({
+              shopId: data.shopId,
+              greenCoffeeId: data.greenCoffeeId,
+              smallBags: data.smallBags,
+              largeBags: data.largeBags,
+              updatedById: data.updatedById,
+              updateType: data.updateType,
+              notes: data.notes || null,
+              createdAt: new Date()
+            });
+          console.log("Successfully updated existing retail inventory:", updatedInventory);
+          return updatedInventory;
+
+        } else {
+          const [inventory] = await tx
+            .insert(retailInventory)
+            .values({
+              shopId: data.shopId,
+              greenCoffeeId: data.greenCoffeeId,
+              smallBags: data.smallBags,
+              largeBags: data.largeBags,
+              updatedById: data.updatedById,
+              updateType: data.updateType,
+              notes: data.notes || null,
+              updatedAt: new Date()
+            })
+            .returning();
+
+          // Also create a history record
+          await tx
+            .insert(retailInventoryHistory)
+            .values({
+              shopId: data.shopId,
+              greenCoffeeId: data.greenCoffeeId,
+              smallBags: data.smallBags,
+              largeBags: data.largeBags,
+              updatedById: data.updatedById,
+              updateType: data.updateType,
+              notes: data.notes || null,
+              createdAt: new Date()
+            });
+
+          console.log("Successfully created new retail inventory:", inventory);
+          return inventory;
+        }
+      });
     } catch (error) {
       console.error("Error updating retail inventory:", error);
       throw error;
