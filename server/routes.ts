@@ -888,21 +888,19 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-  // Update order status endpoint with corrected error handling
+  // Update order status endpoint with corrected error handling and inventory update
   app.patch(
     "/api/orders/:id/status",
     requireRole(["retailOwner", "owner", "roasteryOwner", "roaster", "shopManager", "barista"]),
     async (req, res) => {
       try {
         const orderId = parseInt(req.params.id);
-        const { status, smallBags, largeBags } = req.body;
+        const { status } = req.body;
         console.log("Order status update requested by:", {
           username: req.user?.username,
           role: req.user?.role,
           orderId,
-          status,
-          smallBags,
-          largeBags
+          status
         });
 
         const order = await storage.getOrder(orderId);
@@ -910,59 +908,69 @@ export async function registerRoutes(app: Express): Promise<void> {
           return res.status(404).json({ message: "Order not found" });
         }
 
-        // Owner, retailOwner and roasteryOwner have full access to all status changes
-        if (["owner", "retailOwner", "roasteryOwner"].includes(req.user?.role || "")) {
-          if (smallBags > order.smallBags || largeBags > order.largeBags) {
-            return res.status(400).json({
-              message: "Updated quantities cannot exceed original order quantities"
-            });
+        // Verify shop access for non-admin roles
+        if (!["owner", "roasteryOwner"].includes(req.user?.role || "")) {
+          const hasAccess = await checkShopAccess(req.user!.id, order.shopId);
+          if (!hasAccess) {
+            return res.status(403).json({ message: "No access to this shop's orders" });
           }
-        } else {
-          // Shop manager can only mark orders as delivered
-          if (req.user?.role === "shopManager" && status !== "delivered") {
-            return res.status(403).json({
-              message: "Shop managers can only mark orders as delivered"
-            });
-          }
+        }
 
+        // Validate status changes based on user role
+        if (["retailOwner", "barista"].includes(req.user?.role || "")) {
+          // Retail owners and baristas can only mark as delivered
+          if (status !== "delivered") {
+            return res.status(403).json({
+              message: "You can only mark orders as delivered"
+            });
+          }
+        } else if (req.user?.role === "roaster") {
           // Roaster can only change status to roasted or dispatched
-          if (req.user?.role === "roaster" && !["roasted", "dispatched"].includes(status)) {
+          if (!["roasted", "dispatched"].includes(status)) {
             return res.status(403).json({
               message: "Roasters can only change status to 'roasted' or 'dispatched'"
             });
           }
-
-          // Validate quantities
-          if (smallBags > order.smallBags || largeBags > order.largeBags) {
-            return res.status(400).json({
-              message: "Updated quantities cannot exceed original order quantities"
-            });
-          }
         }
 
-        // Update the order status and create dispatch confirmation
+        // Update order status
         const updatedOrder = await storage.updateOrderStatus(orderId, {
           status,
-          smallBags,
-          largeBags,
           updatedById: req.user!.id
         });
 
-        // Create dispatch confirmation when status changes to "dispatched"
-        if (status === "dispatched") {
-          console.log("Creating dispatch confirmation for order:", orderId);
+        // If status is set to "delivered", update inventory
+        if (status === "delivered") {
           try {
-            const confirmation = await storage.createDispatchedCoffeeConfirmation({
-              orderId: order.id,
+            // Get current inventory
+            const currentInventory = await storage.getRetailInventoryItem(order.shopId, order.greenCoffeeId);
+
+            // Calculate new quantities
+            const newSmallBags = (currentInventory?.smallBags || 0) + order.smallBags;
+            const newLargeBags = (currentInventory?.largeBags || 0) + order.largeBags;
+
+            // Update inventory with new quantities
+            await storage.updateRetailInventory({
               shopId: order.shopId,
-              greenCoffeeId: order.greenCoffeeId,
-              dispatchedSmallBags: smallBags,
-              dispatchedLargeBags: largeBags,
-              status: "pending"
+              coffeeId: order.greenCoffeeId,
+              smallBags: newSmallBags,
+              largeBags: newLargeBags,
+              updatedById: req.user!.id,
+              updateType: "dispatch",
+              notes: `Order #${orderId} delivered`
             });
-            console.log("Created dispatch confirmation:", confirmation);
+
+            console.log("Updated inventory for delivered order:", {
+              orderId,
+              shopId: order.shopId,
+              coffeeId: order.greenCoffeeId,
+              newSmallBags,
+              newLargeBags
+            });
           } catch (error) {
-            console.error("Error creating dispatch confirmation:", error);
+            console.error("Error updating inventory for delivered order:", error);
+            // Don't fail the order status update if inventory update fails
+            // but log it for investigation
           }
         }
 
