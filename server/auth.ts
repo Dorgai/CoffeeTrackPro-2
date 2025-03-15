@@ -48,112 +48,111 @@ export function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Configure passport local strategy with additional checks
+  // Configure passport local strategy with detailed logging
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
+        console.log("Login attempt for username:", username);
+
         const user = await storage.getUserByUsername(username);
+        console.log("User lookup result:", user ? { 
+          id: user.id, 
+          username: user.username, 
+          role: user.role, 
+          isActive: user.isActive,
+          isPendingApproval: user.isPendingApproval
+        } : "User not found");
+
         if (!user) {
+          console.log("Authentication failed: User not found");
           return done(null, false, { message: "Invalid username or password" });
         }
 
-        // All admin roles (including roasteryOwner) should have unrestricted access
+        const isPasswordValid = await comparePasswords(password, user.password);
+        console.log("Password validation result:", isPasswordValid);
+
+        if (!isPasswordValid) {
+          console.log("Authentication failed: Invalid password");
+          return done(null, false, { message: "Invalid username or password" });
+        }
+
+        // All admin roles (including retailOwner) should have unrestricted access
         const isAdminRole = ["owner", "roasteryOwner", "retailOwner"].includes(user.role);
 
         if (isAdminRole) {
-          const isValid = await comparePasswords(password, user.password);
-          if (!isValid) {
-            return done(null, false, { message: "Invalid username or password" });
-          }
+          console.log("Admin role detected, granting access");
           return done(null, user);
         }
 
         // For non-admin roles, check approval and active status
         if (user.isPendingApproval) {
+          console.log("Authentication failed: Account pending approval");
           return done(null, false, { message: "Your account is pending approval" });
         }
 
         if (!user.isActive) {
+          console.log("Authentication failed: Account inactive");
           return done(null, false, { message: "Your account has been deactivated" });
         }
 
-        const isValid = await comparePasswords(password, user.password);
-        if (!isValid) {
-          return done(null, false, { message: "Invalid username or password" });
-        }
-
+        console.log("Authentication successful for user:", user.username);
         return done(null, user);
       } catch (error) {
+        console.error("Authentication error:", error);
         return done(error);
       }
     })
   );
 
   passport.serializeUser((user, done) => {
-    console.log("Serializing user:", { id: user.id, role: user.role });
+    console.log("Serializing user:", { id: user.id, username: user.username, role: user.role });
     done(null, user.id);
   });
 
   passport.deserializeUser(async (id: number, done) => {
     try {
+      console.log("Deserializing user ID:", id);
       const user = await storage.getUser(id);
+
       if (!user) {
-        console.log("User not found during deserialization:", id);
+        console.log("Deserialization failed: User not found:", id);
         return done(null, false);
       }
-      console.log("Deserialized user:", { id: user.id, role: user.role });
+
+      console.log("Successfully deserialized user:", { 
+        id: user.id, 
+        username: user.username, 
+        role: user.role 
+      });
       done(null, user);
     } catch (error) {
-      console.error("Error during deserialization:", error);
+      console.error("Deserialization error:", error);
       done(error);
     }
   });
 
-  // Authentication routes with proper error handling
-  app.post("/api/register", async (req, res, next) => {
-    try {
-      const existingUser = await storage.getUserByUsername(req.body.username);
-      if (existingUser) {
-        return res.status(400).json({ message: "Username already exists" });
-      }
-
-      // If trying to register as roasteryOwner, check if we already have 2 roastery owners
-      if (req.body.role === "roasteryOwner") {
-        const roasteryOwners = await storage.getUsersByRole("roasteryOwner");
-        if (roasteryOwners.length >= 2) {
-          return res.status(400).json({ message: "Maximum number of roastery owners (2) has been reached" });
-        }
-      }
-
-      const hashedPassword = await hashPassword(req.body.password);
-      const user = await storage.createUser({
-        ...req.body,
-        password: hashedPassword,
-        isPendingApproval: req.body.role !== "roasteryOwner", // Roastery owners don't need approval
-        isActive: req.body.role === "roasteryOwner" // Roastery owners are active by default
-      });
-
-      // Don't automatically log in new users since they need approval (except roasteryOwner)
-      const { password, ...userWithoutPassword } = user;
-      res.status(201).json({
-        ...userWithoutPassword,
-        message: user.role === "roasteryOwner"
-          ? "Registration successful. You can now log in."
-          : "Registration successful. Please wait for approval from a roastery owner."
-      });
-    } catch (error) {
-      next(error);
-    }
-  });
-
+  // Authentication routes with detailed logging
   app.post("/api/login", (req, res, next) => {
+    console.log("Login request received for username:", req.body.username);
+
     passport.authenticate("local", (err, user, info) => {
-      if (err) return next(err);
+      if (err) {
+        console.error("Login error:", err);
+        return next(err);
+      }
+
       if (!user) {
+        console.log("Login failed:", info?.message);
         return res.status(401).json({ message: info?.message || "Authentication failed" });
       }
+
       req.login(user, (err) => {
-        if (err) return next(err);
+        if (err) {
+          console.error("Session creation error:", err);
+          return next(err);
+        }
+
+        console.log("Login successful for user:", user.username);
         // Don't send password in response
         const { password, ...userWithoutPassword } = user;
         res.json(userWithoutPassword);
@@ -162,13 +161,19 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/logout", (req, res, next) => {
+    console.log("Logout request received for user:", req.user?.username);
     req.logout((err) => {
-      if (err) return next(err);
+      if (err) {
+        console.error("Logout error:", err);
+        return next(err);
+      }
+      console.log("Logout successful");
       res.sendStatus(200);
     });
   });
 
   app.get("/api/user", (req, res) => {
+    console.log("User info request, authenticated:", req.isAuthenticated());
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
     }
