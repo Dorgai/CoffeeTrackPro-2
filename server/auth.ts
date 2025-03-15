@@ -28,10 +28,15 @@ async function comparePasswords(supplied: string, stored: string) {
     console.log("Password comparison details:", {
       hashedLength: hashed.length,
       saltLength: salt.length,
-      suppliedLength: supplied.length
+      suppliedLength: supplied.length,
+      storedParts: stored.split(".").length
     });
     const hashedBuf = Buffer.from(hashed, "hex");
     const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+    console.log("Buffer lengths:", {
+      hashedBufLength: hashedBuf.length,
+      suppliedBufLength: suppliedBuf.length
+    });
     const result = timingSafeEqual(hashedBuf, suppliedBuf);
     console.log("Password comparison result:", result);
     return result;
