@@ -31,9 +31,12 @@ type InventoryItem = {
   coffeeId: number;
   coffeeName: string;
   producer: string;
+  country: string;
   grade: string;
   smallBags: number;
   largeBags: number;
+  pendingSmallBags: number;
+  pendingLargeBags: number;
   updatedAt: string | null;
   updatedById: number | null;
   updatedByUsername: string | null;
@@ -171,7 +174,7 @@ export default function RetailOverview() {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Package className="h-5 w-5" />
-                  <CardTitle>Current Inventory</CardTitle>
+                  <CardTitle>Coffee Inventory</CardTitle>
                 </div>
                 <CardDescription>Available stock in this location</CardDescription>
               </CardHeader>
@@ -181,9 +184,11 @@ export default function RetailOverview() {
                     <TableRow>
                       <TableHead>Coffee</TableHead>
                       <TableHead>Producer</TableHead>
+                      <TableHead>Origin</TableHead>
                       <TableHead>Grade</TableHead>
                       <TableHead>Small Bags (200g)</TableHead>
                       <TableHead>Large Bags (1kg)</TableHead>
+                      <TableHead>Pending Order</TableHead>
                       <TableHead>Last Updated</TableHead>
                       <TableHead>Updated By</TableHead>
                     </TableRow>
@@ -193,16 +198,28 @@ export default function RetailOverview() {
                       <TableRow key={`${item.shopId}-${item.coffeeId}`}>
                         <TableCell className="font-medium">{item.coffeeName}</TableCell>
                         <TableCell>{item.producer}</TableCell>
+                        <TableCell>{item.country}</TableCell>
                         <TableCell>{item.grade}</TableCell>
                         <TableCell>{item.smallBags}</TableCell>
                         <TableCell>{item.largeBags}</TableCell>
+                        <TableCell>
+                          {item.pendingSmallBags > 0 || item.pendingLargeBags > 0 ? (
+                            <span className="text-sm">
+                              {item.pendingSmallBags > 0 && `${item.pendingSmallBags} small`}
+                              {item.pendingSmallBags > 0 && item.pendingLargeBags > 0 && ', '}
+                              {item.pendingLargeBags > 0 && `${item.pendingLargeBags} large`}
+                            </span>
+                          ) : (
+                            '-'
+                          )}
+                        </TableCell>
                         <TableCell>{item.updatedAt ? formatDate(item.updatedAt) : 'Never'}</TableCell>
                         <TableCell>{item.updatedByUsername || '-'}</TableCell>
                       </TableRow>
                     ))}
                     {data.inventory.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center text-muted-foreground">
+                        <TableCell colSpan={9} className="text-center text-muted-foreground">
                           No inventory items found
                         </TableCell>
                       </TableRow>

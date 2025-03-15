@@ -203,27 +203,38 @@ export class DatabaseStorage {
           FROM retail_inventory
           ${shopId ? sql`WHERE shop_id = ${shopId}` : sql``}
           ORDER BY shop_id, green_coffee_id, updated_at DESC
+        ),
+        coffee_inventory AS (
+          SELECT 
+            li.*,
+            s.name as shop_name,
+            s.location as shop_location,
+            gc.name as coffee_name,
+            gc.producer,
+            gc.grade,
+            gc.country,
+            u.username as updated_by_username
+          FROM latest_inventory li
+          JOIN shops s ON li.shop_id = s.id
+          JOIN green_coffee gc ON li.green_coffee_id = gc.id
+          LEFT JOIN users u ON li.updated_by_id = u.id
         )
         SELECT 
-          li.shop_id as "shopId",
-          li.green_coffee_id as "coffeeId",
-          COALESCE(li.small_bags, 0) as "smallBags",
-          COALESCE(li.large_bags, 0) as "largeBags",
-          li.updated_at as "updatedAt",
-          li.updated_by_id as "updatedById",
-          li.update_type as "updateType",
-          li.notes as "notes",
-          s.name as "shopName",
-          s.location as "shopLocation",
-          gc.name as "coffeeName",
-          gc.producer,
-          gc.grade,
-          u.username as "updatedByUsername"
-        FROM latest_inventory li
-        LEFT JOIN shops s ON li.shop_id = s.id
-        LEFT JOIN green_coffee gc ON li.green_coffee_id = gc.id
-        LEFT JOIN users u ON li.updated_by_id = u.id
-        ORDER BY li.updated_at DESC`;
+          ci.*,
+          COALESCE(oi.total_small_bags, 0) as pending_small_bags,
+          COALESCE(oi.total_large_bags, 0) as pending_large_bags
+        FROM coffee_inventory ci
+        LEFT JOIN (
+          SELECT 
+            shop_id,
+            green_coffee_id,
+            SUM(small_bags) as total_small_bags,
+            SUM(large_bags) as total_large_bags
+          FROM orders
+          WHERE status = 'pending'
+          GROUP BY shop_id, green_coffee_id
+        ) oi ON ci.shop_id = oi.shop_id AND ci.green_coffee_id = oi.green_coffee_id
+        ORDER BY ci.shop_name, ci.coffee_name`;
 
       const result = await db.execute(baseQuery);
       console.log("Found retail inventories:", {
@@ -745,7 +756,7 @@ export class DatabaseStorage {
             updatedById: data.updatedById,
             updateType: data.updateType,
             notes: data.notes || null,
-            createdAt: new Date()
+            updatedAt: new Date()
           });
 
         // Now update or insert the current inventory
@@ -913,11 +924,12 @@ export class DatabaseStorage {
         JOIN green_coffee gc ON o.green_coffee_id = gc.id
         WHERE 
           o.status = 'delivered' 
-          AND o.updated_at > ${startDate}
+          AND o.created_at > ${startDate}
         GROUP BY gc.grade
         ORDER BY gc.grade`;
 
       const result = await db.execute(query);
+      console.log("Retrieved billing quantities:", result.rows);
       return result.rows as Array<{
         grade: string;
         smallBagsQuantity: number;

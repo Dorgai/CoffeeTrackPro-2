@@ -79,6 +79,7 @@ export const orders = pgTable("orders", {
   createdAt: timestamp("created_at").defaultNow(),
   createdById: integer("created_by_id").references(() => users.id),
   updatedById: integer("updated_by_id").references(() => users.id),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const roastingBatches = pgTable("roasting_batches", {
