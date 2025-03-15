@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { Store, Coffee, Package, BarChart2, Users, Settings } from "lucide-react";
+import { Store, Coffee, Package, BarChart2, Users, Settings, CreditCard } from "lucide-react";
 import {
   Menubar,
   MenubarContent,
@@ -28,6 +28,7 @@ export function NavBar() {
   const canAccessAnalytics = ["owner", "roasteryOwner", "retailOwner", "shopManager"].includes(user?.role || "");
   const canAccessRoasting = ["owner", "roasteryOwner", "roaster"].includes(user?.role || "");
   const canAccessRetail = ["owner", "roasteryOwner", "retailOwner", "shopManager", "barista"].includes(user?.role || "");
+  const canAccessBilling = ["owner", "roasteryOwner"].includes(user?.role || "");
 
   // Redirect users to their appropriate dashboard
   const homePath = isRetailUser ? "/retail" : "/";
@@ -77,28 +78,42 @@ export function NavBar() {
           )}
 
           {/* Management Menu */}
-          {canManageShops && (
+          {(canManageShops || canManageUsers || canAccessBilling) && (
             <MenubarMenu>
               <MenubarTrigger>
                 <Settings className="h-4 w-4 mr-2" />
                 Management
               </MenubarTrigger>
               <MenubarContent>
-                <MenubarItem>
-                  <Link href="/shops" className="flex w-full">
-                    Shop Management
-                  </Link>
-                </MenubarItem>
-                <MenubarItem>
-                  <Link href="/user-management" className="flex w-full">
-                    User Management
-                  </Link>
-                </MenubarItem>
-                <MenubarItem>
-                  <Link href="/user-shop-management" className="flex w-full">
-                    User-Shop Assignment
-                  </Link>
-                </MenubarItem>
+                {canManageShops && (
+                  <MenubarItem>
+                    <Link href="/shops" className="flex w-full">
+                      Shop Management
+                    </Link>
+                  </MenubarItem>
+                )}
+                {canManageUsers && (
+                  <>
+                    <MenubarItem>
+                      <Link href="/user-management" className="flex w-full">
+                        User Management
+                      </Link>
+                    </MenubarItem>
+                    <MenubarItem>
+                      <Link href="/user-shop-management" className="flex w-full">
+                        User-Shop Assignment
+                      </Link>
+                    </MenubarItem>
+                  </>
+                )}
+                {canAccessBilling && (
+                  <MenubarItem>
+                    <Link href="/billing" className="flex w-full">
+                      <CreditCard className="h-4 w-4 mr-2" />
+                      Billing Management
+                    </Link>
+                  </MenubarItem>
+                )}
               </MenubarContent>
             </MenubarMenu>
           )}
