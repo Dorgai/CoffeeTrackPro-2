@@ -25,6 +25,11 @@ async function comparePasswords(supplied: string, stored: string) {
   try {
     console.log("Comparing passwords");
     const [hashed, salt] = stored.split(".");
+    console.log("Password comparison details:", {
+      hashedLength: hashed.length,
+      saltLength: salt.length,
+      suppliedLength: supplied.length
+    });
     const hashedBuf = Buffer.from(hashed, "hex");
     const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
     const result = timingSafeEqual(hashedBuf, suppliedBuf);
@@ -132,14 +137,6 @@ export function setupAuth(app: Express) {
       const existingUser = await storage.getUserByUsername(req.body.username);
       if (existingUser) {
         return res.status(400).json({ message: "Username already exists" });
-      }
-
-      // If trying to register as roasteryOwner, check if we already have 2 roastery owners
-      if (req.body.role === "roasteryOwner") {
-        const roasteryOwners = await storage.getUsersByRole("roasteryOwner");
-        if (roasteryOwners.length >= 2) {
-          return res.status(400).json({ message: "Maximum number of roastery owners (2) has been reached" });
-        }
       }
 
       const hashedPassword = await hashPassword(req.body.password);
