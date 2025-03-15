@@ -95,7 +95,6 @@ export const roastingBatches = pgTable("roasting_batches", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Add new billing-related tables and types
 export const billingEvents = pgTable("billing_events", {
   id: serial("id").primaryKey(),
   shopId: integer("shop_id").notNull().references(() => shops.id),
@@ -161,7 +160,6 @@ export const insertRetailInventoryHistorySchema = createInsertSchema(retailInven
 export const insertOrderSchema = createInsertSchema(orders);
 export const insertUserShopSchema = createInsertSchema(userShops);
 
-// Add billing schemas
 export const insertBillingEventSchema = createInsertSchema(billingEvents);
 export const insertBillingEventDetailSchema = createInsertSchema(billingEventDetails);
 export const insertGradePricingSchema = createInsertSchema(gradePricing);
@@ -182,7 +180,6 @@ export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type InsertRoastingBatch = z.infer<typeof insertRoastingBatchSchema>;
 export type InsertUserShop = z.infer<typeof insertUserShopSchema>;
 
-// Add types for the new tables
 export type BillingEvent = typeof billingEvents.$inferSelect;
 export type BillingEventDetail = typeof billingEventDetails.$inferSelect;
 export type GradePricing = typeof gradePricing.$inferSelect;
