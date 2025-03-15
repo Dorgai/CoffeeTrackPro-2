@@ -698,7 +698,7 @@ export class DatabaseStorage {
       console.log("Starting retail inventory update:", data);
 
       return await db.transaction(async (tx) => {
-        // First try to get the current inventory record
+        // First get the current inventory record
         const query = sql`
           SELECT * FROM retail_inventory
           WHERE shop_id = ${data.shopId} 
@@ -709,7 +709,27 @@ export class DatabaseStorage {
         const result = await tx.execute(query);
         const currentInventory = result.rows[0];
 
-        // If a record exists, update it; otherwise insert a new record.
+        // Set previous values from current inventory or default to 0
+        const prevSmallBags = currentInventory?.small_bags || 0;
+        const prevLargeBags = currentInventory?.large_bags || 0;
+
+        // Create history record first
+        await tx
+          .insert(retailInventoryHistory)
+          .values({
+            shopId: data.shopId,
+            greenCoffeeId: data.greenCoffeeId,
+            previousSmallBags: prevSmallBags,
+            previousLargeBags: prevLargeBags,
+            newSmallBags: data.smallBags,
+            newLargeBags: data.largeBags,
+            updatedById: data.updatedById,
+            updateType: data.updateType,
+            notes: data.notes || null,
+            createdAt: new Date()
+          });
+
+        // Now update or insert the current inventory
         if (currentInventory) {
           const [updatedInventory] = await tx
             .update(retailInventory)
@@ -729,23 +749,8 @@ export class DatabaseStorage {
             )
             .returning();
 
-          // Create history record
-          await tx
-            .insert(retailInventoryHistory)
-            .values({
-              shopId: data.shopId,
-              greenCoffeeId: data.greenCoffeeId,
-              smallBags: data.smallBags,
-              largeBags: data.largeBags,
-              updatedById: data.updatedById,
-              updateType: data.updateType,
-              notes: data.notes || null,
-              createdAt: new Date()
-            });
-
           console.log("Successfully updated existing retail inventory:", updatedInventory);
           return updatedInventory;
-
         } else {
           // Insert new record if none exists
           const [inventory] = await tx
@@ -761,20 +766,6 @@ export class DatabaseStorage {
               updatedAt: new Date()
             })
             .returning();
-
-          // Create history record
-          await tx
-            .insert(retailInventoryHistory)
-            .values({
-              shopId: data.shopId,
-              greenCoffeeId: data.greenCoffeeId,
-              smallBags: data.smallBags,
-              largeBags: data.largeBags,
-              updatedById: data.updatedById,
-              updateType: data.updateType,
-              notes: data.notes || null,
-              createdAt: new Date()
-            });
 
           console.log("Successfully created new retail inventory:", inventory);
           return inventory;

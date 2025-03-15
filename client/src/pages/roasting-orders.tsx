@@ -38,29 +38,41 @@ import {
 import { formatDate } from "@/lib/utils";
 
 
-// Update the getAvailableStatuses function to handle order status transitions
 const getAvailableStatuses = (currentStatus: string, userRole: string) => {
   // Roasters can only move orders from pending to roasted, and roasted to dispatched
   if (userRole === "roaster") {
     switch (currentStatus) {
       case "pending":
-        return [{ value: "roasted", label: "Roasted" }];
+        return [{ value: "roasted", label: "Mark as Roasted" }];
       case "roasted":
-        return [{ value: "dispatched", label: "Dispatched" }];
-      case "dispatched":
-      case "delivered":
-        return []; // No status changes allowed for dispatched/delivered orders
+        return [{ value: "dispatched", label: "Mark as Dispatched" }];
       default:
         return [];
     }
   }
 
-  // Other roles (like roasteryOwner) can change to any status
-  return [
-    { value: "roasted", label: "Roasted" },
-    { value: "dispatched", label: "Dispatched" },
-    { value: "delivered", label: "Delivered" },
-  ];
+  // RoasteryOwner and retailOwner can change to any status
+  if (["roasteryOwner", "retailOwner"].includes(userRole)) {
+    switch (currentStatus) {
+      case "pending":
+        return [
+          { value: "roasted", label: "Mark as Roasted" },
+          { value: "dispatched", label: "Mark as Dispatched" },
+          { value: "delivered", label: "Mark as Delivered" }
+        ];
+      case "roasted":
+        return [
+          { value: "dispatched", label: "Mark as Dispatched" },
+          { value: "delivered", label: "Mark as Delivered" }
+        ];
+      case "dispatched":
+        return [{ value: "delivered", label: "Mark as Delivered" }];
+      default:
+        return [];
+    }
+  }
+
+  return [];
 };
 
 // Helper function to group orders by date
@@ -259,16 +271,15 @@ export default function RoastingOrders() {
                             </TableCell>
                             <TableCell>
                               <Button
-                                variant="outline"
+                                variant={order.status === "pending" ? "default" : "outline"}
                                 size="sm"
-                                // Disable the button for roasters if order is dispatched/delivered
+                                className="w-full"
                                 disabled={
-                                  user?.role === "roaster" &&
-                                  (order.status === "dispatched" || order.status === "delivered")
+                                  // Disable if user can't update this status
+                                  !getAvailableStatuses(order.status, user?.role || "").length
                                 }
                                 onClick={() => {
                                   setSelectedOrder(order);
-                                  // Only set the status options available for the current status
                                   const availableStatuses = getAvailableStatuses(order.status, user?.role || "");
                                   if (availableStatuses.length > 0) {
                                     form.reset({
@@ -306,66 +317,32 @@ export default function RoastingOrders() {
           <DialogHeader>
             <DialogTitle>Update Order Status</DialogTitle>
             <DialogDescription>
-              Update the quantity and status for this order
+              {selectedOrder && (
+                <>
+                  Order #{selectedOrder.id} - {selectedOrder.coffeeName}
+                  <br />
+                  Current Status: <Badge>{selectedOrder.status}</Badge>
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
           {selectedOrder && (
             <div className="py-4">
-              <div className="mb-4">
-                <h4 className="font-medium">{selectedOrder.coffeeName}</h4>
-                <p className="text-sm text-muted-foreground">
-                  {selectedOrder.shopName} - Order #{selectedOrder.id}
-                </p>
-              </div>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(async (data) => {
-                  if (!selectedOrder) return;
-                  try {
-                    await updateOrderMutation.mutateAsync({
-                      orderId: selectedOrder.id,
-                      ...data,
-                    });
-                  } catch (error) {
-                    console.error("Failed to update order:", error);
-                  }
-                })} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="smallBags"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Small Bags (200g)</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              min="0"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="largeBags"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Large Bags (1kg)</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              min="0"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
+                <form
+                  onSubmit={form.handleSubmit(async (data) => {
+                    if (!selectedOrder) return;
+                    try {
+                      await updateOrderMutation.mutateAsync({
+                        orderId: selectedOrder.id,
+                        ...data,
+                      });
+                    } catch (error) {
+                      console.error("Failed to update order:", error);
+                    }
+                  })}
+                  className="space-y-4"
+                >
                   <FormField
                     control={form.control}
                     name="status"
@@ -377,11 +354,13 @@ export default function RoastingOrders() {
                             className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                             {...field}
                           >
-                            {getAvailableStatuses(selectedOrder.status, user?.role || "").map(status => (
-                              <option key={status.value} value={status.value}>
-                                {status.label}
-                              </option>
-                            ))}
+                            {getAvailableStatuses(selectedOrder.status, user?.role || "").map(
+                              (status) => (
+                                <option key={status.value} value={status.value}>
+                                  {status.label}
+                                </option>
+                              )
+                            )}
                           </select>
                         </FormControl>
                         <FormMessage />
