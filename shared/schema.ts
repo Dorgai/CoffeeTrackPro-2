@@ -113,7 +113,15 @@ export const insertGreenCoffeeSchema = z.object({
   grade: z.enum(coffeeGrades),
   isActive: z.boolean().default(true)
 });
-export const insertRetailInventorySchema = createInsertSchema(retailInventory);
+export const insertRetailInventorySchema = z.object({
+  shopId: z.number(),
+  greenCoffeeId: z.number(),
+  smallBags: z.coerce.number().min(0, "Cannot be negative"),
+  largeBags: z.coerce.number().min(0, "Cannot be negative"),
+  updatedById: z.number().optional(),
+  updateType: z.enum(["manual", "dispatch"]).default("manual"),
+  notes: z.string().optional()
+});
 export const insertRetailInventoryHistorySchema = createInsertSchema(retailInventoryHistory);
 export const insertOrderSchema = createInsertSchema(orders);
 export const insertUserShopSchema = createInsertSchema(userShops);

@@ -9,6 +9,7 @@ import {
   insertRoastingBatchSchema, 
   insertOrderSchema, 
   insertShopSchema,
+  insertRetailInventorySchema,
   orders,
   shops,
   users,
@@ -686,25 +687,35 @@ export async function registerRoutes(app: Express): Promise<void> {
         const data = insertRoastingBatchSchema.parse({
           ...req.body,
           plannedAmount: String(req.body.plannedAmount),
-          status: "planned"
+          // Remove planned status, batch is completed when created
+          status: "completed"
         });
 
+        // Create the batch
         const batch = await storage.createRoastingBatch(data);
         console.log("Created roasting batch:", batch);
 
         // Update green coffee stock
         const coffee = await storage.getGreenCoffee(data.greenCoffeeId);
-        if (coffee) {
-          const newStock = Number(coffee.currentStock) - Number(data.plannedAmount);
-          await storage.updateGreenCoffeeStock(coffee.id, {
-            currentStock: String(newStock)
-          });
-          console.log("Updated green coffee stock:", {
-            coffeeId: coffee.id,
-            oldStock: coffee.currentStock,
-            newStock
-          });
+        if (!coffee) {
+          throw new Error("Green coffee not found");
         }
+
+        // Deduct the used amount from stock
+        const newStock = Number(coffee.currentStock) - Number(data.plannedAmount);
+        if (newStock < 0) {
+          throw new Error("Insufficient green coffee stock");
+        }
+
+        await storage.updateGreenCoffeeStock(coffee.id, {
+          currentStock: String(newStock)
+        });
+        console.log("Updated green coffee stock:", {
+          coffeeId: coffee.id,
+          oldStock: coffee.currentStock,
+          newStock,
+          batchId: batch.id
+        });
 
         res.status(201).json(batch);
       } catch (error) {
@@ -726,12 +737,20 @@ export async function registerRoutes(app: Express): Promise<void> {
           return res.status(400).json({ message: "Shop ID is required" });
         }
 
+        console.log("Processing retail inventory update request:", {
+          body: req.body,
+          user: req.user?.username,
+          role: req.user?.role
+        });
+
         const data = insertRetailInventorySchema.parse({
           ...req.body,
+          shopId: Number(shopId),
+          greenCoffeeId: Number(req.body.greenCoffeeId),
           updatedById: req.user!.id
         });
 
-        console.log("Processing retail inventory update:", data);
+        console.log("Validated data:", data);
 
         const inventory = await storage.updateRetailInventory(data);
         res.status(201).json(inventory);
