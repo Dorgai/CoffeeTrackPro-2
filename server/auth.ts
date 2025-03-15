@@ -22,10 +22,18 @@ async function hashPassword(password: string) {
 }
 
 async function comparePasswords(supplied: string, stored: string) {
-  const [hashed, salt] = stored.split(".");
-  const hashedBuf = Buffer.from(hashed, "hex");
-  const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-  return timingSafeEqual(hashedBuf, suppliedBuf);
+  try {
+    console.log("Comparing passwords");
+    const [hashed, salt] = stored.split(".");
+    const hashedBuf = Buffer.from(hashed, "hex");
+    const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+    const result = timingSafeEqual(hashedBuf, suppliedBuf);
+    console.log("Password comparison result:", result);
+    return result;
+  } catch (error) {
+    console.error("Error comparing passwords:", error);
+    return false;
+  }
 }
 
 export async function generateHashedPassword(password: string) {
@@ -57,6 +65,8 @@ export function setupAuth(app: Express) {
     new LocalStrategy(async (username, password, done) => {
       try {
         const user = await storage.getUserByUsername(username);
+        console.log("Login attempt:", { username, found: !!user });
+
         if (!user) {
           return done(null, false, { message: "Invalid username or password" });
         }
@@ -66,6 +76,7 @@ export function setupAuth(app: Express) {
 
         if (isAdminRole) {
           const isValid = await comparePasswords(password, user.password);
+          console.log("Admin login validation:", { isValid });
           if (!isValid) {
             return done(null, false, { message: "Invalid username or password" });
           }
@@ -82,12 +93,14 @@ export function setupAuth(app: Express) {
         }
 
         const isValid = await comparePasswords(password, user.password);
+        console.log("User login validation:", { isValid });
         if (!isValid) {
           return done(null, false, { message: "Invalid username or password" });
         }
 
         return done(null, user);
       } catch (error) {
+        console.error("Login error:", error);
         return done(error);
       }
     })
