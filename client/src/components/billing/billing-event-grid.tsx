@@ -206,7 +206,7 @@ export function BillingEventGrid() {
             </TableHeader>
             <TableBody>
               {coffeeGrades.map((grade) => {
-                const gradeData = billingData?.quantities.find(q => q.grade === grade) || 
+                const gradeData = billingData?.quantities.find(q => q.grade === grade) ||
                   { smallBagsQuantity: 0, largeBagsQuantity: 0 };
                 return (
                   <TableRow key={grade}>
@@ -275,7 +275,7 @@ export function BillingEventGrid() {
               </TableHeader>
               <TableBody>
                 {coffeeGrades.map((grade) => {
-                  const gradeData = billingData?.quantities.find(q => q.grade === grade) || 
+                  const gradeData = billingData?.quantities.find(q => q.grade === grade) ||
                     { smallBagsQuantity: 0, largeBagsQuantity: 0 };
                   const totalBags = gradeData.smallBagsQuantity + gradeData.largeBagsQuantity;
                   return (

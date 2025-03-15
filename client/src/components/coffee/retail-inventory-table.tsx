@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useActiveShop } from "@/hooks/use-active-shop";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { cn, formatDate } from "@/lib/utils";
 import { Loader2, Package, Edit } from "lucide-react";
 import { RetailInventoryFormDialog } from "./retail-inventory-form-dialog";
@@ -56,8 +56,15 @@ export function RetailInventoryTable({ onEditSuccess }: Props) {
 
   const canEditInventory = ["owner", "shopManager", "retailOwner", "barista"].includes(user?.role || "");
 
+  // Effect to invalidate queries when shop changes
+  useEffect(() => {
+    if (activeShop?.id) {
+      queryClient.invalidateQueries({ queryKey: ["retail-inventory", activeShop.id] });
+    }
+  }, [activeShop?.id]);
+
   const { data: inventory, isLoading: loadingInventory } = useQuery<InventoryItem[]>({
-    queryKey: ["/api/retail-inventory", activeShop?.id],
+    queryKey: ["retail-inventory", activeShop?.id],
     queryFn: async () => {
       if (!activeShop?.id) return [];
       const res = await apiRequest("GET", `/api/retail-inventory?shopId=${activeShop.id}`);
@@ -65,8 +72,8 @@ export function RetailInventoryTable({ onEditSuccess }: Props) {
       return res.json();
     },
     enabled: Boolean(user && activeShop?.id),
-    staleTime: 30000, // Consider data fresh for 30 seconds
-    refetchOnWindowFocus: true, // Refetch when window regains focus
+    staleTime: 0, // Always fetch fresh data when shop changes
+    refetchOnWindowFocus: true,
   });
 
   if (!user) {

@@ -101,10 +101,22 @@ export const billingEvents = pgTable("billing_events", {
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   status: text("status", { enum: ["pending", "processed", "failed"] }).notNull(),
   type: text("type", { enum: ["order", "subscription", "adjustment"] }).notNull(),
+  cycleStartDate: timestamp("cycle_start_date").notNull(),
+  cycleEndDate: timestamp("cycle_end_date").notNull(),
+  primarySplitPercentage: decimal("primary_split_percentage", { precision: 5, scale: 2 }).notNull(),
+  secondarySplitPercentage: decimal("secondary_split_percentage", { precision: 5, scale: 2 }).notNull(),
   description: text("description"),
   processedAt: timestamp("processed_at"),
   createdAt: timestamp("created_at").defaultNow(),
   createdById: integer("created_by_id").references(() => users.id),
+});
+
+export const billingEventDetails = pgTable("billing_event_details", {
+  id: serial("id").primaryKey(),
+  billingEventId: integer("billing_event_id").notNull().references(() => billingEvents.id),
+  grade: text("grade", { enum: coffeeGrades }).notNull(),
+  smallBagsQuantity: integer("small_bags_quantity").notNull(),
+  largeBagsQuantity: integer("large_bags_quantity").notNull(),
 });
 
 export const gradePricing = pgTable("grade_pricing", {
@@ -150,6 +162,7 @@ export const insertUserShopSchema = createInsertSchema(userShops);
 
 // Add billing schemas
 export const insertBillingEventSchema = createInsertSchema(billingEvents);
+export const insertBillingEventDetailSchema = createInsertSchema(billingEventDetails);
 export const insertGradePricingSchema = createInsertSchema(gradePricing);
 
 export type User = typeof users.$inferSelect;
@@ -170,6 +183,8 @@ export type InsertUserShop = z.infer<typeof insertUserShopSchema>;
 
 // Add types for the new tables
 export type BillingEvent = typeof billingEvents.$inferSelect;
+export type BillingEventDetail = typeof billingEventDetails.$inferSelect;
 export type GradePricing = typeof gradePricing.$inferSelect;
 export type InsertBillingEvent = z.infer<typeof insertBillingEventSchema>;
+export type InsertBillingEventDetail = z.infer<typeof insertBillingEventDetailSchema>;
 export type InsertGradePricing = z.infer<typeof insertGradePricingSchema>;
