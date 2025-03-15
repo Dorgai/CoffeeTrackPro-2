@@ -76,10 +76,6 @@ export function RetailInventoryForm({
 
   const onSubmit = form.handleSubmit(async (data) => {
     try {
-      if (!data.shopId) {
-        throw new Error("Shop ID is required");
-      }
-
       console.log("Submitting inventory update:", {
         ...data,
         updateType: "manual"

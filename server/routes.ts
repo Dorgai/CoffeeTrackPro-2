@@ -641,6 +641,46 @@ export async function registerRoutes(app: Express): Promise<void> {
       }
     });
 
+  app.post("/api/retail-inventory",
+    requireShopAccess(["shopManager", "barista", "retailOwner", "owner", "roaster", "roasteryOwner"]),
+    async (req, res) => {
+      try {
+        const { shopId, greenCoffeeId, smallBags, largeBags, notes } = req.body;
+
+        if (!shopId || !greenCoffeeId) {
+          return res.status(400).json({ message: "Shop ID and Coffee ID are required" });
+        }
+
+        console.log("Processing retail inventory update request:", {
+          body: req.body,
+          user: req.user?.username,
+          role: req.user?.role
+        });
+
+        // For retail owner, we don't need to check shop access as it's already handled by middleware
+        const inventoryData = {
+          shopId: Number(shopId),
+          greenCoffeeId: Number(greenCoffeeId),
+          smallBags: Number(smallBags),
+          largeBags: Number(largeBags),
+          updatedById: req.user!.id,
+          updateType: "manual" as const,
+          notes: notes || undefined
+        };
+
+        console.log("Validated inventory data:", inventoryData);
+
+        const inventory = await storage.updateRetailInventory(inventoryData);
+        res.status(201).json(inventory);
+      } catch (error) {
+        console.error("Error updating retail inventory:", error);
+        res.status(400).json({
+          message: error instanceof Error ? error.message : "Failed to update inventory",
+          details: error instanceof Error ? error.stack : undefined
+        });
+      }
+    });
+
   // Update roasting batch routes
   app.get("/api/roasting-batches",
     requireRole(["roasteryOwner", "roaster"]),
@@ -717,7 +757,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           batchId: batch.id
         });
 
-        res.status(201).json(batch);
+        res.json(batch);
       } catch (error) {
         console.error("Error creating roasting batch:", error);
         res.status(400).json({
@@ -728,40 +768,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   );
 
   // Retail Inventory Routes - accessible by shop manager, barista and retail owner
-  app.post("/api/retail-inventory",
-    requireShopAccess(["shopManager", "barista", "retailOwner", "owner", "roaster", "roasteryOwner"]),
-    async (req, res) => {
-      try {
-        const { shopId } = req.body;
-        if (!shopId) {
-          return res.status(400).json({ message: "Shop ID is required" });
-        }
-
-        console.log("Processing retail inventory update request:", {
-          body: req.body,
-          user: req.user?.username,
-          role: req.user?.role
-        });
-
-        const data = insertRetailInventorySchema.parse({
-          ...req.body,
-          shopId: Number(shopId),
-          greenCoffeeId: Number(req.body.greenCoffeeId),
-          updatedById: req.user!.id
-        });
-
-        console.log("Validated data:", data);
-
-        const inventory = await storage.updateRetailInventory(data);
-        res.status(201).json(inventory);
-      } catch (error) {
-        console.error("Error updating retail inventory:", error);
-        res.status(400).json({
-          message: error instanceof Error ? error.message : "Failed to update inventory",
-          details: error instanceof Error ? error.stack : undefined
-        });
-      }
-    });
+  // app.post("/api/retail-inventory", ...); // This line is replaced above
 
   app.get("/api/retail-inventory",
     requireShopAccess(["shopManager", "barista", "retailOwner", "roasteryOwner", "roaster"]),
@@ -839,7 +846,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   // Orders Routes - accessible by retail owner
   app.get("/api/orders", requireRole(["retailOwner", "owner", "roasteryOwner", "roaster", "shopManager", "barista"]), async (req, res) => {
     try {
-      console.log("Fetching orders for user:", req.user?.username, "with role:", req.user?.role);
+      console.log("Fetching orders for user:", req.user?.username,"with role:", req.user?.role);
       const shopId = req.query.shopId ? Number(req.query.shopId) : undefined;
       console.log("Filtering orders by shopId:", shopId);
 
