@@ -616,7 +616,7 @@ export class DatabaseStorage {
 
   async updateOrderStatus(
     id: number,
-    data: { status: string; smallBags?: number; largeBags?: number }
+    data: { status: string; smallBags?: number; largeBags?: number; updatedById?: number }
   ): Promise<Order> {
     try {
       console.log("Updating order status:", id, "with data:", data);
@@ -640,25 +640,22 @@ export class DatabaseStorage {
             ...(data.smallBags !== undefined && { smallBags: data.smallBags }),
             ...(data.largeBags !== undefined && { largeBags: data.largeBags }),
             updatedAt: new Date(),
+            updatedById: data.updatedById
           })
           .where(eq(orders.id, id))
           .returning();
 
-        // If order is being delivered, update retail inventory
+        // If order is being delivered, update retail inventory by adding the quantities
         if (data.status === 'delivered') {
-          // Create a new inventory record
-          await tx
-            .insert(retailInventory)
-            .values({
-              shopId: order.shopId,
-              greenCoffeeId: order.greenCoffeeId,
-              smallBags: order.smallBags,
-              largeBags: order.largeBags,
-              updatedAt: new Date(),
-              updatedById: order.updatedById || order.createdById,
-              updateType: 'delivery',
-              notes: `Order #${order.id} delivered`
-            });
+          await this.updateRetailInventory({
+            shopId: order.shopId,
+            greenCoffeeId: order.greenCoffeeId,
+            smallBags: order.smallBags,
+            largeBags: order.largeBags,
+            updatedById: order.updatedById || order.createdById,
+            updateType: "dispatch",
+            notes: `Order #${order.id} delivered`
+          });
         }
 
         console.log("Updated order:", order);
@@ -712,6 +709,28 @@ export class DatabaseStorage {
         // Set previous values from current inventory or default to 0
         const prevSmallBags = currentInventory?.small_bags || 0;
         const prevLargeBags = currentInventory?.large_bags || 0;
+
+        // Validate based on update type
+        if (data.updateType === "manual") {
+          // For manual updates (by users), new quantities must be less than current
+          if (data.smallBags > prevSmallBags || data.largeBags > prevLargeBags) {
+            throw new Error("Manual updates can only decrease inventory quantities");
+          }
+        } else if (data.updateType === "dispatch") {
+          // For dispatch updates (from delivered orders), we add to current quantities
+          data.smallBags = prevSmallBags + data.smallBags;
+          data.largeBags = prevLargeBags + data.largeBags;
+        }
+
+        console.log("Calculated new quantities:", {
+          shopId: data.shopId,
+          greenCoffeeId: data.greenCoffeeId,
+          prevSmall: prevSmallBags,
+          prevLarge: prevLargeBags,
+          newSmall: data.smallBags,
+          newLarge: data.largeBags,
+          updateType: data.updateType
+        });
 
         // Create history record first
         await tx
@@ -829,6 +848,150 @@ export class DatabaseStorage {
       return coffee;
     } catch (error) {
       console.error("Error creating green coffee:", error);
+      throw error;
+    }
+  }
+
+  // Add new billing methods
+  async getBillingHistory(): Promise<BillingEvent[]> {
+    try {
+      console.log("Getting billing history");
+      const query = sql`
+        SELECT 
+          be.*,
+          u.username as "createdByUsername",
+          bed.grade,
+          bed.small_bags_quantity as "smallBagsQuantity",
+          bed.large_bags_quantity as "largeBagsQuantity"
+        FROM billing_events be
+        LEFT JOIN users u ON be.created_by_id = u.id
+        LEFT JOIN billing_event_details bed ON be.id = bed.billing_event_id
+        ORDER BY be.created_at DESC`;
+
+      const result = await db.execute(query);
+      return result.rows as BillingEvent[];
+    } catch (error) {
+      console.error("Error getting billing history:", error);
+      return [];
+    }
+  }
+
+  async getLastBillingEvent(): Promise<BillingEvent | undefined> {
+    try {
+      console.log("Getting last billing event");
+      const query = sql`
+        SELECT * FROM billing_events
+        ORDER BY cycle_end_date DESC
+        LIMIT 1`;
+
+      const result = await db.execute(query);
+      return result.rows[0] as BillingEvent | undefined;
+    } catch (error) {
+      console.error("Error getting last billing event:", error);
+      return undefined;
+    }
+  }
+
+  async getBillingQuantities(): Promise<Array<{
+    grade: string;
+    smallBagsQuantity: number;
+    largeBagsQuantity: number;
+  }>> {
+    try {
+      console.log("Calculating billing quantities");
+
+      // Get the last billing event to determine the start date
+      const lastEvent = await this.getLastBillingEvent();
+      const startDate = lastEvent?.cycleEndDate || new Date(0); // If no previous event, use epoch
+
+      const query = sql`
+        SELECT 
+          gc.grade,
+          SUM(o.small_bags) as "smallBagsQuantity",
+          SUM(o.large_bags) as "largeBagsQuantity"
+        FROM orders o
+        JOIN green_coffee gc ON o.green_coffee_id = gc.id
+        WHERE 
+          o.status = 'delivered' 
+          AND o.updated_at > ${startDate}
+        GROUP BY gc.grade
+        ORDER BY gc.grade`;
+
+      const result = await db.execute(query);
+      return result.rows as Array<{
+        grade: string;
+        smallBagsQuantity: number;
+        largeBagsQuantity: number;
+      }>;
+    } catch (error) {
+      console.error("Error calculating billing quantities:", error);
+      return [];
+    }
+  }
+
+  async createBillingEvent(data: {
+    cycleStartDate: Date;
+    cycleEndDate: Date;
+    createdById: number;
+    quantities: Array<{
+      grade: string;
+      smallBagsQuantity: number;
+      largeBagsQuantity: number;
+    }>;
+  }): Promise<BillingEvent> {
+    try {
+      console.log("Creating billing event:", data);
+
+      return await db.transaction(async (tx) => {
+        // Calculate total amount and splits based on grade pricing
+        let totalAmount = 0;
+        for (const q of data.quantities) {
+          const [pricing] = await tx
+            .select()
+            .from(gradePricing)
+            .where(eq(gradePricing.grade, q.grade))
+            .orderBy(sql`updated_at DESC`)
+            .limit(1);
+
+          if (pricing) {
+            // Convert numbers to standard bags for pricing
+            const standardBags = q.smallBagsQuantity * 0.5 + q.largeBagsQuantity;
+            totalAmount += standardBags * Number(pricing.pricePerKg);
+          }
+        }
+
+        // Create the billing event
+        const [event] = await tx
+          .insert(billingEvents)
+          .values({
+            amount: totalAmount,
+            status: "pending",
+            type: "order",
+            cycleStartDate: data.cycleStartDate,
+            cycleEndDate: data.cycleEndDate,
+            createdById: data.createdById,
+            primarySplitPercentage: 70, // Default split percentages
+            secondarySplitPercentage: 30,
+            description: `Billing cycle ${data.cycleStartDate.toISOString().split('T')[0]} to ${data.cycleEndDate.toISOString().split('T')[0]}`,
+          })
+          .returning();
+
+        // Create billing event details for each grade
+        await tx
+          .insert(billingEventDetails)
+          .values(          data.quantities.map(q => ({
+            billingEventId: event.id,
+            grade: q.grade,
+            smallBagsQuantity: q.smallBagsQuantity,
+            largeBagsQuantity: q.largeBagsQuantity,
+          }))
+        );
+
+        console.log("Created billing event:", event);
+        return event;
+      });
+    } catch (error) {
+      console.error("Error creating billing event:", error);
       throw error;
     }
   }

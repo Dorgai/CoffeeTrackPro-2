@@ -1393,4 +1393,51 @@ export async function registerRoutes(app: Express): Promise<void> {
   // Add after "/api/users/:id/shops" routes
 
 
+  // Add billing routes
+  app.get("/api/billing/quantities", requireRole(["owner", "roasteryOwner"]), async (req, res) => {
+    try {
+      console.log("Fetching billing quantities...");
+      const quantities = await storage.getBillingQuantities();
+      console.log("Retrieved quantities:", quantities);
+      res.json({
+        quantities,
+        lastEvent: await storage.getLastBillingEvent()
+      });
+    } catch (error) {
+      console.error("Error in /api/billing/quantities:", error);
+      res.status(500).json({ message: "Failed to fetch billing quantities" });
+    }
+  });
+
+  app.get("/api/billing/history", requireRole(["owner", "roasteryOwner"]), async (req, res) => {
+    try {
+      console.log("Fetching billing history for user:", req.user?.username, "role:", req.user?.role);
+      const history = await storage.getBillingHistory();
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching billing history:", error);
+      res.status(500).json({ message: "Failed to fetch billing history" });
+    }
+  });
+
+  app.post("/api/billing/events", requireRole(["owner", "roasteryOwner"]), async (req, res) => {
+    try {
+      console.log("Creating billing event, requested by:", req.user?.username);
+      console.log("Request data:", req.body);
+
+      const event = await storage.createBillingEvent({
+        ...req.body,
+        createdById: req.user!.id,
+      });
+
+      console.log("Created billing event:", event);
+      res.status(201).json(event);
+    } catch (error) {
+      console.error("Error creating billing event:", error);
+      res.status(400).json({
+        message: error instanceof Error ? error.message : "Failed to create billing event"
+      });
+    }
+  });
+
 }
