@@ -251,7 +251,6 @@ export class DatabaseStorage {
   }
 
 
-
   // Green coffee methods
   async getGreenCoffees(): Promise<GreenCoffee[]> {
     try {
@@ -915,29 +914,49 @@ export class DatabaseStorage {
       const lastEvent = await this.getLastBillingEvent();
       const startDate = lastEvent?.cycleEndDate || new Date(0); // If no previous event, use epoch
 
+      console.log("Using fromDate:", startDate.toISOString());
+
       const query = sql`
+        WITH delivered_orders AS (
+          SELECT 
+            o.*,
+            gc.grade
+          FROM orders o
+          JOIN green_coffee gc ON o.green_coffee_id = gc.id
+          WHERE 
+            o.status = 'delivered' 
+            AND o.created_at > ${startDate}
+        )
         SELECT 
-          gc.grade,
-          SUM(o.small_bags) as "smallBagsQuantity",
-          SUM(o.large_bags) as "largeBagsQuantity"
-        FROM orders o
-        JOIN green_coffee gc ON o.green_coffee_id = gc.id
-        WHERE 
-          o.status = 'delivered' 
-          AND o.created_at > ${startDate}
-        GROUP BY gc.grade
-        ORDER BY gc.grade`;
+          grade,
+          COALESCE(SUM(small_bags), 0) as "smallBagsQuantity",
+          COALESCE(SUM(large_bags), 0) as "largeBagsQuantity"
+        FROM delivered_orders
+        GROUP BY grade
+        ORDER BY grade`;
 
       const result = await db.execute(query);
       console.log("Retrieved billing quantities:", result.rows);
-      return result.rows as Array<{
-        grade: string;
-        smallBagsQuantity: number;
-        largeBagsQuantity: number;
-      }>;
+
+      // Convert string numbers to actual numbers and ensure we have all grades
+      const quantities = coffeeGrades.map(grade => {
+        const found = result.rows.find(row => row.grade === grade);
+        return {
+          grade,
+          smallBagsQuantity: found ? parseInt(found.smallBagsQuantity) || 0 : 0,
+          largeBagsQuantity: found ? parseInt(found.largeBagsQuantity) || 0 : 0
+        };
+      });
+
+      console.log("Processed quantities:", quantities);
+      return quantities;
     } catch (error) {
       console.error("Error calculating billing quantities:", error);
-      return [];
+      return coffeeGrades.map(grade => ({
+        grade,
+        smallBagsQuantity: 0,
+        largeBagsQuantity: 0
+      }));
     }
   }
 
@@ -991,13 +1010,12 @@ export class DatabaseStorage {
         // Create billing event details for each grade
         await tx
           .insert(billingEventDetails)
-          .values(          data.quantities.map(q => ({
+          .values(data.quantities.map(q => ({
             billingEventId: event.id,
             grade: q.grade,
             smallBagsQuantity: q.smallBagsQuantity,
             largeBagsQuantity: q.largeBagsQuantity,
-          }))
-        );
+          })));
 
         console.log("Created billing event:", event);
         return event;
