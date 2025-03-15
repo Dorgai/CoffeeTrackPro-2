@@ -15,7 +15,7 @@ declare global {
 
 const scryptAsync = promisify(scrypt);
 
-async function hashPassword(password: string) {
+export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const buf = (await scryptAsync(password, salt, 64)) as Buffer;
   return `${buf.toString("hex")}.${salt}`;
@@ -51,24 +51,30 @@ export function setupAuth(app: Express) {
     new LocalStrategy(async (username, password, done) => {
       try {
         console.log("Login attempt for username:", username);
-        const user = await storage.getUserByUsername(username);
 
+        const user = await storage.getUserByUsername(username);
         if (!user) {
           console.log("Authentication failed: User not found");
           return done(null, false, { message: "Invalid username or password" });
         }
 
-        console.log("User found:", {
+        console.log("Found user:", {
           id: user.id,
           username: user.username,
           role: user.role,
           isActive: user.isActive
         });
 
-        const isPasswordValid = await comparePasswords(password, user.password);
-        console.log("Password validation result:", isPasswordValid);
+        if (!user.password) {
+          console.log("Authentication failed: No password set");
+          return done(null, false, { message: "Invalid username or password" });
+        }
 
-        if (!isPasswordValid) {
+        console.log("Comparing passwords...");
+        const isValid = await comparePasswords(password, user.password);
+        console.log("Password validation result:", isValid);
+
+        if (!isValid) {
           console.log("Authentication failed: Invalid password");
           return done(null, false, { message: "Invalid username or password" });
         }
@@ -102,7 +108,6 @@ export function setupAuth(app: Express) {
     }
   });
 
-  // Authentication routes
   app.post("/api/login", (req, res, next) => {
     console.log("Login request received:", { username: req.body.username });
 
