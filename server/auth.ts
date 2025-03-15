@@ -15,17 +15,33 @@ declare global {
 
 const scryptAsync = promisify(scrypt);
 
-export async function hashPassword(password: string) {
-  const salt = randomBytes(16).toString("hex");
-  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-  return `${buf.toString("hex")}.${salt}`;
+export async function hashPassword(password: string): Promise<string> {
+  try {
+    const salt = randomBytes(16).toString('hex');
+    const derivedKey = (await scryptAsync(password, salt, 64)) as Buffer;
+    return `${derivedKey.toString('hex')}.${salt}`;
+  } catch (error) {
+    console.error('Error hashing password:', error);
+    throw error;
+  }
 }
 
-async function comparePasswords(supplied: string, stored: string) {
-  const [hashed, salt] = stored.split(".");
-  const hashedBuf = Buffer.from(hashed, "hex");
-  const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-  return timingSafeEqual(hashedBuf, suppliedBuf);
+async function comparePasswords(supplied: string, stored: string): Promise<boolean> {
+  try {
+    const [hashedPassword, salt] = stored.split('.');
+    if (!hashedPassword || !salt) {
+      console.error('Invalid stored password format');
+      return false;
+    }
+
+    const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+    const storedBuf = Buffer.from(hashedPassword, 'hex');
+
+    return timingSafeEqual(storedBuf, suppliedBuf);
+  } catch (error) {
+    console.error('Error comparing passwords:', error);
+    return false;
+  }
 }
 
 export function setupAuth(app: Express) {
@@ -54,32 +70,26 @@ export function setupAuth(app: Express) {
 
         const user = await storage.getUserByUsername(username);
         if (!user) {
-          console.log("Authentication failed: User not found");
+          console.log("User not found:", username);
           return done(null, false, { message: "Invalid username or password" });
         }
 
-        console.log("Found user:", {
-          id: user.id,
-          username: user.username,
-          role: user.role,
-          isActive: user.isActive
-        });
+        console.log("User found:", { id: user.id, username: user.username });
 
         if (!user.password) {
-          console.log("Authentication failed: No password set");
+          console.log("No password set for user:", username);
           return done(null, false, { message: "Invalid username or password" });
         }
 
-        console.log("Comparing passwords...");
         const isValid = await comparePasswords(password, user.password);
         console.log("Password validation result:", isValid);
 
         if (!isValid) {
-          console.log("Authentication failed: Invalid password");
+          console.log("Invalid password for user:", username);
           return done(null, false, { message: "Invalid username or password" });
         }
 
-        console.log("Authentication successful");
+        console.log("Authentication successful for user:", username);
         return done(null, user);
       } catch (error) {
         console.error("Authentication error:", error);
@@ -89,7 +99,7 @@ export function setupAuth(app: Express) {
   );
 
   passport.serializeUser((user, done) => {
-    console.log("Serializing user:", { id: user.id, username: user.username });
+    console.log("Serializing user:", user.id);
     done(null, user.id);
   });
 
@@ -97,10 +107,10 @@ export function setupAuth(app: Express) {
     try {
       const user = await storage.getUser(id);
       if (!user) {
-        console.log("Deserialization failed: User not found");
+        console.log("User not found during deserialization:", id);
         return done(null, false);
       }
-      console.log("Deserialized user:", { id: user.id, username: user.username });
+      console.log("Deserialized user:", user.id);
       done(null, user);
     } catch (error) {
       console.error("Deserialization error:", error);
@@ -109,7 +119,7 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", (req, res, next) => {
-    console.log("Login request received:", { username: req.body.username });
+    console.log("Login request received for:", req.body.username);
 
     passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) {
@@ -128,7 +138,7 @@ export function setupAuth(app: Express) {
           return next(err);
         }
 
-        console.log("Login successful for user:", user.username);
+        console.log("Login successful for:", user.username);
         const { password, ...userWithoutPassword } = user;
         res.json(userWithoutPassword);
       });
@@ -137,14 +147,14 @@ export function setupAuth(app: Express) {
 
   app.post("/api/logout", (req, res, next) => {
     const username = req.user?.username;
-    console.log("Logout request received for user:", username);
+    console.log("Logout request received for:", username);
 
     req.logout((err) => {
       if (err) {
         console.error("Logout error:", err);
         return next(err);
       }
-      console.log("Logout successful for user:", username);
+      console.log("Logout successful for:", username);
       res.sendStatus(200);
     });
   });
