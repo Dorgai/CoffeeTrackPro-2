@@ -17,29 +17,30 @@ const scryptAsync = promisify(scrypt);
 
 async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
-  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-  return `${buf.toString("hex")}.${salt}`;
+  const derivedKey = (await scryptAsync(password, salt, 64)) as Buffer;
+  return `${derivedKey.toString("hex")}.${salt}`;
 }
 
 async function comparePasswords(supplied: string, stored: string) {
   try {
     console.log("Comparing passwords");
-    const [hashed, salt] = stored.split(".");
+    const [hashedHex, salt] = stored.split(".");
     console.log("Password comparison details:", {
-      hashedLength: hashed.length,
+      hashedLength: hashedHex.length,
       saltLength: salt.length,
       suppliedLength: supplied.length,
       storedParts: stored.split(".").length
     });
-    const hashedBuf = Buffer.from(hashed, "hex");
-    const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+
+    const hashedBuffer = Buffer.from(hashedHex, "hex");
+    const suppliedBuffer = (await scryptAsync(supplied, salt, 64)) as Buffer;
+
     console.log("Buffer lengths:", {
-      hashedBufLength: hashedBuf.length,
-      suppliedBufLength: suppliedBuf.length
+      hashedBufLength: hashedBuffer.length,
+      suppliedBufLength: suppliedBuffer.length
     });
-    const result = timingSafeEqual(hashedBuf, suppliedBuf);
-    console.log("Password comparison result:", result);
-    return result;
+
+    return timingSafeEqual(hashedBuffer, suppliedBuffer);
   } catch (error) {
     console.error("Error comparing passwords:", error);
     return false;
