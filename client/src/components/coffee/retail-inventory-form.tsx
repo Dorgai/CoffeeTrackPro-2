@@ -50,21 +50,14 @@ export function RetailInventoryForm({
   const { activeShop } = useActiveShop();
 
   // Use either the prop shopId or activeShop.id
-  const shopId = propShopId || activeShop?.id;
+  const shopId = propShopId ?? activeShop?.id;
 
-  console.log("RetailInventoryForm render:", {
-    propShopId,
-    activeShopId: activeShop?.id,
-    resultingShopId: shopId,
-    coffeeId
-  });
-
+  // Early return if no shop is selected
   if (!shopId) {
-    console.error("Missing shop ID in RetailInventoryForm");
     return (
       <Alert>
         <AlertDescription>
-          Please select a shop to edit inventory. If you are a barista, try refreshing the page.
+          Please select a shop to edit inventory.
         </AlertDescription>
       </Alert>
     );
@@ -83,7 +76,15 @@ export function RetailInventoryForm({
 
   const onSubmit = form.handleSubmit(async (data) => {
     try {
-      console.log("Submitting inventory update:", data);
+      if (!data.shopId) {
+        throw new Error("Shop ID is required");
+      }
+
+      console.log("Submitting inventory update:", {
+        ...data,
+        updateType: "manual"
+      });
+
       const response = await apiRequest("POST", "/api/retail-inventory", {
         ...data,
         updateType: "manual",
