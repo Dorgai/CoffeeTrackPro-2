@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { RoastingForm } from "@/components/coffee/roasting-form";
 import { InventoryGrid } from "@/components/coffee/inventory-grid";
+import { GreenCoffeeForm } from "@/components/coffee/green-coffee-form";
 import type { GreenCoffee, RoastingBatch } from "@shared/schema";
 import { Loader2 } from "lucide-react";
 import StockProgress from "@/components/stock-progress";
@@ -14,10 +15,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function Roasting() {
+  const { user } = useAuth();
   const [selectedCoffee, setSelectedCoffee] = useState<GreenCoffee | null>(null);
+  const [showAddCoffeeDialog, setShowAddCoffeeDialog] = useState(false);
 
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
@@ -53,6 +59,8 @@ export default function Roasting() {
   const totalStock = coffees?.reduce((sum, coffee) => sum + Number(coffee.currentStock), 0) || 0;
   const totalDesired = coffees?.reduce((sum, coffee) => sum + Number(coffee.minThreshold), 0) || 0;
 
+  const canAddGreenCoffee = ["owner", "roasteryOwner"].includes(user?.role || "");
+
   return (
     <div className="container mx-auto py-8 space-y-8">
       <div>
@@ -63,9 +71,27 @@ export default function Roasting() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Green Coffee Inventory</CardTitle>
-          <CardDescription>Current stock levels and selection for roasting</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Green Coffee Inventory</CardTitle>
+            <CardDescription>Current stock levels and selection for roasting</CardDescription>
+          </div>
+          {canAddGreenCoffee && (
+            <Dialog open={showAddCoffeeDialog} onOpenChange={setShowAddCoffeeDialog}>
+              <DialogTrigger asChild>
+                <Button>Add New Coffee</Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[500px]">
+                <CardHeader>
+                  <CardTitle>Add New Green Coffee</CardTitle>
+                  <CardDescription>Register a new green coffee in the inventory</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <GreenCoffeeForm onSuccess={() => setShowAddCoffeeDialog(false)} />
+                </CardContent>
+              </DialogContent>
+            </Dialog>
+          )}
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid gap-4">
@@ -75,7 +101,7 @@ export default function Roasting() {
               label="Total Green Coffee Stock"
             />
           </div>
-          <InventoryGrid
+          <InventoryGrid 
             coffees={coffees || []}
             onSelect={setSelectedCoffee}
           />
