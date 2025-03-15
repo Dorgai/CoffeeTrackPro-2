@@ -826,6 +826,21 @@ export class DatabaseStorage {
       return undefined;
     }
   }
+  // Add createGreenCoffee method
+  async createGreenCoffee(data: any): Promise<GreenCoffee> {
+    try {
+      console.log("Creating new green coffee entry:", data);
+      const [coffee] = await db
+        .insert(greenCoffee)
+        .values(data)
+        .returning();
+      console.log("Created green coffee:", coffee);
+      return coffee;
+    } catch (error) {
+      console.error("Error creating green coffee:", error);
+      throw error;
+    }
+  }
 }
 
 export const storage = new DatabaseStorage();
