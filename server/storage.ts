@@ -701,8 +701,15 @@ export class DatabaseStorage {
               notes: data.notes || null,
               updatedAt: new Date()
             })
-            .where(eq(retailInventory.shopId, data.shopId).and(eq(retailInventory.greenCoffeeId, data.greenCoffeeId)))
+            .where(
+              and(
+                eq(retailInventory.shopId, data.shopId),
+                eq(retailInventory.greenCoffeeId, data.greenCoffeeId)
+              )
+            )
             .returning();
+
+          // Create history record
           await tx
             .insert(retailInventoryHistory)
             .values({
@@ -715,10 +722,12 @@ export class DatabaseStorage {
               notes: data.notes || null,
               createdAt: new Date()
             });
+
           console.log("Successfully updated existing retail inventory:", updatedInventory);
           return updatedInventory;
 
         } else {
+          // Insert new record if none exists
           const [inventory] = await tx
             .insert(retailInventory)
             .values({
@@ -733,7 +742,7 @@ export class DatabaseStorage {
             })
             .returning();
 
-          // Also create a history record
+          // Create history record
           await tx
             .insert(retailInventoryHistory)
             .values({
