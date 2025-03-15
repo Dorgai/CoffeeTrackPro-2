@@ -36,15 +36,30 @@ export class DatabaseStorage {
   async getUserByUsername(username: string): Promise<User | undefined> {
     try {
       console.log("Looking up user by username:", username);
-      const [user] = await db
-        .select()
-        .from(users)
-        .where(eq(users.username, username));
-      console.log("Found user:", user ? "yes" : "no");
+
+      // Execute query with detailed logging
+      const query = sql`
+        SELECT * FROM users 
+        WHERE username = ${username}
+        AND is_active = true`;
+
+      console.log("Executing query:", query.toString());
+
+      const result = await db.execute(query);
+      const user = result.rows[0];
+
+      console.log("Query result:", {
+        found: !!user,
+        username: user?.username,
+        role: user?.role,
+        isActive: user?.is_active,
+        isPendingApproval: user?.is_pending_approval
+      });
+
       return user;
     } catch (error) {
-      console.error("Error getting user by username:", error);
-      return undefined;
+      console.error("Error in getUserByUsername:", error);
+      throw error;
     }
   }
 
