@@ -104,7 +104,7 @@ export default function RetailOverview() {
 
   const updateOrderStatusMutation = useMutation({
     mutationFn: async ({ orderId, status }: { orderId: number; status: string }) => {
-      const res = await apiRequest("PATCH", `/api/orders/${orderId}`, { status });
+      const res = await apiRequest("PATCH", `/api/orders/${orderId}/status`, { status });
       if (!res.ok) {
         throw new Error("Failed to update order status");
       }
@@ -292,26 +292,46 @@ export default function RetailOverview() {
                         <TableCell>{formatDate(order.createdAt)}</TableCell>
                         {(user?.role === "retailOwner" || user?.role === "roasteryOwner") && (
                           <TableCell>
-                            <Select
-                              defaultValue={order.status}
-                              onValueChange={(value) =>
-                                updateOrderStatusMutation.mutate({
-                                  orderId: order.id,
-                                  status: value,
-                                })
-                              }
-                              disabled={updateOrderStatusMutation.isPending}
-                            >
-                              <SelectTrigger className="w-[130px]">
-                                <SelectValue placeholder="Change status" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="pending">Pending</SelectItem>
-                                <SelectItem value="roasted">Roasted</SelectItem>
-                                <SelectItem value="dispatched">Dispatched</SelectItem>
-                                <SelectItem value="delivered">Delivered</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            {user?.role === "retailOwner" ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  updateOrderStatusMutation.mutate({
+                                    orderId: order.id,
+                                    status: "delivered",
+                                  })
+                                }
+                                disabled={updateOrderStatusMutation.isPending || order.status === "delivered"}
+                              >
+                                {updateOrderStatusMutation.isPending ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  "Mark as Delivered"
+                                )}
+                              </Button>
+                            ) : (
+                              <Select
+                                defaultValue={order.status}
+                                onValueChange={(value) =>
+                                  updateOrderStatusMutation.mutate({
+                                    orderId: order.id,
+                                    status: value,
+                                  })
+                                }
+                                disabled={updateOrderStatusMutation.isPending}
+                              >
+                                <SelectTrigger className="w-[130px]">
+                                  <SelectValue placeholder="Change status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="pending">Pending</SelectItem>
+                                  <SelectItem value="roasted">Roasted</SelectItem>
+                                  <SelectItem value="dispatched">Dispatched</SelectItem>
+                                  <SelectItem value="delivered">Delivered</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            )}
                           </TableCell>
                         )}
                       </TableRow>

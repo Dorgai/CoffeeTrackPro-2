@@ -58,11 +58,12 @@ type OrderWithDetails = {
   updatedBy: string | null;
 };
 
-const updateOrderSchema = z.object({
-  status: z.enum(["delivered"] as const),
-});
+//Removed unnecessary schema and type
+// const updateOrderSchema = z.object({
+//   status: z.enum(["delivered"] as const),
+// });
 
-type UpdateOrderValues = z.infer<typeof updateOrderSchema>;
+// type UpdateOrderValues = z.infer<typeof updateOrderSchema>;
 
 export default function RetailOrders() {
   const { toast } = useToast();
@@ -71,6 +72,33 @@ export default function RetailOrders() {
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<OrderWithDetails | null>(null);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
+
+  // Add update order mutation
+  const updateOrderMutation = useMutation({
+    mutationFn: async (orderId: number) => {
+      const res = await apiRequest("PATCH", `/api/orders/${orderId}/status`, {
+        status: "delivered"
+      });
+      if (!res.ok) {
+        throw new Error("Failed to update order status");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      toast({
+        title: "Success",
+        description: "Order marked as delivered",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   const form = useForm<UpdateOrderValues>({
     resolver: zodResolver(updateOrderSchema),
@@ -93,35 +121,6 @@ export default function RetailOrders() {
     enabled: !!activeShop?.id,
   });
 
-  const updateOrderMutation = useMutation({
-    mutationFn: async (data: UpdateOrderValues & { orderId: number }) => {
-      const res = await apiRequest("PATCH", `/api/orders/${data.orderId}/status`, {
-        status: data.status,
-        updatedById: user?.id,
-      });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Failed to update order");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-      setIsUpdateDialogOpen(false);
-      setSelectedOrder(null);
-      toast({
-        title: "Success",
-        description: "Order status updated successfully",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update order",
-        variant: "destructive",
-      });
-    },
-  });
 
   if (loadingCoffees || loadingOrders) {
     return (
@@ -200,12 +199,14 @@ export default function RetailOrders() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => {
-                                setSelectedOrder(order);
-                                setIsUpdateDialogOpen(true);
-                              }}
+                              onClick={() => updateOrderMutation.mutate(order.id)}
+                              disabled={updateOrderMutation.isPending}
                             >
-                              Mark as Delivered
+                              {updateOrderMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                "Mark as Delivered"
+                              )}
                             </Button>
                           )}
                         </TableCell>
@@ -246,60 +247,8 @@ export default function RetailOrders() {
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        open={isUpdateDialogOpen}
-        onOpenChange={(open) => {
-          setIsUpdateDialogOpen(open);
-          if (!open) setSelectedOrder(null);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Update Order Status</DialogTitle>
-            <DialogDescription>
-              {selectedOrder && (
-                <>
-                  Order #{selectedOrder.id} - {selectedOrder.coffeeName}
-                  <br />
-                  Current Status: <Badge>{selectedOrder.status}</Badge>
-                </>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          {selectedOrder && (
-            <div className="py-4">
-              <Form {...form}>
-                <form
-                  onSubmit={form.handleSubmit(async (data) => {
-                    if (!selectedOrder) return;
-                    try {
-                      await updateOrderMutation.mutateAsync({
-                        orderId: selectedOrder.id,
-                        ...data,
-                      });
-                    } catch (error) {
-                      console.error("Failed to update order:", error);
-                    }
-                  })}
-                  className="space-y-4"
-                >
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={updateOrderMutation.isPending}
-                  >
-                    {updateOrderMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      "Mark as Delivered"
-                    )}
-                  </Button>
-                </form>
-              </Form>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+
+      {/*Removed Update Order Dialog as it's no longer needed with the new mutation implementation*/}
     </div>
   );
 }
