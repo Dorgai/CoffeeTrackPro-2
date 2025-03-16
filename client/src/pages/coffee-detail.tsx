@@ -147,12 +147,17 @@ export default function CoffeeDetail() {
   return (
     <div className="container mx-auto py-8 space-y-8">
       <div className="flex justify-between items-center">
-        <Link href="/inventory">
-          <Button variant="outline">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Inventory
-          </Button>
-        </Link>
+        <div className="flex flex-col gap-2">
+          <Link href="/inventory">
+            <Button variant="outline">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Inventory
+            </Button>
+          </Link>
+          <h2 className="text-sm text-muted-foreground">
+            Home / Coffee / {coffee.name}
+          </h2>
+        </div>
 
         <div className="flex space-x-2">
           <Dialog>
@@ -207,11 +212,11 @@ export default function CoffeeDetail() {
                 <dl className="space-y-2">
                   <div className="flex justify-between">
                     <dt className="font-medium text-muted-foreground">Current Stock:</dt>
-                    <dd>{coffee.current_stock || coffee.currentStock} kg</dd>
+                    <dd>{coffee.currentStock} kg</dd>
                   </div>
                   <div className="flex justify-between">
                     <dt className="font-medium text-muted-foreground">Minimum Threshold:</dt>
-                    <dd>{coffee.min_threshold || coffee.minThreshold} kg</dd>
+                    <dd>{coffee.minThreshold} kg</dd>
                   </div>
                   <div className="flex justify-between">
                     <dt className="font-medium text-muted-foreground">Grade:</dt>
@@ -219,16 +224,16 @@ export default function CoffeeDetail() {
                   </div>
                   <div className="flex justify-between">
                     <dt className="font-medium text-muted-foreground">Added on:</dt>
-                    <dd>{formatDate(coffee.created_at || coffee.createdAt || "")}</dd>
+                    <dd>{formatDate(coffee.createdAt)}</dd>
                   </div>
                 </dl>
               </div>
 
               <div>
-                <h3 className="text-lg font-semibold">Cupping Notes</h3>
+                <h3 className="text-lg font-semibold">Additional Information</h3>
                 <Separator className="my-2" />
-                <p className="text-muted-foreground">
-                  {coffee.cuppingNotes || "No cupping notes available"}
+                <p className="text-muted-foreground whitespace-pre-wrap">
+                  {coffee.notes || "No additional information available"}
                 </p>
               </div>
             </div>
@@ -300,7 +305,7 @@ export default function CoffeeDetail() {
                         title: "Batch Recorded",
                         description: "Roasting batch has been recorded successfully",
                       });
-                      queryClient.invalidateQueries({ queryKey: [`/api/roasting-batches/coffee/${coffeeId}`] });
+                      queryClient.invalidateQueries({ queryKey: [`/api/roasting-batches`] });
                     }}
                   />
                 </DialogContent>
@@ -324,7 +329,7 @@ export default function CoffeeDetail() {
                 <TableBody>
                   {batches.map((batch) => (
                     <TableRow key={batch.id}>
-                      <TableCell>{formatDate(batch.roasted_at || batch.roastedAt || batch.created_at || batch.createdAt || "")}</TableCell>
+                      <TableCell>{formatDate(batch.roastedAt || batch.createdAt)}</TableCell>
                       <TableCell>{batch.plannedAmount}</TableCell>
                       <TableCell>{batch.status}</TableCell>
                       <TableCell>{batch.smallBagsProduced || 0}</TableCell>
