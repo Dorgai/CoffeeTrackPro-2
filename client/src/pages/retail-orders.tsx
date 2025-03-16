@@ -15,6 +15,13 @@ import { ShopSelector } from "@/components/layout/shop-selector";
 import { useToast } from "@/hooks/use-toast";
 import { formatDate } from "@/lib/utils";
 import { OrderForm } from "@/components/coffee/order-form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type OrderWithDetails = {
   id: number;
@@ -34,6 +41,13 @@ type OrderWithDetails = {
   updatedBy: string | null;
 };
 
+const ORDER_STATUS_SEQUENCE = {
+  pending: ["roasted"],
+  roasted: ["dispatched"],
+  dispatched: ["delivered"],
+  delivered: [],
+};
+
 export default function RetailOrders() {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -41,11 +55,9 @@ export default function RetailOrders() {
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
 
   const updateOrderMutation = useMutation({
-    mutationFn: async (orderId: number) => {
+    mutationFn: async ({ orderId, status }: { orderId: number; status: string }) => {
       console.log("Updating order status for order:", orderId);
-      const res = await apiRequest("PATCH", `/api/orders/${orderId}/status`, {
-        status: "delivered"
-      });
+      const res = await apiRequest("PATCH", `/api/orders/${orderId}/status`, { status });
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.message || "Failed to update order status");
@@ -57,7 +69,7 @@ export default function RetailOrders() {
       queryClient.invalidateQueries({ queryKey: ["/api/billing/quantities"] });
       toast({
         title: "Success",
-        description: "Order marked as delivered",
+        description: "Order status updated successfully",
       });
     },
     onError: (error: Error) => {
@@ -86,6 +98,18 @@ export default function RetailOrders() {
     },
     enabled: !!activeShop?.id,
   });
+
+  // Helper function to get allowed next statuses
+  const getNextStatuses = (currentStatus: string): string[] => {
+    if (user?.role === "roasteryOwner") {
+      // Roastery owners can set any status except going backwards
+      const allStatuses = ["pending", "roasted", "dispatched", "delivered"];
+      const currentIndex = allStatuses.indexOf(currentStatus);
+      return allStatuses.slice(currentIndex + 1);
+    }
+    // For retail owners and others, use the sequence map
+    return ORDER_STATUS_SEQUENCE[currentStatus] || [];
+  };
 
   if (loadingCoffees || loadingOrders) {
     return (
@@ -144,14 +168,12 @@ export default function RetailOrders() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {orders.map((order: OrderWithDetails) => {
-                    const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
-                    const canUpdateToDelivered = user?.role === "retailOwner" && order.status === "dispatched";
-
+                  {orders.map((order) => {
+                    const nextStatuses = getNextStatuses(order.status);
                     return (
                       <TableRow key={order.id}>
                         <TableCell>{formatDate(order.createdAt)}</TableCell>
-                        <TableCell className="font-medium">{coffee?.name || 'Unknown'}</TableCell>
+                        <TableCell className="font-medium">{order.coffeeName}</TableCell>
                         <TableCell>{order.smallBags}</TableCell>
                         <TableCell>{order.largeBags}</TableCell>
                         <TableCell>
@@ -160,19 +182,54 @@ export default function RetailOrders() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          {canUpdateToDelivered && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => updateOrderMutation.mutate(order.id)}
-                              disabled={updateOrderMutation.isPending}
-                            >
-                              {updateOrderMutation.isPending ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
+                          {(user?.role === "retailOwner" || user?.role === "roasteryOwner") && (
+                            <>
+                              {user?.role === "retailOwner" ? (
+                                order.status === "dispatched" && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      updateOrderMutation.mutate({
+                                        orderId: order.id,
+                                        status: "delivered",
+                                      })
+                                    }
+                                    disabled={updateOrderMutation.isPending}
+                                  >
+                                    {updateOrderMutation.isPending ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      "Mark as Delivered"
+                                    )}
+                                  </Button>
+                                )
                               ) : (
-                                "Mark as Delivered"
+                                nextStatuses.length > 0 && (
+                                  <Select
+                                    defaultValue={order.status}
+                                    onValueChange={(value) =>
+                                      updateOrderMutation.mutate({
+                                        orderId: order.id,
+                                        status: value,
+                                      })
+                                    }
+                                    disabled={updateOrderMutation.isPending}
+                                  >
+                                    <SelectTrigger className="w-[130px]">
+                                      <SelectValue placeholder="Change status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {nextStatuses.map((status) => (
+                                        <SelectItem key={status} value={status}>
+                                          {status.charAt(0).toUpperCase() + status.slice(1)}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                )
                               )}
-                            </Button>
+                            </>
                           )}
                         </TableCell>
                       </TableRow>
