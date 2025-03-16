@@ -851,13 +851,13 @@ export async function registerRoutes(app: Express): Promise<void> {
           ? inventory.filter(item => item.shopId === shopId)
           : inventory;
 
-        console.logconsole.log("Filtered inventory count:", filteredInventory.length);
+        console.log("Filtered inventory count:", filteredInventory.length);
         res.json(filteredInventory);
       } catch (error) {
         console.error("Error fetching retail inventory:", error);
         res.status(500).json({message: "Failed to fetch inventory",
           details: error instanceof Error ? error.message : "Unknown error"
-        });
+                });
       }
     });
 
@@ -1177,25 +1177,62 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-  app.get("/api/billing/quantities", requireRole(["roasteryOwner"]), async (req, res) => {
+  // Add or update the billing quantities endpoint
+  app.get("/api/billing/quantities", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
     try {
       console.log("Fetching billing quantities...");
 
-      // First get the last billing event to determine start date
-      const lastEvent = await storage.getLastBillingEvent();
-      console.log("Last billing event:", lastEvent);
+      // Get the quantities using SQL query that we verified works
+      const quantities = await db.execute(sql`
+        SELECT gc.grade,
+               SUM(o.small_bags) as small_bags_quantity,
+               SUM(o.large_bags) as large_bags_quantity
+        FROM orders o
+        JOIN green_coffee gc ON o.green_coffee_id = gc.id
+        WHERE o.status = 'delivered'
+          AND NOT EXISTS (
+            SELECT 1 FROM billing_events be
+            JOIN billing_event_details bed ON be.id = bed.billing_event_id
+            WHERE bed.grade = gc.grade
+          )
+        GROUP BY gc.grade
+      `);
 
-      // Format the response
-      const quantities = await storage.getBillingQuantities();
-      console.log("Retrieved quantities:", quantities);
+      // Get the earliest unbilled delivered order date
+      const [fromDateResult] = await db.execute(sql`
+        SELECT MIN(o.created_at) as from_date
+        FROM orders o
+        WHERE o.status = 'delivered'
+          AND NOT EXISTS (
+            SELECT 1 FROM billing_events be
+            JOIN billing_event_details bed ON be.id = bed.billing_event_id
+            WHERE bed.grade = (
+              SELECT grade FROM green_coffee WHERE id = o.green_coffee_id
+            )
+          )
+      `);
+
+      const fromDate = fromDateResult?.from_date || new Date().toISOString();
+
+      // Transform the quantities to match the expected format
+      const formattedQuantities = quantities.map(q => ({
+        grade: q.grade,
+        smallBagsQuantity: Number(q.small_bags_quantity),
+        largeBagsQuantity: Number(q.large_bags_quantity)
+      }));
+
+      console.log("Billing quantities response:", {
+        fromDate,
+        quantities: formattedQuantities
+      });
 
       res.json({
-        fromDate: lastEvent?.cycleEndDate || new Date(0).toISOString(),
-        quantities: quantities
+        fromDate,
+        quantities: formattedQuantities
       });
     } catch (error) {
-      console.error("Error in /api/billing/quantities:", error);
-      res.status(500).json({ 
+      console.error("Error fetching billing quantities:", error);
+      res.status(500).json({
         message: error instanceof Error ? error.message : "Failed to fetch billing quantities"
       });
     }
