@@ -41,23 +41,29 @@ export function BillingEventGrid() {
         throw new Error("Split percentages must sum to 100%");
       }
 
-      // Filter out quantities with zero values
-      const quantities = billingData.quantities
-        .filter(q => q.smallBagsQuantity > 0 || q.largeBagsQuantity > 0)
-        .map(q => ({
-          grade: q.grade,
-          smallBagsQuantity: q.smallBagsQuantity,
-          largeBagsQuantity: q.largeBagsQuantity
-        }));
+      // Filter out quantities with zero values and create valid billing quantities
+      const validQuantities = coffeeGrades
+        .map(grade => {
+          const gradeData = billingData.quantities.find(q => q.grade === grade) || 
+            { smallBagsQuantity: 0, largeBagsQuantity: 0 };
+          return {
+            grade,
+            smallBagsQuantity: gradeData.smallBagsQuantity,
+            largeBagsQuantity: gradeData.largeBagsQuantity
+          };
+        })
+        .filter(q => q.smallBagsQuantity > 0 || q.largeBagsQuantity > 0);
 
-      if (quantities.length === 0) {
+      if (validQuantities.length === 0) {
         throw new Error("No quantities to bill");
       }
 
       const payload = {
         primarySplitPercentage: primarySplit,
         secondarySplitPercentage: secondarySplit,
-        quantities
+        quantities: validQuantities,
+        cycleStartDate: billingData.fromDate,
+        cycleEndDate: new Date().toISOString()
       };
 
       console.log("Creating billing event with payload:", JSON.stringify(payload, null, 2));

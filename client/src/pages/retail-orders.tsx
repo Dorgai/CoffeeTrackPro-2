@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ShopSelector } from "@/components/layout/shop-selector";
 import { useToast } from "@/hooks/use-toast";
@@ -40,11 +41,13 @@ export default function RetailOrders() {
   // Add update order mutation
   const updateOrderMutation = useMutation({
     mutationFn: async (orderId: number) => {
+      console.log("Updating order status for order:", orderId);
       const res = await apiRequest("PATCH", `/api/orders/${orderId}/status`, {
         status: "delivered"
       });
       if (!res.ok) {
-        throw new Error("Failed to update order status");
+        const error = await res.json();
+        throw new Error(error.message || "Failed to update order status");
       }
       return res.json();
     },
@@ -56,6 +59,7 @@ export default function RetailOrders() {
       });
     },
     onError: (error: Error) => {
+      console.error("Error updating order:", error);
       toast({
         title: "Error",
         description: error.message,
@@ -73,6 +77,9 @@ export default function RetailOrders() {
     queryFn: async () => {
       if (!activeShop?.id) return [];
       const res = await apiRequest("GET", `/api/orders?shopId=${activeShop.id}`);
+      if (!res.ok) {
+        throw new Error("Failed to fetch orders");
+      }
       return res.json();
     },
     enabled: !!activeShop?.id,
@@ -137,7 +144,7 @@ export default function RetailOrders() {
                 <TableBody>
                   {orders.map((order: OrderWithDetails) => {
                     const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
-                    const canUpdateToDelivered = order.status === "dispatched" && user?.role === "retailOwner";
+                    const canUpdateToDelivered = user?.role === "retailOwner" && order.status === "dispatched";
 
                     return (
                       <TableRow key={order.id}>
@@ -179,6 +186,21 @@ export default function RetailOrders() {
           </CardContent>
         </Card>
       )}
+
+      <Dialog
+        open={isOrderDialogOpen}
+        onOpenChange={setIsOrderDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Place New Order</DialogTitle>
+            <DialogDescription>Order coffee from the roastery</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {/* Order form content here */}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
