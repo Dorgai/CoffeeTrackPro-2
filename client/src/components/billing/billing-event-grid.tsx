@@ -33,6 +33,7 @@ export function BillingEventGrid() {
   const createBillingEventMutation = useMutation({
     mutationFn: async () => {
       if (!billingData?.quantities || !Array.isArray(billingData.quantities)) {
+        console.error("Invalid billing data:", billingData);
         throw new Error("Invalid billing quantities data");
       }
 
@@ -40,11 +41,18 @@ export function BillingEventGrid() {
         throw new Error("Split percentages must sum to 100%");
       }
 
-      const quantities = billingData.quantities.map(q => ({
-        grade: q.grade,
-        smallBagsQuantity: q.smallBagsQuantity,
-        largeBagsQuantity: q.largeBagsQuantity
-      }));
+      // Filter out quantities with zero values
+      const quantities = billingData.quantities
+        .filter(q => q.smallBagsQuantity > 0 || q.largeBagsQuantity > 0)
+        .map(q => ({
+          grade: q.grade,
+          smallBagsQuantity: q.smallBagsQuantity,
+          largeBagsQuantity: q.largeBagsQuantity
+        }));
+
+      if (quantities.length === 0) {
+        throw new Error("No quantities to bill");
+      }
 
       const payload = {
         primarySplitPercentage: primarySplit,
@@ -52,7 +60,7 @@ export function BillingEventGrid() {
         quantities
       };
 
-      console.log("Creating billing event with payload:", payload);
+      console.log("Creating billing event with payload:", JSON.stringify(payload, null, 2));
 
       const res = await apiRequest("POST", "/api/billing/events", payload);
 
@@ -62,7 +70,9 @@ export function BillingEventGrid() {
         throw new Error(errorData.message || "Failed to create billing event");
       }
 
-      return res.json();
+      const data = await res.json();
+      console.log("Billing event created successfully:", data);
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/billing/quantities"] });
