@@ -149,40 +149,44 @@ export function BillingEventGrid() {
       <Card>
         <CardHeader>
           <CardTitle>Billing History</CardTitle>
-          <CardDescription>Past billing events and their details</CardDescription>
+          <CardDescription>Past billing cycles and their quantities</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Cycle Start</TableHead>
-                <TableHead>Cycle End</TableHead>
-                <TableHead>Primary Split (%)</TableHead>
-                <TableHead>Secondary Split (%)</TableHead>
-                <TableHead>Details</TableHead>
+                <TableHead>Cycle Period</TableHead>
+                {coffeeGrades.map(grade => (
+                  <TableHead key={grade}>{grade}</TableHead>
+                ))}
               </TableRow>
             </TableHeader>
             <TableBody>
               {billingHistory?.map((event) => (
                 <TableRow key={event.id}>
-                  <TableCell>{formatDateSafely(event.cycleStartDate)}</TableCell>
-                  <TableCell>{formatDateSafely(event.cycleEndDate)}</TableCell>
-                  <TableCell>{event.primarySplitPercentage}%</TableCell>
-                  <TableCell>{event.secondarySplitPercentage}%</TableCell>
                   <TableCell>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setSelectedEventId(event.id)}
-                    >
-                      View Details
-                    </Button>
+                    {formatDateSafely(event.cycleStartDate)} to {formatDateSafely(event.cycleEndDate)}
                   </TableCell>
+                  {coffeeGrades.map(grade => {
+                    const details = selectedEventDetails?.find(d => d.grade === grade);
+                    return (
+                      <TableCell key={grade}>
+                        {details ? (
+                          <>
+                            {details.smallBagsQuantity} small,{' '}
+                            {details.largeBagsQuantity} large
+                          </>
+                        ) : (
+                          '0 small, 0 large'
+                        )}
+                      </TableCell>
+                    );
+                  })}
                 </TableRow>
               ))}
               {(!billingHistory || billingHistory.length === 0) && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                  <TableCell colSpan={coffeeGrades.length + 1} className="text-center text-muted-foreground">
                     No billing events found
                   </TableCell>
                 </TableRow>
@@ -197,15 +201,6 @@ export function BillingEventGrid() {
           <CardTitle>Current Billing Cycle</CardTitle>
           <CardDescription>
             Data gathered since: {billingData?.fromDate ? formatDateSafely(billingData.fromDate) : 'N/A'}
-          </CardDescription>
-        </CardHeader>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Current Billing Cycle Quantities</CardTitle>
-          <CardDescription>
-            Quantities aggregated by coffee grade since the last billing event
           </CardDescription>
         </CardHeader>
         <CardContent>
