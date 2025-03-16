@@ -855,9 +855,9 @@ export async function registerRoutes(app: Express): Promise<void> {
         res.json(filteredInventory);
       } catch (error) {
         console.error("Error fetching retail inventory:", error);
-        res.status(500).json({message: "Failed to fetch inventory",
+        res.status(500).json({message: "Failed tofetch inventory",
           details: error instanceof Error ? error.message : "Unknown error"
-                });
+        });
       }
     });
 
@@ -1182,58 +1182,47 @@ export async function registerRoutes(app: Express): Promise<void> {
     try {
       console.log("Fetching billing quantities...");
 
-      // Get the quantities using SQL query that we verified works
+      // First get the last billing event to determine start date
+      const [lastBillingEvent] = await db.execute(sql`
+        SELECT MAX(cycle_end_date) as last_date 
+        FROM billing_events
+      `);
+
+      const fromDate = lastBillingEvent?.last_date || new Date(0).toISOString();
+
+      // Get delivered orders quantities grouped by grade
       const quantities = await db.execute(sql`
-        SELECT gc.grade,
-               SUM(o.small_bags) as small_bags_quantity,
-               SUM(o.large_bags) as large_bags_quantity
+        SELECT 
+          gc.grade,
+          COALESCE(SUM(o.small_bags), 0) as small_bags_quantity,
+          COALESCE(SUM(o.large_bags), 0) as large_bags_quantity
         FROM orders o
         JOIN green_coffee gc ON o.green_coffee_id = gc.id
         WHERE o.status = 'delivered'
-          AND NOT EXISTS (
-            SELECT 1 FROM billing_events be
-            JOIN billing_event_details bed ON be.id = bed.billing_event_id
-            WHERE bed.grade = gc.grade
-          )
         GROUP BY gc.grade
       `);
 
-      // Get the earliest unbilled delivered order date
-      const [fromDateResult] = await db.execute(sql`
-        SELECT MIN(o.created_at) as from_date
-        FROM orders o
-        WHERE o.status = 'delivered'
-          AND NOT EXISTS (
-            SELECT 1 FROM billing_events be
-            JOIN billing_event_details bed ON be.id = bed.billing_event_id
-            WHERE bed.grade = (
-              SELECT grade FROM green_coffee WHERE id = o.green_coffee_id
-            )
-          )
-      `);
+      console.log("SQL Query Result:", quantities);
 
-      const fromDate = fromDateResult?.from_date || new Date().toISOString();
-
-      // Transform the quantities to match the expected format
-      const formattedQuantities = quantities.map(q => ({
-        grade: q.grade,
-        smallBagsQuantity: Number(q.small_bags_quantity),
-        largeBagsQuantity: Number(q.large_bags_quantity)
+      // Format the response
+      const formattedQuantities = quantities.map(row => ({
+        grade: row.grade,
+        smallBagsQuantity: Number(row.small_bags_quantity),
+        largeBagsQuantity: Number(row.large_bags_quantity)
       }));
 
-      console.log("Billing quantities response:", {
-        fromDate,
-        quantities: formattedQuantities
-      });
+      console.log("Formatted quantities:", formattedQuantities);
 
       res.json({
         fromDate,
         quantities: formattedQuantities
       });
+
     } catch (error) {
       console.error("Error fetching billing quantities:", error);
       res.status(500).json({
-        message: error instanceof Error ? error.message : "Failed to fetch billing quantities"
+        message: "Failed to fetch billing quantities",
+        details: error instanceof Error ? error.message : String(error)
       });
     }
   });
