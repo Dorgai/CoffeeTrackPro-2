@@ -206,20 +206,20 @@ export default function CoffeeDetail() {
 
                 <dl className="space-y-2">
                   <div className="flex justify-between">
-                    <dt className="font-medium text-muted-foreground">Altitude:</dt>
-                    <dd>{coffee.altitude || "Not specified"}</dd>
-                  </div>
-                  <div className="flex justify-between">
                     <dt className="font-medium text-muted-foreground">Current Stock:</dt>
-                    <dd>{coffee.currentStock} kg</dd>
+                    <dd>{coffee.current_stock || coffee.currentStock} kg</dd>
                   </div>
                   <div className="flex justify-between">
                     <dt className="font-medium text-muted-foreground">Minimum Threshold:</dt>
-                    <dd>{coffee.minThreshold} kg</dd>
+                    <dd>{coffee.min_threshold || coffee.minThreshold} kg</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="font-medium text-muted-foreground">Grade:</dt>
+                    <dd>{coffee.grade}</dd>
                   </div>
                   <div className="flex justify-between">
                     <dt className="font-medium text-muted-foreground">Added on:</dt>
-                    <dd>{formatDate(coffee.createdAt || "")}</dd>
+                    <dd>{formatDate(coffee.created_at || coffee.createdAt || "")}</dd>
                   </div>
                 </dl>
               </div>
@@ -324,7 +324,7 @@ export default function CoffeeDetail() {
                 <TableBody>
                   {batches.map((batch) => (
                     <TableRow key={batch.id}>
-                      <TableCell>{formatDate(batch.createdAt || "")}</TableCell>
+                      <TableCell>{formatDate(batch.roasted_at || batch.roastedAt || batch.created_at || batch.createdAt || "")}</TableCell>
                       <TableCell>{batch.plannedAmount}</TableCell>
                       <TableCell>{batch.status}</TableCell>
                       <TableCell>{batch.smallBagsProduced || 0}</TableCell>

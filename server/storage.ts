@@ -984,7 +984,8 @@ export class DatabaseStorage {
           rb.*,
           gc.name as "coffeeName",
           gc.producer
-        FROM roasting_batches rb        LEFT JOIN green_coffee gc ON rb.green_coffee_id = gc.id
+        FROM roasting_batches rb
+        LEFT JOIN green_coffee gc ON rb.green_coffee_id = gc.id
         ORDER BY rb.created_at DESC
       `;
 
@@ -1071,6 +1072,465 @@ export class DatabaseStorage {
   }
 
   // Add getOrder and updateOrderStatus methods
+  async getOrder(id: number): Promise<Order | undefined> {
+    try {
+      console.log("Getting order by ID:", id);
+      const [order] = await db
+        .select()
+        .from(orders)
+        .where(eq(orders.id, id));
+      console.log("Found order:", order ? "yes" : "no");
+      return order;
+    } catch (error) {
+      console.error("Error getting order:", error);
+      return undefined;
+    }
+  }
+
+  async updateOrderStatus(
+    id: number,
+    data: { status: string; smallBags?: number; largeBags?: number; updatedById?: number }
+  ): Promise<Order> {
+    try {
+      console.log("Updating order status:", id, "with data:", data);
+
+      return await db.transaction(async (tx) => {
+        // Get the existing order first
+        const [existingOrder] = await tx
+          .select()
+          .from(orders)
+          .where(eq(orders.id, id));
+
+        if (!existingOrder) {
+          throw new Error("Order not found");
+        }
+
+        // Update the order status
+        const [order] = await tx
+          .update(orders)
+          .set({
+            status: data.status,
+            ...(data.smallBags !== undefined && { smallBags: data.smallBags }),
+            ...(data.largeBags !== undefined && { largeBags: data.largeBags }),
+            updatedAt: new Date(),
+            updatedById: data.updatedById
+          })
+          .where(eq(orders.id, id))
+          .returning();
+
+        // If order is being delivered, update retail inventory by adding the quantities
+        if (data.status === 'delivered') {
+          await this.updateRetailInventory({
+            shopId: order.shopId,
+            greenCoffeeId: order.greenCoffeeId,
+            smallBags: order.smallBags,
+            largeBags: order.largeBags,
+            updatedById: order.updatedById || order.createdById,
+            updateType: "dispatch",
+            notes: `Order #${order.id} delivered`
+          });
+        }
+
+        console.log("Updated order:", order);
+        return order;
+      });
+    } catch (error) {
+      console.error("Error updating order status:", error);
+      throw error;
+    }
+  }
+
+  async fetchUserShopAssignments(userId: number): Promise<Array<{ userId: number; shopId: number }>> {
+    try {
+      console.log(`Fetching user-shop assignments for userId: ${userId}`);
+      const assignments = await db.select({ userId: userShops.userId, shopId: userShops.shopId }).from(userShops).where(eq(userShops.userId, userId));
+      console.log(`Found ${assignments.length} assignments for userId: ${userId}`);
+      return assignments;
+    } catch (error) {
+      console.error("Error fetching user-shop assignments:", error);
+      return [];
+    }
+  }
+
+  async updateRetailInventory(data: {
+    shopId: number;
+    greenCoffeeId: number;
+    smallBags: number;
+    largeBags: number;
+    updatedById: number;
+    updateType: "manual" | "dispatch";
+    notes?: string;
+  }): Promise<RetailInventory> {
+    try {
+      console.log("Starting retail inventory update:", data);
+
+      return await db.transaction(async (tx) => {
+        // First get the current inventory record using safe query
+        const query = sql`
+          WITH latest_inventory AS (
+            SELECT * FROM retail_inventory
+            WHERE shop_id = ${data.shopId} 
+            AND green_coffee_id = ${data.greenCoffeeId}
+            ORDER BY updated_at DESC
+            LIMIT 1
+          )
+          SELECT * FROM latest_inventory`;
+
+        const result = await tx.execute(query);
+        const currentInventory = result.rows[0];
+
+        // Set previous values from current inventory or default to 0
+        const prevSmallBags = currentInventory?.small_bags || 0;
+        const prevLargeBags = currentInventory?.large_bags || 0;
+
+        // Validate based on update type
+        if (data.updateType === "manual") {
+          // For manual updates (by users), new quantities must be less than current
+          if (data.smallBags > prevSmallBags || data.largeBags > prevLargeBags) {
+            throw new Error("Manual updates can only decrease inventory quantities");
+          }
+        } else if (data.updateType === "dispatch") {
+          // For dispatch updates (from delivered orders), we add to current quantities
+          data.smallBags = prevSmallBags + data.smallBags;
+          data.largeBags = prevLargeBags + data.largeBags;
+        }
+
+        console.log("Calculated new quantities:", {
+          shopId: data.shopId,
+          greenCoffeeId: data.greenCoffeeId,
+          prevSmall: prevSmallBags,
+          prevLarge: prevLargeBags,
+          newSmall: data.smallBags,
+          newLarge: data.largeBags,
+          updateType: data.updateType
+        });
+
+        // Create history record first
+        await tx
+          .insert(retailInventoryHistory)
+          .values({
+            shopId: data.shopId,
+            greenCoffeeId: data.greenCoffeeId,
+            previousSmallBags: prevSmallBags,
+            previousLargeBags: prevLargeBags,
+            newSmallBags: data.smallBags,
+            newLargeBags: data.largeBags,
+            updatedById: data.updatedById,
+            updateType: data.updateType,
+            notes: data.notes || null,
+            updatedAt: new Date()
+          });
+
+        // Now update or insert the current inventory
+        if (currentInventory) {
+          const [updatedInventory] = await tx
+            .update(retailInventory)
+            .set({
+              smallBags: data.smallBags,
+              largeBags: data.largeBags,
+              updatedById: data.updatedById,
+              updateType: data.updateType,
+              notes: data.notes || null,
+              updatedAt: new Date()
+            })
+            .where(
+              and(
+                eq(retailInventory.shopId, data.shopId),
+                eq(retailInventory.greenCoffeeId, data.greenCoffeeId)
+              )
+            )
+            .returning();
+
+          console.log("Successfully updated existing retail inventory:", updatedInventory);
+          return updatedInventory;
+        } else {
+          // Insert new record if none exists
+          const [inventory] = await tx
+            .insert(retailInventory)
+            .values({
+              shopId: data.shopId,
+              greenCoffeeId: data.greenCoffeeId,
+              smallBags: data.smallBags,
+              largeBags: data.largeBags,
+              updatedById: data.updatedById,
+              updateType: data.updateType,
+              notes: data.notes || null,
+              updatedAt: new Date()
+            })
+            .returning();
+
+          console.log("Successfully created new retail inventory:", inventory);
+          return inventory;
+        }
+      });
+    } catch (error) {
+      console.error("Error updating retail inventory:", error);
+      throw error;
+    }
+  }
+
+  async getRetailInventoryItem(shopId: number, greenCoffeeId: number): Promise<RetailInventory | undefined> {
+    try {
+      console.log("Getting retail inventory item for shop:", shopId, "coffee:", greenCoffeeId);
+
+      const query = sql`
+        WITH latest_inventory AS (
+          SELECT DISTINCT ON (shop_id, green_coffee_id)
+            shop_id,
+            green_coffee_id,
+            small_bags,
+            large_bags,
+            updated_at,
+            updated_by_id,
+            update_type,
+            notes
+          FROM retail_inventory
+          WHERE shop_id = ${shopId} AND green_coffee_id = ${greenCoffeeId}
+          ORDER BY shop_id, green_coffee_id, updated_at DESC
+        )
+        SELECT 
+          li.*,
+          s.name as shop_name,
+          s.location as shop_location,
+          gc.name as coffee_name,
+          gc.producer,
+          gc.grade,
+          u.username as updated_by_username
+        FROM latest_inventory li
+        LEFT JOIN shops s ON li.shop_id = s.id
+        LEFT JOIN green_coffee gc ON li.green_coffee_id = gc.id
+        LEFT JOIN users u ON li.updated_by_id = u.id
+        LIMIT 1`;
+
+      const result = await db.execute(query);
+      return result.rows[0] as RetailInventory | undefined;
+    } catch (error) {
+      console.error("Error getting retail inventory item:", error);
+      return undefined;
+    }
+  }
+  // Add createGreenCoffee method
+  async createGreenCoffee(data: any): Promise<GreenCoffee> {
+    try {
+      console.log("Creating new green coffee entry:", data);
+      const [coffee] = await db
+        .insert(greenCoffee)
+        .values(data)
+        .returning();
+      console.log("Created green coffee:", coffee);
+      return coffee;
+    } catch (error) {
+      console.error("Error creating green coffee:", error);
+      throw error;
+    }
+  }
+
+  // Add new billing methods
+  async getBillingHistory(): Promise<Array<BillingEvent & { details: BillingEventDetail[] }>> {
+    try {
+      console.log("Getting billing history with details");
+      const query = sql`
+        WITH events AS (
+          SELECT DISTINCT ON (be.id)
+            be.*,
+            u.username as "createdByUsername"
+          FROM billing_events be
+          LEFT JOIN users u ON be.created_by_id = u.id
+          ORDER BY be.cycle_end_date DESC
+        ),
+        details AS (
+          SELECT 
+            billing_event_id,
+            json_agg(
+              json_build_object(
+                'grade', grade,
+                'smallBagsQuantity', small_bags_quantity,
+                'largeBagsQuantity', large_bags_quantity
+              )
+            ) as details
+          FROM billing_event_details
+          GROUP BY billing_event_id
+        )
+        SELECT 
+          e.*,
+          COALESCE(d.details, '[]'::json) as details
+        FROM events e
+        LEFT JOIN details d ON e.id = d.billing_event_id
+        ORDER BY e.cycle_end_date DESC`;
+
+      const result = await db.execute(query);
+      console.log("Retrieved billing history:", result.rows?.length, "events");
+
+      return result.rows.map(row => ({
+        ...row,
+        details: Array.isArray(row.details) ? row.details : []
+      }));
+    } catch (error) {
+      console.error("Error getting billing history:", error);
+      return [];
+    }
+  }
+
+  async getLastBillingEvent(): Promise<BillingEvent | undefined> {
+    try {
+      console.log("Getting last billing event");
+      const query = sql`
+        SELECT * FROM billing_events
+        ORDER BY cycle_end_date DESC
+        LIMIT 1`;
+
+      const result = await db.execute(query);
+      console.log("Last billing event found:", result.rows[0]);
+      return result.rows[0] as BillingEvent | undefined;
+    } catch (error) {
+      console.error("Error getting last billing event:", error);
+      return undefined;
+    }
+  }
+
+  async getBillingQuantities(): Promise<Array<{
+    grade: string;
+    smallBagsQuantity: number;
+    largeBagsQuantity: number;
+  }>> {
+    try {
+      // Get the last billing event to determine the start date
+      const lastEvent = await this.getLastBillingEvent();
+      const startDate = lastEvent?.cycleEndDate || new Date(0).toISOString();
+
+      console.log("Using start date for billing quantities:", startDate);
+
+      const query = sql`
+        SELECT 
+          gc.grade,
+          COALESCE(SUM(o.small_bags), 0)::integer as "smallBagsQuantity",
+          COALESCE(SUM(o.large_bags), 0)::integer as "largeBagsQuantity"
+        FROM green_coffee gc
+        LEFT JOIN orders o ON o.green_coffee_id = gc.id 
+          AND o.status = 'delivered'
+          AND o.updated_at > ${startDate}::timestamptz
+        GROUP BY gc.grade
+        ORDER BY gc.grade`;
+
+      const result = await db.execute(query);
+      console.log("Retrieved billing quantities:", result.rows);
+
+      return result.rows.map(row => ({
+        grade: row.grade as string,
+        smallBagsQuantity: Number(row.smallBagsQuantity),
+        largeBagsQuantity: Number(row.largeBagsQuantity)
+      }));
+    } catch (error) {
+      console.error("Error calculating billing quantities:", error);
+      return [];
+    }
+  }
+
+  async createBillingEvent(data: {
+    cycleStartDate: Date | string;
+    cycleEndDate: Date | string;
+    createdById: number;
+    primarySplitPercentage: number;
+    secondarySplitPercentage: number;
+    quantities: Array<{
+      grade: string;
+      smallBagsQuantity: number;
+      largeBagsQuantity: number;
+    }>;
+  }): Promise<BillingEvent> {
+    try {
+      console.log("Creating billing event with data:", JSON.stringify(data, null, 2));
+
+      return await db.transaction(async (tx) => {
+        // Get the last billing event to determine the cycle start date
+        const lastEvent = await this.getLastBillingEvent();
+        const cycleStart = lastEvent?.cycleEndDate || '1970-01-01T00:00:00.000Z';
+        const now = new Date();
+        const cycleEnd = now.toISOString();
+
+        console.log("Creating billing event with dates:", {
+          cycleStart,
+          cycleEnd
+        });
+
+        // Create the billing event
+        const [event] = await tx
+          .insert(billingEvents)
+          .values({
+            cycleStartDate: cycleStart,
+            cycleEndDate: cycleEnd,
+            createdById: data.createdById,
+            primarySplitPercentage: data.primarySplitPercentage,
+            secondarySplitPercentage: data.secondarySplitPercentage,
+            description: `Billing cycle ${cycleStart} to ${cycleEnd}`,
+            status: "completed",
+            type: "order",
+            amount: "0.00"
+          })
+          .returning();
+
+        // Create billing event details
+        await Promise.all(
+          data.quantities
+            .filter(q => q.smallBagsQuantity > 0 || q.largeBagsQuantity > 0)
+            .map(q =>
+              tx
+                .insert(billingEventDetails)
+                .values({
+                  grade: q.grade,
+                  billingEventId: event.id,
+                  smallBagsQuantity: q.smallBagsQuantity,
+                  largeBagsQuantity: q.largeBagsQuantity
+                })
+            )
+        );
+
+        // Update all delivered orders to billed status
+        await tx
+          .update(orders)
+          .set({
+            status: "billed",
+            updatedAt: now
+          })
+          .where(
+            and(
+              eq(orders.status, "delivered"),
+              sql`updated_at > ${cycleStart}::timestamptz`
+            )
+          );
+
+        return event;
+      });
+    } catch (error) {
+      console.error("Error creating billing event:", error);
+      throw error;
+    }
+  }
+
+  async createOrder(data: InsertOrder): Promise<Order> {
+    try {
+      console.log("Creating new order:", data);
+      const [order] = await db
+        .insert(orders)
+        .values({
+          shopId: data.shopId,
+          greenCoffeeId: data.greenCoffeeId,
+          smallBags: data.smallBags || 0,
+          largeBags: data.largeBags || 0,
+          status: 'pending',
+          createdById: data.createdById,
+          createdAt: new Date(),
+        })
+        .returning();
+
+      console.log("Created order:", order);
+      return order;
+    } catch (error) {
+      console.error("Error creating order:", error);
+      throw error;
+    }
+  }
+
   async getOrder(id: number): Promise<Order | undefined> {
     try {
       console.log("Getting order by ID:", id);
