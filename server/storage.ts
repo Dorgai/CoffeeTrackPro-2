@@ -954,7 +954,7 @@ export class DatabaseStorage {
         FROM green_coffee gc
         LEFT JOIN orders o ON o.green_coffee_id = gc.id 
           AND o.status = 'delivered' 
-          AND o.created_at > ${startDate}::timestamptz
+          AND o.updated_at > ${startDate}::timestamptz
         GROUP BY gc.grade
         ORDER BY gc.grade`;
 
@@ -974,7 +974,7 @@ export class DatabaseStorage {
 
   async createBillingEvent(data: {
     cycleStartDate: Date | string;
-    cycleEndDate: Date | string;
+    cycleEndDate: Date| string;
     createdById: number;
     primarySplitPercentage: number;
     secondarySplitPercentage: number;
@@ -1010,14 +1010,11 @@ export class DatabaseStorage {
         // Get the last billing event to determine the cycle start date
         const lastEvent = await this.getLastBillingEvent();
         const now = new Date();
-
-        // Format dates properly
-        const cycleStartDateStr = lastEvent?.cycleEndDate || new Date(0).toISOString();
-        const cycleEndDateStr = now.toISOString();
+        const cycleStart = lastEvent ? lastEvent.cycleEndDate : '1970-01-01 00:00:00';
 
         console.log("Creating billing event with dates:", {
-          cycleStartDate: cycleStartDateStr,
-          cycleEndDate: cycleEndDateStr
+          cycleStart,
+          cycleEnd: now.toISOString()
         });
 
         // Create billing events for each active shop
@@ -1030,11 +1027,11 @@ export class DatabaseStorage {
                 amount: "0.00",
                 status: "pending",
                 type: "order",
-                cycleStartDate: cycleStartDateStr,
-                cycleEndDate: cycleEndDateStr,
+                cycleStartDate: cycleStart,
+                cycleEndDate: now.toISOString(),
                 primarySplitPercentage: data.primarySplitPercentage,
                 secondarySplitPercentage: data.secondarySplitPercentage,
-                description: `Billing cycle from ${new Date(cycleStartDateStr).toLocaleString()} to ${now.toLocaleString()}`,
+                description: `Billing cycle ${cycleStart} to ${now.toISOString()}`,
                 createdById: data.createdById
               })
               .returning();
