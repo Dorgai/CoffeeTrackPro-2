@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { BillingEvent, BillingEventDetail, coffeeGrades } from "@shared/schema";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
@@ -156,7 +156,6 @@ export function BillingEventGrid() {
                   <TableHead>Grade</TableHead>
                   <TableHead>Small Bags</TableHead>
                   <TableHead>Large Bags</TableHead>
-                  {/*Removed Total Bags Head*/}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -165,7 +164,6 @@ export function BillingEventGrid() {
                     <TableCell className="font-medium">{detail.grade}</TableCell>
                     <TableCell>{detail.smallBagsQuantity}</TableCell>
                     <TableCell>{detail.largeBagsQuantity}</TableCell>
-                    {/*Removed Total Bags Cell*/}
                   </TableRow>
                 ))}
               </TableBody>
@@ -185,37 +183,37 @@ export function BillingEventGrid() {
       </Card>
 
       <Card>
-          <CardHeader>
-            <CardTitle>Current Billing Cycle Quantities</CardTitle>
-            <CardDescription>
-              Quantities aggregated by coffee grade since the last billing event
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Grade</TableHead>
-                  <TableHead>Small Bags</TableHead>
-                  <TableHead>Large Bags</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {coffeeGrades.map((grade) => {
-                  const gradeData = billingData?.quantities.find(q => q.grade === grade) ||
-                    { smallBagsQuantity: 0, largeBagsQuantity: 0 };
-                  return (
-                    <TableRow key={grade}>
-                      <TableCell className="font-medium">{grade}</TableCell>
-                      <TableCell>{gradeData.smallBagsQuantity}</TableCell>
-                      <TableCell>{gradeData.largeBagsQuantity}</TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        <CardHeader>
+          <CardTitle>Current Billing Cycle Quantities</CardTitle>
+          <CardDescription>
+            Quantities aggregated by coffee grade since the last billing event
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Grade</TableHead>
+                <TableHead>Small Bags</TableHead>
+                <TableHead>Large Bags</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {coffeeGrades.map((grade) => {
+                const gradeData = billingData?.quantities.find(q => q.grade === grade) ||
+                  { smallBagsQuantity: 0, largeBagsQuantity: 0 };
+                return (
+                  <TableRow key={grade}>
+                    <TableCell className="font-medium">{grade}</TableCell>
+                    <TableCell>{gradeData.smallBagsQuantity}</TableCell>
+                    <TableCell>{gradeData.largeBagsQuantity}</TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       {/* Split View - Only show for roasteryOwner */}
       {!isManager && (
