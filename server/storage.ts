@@ -945,8 +945,8 @@ export class DatabaseStorage {
   }
 
   async createBillingEvent(data: {
-    cycleStartDate: Date;
-    cycleEndDate: Date;
+    cycleStartDate: Date | string;
+    cycleEndDate: Date | string;
     createdById: number;
     primarySplitPercentage: number;
     secondarySplitPercentage: number;
@@ -982,6 +982,10 @@ export class DatabaseStorage {
 
         console.log("Creating billing events for active shops:", activeShops.length);
 
+        // Convert dates to proper format
+        const cycleStartDate = new Date(data.cycleStartDate);
+        const cycleEndDate = new Date(data.cycleEndDate);
+
         // Create billing events for each active shop
         const events = await Promise.all(
           activeShops.map(async (shop) => {
@@ -992,12 +996,12 @@ export class DatabaseStorage {
                 amount: 0, // No price calculation needed
                 status: "pending",
                 type: "order",
-                cycleStartDate: data.cycleStartDate,
-                cycleEndDate: data.cycleEndDate,
+                cycleStartDate,
+                cycleEndDate,
                 createdById: data.createdById,
                 primarySplitPercentage: data.primarySplitPercentage,
                 secondarySplitPercentage: data.secondarySplitPercentage,
-                description: `Billing cycle ${data.cycleStartDate.toISOString().split('T')[0]} to ${data.cycleEndDate.toISOString().split('T')[0]}`,
+                description: `Billing cycle ${cycleStartDate.toISOString().split('T')[0]} to ${cycleEndDate.toISOString().split('T')[0]}`,
               })
               .returning();
 
