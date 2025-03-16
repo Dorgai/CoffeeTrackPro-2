@@ -54,16 +54,25 @@ export function BillingEventGrid() {
   // Create billing event mutation
   const createBillingEventMutation = useMutation({
     mutationFn: async () => {
-      if (!billingData?.quantities) return;
+      if (!billingData) {
+        throw new Error("No billing data available");
+      }
 
-      const res = await apiRequest("POST", "/api/billing/events", {
+      const payload = {
         primarySplitPercentage: primarySplit,
         secondarySplitPercentage: secondarySplit,
-        quantities: billingData.quantities
-      });
+        quantities: billingData.quantities.map(q => ({
+          grade: q.grade,
+          smallBagsQuantity: q.smallBagsQuantity,
+          largeBagsQuantity: q.largeBagsQuantity
+        }))
+      };
+
+      const res = await apiRequest("POST", "/api/billing/events", payload);
 
       if (!res.ok) {
-        throw new Error("Failed to create billing event");
+        const error = await res.json();
+        throw new Error(error.message || "Failed to create billing event");
       }
       return res.json();
     },
