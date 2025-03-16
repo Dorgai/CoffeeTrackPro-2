@@ -917,31 +917,26 @@ export class DatabaseStorage {
       console.log("Using fromDate:", startDate.toISOString());
 
       const query = sql`
-        WITH delivered_orders AS (
-          SELECT 
-            o.*,
-            gc.grade
-          FROM orders o
-          JOIN green_coffee gc ON o.green_coffee_id = gc.id
-          WHERE 
-            o.status = 'delivered' 
-            AND o.created_at > ${startDate}
-        )
         SELECT 
-          grade,
-          COALESCE(SUM(small_bags), 0) as "smallBagsQuantity",
-          COALESCE(SUM(large_bags), 0) as "largeBagsQuantity"
-        FROM delivered_orders
-        GROUP BY grade
-        ORDER BY grade`;
+          gc.grade,
+          COALESCE(SUM(o.small_bags), 0)::integer as "smallBagsQuantity",
+          COALESCE(SUM(o.large_bags), 0)::integer as "largeBagsQuantity"
+        FROM orders o
+        JOIN green_coffee gc ON o.green_coffee_id = gc.id
+        WHERE 
+          o.status = 'delivered' 
+          AND o.created_at > ${startDate}
+        GROUP BY gc.grade
+        ORDER BY gc.grade`;
 
       const result = await db.execute(query);
       console.log("Retrieved billing quantities:", result.rows);
 
+      // Map the results directly, no need for string conversion since we cast in SQL
       return result.rows.map(row => ({
         grade: row.grade,
-        smallBagsQuantity: parseInt(row.smallBagsQuantity) || 0,
-        largeBagsQuantity: parseInt(row.largeBagsQuantity) || 0
+        smallBagsQuantity: row.smallBagsQuantity,
+        largeBagsQuantity: row.largeBagsQuantity
       }));
     } catch (error) {
       console.error("Error calculating billing quantities:", error);
@@ -985,7 +980,7 @@ export class DatabaseStorage {
           .insert(billingEvents)
           .values({
             amount: totalAmount,
-            status: "pending",
+            status:"pending",
             type: "order",
             cycleStartDate: data.cycleStartDate,
             cycleEndDate: data.cycleEndDate,

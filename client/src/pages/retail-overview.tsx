@@ -1,11 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Loader2, Package, ShoppingCart } from "lucide-react";
 import { Shop } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { RetailInventoryList } from "@/components/coffee/retail-inventory-list";
 import { ShopSelector } from "@/components/layout/shop-selector";
 import { useActiveShop } from "@/hooks/use-active-shop";
+import { useToast } from "@/hooks/use-toast";
 import {
   Card,
   CardContent,
@@ -21,6 +22,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
 
 type InventoryItem = {
@@ -57,11 +66,11 @@ type OrderItem = {
 export default function RetailOverview() {
   const { user } = useAuth();
   const { activeShop } = useActiveShop();
+  const { toast } = useToast();
 
-  // Get user's shops
   const { data: userShops } = useQuery<Shop[]>({
     queryKey: ["/api/user/shops"],
-    enabled: user?.role !== "roasteryOwner", // Only fetch for non-roasteryOwner users
+    enabled: user?.role !== "roasteryOwner",
   });
 
   const { data: inventory, isLoading: loadingInventory } = useQuery<InventoryItem[]>({
@@ -77,7 +86,7 @@ export default function RetailOverview() {
       console.log("Fetched inventory data:", data);
       return data;
     },
-    enabled: Boolean(user) // Only fetch when user is logged in
+    enabled: Boolean(user)
   });
 
   const { data: orders, isLoading: loadingOrders } = useQuery<OrderItem[]>({
@@ -91,6 +100,30 @@ export default function RetailOverview() {
       return res.json();
     },
     enabled: Boolean(user)
+  });
+
+  const updateOrderStatusMutation = useMutation({
+    mutationFn: async ({ orderId, status }: { orderId: number; status: string }) => {
+      const res = await apiRequest("PATCH", `/api/orders/${orderId}`, { status });
+      if (!res.ok) {
+        throw new Error("Failed to update order status");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      toast({
+        title: "Order status updated",
+        description: "The order status has been successfully updated.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update order status",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   if (loadingInventory || loadingOrders) {
@@ -110,7 +143,6 @@ export default function RetailOverview() {
     );
   }
 
-  // Group inventory by shop
   const shopData = inventory.reduce<Record<number, {
     shopName: string;
     shopLocation: string;
@@ -119,12 +151,10 @@ export default function RetailOverview() {
   }>>((acc, item) => {
     const { shopId, shopName, shopLocation } = item;
 
-    // If activeShop is selected, only show that shop's data
     if (activeShop?.id && activeShop.id !== shopId) {
       return acc;
     }
 
-    // For roasteryOwner, show all shops
     if (user?.role === "roasteryOwner" || userShops?.some(s => s.id === shopId)) {
       if (!acc[shopId]) {
         acc[shopId] = {
@@ -140,7 +170,6 @@ export default function RetailOverview() {
     return acc;
   }, {});
 
-  // Add orders to the grouped data
   orders?.forEach(order => {
     if (shopData[order.shopId]) {
       shopData[order.shopId].orders.push(order);
@@ -247,6 +276,9 @@ export default function RetailOverview() {
                       <TableHead>Status</TableHead>
                       <TableHead>Created By</TableHead>
                       <TableHead>Order Date</TableHead>
+                      {(user?.role === "retailOwner" || user?.role === "roasteryOwner") && (
+                        <TableHead>Actions</TableHead>
+                      )}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -258,11 +290,38 @@ export default function RetailOverview() {
                         <TableCell className="capitalize">{order.status}</TableCell>
                         <TableCell>{order.createdBy}</TableCell>
                         <TableCell>{formatDate(order.createdAt)}</TableCell>
+                        {(user?.role === "retailOwner" || user?.role === "roasteryOwner") && (
+                          <TableCell>
+                            <Select
+                              defaultValue={order.status}
+                              onValueChange={(value) =>
+                                updateOrderStatusMutation.mutate({
+                                  orderId: order.id,
+                                  status: value,
+                                })
+                              }
+                              disabled={updateOrderStatusMutation.isPending}
+                            >
+                              <SelectTrigger className="w-[130px]">
+                                <SelectValue placeholder="Change status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="roasted">Roasted</SelectItem>
+                                <SelectItem value="dispatched">Dispatched</SelectItem>
+                                <SelectItem value="delivered">Delivered</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                     {data.orders.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center text-muted-foreground">
+                        <TableCell
+                          colSpan={(user?.role === "retailOwner" || user?.role === "roasteryOwner") ? 7 : 6}
+                          className="text-center text-muted-foreground"
+                        >
                           No orders found
                         </TableCell>
                       </TableRow>
