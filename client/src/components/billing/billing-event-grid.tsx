@@ -63,7 +63,8 @@ export function BillingEventGrid() {
         secondarySplitPercentage: secondarySplit,
         quantities: validQuantities,
         cycleStartDate: billingData.fromDate,
-        cycleEndDate: new Date().toISOString()
+        cycleEndDate: new Date().toISOString(),
+        createdById: user?.id
       };
 
       console.log("Creating billing event with payload:", JSON.stringify(payload, null, 2));

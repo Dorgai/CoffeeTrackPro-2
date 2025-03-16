@@ -948,6 +948,8 @@ export class DatabaseStorage {
     cycleStartDate: Date;
     cycleEndDate: Date;
     createdById: number;
+    primarySplitPercentage: number;
+    secondarySplitPercentage: number;
     quantities: Array<{
       grade: string;
       smallBagsQuantity: number;
@@ -955,54 +957,69 @@ export class DatabaseStorage {
     }>;
   }): Promise<BillingEvent> {
     try {
-      console.log("Creating billing event:", data);
+      console.log("Creating billing event with data:", JSON.stringify(data, null, 2));
+
+      // Validate required fields
+      if (!data.createdById) {
+        throw new Error("createdById is required");
+      }
+
+      if (!Array.isArray(data.quantities)) {
+        console.error("Invalid quantities:", data.quantities);
+        throw new Error("Quantities must be an array");
+      }
+
+      if (data.quantities.length === 0) {
+        throw new Error("No quantities provided");
+      }
 
       return await db.transaction(async (tx) => {
-        // Calculate total amount and splits based on grade pricing
-        let totalAmount = 0;
-        for (const q of data.quantities) {
-          const [pricing] = await tx
-            .select()
-            .from(gradePricing)
-            .where(eq(gradePricing.grade, q.grade))
-            .orderBy(sql`updated_at DESC`)
-            .limit(1);
+        // Get active shops to create billing events for each
+        const activeShops = await tx
+          .select()
+          .from(shops)
+          .where(eq(shops.isActive, true));
 
-          if (pricing) {
-            // Convert numbers to standard bags for pricing
-            const standardBags = q.smallBagsQuantity * 0.5 + q.largeBagsQuantity;
-            totalAmount += standardBags * Number(pricing.pricePerKg);
-          }
-        }
+        console.log("Creating billing events for active shops:", activeShops.length);
 
-        // Create the billing event
-        const [event] = await tx
-          .insert(billingEvents)
-          .values({
-            amount: totalAmount,
-            status:"pending",
-            type: "order",
-            cycleStartDate: data.cycleStartDate,
-            cycleEndDate: data.cycleEndDate,
-            createdById: data.createdById,
-            primarySplitPercentage: 70, // Default split percentages
-            secondarySplitPercentage: 30,
-            description: `Billing cycle ${data.cycleStartDate.toISOString().split('T')[0]} to ${data.cycleEndDate.toISOString().split('T')[0]}`,
+        // Create billing events for each active shop
+        const events = await Promise.all(
+          activeShops.map(async (shop) => {
+            const [event] = await tx
+              .insert(billingEvents)
+              .values({
+                shopId: shop.id,
+                amount: 0, // No price calculation needed
+                status: "pending",
+                type: "order",
+                cycleStartDate: data.cycleStartDate,
+                cycleEndDate: data.cycleEndDate,
+                createdById: data.createdById,
+                primarySplitPercentage: data.primarySplitPercentage,
+                secondarySplitPercentage: data.secondarySplitPercentage,
+                description: `Billing cycle ${data.cycleStartDate.toISOString().split('T')[0]} to ${data.cycleEndDate.toISOString().split('T')[0]}`,
+              })
+              .returning();
+
+            console.log("Created billing event:", event.id, "for shop:", shop.id);
+
+            // Create billing event details for each grade
+            await tx
+              .insert(billingEventDetails)
+              .values(data.quantities.map(q => ({
+                billingEventId: event.id,
+                grade: q.grade,
+                smallBagsQuantity: q.smallBagsQuantity,
+                largeBagsQuantity: q.largeBagsQuantity
+              })));
+
+            console.log("Added quantities details for event:", event.id);
+            return event;
           })
-          .returning();
+        );
 
-        // Create billing event details for each grade
-        await tx
-          .insert(billingEventDetails)
-          .values(data.quantities.map(q => ({
-            billingEventId: event.id,
-            grade: q.grade,
-            smallBagsQuantity: q.smallBagsQuantity,
-            largeBagsQuantity: q.largeBagsQuantity,
-          })));
-
-        console.log("Created billing event:", event);
-        return event;
+        // Return the first event as a representative
+        return events[0];
       });
     } catch (error) {
       console.error("Error creating billing event:", error);
