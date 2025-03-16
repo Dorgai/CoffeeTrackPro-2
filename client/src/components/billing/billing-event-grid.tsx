@@ -25,7 +25,6 @@ export function BillingEventGrid() {
   const { user } = useAuth();
   const [primarySplit, setPrimarySplit] = useState(70);
   const [secondarySplit, setSecondarySplit] = useState(30);
-  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const isManager = user?.role === "shopManager";
   const isReadOnly = user?.role === "retailOwner";
 
@@ -86,7 +85,6 @@ export function BillingEventGrid() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/billing/quantities"] });
       queryClient.invalidateQueries({ queryKey: ["/api/billing/history"] });
-      setSelectedEventId(null); // Reset selected event
       toast({
         title: "Success",
         description: "Billing event created successfully",
@@ -106,24 +104,29 @@ export function BillingEventGrid() {
     queryKey: ["/api/billing/quantities"],
   });
 
-  const { data: billingHistory, isLoading: historyLoading } = useQuery<BillingEvent[]>({
+  const { data: billingHistory, isLoading: historyLoading } = useQuery<Array<BillingEvent & { details: BillingEventDetail[] }>>({
     queryKey: ["/api/billing/history"],
-  });
-
-  const { data: selectedEventDetails, isLoading: detailsLoading } = useQuery<BillingEventDetail[]>({
-    queryKey: ["/api/billing/details", selectedEventId],
     queryFn: async () => {
-      if (!selectedEventId) return null;
-      const res = await apiRequest("GET", `/api/billing/details/${selectedEventId}`);
+      const res = await apiRequest("GET", "/api/billing/history");
       if (!res.ok) {
-        throw new Error("Failed to fetch billing details");
+        throw new Error("Failed to fetch billing history");
       }
-      return res.json();
-    },
-    enabled: selectedEventId !== null,
+      const events = await res.json();
+
+      // Fetch details for all events
+      const eventsWithDetails = await Promise.all(
+        events.map(async (event: BillingEvent) => {
+          const detailsRes = await apiRequest("GET", `/api/billing/details/${event.id}`);
+          const details = detailsRes.ok ? await detailsRes.json() : [];
+          return { ...event, details };
+        })
+      );
+
+      return eventsWithDetails;
+    }
   });
 
-  if (quantitiesLoading || historyLoading || detailsLoading) {
+  if (quantitiesLoading || historyLoading) {
     return (
       <div className="flex items-center justify-center min-h-[200px]">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -168,7 +171,7 @@ export function BillingEventGrid() {
                     {formatDateSafely(event.cycleStartDate)} to {formatDateSafely(event.cycleEndDate)}
                   </TableCell>
                   {coffeeGrades.map(grade => {
-                    const details = selectedEventDetails?.find(d => d.grade === grade);
+                    const details = event.details?.find(d => d.grade === grade);
                     return (
                       <TableCell key={grade}>
                         {details ? (
@@ -291,37 +294,6 @@ export function BillingEventGrid() {
                 Generate Billing Event
               </Button>
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {selectedEventId && selectedEventDetails && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Billing Event Details</CardTitle>
-            <CardDescription>
-              Detailed quantities for selected billing event
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Grade</TableHead>
-                  <TableHead>Small Bags</TableHead>
-                  <TableHead>Large Bags</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {selectedEventDetails.map((detail) => (
-                  <TableRow key={detail.id}>
-                    <TableCell className="font-medium">{detail.grade}</TableCell>
-                    <TableCell>{detail.smallBagsQuantity}</TableCell>
-                    <TableCell>{detail.largeBagsQuantity}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
           </CardContent>
         </Card>
       )}
