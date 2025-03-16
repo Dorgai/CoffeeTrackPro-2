@@ -130,7 +130,6 @@ export function BillingEventGrid() {
     },
   });
 
-
   if (quantitiesLoading || historyLoading || detailsLoading) {
     return (
       <div className="flex items-center justify-center min-h-[200px]">
@@ -169,8 +168,8 @@ export function BillingEventGrid() {
                 <TableRow key={event.id}>
                   <TableCell>{format(new Date(event.cycleStartDate), 'PPP')}</TableCell>
                   <TableCell>{format(new Date(event.cycleEndDate), 'PPP')}</TableCell>
-                  <TableCell>{Number(event.primarySplitPercentage).toFixed(2)}%</TableCell>
-                  <TableCell>{Number(event.secondarySplitPercentage).toFixed(2)}%</TableCell>
+                  <TableCell>{event.primarySplitPercentage}%</TableCell>
+                  <TableCell>{event.secondarySplitPercentage}%</TableCell>
                   <TableCell>
                     <Button
                       variant="outline"

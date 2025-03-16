@@ -113,8 +113,8 @@ export default function RetailOverview() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       toast({
-        title: "Order status updated",
-        description: "The order status has been successfully updated.",
+        title: "Success",
+        description: "Order status updated successfully",
       });
     },
     onError: (error: Error) => {
@@ -302,7 +302,7 @@ export default function RetailOverview() {
                                     status: "delivered",
                                   })
                                 }
-                                disabled={updateOrderStatusMutation.isPending || order.status === "delivered"}
+                                disabled={updateOrderStatusMutation.isPending || order.status === "delivered" || order.status !== "dispatched"}
                               >
                                 {updateOrderStatusMutation.isPending ? (
                                   <Loader2 className="h-4 w-4 animate-spin" />
