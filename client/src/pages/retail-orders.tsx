@@ -175,7 +175,6 @@ export default function RetailOrders() {
                     <TableHead>Coffee</TableHead>
                     <TableHead>Small Bags (200g)</TableHead>
                     <TableHead>Large Bags (1kg)</TableHead>
-                    <TableHead>Total Weight</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -183,8 +182,7 @@ export default function RetailOrders() {
                 <TableBody>
                   {orders.map((order) => {
                     const coffee = coffees?.find(c => c.id === order.greenCoffeeId);
-                    const totalWeight = (order.smallBags * 0.2) + (order.largeBags * 1);
-                    const canUpdateToDelivered = order.status === "dispatched";
+                    const canUpdateToDelivered = order.status === "dispatched" && user?.role === "retailOwner";
 
                     return (
                       <TableRow key={order.id}>
@@ -192,7 +190,6 @@ export default function RetailOrders() {
                         <TableCell className="font-medium">{coffee?.name || 'Unknown'}</TableCell>
                         <TableCell>{order.smallBags}</TableCell>
                         <TableCell>{order.largeBags}</TableCell>
-                        <TableCell>{totalWeight.toFixed(2)} kg</TableCell>
                         <TableCell>
                           <Badge variant={order.status === "pending" ? "destructive" : "outline"}>
                             {order.status}
