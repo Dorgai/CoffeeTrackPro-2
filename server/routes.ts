@@ -859,7 +859,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           details: error instanceof Error ? error.message : "Unknown error"
         });
       }
-    });
+        });
 
   // Add new endpoint for inventory history
   app.get("/api/retail-inventory/history", requireShopAccess(["shopManager", "barista", "roasteryOwner", "retailOwner"]), async (req, res) => {
@@ -1205,35 +1205,45 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  // Billing event creation endpoint
   app.post("/api/billing/events", requireRole(["roasteryOwner"]), async (req, res) => {
     try {
-      const { primarySplitPercentage, secondarySplitPercentage, quantities } = req.body;
+      console.log("Creating billing event, requested by:", {
+        userId: req.user?.id,
+        username: req.user?.username,
+        role: req.user?.role
+      });
 
-      // Get the last billing event to determine the cycle start date
-      const lastEvent = await storage.getLastBillingEvent();
-      const cycleStartDate = lastEvent ? lastEvent.cycleEndDate : new Date(0);
-      const cycleEndDate = new Date(); // Current time
+      console.log("Request payload:", JSON.stringify(req.body, null, 2));
 
-      // Create the billing event
-      const event = await storage.createBillingEvent(
-        {
-          cycleStartDate,
-          cycleEndDate,
-          primarySplitPercentage,
-          secondarySplitPercentage,
-          createdById: req.user!.id
-        },
-        quantities.map((q: any) => ({
-          grade: q.grade,
-          smallBagsQuantity: q.smallBagsQuantity,
-          largeBagsQuantity: q.largeBagsQuantity
-        }))
-      );
+      // Validate required fields
+      const { primarySplitPercentage, secondarySplitPercentage, quantities, cycleStartDate, cycleEndDate } = req.body;
 
+      if (!primarySplitPercentage || !secondarySplitPercentage) {
+        throw new Error("Split percentages are required");
+      }
+
+      if (!Array.isArray(quantities) || quantities.length === 0) {
+        throw new Error("Valid quantities array is required");
+      }
+
+      if (!cycleStartDate || !cycleEndDate) {
+        throw new Error("Cycle dates are required");
+      }
+
+      const event = await storage.createBillingEvent({
+        ...req.body,
+        createdById: req.user!.id,
+      });
+
+      console.log("Successfully created billing event:", event);
       res.json(event);
     } catch (error) {
-      console.error("Error creating billing event:", error);
-      res.status(500).json({ message: "Failed to create billing event" });
+      console.error("Error in billing event creation:", error);
+      res.status(400).json({
+        message: error instanceof Error ? error.message : "Failed to create billing event",
+        details: error instanceof Error ? error.stack : undefined
+      });
     }
   });
 
