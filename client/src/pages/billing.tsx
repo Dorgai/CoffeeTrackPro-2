@@ -42,7 +42,13 @@ export default function BillingPage() {
   // Handle generate billing event
   const handleGenerateBillingEvent = async () => {
     try {
-      const res = await apiRequest("POST", "/api/billing/generate", {});
+      // Default split percentages - adjust as needed
+      const payload = {
+        primarySplitPercentage: 70,
+        secondarySplitPercentage: 30,
+      };
+
+      const res = await apiRequest("POST", "/api/billing/generate", payload);
       if (!res.ok) {
         throw new Error("Failed to generate billing event");
       }
@@ -131,13 +137,16 @@ export default function BillingPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {deliveredQuantities?.map((qty) => (
-                <TableRow key={qty.grade}>
-                  <TableCell className="font-medium">{qty.grade}</TableCell>
-                  <TableCell>{qty.smallBagsQuantity}</TableCell>
-                  <TableCell>{qty.largeBagsQuantity}</TableCell>
-                </TableRow>
-              ))}
+              {coffeeGrades.map((grade) => {
+                const gradeQuantity = deliveredQuantities?.find(q => q.grade === grade);
+                return (
+                  <TableRow key={grade}>
+                    <TableCell className="font-medium">{grade}</TableCell>
+                    <TableCell>{gradeQuantity?.smallBagsQuantity || 0}</TableCell>
+                    <TableCell>{gradeQuantity?.largeBagsQuantity || 0}</TableCell>
+                  </TableRow>
+                );
+              })}
               {(!deliveredQuantities || deliveredQuantities.length === 0) && (
                 <TableRow>
                   <TableCell colSpan={3} className="text-center text-muted-foreground">
