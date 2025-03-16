@@ -1,5 +1,5 @@
-import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useState } from "react";
 import { BillingEvent, BillingEventDetail, coffeeGrades } from "@shared/schema";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -40,6 +40,10 @@ export function BillingEventGrid() {
         throw new Error("Split percentages must sum to 100%");
       }
 
+      if (!user?.id) {
+        throw new Error("User ID is required");
+      }
+
       const validQuantities = coffeeGrades
         .map(grade => {
           const gradeData = billingData.quantities.find(q => q.grade === grade) ||
@@ -54,10 +58,6 @@ export function BillingEventGrid() {
 
       if (validQuantities.length === 0) {
         throw new Error("No quantities to bill");
-      }
-
-      if (!user?.id) {
-        throw new Error("User ID is required");
       }
 
       const payload = {
@@ -86,6 +86,7 @@ export function BillingEventGrid() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/billing/quantities"] });
       queryClient.invalidateQueries({ queryKey: ["/api/billing/history"] });
+      setSelectedEventId(null); // Reset selected event
       toast({
         title: "Success",
         description: "Billing event created successfully",
@@ -120,14 +121,6 @@ export function BillingEventGrid() {
       return res.json();
     },
     enabled: selectedEventId !== null,
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-      setSelectedEventId(null);
-    },
   });
 
   if (quantitiesLoading || historyLoading || detailsLoading) {
