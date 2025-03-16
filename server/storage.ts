@@ -873,12 +873,12 @@ export class DatabaseStorage {
       console.log("Getting billing history with details");
       const query = sql`
         WITH events AS (
-          SELECT DISTINCT ON (be.shop_id, be.cycle_end_date)
+          SELECT DISTINCT ON (be.cycle_end_date)
             be.*,
             u.username as "createdByUsername"
           FROM billing_events be
           LEFT JOIN users u ON be.created_by_id = u.id
-          ORDER BY be.shop_id, be.cycle_end_date DESC
+          ORDER BY be.cycle_end_date DESC
         ),
         details AS (
           SELECT 
@@ -974,7 +974,8 @@ export class DatabaseStorage {
 
   async createBillingEvent(data: {
     cycleStartDate: Date | string;
-    cycleEndDate: Date | string;    createdById: number;
+    cycleEndDate: Date | string;
+    createdById: number;
     primarySplitPercentage: number;
     secondarySplitPercentage: number;
     quantities: Array<{
@@ -986,7 +987,6 @@ export class DatabaseStorage {
     try {
       console.log("Creating billing event with data:", JSON.stringify(data, null, 2));
 
-      // Validate required fields
       if (!data.createdById) {
         throw new Error("createdById is required");
       }
@@ -1009,22 +1009,18 @@ export class DatabaseStorage {
 
         // Get the last billing event to determine the cycle start date
         const lastEvent = await this.getLastBillingEvent();
-
-        // Ensure we have valid dates
         const now = new Date();
-        const cycleStartDate = lastEvent
-          ? new Date(lastEvent.cycleEndDate)
-          : new Date(0);
-        const cycleEndDate = now;
+
+        // Format dates properly
+        const cycleStartDateStr = lastEvent?.cycleEndDate || new Date(0).toISOString();
+        const cycleEndDateStr = now.toISOString();
 
         console.log("Creating billing event with dates:", {
-          cycleStartDate,
-          cycleEndDate,
-          cycleStartIso: cycleStartDate.toISOString(),
-          cycleEndIso: cycleEndDate.toISOString()
+          cycleStartDate: cycleStartDateStr,
+          cycleEndDate: cycleEndDateStr
         });
 
-        // Create a billing event for each active shop
+        // Create billing events for each active shop
         const events = await Promise.all(
           activeShops.map(async (shop) => {
             const [event] = await tx
@@ -1034,12 +1030,12 @@ export class DatabaseStorage {
                 amount: "0.00",
                 status: "pending",
                 type: "order",
-                cycleStartDate: cycleStartDate.toISOString(),
-                cycleEndDate: cycleEndDate.toISOString(),
+                cycleStartDate: cycleStartDateStr,
+                cycleEndDate: cycleEndDateStr,
                 primarySplitPercentage: data.primarySplitPercentage,
                 secondarySplitPercentage: data.secondarySplitPercentage,
-                description: `Billing cycle from ${cycleStartDate.toLocaleString()} to ${cycleEndDate.toLocaleString()}`,
-                createdById: data.createdById,
+                description: `Billing cycle from ${new Date(cycleStartDateStr).toLocaleString()} to ${now.toLocaleString()}`,
+                createdById: data.createdById
               })
               .returning();
 
@@ -1072,7 +1068,7 @@ export class DatabaseStorage {
     }
   }
 
-  // The rest of the class implementation remains unchanged...
+  // The rest of the class implementation remains unchanged
 }
 
 export const storage = new DatabaseStorage();
