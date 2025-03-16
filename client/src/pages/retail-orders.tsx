@@ -228,10 +228,10 @@ export default function RetailOrders() {
         onOpenChange={setIsOrderDialogOpen}
       >
         <DialogContent className="sm:max-w-[500px]">
-          <CardHeader>
-            <CardTitle>Place New Order</CardTitle>
-            <CardDescription>Order coffee from the roastery</CardDescription>
-          </CardHeader>
+          <DialogHeader>
+            <DialogTitle>Place New Order</DialogTitle>
+            <DialogDescription>Order coffee from the roastery</DialogDescription>
+          </DialogHeader>
           <CardContent>
             {coffees?.map((coffee) => (
               <div key={coffee.id} className="mb-4">
