@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { useAuth } from "@/hooks/use-auth";
 
 type BillingQuantityResponse = {
@@ -29,7 +29,6 @@ export function BillingEventGrid() {
   const isManager = user?.role === "shopManager";
   const isReadOnly = user?.role === "retailOwner";
 
-  // Create billing event mutation
   const createBillingEventMutation = useMutation({
     mutationFn: async () => {
       if (!billingData?.quantities || !Array.isArray(billingData.quantities)) {
@@ -41,10 +40,9 @@ export function BillingEventGrid() {
         throw new Error("Split percentages must sum to 100%");
       }
 
-      // Filter out quantities with zero values and create valid billing quantities
       const validQuantities = coffeeGrades
         .map(grade => {
-          const gradeData = billingData.quantities.find(q => q.grade === grade) || 
+          const gradeData = billingData.quantities.find(q => q.grade === grade) ||
             { smallBagsQuantity: 0, largeBagsQuantity: 0 };
           return {
             grade,
@@ -103,17 +101,14 @@ export function BillingEventGrid() {
     },
   });
 
-  // Fetch quantities since last billing event
   const { data: billingData, isLoading: quantitiesLoading } = useQuery<BillingQuantityResponse>({
     queryKey: ["/api/billing/quantities"],
   });
 
-  // Fetch billing history
   const { data: billingHistory, isLoading: historyLoading } = useQuery<BillingEvent[]>({
     queryKey: ["/api/billing/history"],
   });
 
-  // Fetch billing details for selected event
   const { data: selectedEventDetails, isLoading: detailsLoading } = useQuery<BillingEventDetail[]>({
     queryKey: ["/api/billing/details", selectedEventId],
     queryFn: async () => {
@@ -147,9 +142,17 @@ export function BillingEventGrid() {
     q => q.smallBagsQuantity > 0 || q.largeBagsQuantity > 0
   );
 
+  const formatDateSafely = (dateString: string) => {
+    try {
+      return format(parseISO(dateString), 'PPP');
+    } catch (error) {
+      console.error("Error formatting date:", dateString, error);
+      return dateString;
+    }
+  };
+
   return (
     <div className="space-y-8">
-      {/* Billing History */}
       <Card>
         <CardHeader>
           <CardTitle>Billing History</CardTitle>
@@ -169,8 +172,8 @@ export function BillingEventGrid() {
             <TableBody>
               {billingHistory?.map((event) => (
                 <TableRow key={event.id}>
-                  <TableCell>{format(new Date(event.cycleStartDate), 'PPP')}</TableCell>
-                  <TableCell>{format(new Date(event.cycleEndDate), 'PPP')}</TableCell>
+                  <TableCell>{formatDateSafely(event.cycleStartDate)}</TableCell>
+                  <TableCell>{formatDateSafely(event.cycleEndDate)}</TableCell>
                   <TableCell>{event.primarySplitPercentage}%</TableCell>
                   <TableCell>{event.secondarySplitPercentage}%</TableCell>
                   <TableCell>
@@ -196,17 +199,15 @@ export function BillingEventGrid() {
         </CardContent>
       </Card>
 
-      {/* Current Billing Cycle Information */}
       <Card>
         <CardHeader>
           <CardTitle>Current Billing Cycle</CardTitle>
           <CardDescription>
-            Data gathered since: {billingData?.fromDate ? format(new Date(billingData.fromDate), 'PPP') : 'N/A'}
+            Data gathered since: {billingData?.fromDate ? formatDateSafely(billingData.fromDate) : 'N/A'}
           </CardDescription>
         </CardHeader>
       </Card>
 
-      {/* Current Billing Cycle Quantities */}
       <Card>
         <CardHeader>
           <CardTitle>Current Billing Cycle Quantities</CardTitle>
@@ -247,7 +248,6 @@ export function BillingEventGrid() {
         </CardContent>
       </Card>
 
-      {/* Split View - Only show for roasteryOwner */}
       {!isManager && !isReadOnly && (
         <Card>
           <CardHeader>
@@ -292,7 +292,7 @@ export function BillingEventGrid() {
               <Button
                 onClick={() => createBillingEventMutation.mutate()}
                 disabled={
-                  createBillingEventMutation.isPending || 
+                  createBillingEventMutation.isPending ||
                   !hasNonZeroQuantities ||
                   primarySplit + secondarySplit !== 100
                 }
@@ -307,7 +307,6 @@ export function BillingEventGrid() {
         </Card>
       )}
 
-      {/* Selected Event Details */}
       {selectedEventId && selectedEventDetails && (
         <Card>
           <CardHeader>
