@@ -11,6 +11,15 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useAuth } from "@/hooks/use-auth";
 
+type BillingQuantityResponse = {
+  fromDate: string;
+  quantities: {
+    grade: string;
+    smallBagsQuantity: number;
+    largeBagsQuantity: number;
+  }[];
+};
+
 export function BillingEventGrid() {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -18,6 +27,60 @@ export function BillingEventGrid() {
   const [secondarySplit, setSecondarySplit] = useState(30);
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const isManager = user?.role === "shopManager";
+  const isReadOnly = user?.role === "retailOwner";
+
+  // Create billing event mutation
+  const createBillingEventMutation = useMutation({
+    mutationFn: async () => {
+      if (!billingData?.quantities || !Array.isArray(billingData.quantities)) {
+        throw new Error("Invalid billing quantities data");
+      }
+
+      if (primarySplit + secondarySplit !== 100) {
+        throw new Error("Split percentages must sum to 100%");
+      }
+
+      const quantities = billingData.quantities.map(q => ({
+        grade: q.grade,
+        smallBagsQuantity: q.smallBagsQuantity,
+        largeBagsQuantity: q.largeBagsQuantity
+      }));
+
+      const payload = {
+        primarySplitPercentage: primarySplit,
+        secondarySplitPercentage: secondarySplit,
+        quantities
+      };
+
+      console.log("Creating billing event with payload:", payload);
+
+      const res = await apiRequest("POST", "/api/billing/events", payload);
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        console.error("Failed to create billing event:", errorData);
+        throw new Error(errorData.message || "Failed to create billing event");
+      }
+
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/billing/quantities"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/billing/history"] });
+      toast({
+        title: "Success",
+        description: "Billing event created successfully",
+      });
+    },
+    onError: (error: Error) => {
+      console.error("Billing event creation error:", error);
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   // Fetch quantities since last billing event
   const { data: billingData, isLoading: quantitiesLoading } = useQuery<BillingQuantityResponse>({
@@ -51,56 +114,6 @@ export function BillingEventGrid() {
     },
   });
 
-  // Create billing event mutation
-  const createBillingEventMutation = useMutation({
-    mutationFn: async () => {
-      if (!billingData) {
-        throw new Error("No billing data available");
-      }
-
-      if (primarySplit + secondarySplit !== 100) {
-        throw new Error("Split percentages must sum to 100%");
-      }
-
-      const payload = {
-        primarySplitPercentage: primarySplit,
-        secondarySplitPercentage: secondarySplit,
-        quantities: billingData.quantities.map(q => ({
-          grade: q.grade,
-          smallBagsQuantity: q.smallBagsQuantity,
-          largeBagsQuantity: q.largeBagsQuantity
-        }))
-      };
-
-      console.log("Creating billing event with payload:", payload);
-
-      const res = await apiRequest("POST", "/api/billing/events", payload);
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        console.error("Failed to create billing event:", errorData);
-        throw new Error(errorData.message || "Failed to create billing event");
-      }
-
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/billing/quantities"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/billing/history"] });
-      toast({
-        title: "Success",
-        description: "Billing event created successfully",
-      });
-    },
-    onError: (error: Error) => {
-      console.error("Billing event creation error:", error);
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
 
   if (quantitiesLoading || historyLoading || detailsLoading) {
     return (
@@ -200,6 +213,7 @@ export function BillingEventGrid() {
         </CardHeader>
       </Card>
 
+      {/* Current Billing Cycle Quantities */}
       <Card>
         <CardHeader>
           <CardTitle>Current Billing Cycle Quantities</CardTitle>
@@ -218,7 +232,7 @@ export function BillingEventGrid() {
             </TableHeader>
             <TableBody>
               {coffeeGrades.map((grade) => {
-                const gradeData = billingData?.quantities.find(q => q.grade === grade) ||
+                const gradeData = billingData?.quantities?.find(q => q.grade === grade) ||
                   { smallBagsQuantity: 0, largeBagsQuantity: 0 };
                 return (
                   <TableRow key={grade}>
@@ -234,7 +248,7 @@ export function BillingEventGrid() {
       </Card>
 
       {/* Split View - Only show for roasteryOwner */}
-      {!isManager && (
+      {!isManager && !isReadOnly && (
         <Card>
           <CardHeader>
             <CardTitle>Revenue Split View</CardTitle>
@@ -284,7 +298,7 @@ export function BillingEventGrid() {
               </TableHeader>
               <TableBody>
                 {coffeeGrades.map((grade) => {
-                  const gradeData = billingData?.quantities.find(q => q.grade === grade) ||
+                  const gradeData = billingData?.quantities?.find(q => q.grade === grade) ||
                     { smallBagsQuantity: 0, largeBagsQuantity: 0 };
                   const totalBags = gradeData.smallBagsQuantity + gradeData.largeBagsQuantity;
                   return (
@@ -305,7 +319,7 @@ export function BillingEventGrid() {
             <div className="mt-6">
               <Button
                 onClick={() => createBillingEventMutation.mutate()}
-                disabled={createBillingEventMutation.isPending || !billingData?.quantities}
+                disabled={createBillingEventMutation.isPending || !billingData?.quantities?.length}
               >
                 {createBillingEventMutation.isPending ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -319,12 +333,3 @@ export function BillingEventGrid() {
     </div>
   );
 }
-
-type BillingQuantityResponse = {
-  fromDate: string;
-  quantities: {
-    grade: string;
-    smallBagsQuantity: number;
-    largeBagsQuantity: number;
-  }[];
-};
