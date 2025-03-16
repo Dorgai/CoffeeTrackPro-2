@@ -58,13 +58,17 @@ export function BillingEventGrid() {
         throw new Error("No quantities to bill");
       }
 
+      if (!user?.id) {
+        throw new Error("User ID is required");
+      }
+
       const payload = {
         primarySplitPercentage: primarySplit,
         secondarySplitPercentage: secondarySplit,
         quantities: validQuantities,
         cycleStartDate: billingData.fromDate,
         cycleEndDate: new Date().toISOString(),
-        createdById: user?.id
+        createdById: user.id
       };
 
       console.log("Creating billing event with payload:", JSON.stringify(payload, null, 2));
