@@ -1,6 +1,5 @@
 import { BillingEventGrid } from "@/components/billing/billing-event-grid";
 import { useAuth } from "@/hooks/use-auth";
-import { Redirect } from "wouter";
 import { Loader2 } from "lucide-react";
 
 export default function BillingPage() {
@@ -14,8 +13,8 @@ export default function BillingPage() {
     );
   }
 
-  // Only roasteryOwner can access billing
-  if (!user || user.role !== "roasteryOwner") {
+  // Allow both roasteryOwner and retailOwner to access billing
+  if (!user || (user.role !== "roasteryOwner" && user.role !== "retailOwner")) {
     return <Redirect to="/" />;
   }
 
@@ -25,7 +24,9 @@ export default function BillingPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Billing Management</h1>
           <p className="text-muted-foreground">
-            Manage billing events, pricing, and revenue splits
+            {user.role === "roasteryOwner" 
+              ? "Manage billing events, pricing, and revenue splits"
+              : "View billing events and quantities"}
           </p>
         </div>
       </div>

@@ -58,6 +58,10 @@ export function BillingEventGrid() {
         throw new Error("No billing data available");
       }
 
+      if (primarySplit + secondarySplit !== 100) {
+        throw new Error("Split percentages must sum to 100%");
+      }
+
       const payload = {
         primarySplitPercentage: primarySplit,
         secondarySplitPercentage: secondarySplit,
@@ -68,12 +72,16 @@ export function BillingEventGrid() {
         }))
       };
 
+      console.log("Creating billing event with payload:", payload);
+
       const res = await apiRequest("POST", "/api/billing/events", payload);
 
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Failed to create billing event");
+        const errorData = await res.json();
+        console.error("Failed to create billing event:", errorData);
+        throw new Error(errorData.message || "Failed to create billing event");
       }
+
       return res.json();
     },
     onSuccess: () => {
@@ -85,6 +93,7 @@ export function BillingEventGrid() {
       });
     },
     onError: (error: Error) => {
+      console.error("Billing event creation error:", error);
       toast({
         title: "Error",
         description: error.message,
