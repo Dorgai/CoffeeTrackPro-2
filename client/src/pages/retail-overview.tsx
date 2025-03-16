@@ -63,6 +63,13 @@ type OrderItem = {
   createdBy: string;
 };
 
+const ORDER_STATUS_SEQUENCE = {
+  pending: ["roasted"],
+  roasted: ["dispatched"],
+  dispatched: ["delivered"],
+  delivered: [],
+};
+
 export default function RetailOverview() {
   const { user } = useAuth();
   const { activeShop } = useActiveShop();
@@ -125,6 +132,18 @@ export default function RetailOverview() {
       });
     },
   });
+
+  // Helper function to get allowed next statuses
+  const getNextStatuses = (currentStatus: string): string[] => {
+    if (user?.role === "roasteryOwner") {
+      // Roastery owners can set any status except going backwards
+      const allStatuses = ["pending", "roasted", "dispatched", "delivered"];
+      const currentIndex = allStatuses.indexOf(currentStatus);
+      return allStatuses.slice(currentIndex + 1);
+    }
+    // For retail owners and others, use the sequence map
+    return ORDER_STATUS_SEQUENCE[currentStatus] || [];
+  };
 
   if (loadingInventory || loadingOrders) {
     return (
@@ -282,60 +301,68 @@ export default function RetailOverview() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {data.orders.map((order) => (
-                      <TableRow key={order.id}>
-                        <TableCell className="font-medium">{order.coffeeName}</TableCell>
-                        <TableCell>{order.smallBags}</TableCell>
-                        <TableCell>{order.largeBags}</TableCell>
-                        <TableCell className="capitalize">{order.status}</TableCell>
-                        <TableCell>{order.createdBy}</TableCell>
-                        <TableCell>{formatDate(order.createdAt)}</TableCell>
-                        {(user?.role === "retailOwner" || user?.role === "roasteryOwner") && (
-                          <TableCell>
-                            {user?.role === "retailOwner" ? (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  updateOrderStatusMutation.mutate({
-                                    orderId: order.id,
-                                    status: "delivered",
-                                  })
-                                }
-                                disabled={updateOrderStatusMutation.isPending || order.status === "delivered" || order.status !== "dispatched"}
-                              >
-                                {updateOrderStatusMutation.isPending ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  "Mark as Delivered"
-                                )}
-                              </Button>
-                            ) : (
-                              <Select
-                                defaultValue={order.status}
-                                onValueChange={(value) =>
-                                  updateOrderStatusMutation.mutate({
-                                    orderId: order.id,
-                                    status: value,
-                                  })
-                                }
-                                disabled={updateOrderStatusMutation.isPending}
-                              >
-                                <SelectTrigger className="w-[130px]">
-                                  <SelectValue placeholder="Change status" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="pending">Pending</SelectItem>
-                                  <SelectItem value="roasted">Roasted</SelectItem>
-                                  <SelectItem value="dispatched">Dispatched</SelectItem>
-                                  <SelectItem value="delivered">Delivered</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            )}
-                          </TableCell>
-                        )}
-                      </TableRow>
-                    ))}
+                    {data.orders.map((order) => {
+                      const nextStatuses = getNextStatuses(order.status);
+                      return (
+                        <TableRow key={order.id}>
+                          <TableCell className="font-medium">{order.coffeeName}</TableCell>
+                          <TableCell>{order.smallBags}</TableCell>
+                          <TableCell>{order.largeBags}</TableCell>
+                          <TableCell className="capitalize">{order.status}</TableCell>
+                          <TableCell>{order.createdBy}</TableCell>
+                          <TableCell>{formatDate(order.createdAt)}</TableCell>
+                          {(user?.role === "retailOwner" || user?.role === "roasteryOwner") && (
+                            <TableCell>
+                              {user?.role === "retailOwner" ? (
+                                order.status === "dispatched" && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      updateOrderStatusMutation.mutate({
+                                        orderId: order.id,
+                                        status: "delivered",
+                                      })
+                                    }
+                                    disabled={updateOrderStatusMutation.isPending || order.status === "delivered"}
+                                  >
+                                    {updateOrderStatusMutation.isPending ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      "Mark as Delivered"
+                                    )}
+                                  </Button>
+                                )
+                              ) : (
+                                nextStatuses.length > 0 && (
+                                  <Select
+                                    defaultValue={order.status}
+                                    onValueChange={(value) =>
+                                      updateOrderStatusMutation.mutate({
+                                        orderId: order.id,
+                                        status: value,
+                                      })
+                                    }
+                                    disabled={updateOrderStatusMutation.isPending}
+                                  >
+                                    <SelectTrigger className="w-[130px]">
+                                      <SelectValue placeholder="Change status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {nextStatuses.map((status) => (
+                                        <SelectItem key={status} value={status}>
+                                          {status.charAt(0).toUpperCase() + status.slice(1)}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                )
+                              )}
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      );
+                    })}
                     {data.orders.length === 0 && (
                       <TableRow>
                         <TableCell
