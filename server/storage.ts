@@ -938,25 +938,14 @@ export class DatabaseStorage {
       const result = await db.execute(query);
       console.log("Retrieved billing quantities:", result.rows);
 
-      // Convert string numbers to actual numbers and ensure we have all grades
-      const quantities = coffeeGrades.map(grade => {
-        const found = result.rows.find(row => row.grade === grade);
-        return {
-          grade,
-          smallBagsQuantity: found ? parseInt(found.smallBagsQuantity) || 0 : 0,
-          largeBagsQuantity: found ? parseInt(found.largeBagsQuantity) || 0 : 0
-        };
-      });
-
-      console.log("Processed quantities:", quantities);
-      return quantities;
+      return result.rows.map(row => ({
+        grade: row.grade,
+        smallBagsQuantity: parseInt(row.smallBagsQuantity) || 0,
+        largeBagsQuantity: parseInt(row.largeBagsQuantity) || 0
+      }));
     } catch (error) {
       console.error("Error calculating billing quantities:", error);
-      return coffeeGrades.map(grade => ({
-        grade,
-        smallBagsQuantity: 0,
-        largeBagsQuantity: 0
-      }));
+      return [];
     }
   }
 
