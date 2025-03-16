@@ -127,7 +127,7 @@ export function BillingEventGrid() {
       if (!dateString) return 'N/A';
       const date = parseISO(dateString);
       if (!isValid(date)) throw new Error('Invalid date');
-      return format(date, 'PPP p'); // Added time to the date format
+      return format(date, 'PPP p'); // "Sep 15, 2023, 3:25 PM" format
     } catch (error) {
       console.error("Error formatting date:", dateString, error);
       return 'N/A';

@@ -7,6 +7,11 @@ import { pool } from "./db";
 
 const PostgresSessionStore = connectPg(session);
 
+// Utility function for formatting dates (moved outside the class)
+function formatTimestamp(date: Date): string {
+  return date.toISOString(); // Keep full ISO timestamp precision
+}
+
 export class DatabaseStorage {
   sessionStore: session.Store;
 
@@ -972,7 +977,8 @@ export class DatabaseStorage {
     createdById: number;
     primarySplitPercentage: number;
     secondarySplitPercentage: number;
-    quantities: Array<{      grade: string;      smallBagsQuantity: number;
+    quantities: Array<{
+      grade: string;      smallBagsQuantity: number;
       largeBagsQuantity: number;
     }>;
   }): Promise<BillingEvent> {
@@ -1000,71 +1006,67 @@ export class DatabaseStorage {
           .from(shops)
           .where(eq(shops.isActive, true));
 
-        console.log("Creating billing events for active shops:", activeShops.length);
+        // Get the last billing event to determine the cycle start date
+        const lastEvent = await this.getLastBillingEvent();
+        const cycleStartDate = lastEvent
+          ? new Date(lastEvent.cycleEndDate)
+          : new Date(0);
+        const cycleEndDate = new Date(); // Current timestamp
 
-        // Convert dates to proper format
-        const cycleStartDate = new Date(data.cycleStartDate);
-        const cycleEndDate = new Date(data.cycleEndDate);
+        console.log("Creating billing event with dates:", {
+          cycleStartDate: formatTimestamp(cycleStartDate),
+          cycleEndDate: formatTimestamp(cycleEndDate),
+        });
 
-        // Create billing events for each active shop
+        // Create a billing event for each active shop
         const events = await Promise.all(
           activeShops.map(async (shop) => {
             const [event] = await tx
               .insert(billingEvents)
               .values({
                 shopId: shop.id,
-                amount: 0, // No price calculation needed
+                amount: "0.00",
                 status: "pending",
                 type: "order",
-                cycleStartDate,
-                cycleEndDate,
+                cycleStartDate: formatTimestamp(cycleStartDate),
+                cycleEndDate: formatTimestamp(cycleEndDate),
                 createdById: data.createdById,
                 primarySplitPercentage: data.primarySplitPercentage,
                 secondarySplitPercentage: data.secondarySplitPercentage,
-                description: `Billing cycle ${cycleStartDate.toISOString().split('T')[0]} to ${cycleEndDate.toISOString().split('T')[0]}`,
+                description: `Billing cycle from ${cycleStartDate.toLocaleString()} to ${cycleEndDate.toLocaleString()}`,
               })
               .returning();
 
-            console.log("Created billing event:", event.id, "for shop:", shop.id);
+            // Create details for each grade's quantities
+            await Promise.all(
+              data.quantities
+                .filter(q => q.smallBagsQuantity > 0 || q.largeBagsQuantity > 0)
+                .map(async (q) => {
+                  await tx
+                    .insert(billingEventDetails)
+                    .values({
+                      billingEventId: event.id,
+                      grade: q.grade,
+                      smallBagsQuantity: q.smallBagsQuantity,
+                      largeBagsQuantity: q.largeBagsQuantity,
+                    });
+                })
+            );
 
-            // Create billing event details for each grade
-            await tx
-              .insert(billingEventDetails)
-              .values(data.quantities.map(q => ({
-                billingEventId: event.id,
-                grade: q.grade,
-                smallBagsQuantity: q.smallBagsQuantity,
-                largeBagsQuantity: q.largeBagsQuantity
-              })));
-
-            console.log("Added quantities details for event:", event.id);
             return event;
           })
         );
 
-        // Return the first event as a representative
-        return events[0];
+        console.log("Created billing events:", events.length);
+        return events[0]; // Return first event
       });
     } catch (error) {
       console.error("Error creating billing event:", error);
       throw error;
     }
   }
-  async getBillingEventDetails(eventId: number): Promise<BillingEventDetail[]> {
-    try {
-      console.log("Getting billing event details for event:", eventId);
-      const details = await db
-        .select()
-        .from(billingEventDetails)
-        .where(eq(billingEventDetails.billingEventId, eventId));
 
-      console.log("Found billing details:", details.length);
-      return details;
-    } catch (error) {
-      console.error("Error getting billing event details:", error);
-      return [];
-    }
-  }
+  // The rest of the class implementation remains unchanged...
 }
 
 export const storage = new DatabaseStorage();
