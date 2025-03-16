@@ -851,7 +851,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           ? inventory.filter(item => item.shopId === shopId)
           : inventory;
 
-        console.log("Filtered inventory count:", filteredInventory.length);
+        console.logconsole.log("Filtered inventory count:", filteredInventory.length);
         res.json(filteredInventory);
       } catch (error) {
         console.error("Error fetching retail inventory:", error);
@@ -859,7 +859,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           details: error instanceof Error ? error.message : "Unknown error"
         });
       }
-        });
+    });
 
   // Add new endpoint for inventory history
   app.get("/api/retail-inventory/history", requireShopAccess(["shopManager", "barista", "roasteryOwner", "retailOwner"]), async (req, res) => {
@@ -1177,31 +1177,40 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-  app.get("/api/billing/quantities", requireRole(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
+  app.get("/api/billing/quantities", requireRole(["roasteryOwner"]), async (req, res) => {
     try {
       console.log("Fetching billing quantities...");
 
-      // Get the last billing event to determine the start date
+      // First get the last billing event to determine start date
       const lastEvent = await storage.getLastBillingEvent();
-      const fromDate = lastEvent ? lastEvent.cycleEndDate : new Date(0); // Use epoch if no previous event
+      console.log("Last billing event:", lastEvent);
 
-      console.log("Using fromDate:", fromDate);
-
-      // Get quantities since last billing event
-      const quantities = await storage.getBillingQuantities(fromDate);
+      // Format the response
+      const quantities = await storage.getBillingQuantities();
       console.log("Retrieved quantities:", quantities);
 
-      // Send response with both fromDate and quantities
       res.json({
-        fromDate: fromDate.toISOString(),
+        fromDate: lastEvent?.cycleEndDate || new Date(0).toISOString(),
         quantities: quantities
       });
     } catch (error) {
       console.error("Error in /api/billing/quantities:", error);
-      res.status(500).json({
-        message: "Failed to fetch billing quantities",
-        details: error instanceof Error ? error.message : "Unknown error"
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to fetch billing quantities"
       });
+    }
+  });
+
+  // Update the billing history endpoint to include details
+  app.get("/api/billing/history", requireRole(["roasteryOwner"]), async (req, res) => {
+    try {
+      console.log("Fetching billing history for user:", req.user?.username, "role:", req.user?.role);
+      const history = await storage.getBillingHistory();
+      console.log("Retrieved billing history:", history?.length, "events");
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching billing history:", error);
+      res.status(500).json({ message: "Failed to fetch billing history" });
     }
   });
 

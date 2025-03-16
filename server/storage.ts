@@ -863,23 +863,45 @@ export class DatabaseStorage {
   }
 
   // Add new billing methods
-  async getBillingHistory(): Promise<BillingEvent[]> {
+  async getBillingHistory(): Promise<Array<BillingEvent & { details: BillingEventDetail[] }>> {
     try {
-      console.log("Getting billing history");
+      console.log("Getting billing history with details");
       const query = sql`
+        WITH events AS (
+          SELECT 
+            be.*,
+            u.username as "createdByUsername"
+          FROM billing_events be
+          LEFT JOIN users u ON be.created_by_id = u.id
+          ORDER BY be.created_at DESC
+        )
         SELECT 
-          be.*,
-          u.username as "createdByUsername",
-          bed.grade,
-          bed.small_bags_quantity as "smallBagsQuantity",
-          bed.large_bags_quantity as "largeBagsQuantity"
-        FROM billing_events be
-        LEFT JOIN users u ON be.created_by_id = u.id
-        LEFT JOIN billing_event_details bed ON be.id = bed.billing_event_id
-        ORDER BY be.created_at DESC`;
+          e.*,
+          json_agg(
+            json_build_object(
+              'id', bed.id,
+              'grade', bed.grade,
+              'smallBagsQuantity', bed.small_bags_quantity,
+              'largeBagsQuantity', bed.large_bags_quantity
+            )
+          ) as details
+        FROM events e
+        LEFT JOIN billing_event_details bed ON e.id = bed.billing_event_id
+        GROUP BY 
+          e.id, e.shop_id, e.amount, e.status, e.type,
+          e.cycle_start_date, e.cycle_end_date,
+          e.primary_split_percentage, e.secondary_split_percentage,
+          e.description, e.processed_at, e.created_at,
+          e.created_by_id, e."createdByUsername"
+        ORDER BY e.created_at DESC`;
 
       const result = await db.execute(query);
-      return result.rows as BillingEvent[];
+      console.log("Retrieved billing history:", result.rows?.length, "events");
+
+      return result.rows.map(row => ({
+        ...row,
+        details: row.details === '[null]' ? [] : row.details
+      }));
     } catch (error) {
       console.error("Error getting billing history:", error);
       return [];
@@ -912,7 +934,7 @@ export class DatabaseStorage {
 
       // Get the last billing event to determine the start date
       const lastEvent = await this.getLastBillingEvent();
-      const startDate = lastEvent?.cycleEndDate || new Date(0); // If no previous event, use epoch
+      const startDate = lastEvent ? new Date(lastEvent.cycleEndDate) : new Date(0); // If no previous event, use epoch
 
       console.log("Using fromDate:", startDate.toISOString());
 
@@ -932,11 +954,11 @@ export class DatabaseStorage {
       const result = await db.execute(query);
       console.log("Retrieved billing quantities:", result.rows);
 
-      // Map the results directly, no need for string conversion since we cast in SQL
+      // Map the results to the expected format
       return result.rows.map(row => ({
-        grade: row.grade,
-        smallBagsQuantity: row.smallBagsQuantity,
-        largeBagsQuantity: row.largeBagsQuantity
+        grade: row.grade as string,
+        smallBagsQuantity: Number(row.smallBagsQuantity),
+        largeBagsQuantity: Number(row.largeBagsQuantity)
       }));
     } catch (error) {
       console.error("Error calculating billing quantities:", error);
@@ -1028,6 +1050,21 @@ export class DatabaseStorage {
     } catch (error) {
       console.error("Error creating billing event:", error);
       throw error;
+    }
+  }
+  async getBillingEventDetails(eventId: number): Promise<BillingEventDetail[]> {
+    try {
+      console.log("Getting billing event details for event:", eventId);
+      const details = await db
+        .select()
+        .from(billingEventDetails)
+        .where(eq(billingEventDetails.billingEventId, eventId));
+
+      console.log("Found billing details:", details.length);
+      return details;
+    } catch (error) {
+      console.error("Error getting billing event details:", error);
+      return [];
     }
   }
 }
