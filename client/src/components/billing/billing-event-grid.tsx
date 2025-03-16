@@ -34,13 +34,6 @@ export function BillingEventGrid() {
 
   const { data: billingHistory, isLoading: historyLoading, refetch: refetchHistory } = useQuery<Array<BillingEvent & { details: BillingEventDetail[] }>>({
     queryKey: ["/api/billing/history"],
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/billing/history");
-      if (!res.ok) {
-        throw new Error("Failed to fetch billing history");
-      }
-      return res.json();
-    }
   });
 
   const createBillingEventMutation = useMutation({
@@ -96,7 +89,7 @@ export function BillingEventGrid() {
       return res.json();
     },
     onSuccess: async () => {
-      // Refetch both quantities and history data
+      // Force refetch both quantities and history data
       await Promise.all([
         refetchQuantities(),
         refetchHistory()
@@ -190,62 +183,57 @@ export function BillingEventGrid() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Billing History</CardTitle>
-          <CardDescription>Past billing cycles and their quantities</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Cycle Period</TableHead>
-                {coffeeGrades.map(grade => (
-                  <TableHead key={grade}>{grade}</TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {billingHistory?.map((event) => (
-                <TableRow key={event.id}>
-                  <TableCell>
-                    {formatDateSafely(event.cycleStartDate)} to {formatDateSafely(event.cycleEndDate)}
-                  </TableCell>
-                  {coffeeGrades.map(grade => {
-                    const details = event.details?.find(d => d.grade === grade);
-                    return (
-                      <TableCell key={grade}>
-                        {details ? (
-                          <>
-                            {details.smallBagsQuantity} small,{' '}
-                            {details.largeBagsQuantity} large
-                          </>
-                        ) : (
-                          '0 small, 0 large'
-                        )}
-                      </TableCell>
-                    );
-                  })}
-                </TableRow>
-              ))}
-              {(!billingHistory || billingHistory.length === 0) && (
+      {billingHistory && billingHistory.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Billing History</CardTitle>
+            <CardDescription>Past billing cycles and their quantities</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={coffeeGrades.length + 1} className="text-center text-muted-foreground">
-                    No billing events found
-                  </TableCell>
+                  <TableHead>Cycle Period</TableHead>
+                  {coffeeGrades.map(grade => (
+                    <TableHead key={grade}>{grade}</TableHead>
+                  ))}
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              </TableHeader>
+              <TableBody>
+                {billingHistory.map((event) => (
+                  <TableRow key={event.id}>
+                    <TableCell>
+                      {formatDateSafely(event.cycleStartDate)} to {formatDateSafely(event.cycleEndDate)}
+                    </TableCell>
+                    {coffeeGrades.map(grade => {
+                      const details = event.details?.find(d => d.grade === grade);
+                      return (
+                        <TableCell key={grade}>
+                          {details ? (
+                            <>
+                              {details.smallBagsQuantity} small,{' '}
+                              {details.largeBagsQuantity} large
+                            </>
+                          ) : (
+                            '0 small, 0 large'
+                          )}
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       {!isManager && !isReadOnly && (
         <Card>
           <CardHeader>
-            <CardTitle>Revenue Split View</CardTitle>
+            <CardTitle>Revenue Split Settings</CardTitle>
             <CardDescription>
-              Adjust split percentages and view quantity distribution
+              Adjust split percentages and generate billing event
             </CardDescription>
           </CardHeader>
           <CardContent>
