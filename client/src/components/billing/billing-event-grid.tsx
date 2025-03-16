@@ -11,13 +11,15 @@ import { useToast } from "@/hooks/use-toast";
 import { format, parseISO } from "date-fns";
 import { useAuth } from "@/hooks/use-auth";
 
+type BillingQuantity = {
+  grade: string;
+  smallBagsQuantity: number;
+  largeBagsQuantity: number;
+};
+
 type BillingQuantityResponse = {
   fromDate: string;
-  quantities: {
-    grade: string;
-    smallBagsQuantity: number;
-    largeBagsQuantity: number;
-  }[];
+  quantities: BillingQuantity[];
 };
 
 export function BillingEventGrid() {
@@ -30,10 +32,26 @@ export function BillingEventGrid() {
 
   const { data: billingData, isLoading: quantitiesLoading } = useQuery<BillingQuantityResponse>({
     queryKey: ["/api/billing/quantities"],
+    queryFn: async () => {
+      console.log("Fetching billing quantities...");
+      const res = await apiRequest("GET", "/api/billing/quantities");
+      if (!res.ok) throw new Error("Failed to fetch billing quantities");
+      const data = await res.json();
+      console.log("Received billing quantities:", data);
+      return data;
+    }
   });
 
-  const { data: billingHistory, isLoading: historyLoading, refetch: refetchHistory } = useQuery<Array<BillingEvent & { details: BillingEventDetail[] }>>({
+  const { data: billingHistory, isLoading: historyLoading } = useQuery<Array<BillingEvent & { details: BillingEventDetail[] }>>({
     queryKey: ["/api/billing/history"],
+    queryFn: async () => {
+      console.log("Fetching billing history...");
+      const res = await apiRequest("GET", "/api/billing/history");
+      if (!res.ok) throw new Error("Failed to fetch billing history");
+      const data = await res.json();
+      console.log("Received billing history:", data);
+      return data;
+    }
   });
 
   const createBillingEventMutation = useMutation({
@@ -76,7 +94,7 @@ export function BillingEventGrid() {
         createdById: user.id
       };
 
-      console.log("Creating billing event with payload:", JSON.stringify(payload, null, 2));
+      console.log("Creating billing event with payload:", payload);
 
       const res = await apiRequest("POST", "/api/billing/events", payload);
 
@@ -88,8 +106,9 @@ export function BillingEventGrid() {
 
       return res.json();
     },
-    onSuccess: async () => {
-      await refetchHistory();
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/billing/quantities"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/billing/history"] });
       toast({
         title: "Success",
         description: "Billing event created successfully",
@@ -124,26 +143,20 @@ export function BillingEventGrid() {
     }
   };
 
-  const getCyclePeriodDisplay = (fromDate: string) => {
-    try {
-      if (!fromDate) return 'No data available';
-      const date = parseISO(fromDate);
-      if (!isValid(date)) return 'Invalid date';
-      if (date.getTime() === 0) return 'First billing cycle';
-      return `Billing data collected since: ${formatDateSafely(fromDate)}`;
-    } catch (error) {
-      console.error("Error formatting cycle period:", error);
-      return 'Date formatting error';
-    }
-  };
+  const hasDeliveredOrders = billingData?.quantities?.some(
+    q => q.smallBagsQuantity > 0 || q.largeBagsQuantity > 0
+  );
 
   return (
     <div className="space-y-8">
+      {/* Current Billing Cycle */}
       <Card>
         <CardHeader>
           <CardTitle>Current Billing Cycle</CardTitle>
           <CardDescription>
-            {billingData?.fromDate ? getCyclePeriodDisplay(billingData.fromDate) : 'N/A'}
+            {billingData?.fromDate ? 
+              `Billing data collected since: ${formatDateSafely(billingData.fromDate)}` : 
+              'No current billing cycle'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -151,18 +164,24 @@ export function BillingEventGrid() {
             <TableHeader>
               <TableRow>
                 <TableHead>Grade</TableHead>
-                <TableHead>Small Bags</TableHead>
-                <TableHead>Large Bags</TableHead>
+                <TableHead>Small Bags (200g)</TableHead>
+                <TableHead>Large Bags (1kg)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {billingData?.quantities.map((qty) => (
-                <TableRow key={qty.grade}>
-                  <TableCell className="font-medium">{qty.grade}</TableCell>
-                  <TableCell>{qty.smallBagsQuantity}</TableCell>
-                  <TableCell>{qty.largeBagsQuantity}</TableCell>
-                </TableRow>
-              ))}
+              {coffeeGrades.map((grade) => {
+                const quantities = billingData?.quantities?.find(q => q.grade === grade) || {
+                  smallBagsQuantity: 0,
+                  largeBagsQuantity: 0
+                };
+                return (
+                  <TableRow key={grade}>
+                    <TableCell className="font-medium">{grade}</TableCell>
+                    <TableCell>{quantities.smallBagsQuantity}</TableCell>
+                    <TableCell>{quantities.largeBagsQuantity}</TableCell>
+                  </TableRow>
+                );
+              })}
               {(!billingData?.quantities || billingData.quantities.length === 0) && (
                 <TableRow>
                   <TableCell colSpan={3} className="text-center text-muted-foreground">
@@ -175,53 +194,7 @@ export function BillingEventGrid() {
         </CardContent>
       </Card>
 
-      {billingHistory && billingHistory.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Billing History</CardTitle>
-            <CardDescription>Past billing cycles and their quantities</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Cycle Period</TableHead>
-                  {coffeeGrades.map(grade => (
-                    <TableHead key={grade}>{grade}</TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {billingHistory.map((event) => (
-                  <TableRow key={event.id}>
-                    <TableCell>
-                      <span>{formatDateSafely(event.cycleStartDate)}</span>
-                      {' to '}
-                      <span>{formatDateSafely(event.cycleEndDate)}</span>
-                    </TableCell>
-                    {coffeeGrades.map(grade => {
-                      const details = event.details?.find(d => d.grade === grade);
-                      return (
-                        <TableCell key={grade}>
-                          {details ? (
-                            <>
-                              {details.smallBagsQuantity} small,{' '}
-                              {details.largeBagsQuantity} large
-                            </>
-                          ) : (
-                            '0 small, 0 large'
-                          )}
-                        </TableCell>
-                      );
-                    })}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-
+      {/* Revenue Split Settings */}
       {!isManager && !isReadOnly && (
         <Card>
           <CardHeader>
@@ -267,7 +240,7 @@ export function BillingEventGrid() {
                 onClick={() => createBillingEventMutation.mutate()}
                 disabled={
                   createBillingEventMutation.isPending ||
-                  !billingData?.quantities.some(q => q.smallBagsQuantity > 0 || q.largeBagsQuantity > 0) ||
+                  !hasDeliveredOrders ||
                   primarySplit + secondarySplit !== 100
                 }
               >
@@ -277,6 +250,55 @@ export function BillingEventGrid() {
                 Generate Billing Event
               </Button>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Billing History */}
+      {billingHistory && billingHistory.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Billing History</CardTitle>
+            <CardDescription>Past billing cycles and their quantities</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Period</TableHead>
+                  {coffeeGrades.map(grade => (
+                    <TableHead key={grade}>{grade}</TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {billingHistory.map((event) => (
+                  <TableRow key={event.id}>
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        <span>From: {formatDateSafely(event.cycleStartDate)}</span>
+                        <span>To: {formatDateSafely(event.cycleEndDate)}</span>
+                      </div>
+                    </TableCell>
+                    {coffeeGrades.map(grade => {
+                      const details = event.details?.find(d => d.grade === grade);
+                      return (
+                        <TableCell key={grade}>
+                          {details ? (
+                            <>
+                              {details.smallBagsQuantity} small,{' '}
+                              {details.largeBagsQuantity} large
+                            </>
+                          ) : (
+                            '0 small, 0 large'
+                          )}
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
       )}
