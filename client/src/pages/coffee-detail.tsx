@@ -56,17 +56,29 @@ export default function CoffeeDetail() {
     );
   }
 
+  // Fetch coffee details
   const { data: coffee, isLoading: loadingCoffee, error: coffeeError } = useQuery<GreenCoffee>({
     queryKey: ["/api/green-coffee", coffeeId],
+    queryFn: async () => {
+      console.log("Fetching coffee details for ID:", coffeeId);
+      const res = await apiRequest("GET", `/api/green-coffee/${coffeeId}`);
+      if (!res.ok) throw new Error('Failed to fetch coffee details');
+      const data = await res.json();
+      console.log("Received coffee data:", data);
+      return data;
+    },
   });
 
+  // Fetch roasting batches
   const { data: batches, isLoading: loadingBatches } = useQuery<RoastingBatch[]>({
     queryKey: ["/api/roasting-batches", coffeeId],
     queryFn: async () => {
       console.log("Fetching roasting batches for coffee:", coffeeId);
-      const res = await fetch(`/api/roasting-batches?greenCoffeeId=${coffeeId}`);
+      const res = await apiRequest("GET", `/api/roasting-batches?greenCoffeeId=${coffeeId}`);
       if (!res.ok) throw new Error('Failed to fetch roasting batches');
-      return res.json();
+      const data = await res.json();
+      console.log("Received batches data:", data);
+      return data;
     },
     enabled: !!coffeeId
   });
@@ -90,6 +102,7 @@ export default function CoffeeDetail() {
   }
 
   if (coffeeError) {
+    console.error("Error loading coffee:", coffeeError);
     return (
       <div className="container mx-auto py-8">
         <Card>
@@ -113,6 +126,7 @@ export default function CoffeeDetail() {
   }
 
   if (!coffee) {
+    console.log("No coffee data available");
     return (
       <div className="container mx-auto py-8">
         <Card>
@@ -134,6 +148,8 @@ export default function CoffeeDetail() {
       </div>
     );
   }
+
+  console.log("Rendering coffee details:", coffee);
 
   // Calculate total roasted and total packaged amounts
   const totalRoasted = batches?.reduce((sum, batch) =>
@@ -305,7 +321,7 @@ export default function CoffeeDetail() {
                         title: "Batch Recorded",
                         description: "Roasting batch has been recorded successfully",
                       });
-                      queryClient.invalidateQueries({ queryKey: [`/api/roasting-batches`] });
+                      queryClient.invalidateQueries({ queryKey: ["/api/roasting-batches"] });
                     }}
                   />
                 </DialogContent>
