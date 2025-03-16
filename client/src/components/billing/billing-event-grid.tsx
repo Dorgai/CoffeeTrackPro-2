@@ -1,4 +1,4 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { BillingEvent, BillingEventDetail, coffeeGrades } from "@shared/schema";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,7 +28,7 @@ export function BillingEventGrid() {
   const isManager = user?.role === "shopManager";
   const isReadOnly = user?.role === "retailOwner";
 
-  const { data: billingData, isLoading: quantitiesLoading, refetch: refetchQuantities } = useQuery<BillingQuantityResponse>({
+  const { data: billingData, isLoading: quantitiesLoading } = useQuery<BillingQuantityResponse>({
     queryKey: ["/api/billing/quantities"],
   });
 
@@ -89,12 +89,7 @@ export function BillingEventGrid() {
       return res.json();
     },
     onSuccess: async () => {
-      // Force refetch both quantities and history data
-      await Promise.all([
-        refetchQuantities(),
-        refetchHistory()
-      ]);
-
+      await refetchHistory();
       toast({
         title: "Success",
         description: "Billing event created successfully",
@@ -118,16 +113,12 @@ export function BillingEventGrid() {
     );
   }
 
-  const hasNonZeroQuantities = billingData?.quantities?.some(
-    q => q.smallBagsQuantity > 0 || q.largeBagsQuantity > 0
-  );
-
   const formatDateSafely = (dateString: string) => {
     try {
       if (!dateString) return 'N/A';
       const date = parseISO(dateString);
       if (!isValid(date)) throw new Error('Invalid date');
-      return format(date, 'PPP p'); // "Sep 15, 2023, 3:25 PM" format
+      return format(date, 'PPP p'); 
     } catch (error) {
       console.error("Error formatting date:", dateString, error);
       return 'N/A';
@@ -166,17 +157,13 @@ export function BillingEventGrid() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {coffeeGrades.map((grade) => {
-                const gradeData = billingData?.quantities?.find(q => q.grade === grade) ||
-                  { smallBagsQuantity: 0, largeBagsQuantity: 0 };
-                return (
-                  <TableRow key={grade}>
-                    <TableCell className="font-medium">{grade}</TableCell>
-                    <TableCell>{gradeData.smallBagsQuantity}</TableCell>
-                    <TableCell>{gradeData.largeBagsQuantity}</TableCell>
-                  </TableRow>
-                );
-              })}
+              {billingData?.quantities.map((qty) => (
+                <TableRow key={qty.grade}>
+                  <TableCell className="font-medium">{qty.grade}</TableCell>
+                  <TableCell>{qty.smallBagsQuantity}</TableCell>
+                  <TableCell>{qty.largeBagsQuantity}</TableCell>
+                </TableRow>
+              ))}
               {(!billingData?.quantities || billingData.quantities.length === 0) && (
                 <TableRow>
                   <TableCell colSpan={3} className="text-center text-muted-foreground">
@@ -279,7 +266,7 @@ export function BillingEventGrid() {
                 onClick={() => createBillingEventMutation.mutate()}
                 disabled={
                   createBillingEventMutation.isPending ||
-                  !hasNonZeroQuantities ||
+                  !billingData?.quantities.some(q => q.smallBagsQuantity > 0 || q.largeBagsQuantity > 0) ||
                   primarySplit + secondarySplit !== 100
                 }
               >

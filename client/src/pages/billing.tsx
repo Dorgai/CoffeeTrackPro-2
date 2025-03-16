@@ -1,6 +1,6 @@
-import { BillingEventGrid } from "@/components/billing/billing-event-grid";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
+import { Redirect } from "wouter";
 
 export default function BillingPage() {
   const { user, isLoading } = useAuth();
@@ -25,13 +25,11 @@ export default function BillingPage() {
           <h1 className="text-3xl font-bold tracking-tight">Billing Management</h1>
           <p className="text-muted-foreground">
             {user.role === "roasteryOwner" 
-              ? "Manage billing events, pricing, and revenue splits"
+              ? "Manage billing events and revenue splits"
               : "View billing events and quantities"}
           </p>
         </div>
       </div>
-
-      <BillingEventGrid />
     </div>
   );
 }
