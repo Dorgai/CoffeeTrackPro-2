@@ -48,9 +48,11 @@ export default function BillingPage() {
       }
 
       // Refresh data
-      queryClient.invalidateQueries({ queryKey: ["/api/billing/delivered-quantities"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/billing/history"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/billing/delivered-quantities"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/billing/history"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/orders"] })
+      ]);
 
       toast({
         title: "Success",
@@ -85,10 +87,10 @@ export default function BillingPage() {
   const formatDateTime = (dateStr: string) => {
     try {
       const date = parseISO(dateStr);
-      return format(date, "MMM d, yyyy HH:mm:ss");
+      return format(date, "PPP p"); // Mar 15, 2025 at 2:30 PM
     } catch (error) {
       console.error("Error formatting date:", dateStr, error);
-      return dateStr;
+      return "Date error";
     }
   };
 
