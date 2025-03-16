@@ -35,7 +35,10 @@ export function BillingEventGrid() {
     queryFn: async () => {
       console.log("Fetching billing quantities...");
       const res = await apiRequest("GET", "/api/billing/quantities");
-      if (!res.ok) throw new Error("Failed to fetch billing quantities");
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to fetch billing quantities");
+      }
       const data = await res.json();
       console.log("Received billing quantities:", data);
       return data;
@@ -47,7 +50,10 @@ export function BillingEventGrid() {
     queryFn: async () => {
       console.log("Fetching billing history...");
       const res = await apiRequest("GET", "/api/billing/history");
-      if (!res.ok) throw new Error("Failed to fetch billing history");
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to fetch billing history");
+      }
       const data = await res.json();
       console.log("Received billing history:", data);
       return data;
@@ -56,52 +62,20 @@ export function BillingEventGrid() {
 
   const createBillingEventMutation = useMutation({
     mutationFn: async () => {
-      if (!billingData?.quantities || !Array.isArray(billingData.quantities)) {
-        console.error("Invalid billing data:", billingData);
-        throw new Error("Invalid billing quantities data");
-      }
-
-      if (primarySplit + secondarySplit !== 100) {
-        throw new Error("Split percentages must sum to 100%");
-      }
-
-      if (!user?.id) {
-        throw new Error("User ID is required");
-      }
-
-      const validQuantities = coffeeGrades
-        .map(grade => {
-          const gradeData = billingData.quantities.find(q => q.grade === grade) ||
-            { smallBagsQuantity: 0, largeBagsQuantity: 0 };
-          return {
-            grade,
-            smallBagsQuantity: gradeData.smallBagsQuantity,
-            largeBagsQuantity: gradeData.largeBagsQuantity
-          };
-        })
-        .filter(q => q.smallBagsQuantity > 0 || q.largeBagsQuantity > 0);
-
-      if (validQuantities.length === 0) {
-        throw new Error("No quantities to bill");
-      }
-
       const payload = {
         primarySplitPercentage: primarySplit,
         secondarySplitPercentage: secondarySplit,
-        quantities: validQuantities,
-        cycleStartDate: billingData.fromDate,
+        cycleStartDate: billingData?.fromDate || new Date().toISOString(),
         cycleEndDate: new Date().toISOString(),
-        createdById: user.id
+        quantities: billingData?.quantities || []
       };
 
       console.log("Creating billing event with payload:", payload);
-
       const res = await apiRequest("POST", "/api/billing/events", payload);
 
       if (!res.ok) {
-        const errorData = await res.json();
-        console.error("Failed to create billing event:", errorData);
-        throw new Error(errorData.message || "Failed to create billing event");
+        const error = await res.json();
+        throw new Error(error.message || "Failed to create billing event");
       }
 
       return res.json();
@@ -132,13 +106,13 @@ export function BillingEventGrid() {
     );
   }
 
-  const formatDateSafely = (dateString: string) => {
+  const formatDateSafely = (dateStr: string) => {
     try {
-      if (!dateString) return 'N/A';
-      const date = parseISO(dateString);
+      if (!dateStr) return 'N/A';
+      const date = parseISO(dateStr);
       return format(date, 'PPP p');
     } catch (error) {
-      console.error("Error formatting date:", dateString, error);
+      console.error("Error formatting date:", dateStr, error);
       return 'N/A';
     }
   };
