@@ -1,6 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
-import { GreenCoffee } from "@shared/schema";
 import { Loader2, PackagePlus } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useActiveShop } from "@/hooks/use-active-shop";
@@ -20,25 +19,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { formatDate } from "@/lib/utils";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { OrderForm } from "@/components/coffee/order-form";
-import { ShopSelector } from "@/components/layout/shop-selector";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { ShopSelector } from "@/components/layout/shop-selector";
 import { useToast } from "@/hooks/use-toast";
+import { formatDate } from "@/lib/utils";
 
 type OrderWithDetails = {
   id: number;
@@ -58,20 +44,11 @@ type OrderWithDetails = {
   updatedBy: string | null;
 };
 
-//Removed unnecessary schema and type
-// const updateOrderSchema = z.object({
-//   status: z.enum(["delivered"] as const),
-// });
-
-// type UpdateOrderValues = z.infer<typeof updateOrderSchema>;
-
 export default function RetailOrders() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { activeShop } = useActiveShop();
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<OrderWithDetails | null>(null);
-  const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
 
   // Add update order mutation
   const updateOrderMutation = useMutation({
@@ -100,18 +77,11 @@ export default function RetailOrders() {
     },
   });
 
-  const form = useForm<UpdateOrderValues>({
-    resolver: zodResolver(updateOrderSchema),
-    defaultValues: {
-      status: "delivered",
-    },
-  });
-
-  const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
+  const { data: coffees, isLoading: loadingCoffees } = useQuery({
     queryKey: ["/api/green-coffee"],
   });
 
-  const { data: orders, isLoading: loadingOrders } = useQuery<OrderWithDetails[]>({
+  const { data: orders, isLoading: loadingOrders } = useQuery({
     queryKey: ["/api/orders", activeShop?.id],
     queryFn: async () => {
       if (!activeShop?.id) return [];
@@ -120,7 +90,6 @@ export default function RetailOrders() {
     },
     enabled: !!activeShop?.id,
   });
-
 
   if (loadingCoffees || loadingOrders) {
     return (
@@ -223,32 +192,6 @@ export default function RetailOrders() {
           </CardContent>
         </Card>
       )}
-
-      <Dialog
-        open={isOrderDialogOpen}
-        onOpenChange={setIsOrderDialogOpen}
-      >
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Place New Order</DialogTitle>
-            <DialogDescription>Order coffee from the roastery</DialogDescription>
-          </DialogHeader>
-          <CardContent>
-            {coffees?.map((coffee) => (
-              <div key={coffee.id} className="mb-4">
-                <OrderForm
-                  coffee={coffee}
-                  availableBags={{ smallBags: 0, largeBags: 0 }}
-                  onSuccess={() => setIsOrderDialogOpen(false)}
-                />
-              </div>
-            ))}
-          </CardContent>
-        </DialogContent>
-      </Dialog>
-
-
-      {/*Removed Update Order Dialog as it's no longer needed with the new mutation implementation*/}
     </div>
   );
 }
