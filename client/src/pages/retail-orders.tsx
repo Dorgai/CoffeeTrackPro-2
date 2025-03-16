@@ -1,5 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
+import { GreenCoffee } from "@shared/schema";
 import { Loader2, PackagePlus } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useActiveShop } from "@/hooks/use-active-shop";
@@ -69,11 +70,11 @@ export default function RetailOrders() {
     },
   });
 
-  const { data: coffees, isLoading: loadingCoffees } = useQuery({
+  const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
   });
 
-  const { data: orders, isLoading: loadingOrders } = useQuery({
+  const { data: orders, isLoading: loadingOrders } = useQuery<OrderWithDetails[]>({
     queryKey: ["/api/orders", activeShop?.id],
     queryFn: async () => {
       if (!activeShop?.id) return [];
@@ -203,7 +204,10 @@ export default function RetailOrders() {
                 <OrderForm
                   coffee={coffee}
                   availableBags={{ smallBags: 0, largeBags: 0 }}
-                  onSuccess={() => setIsOrderDialogOpen(false)}
+                  onSuccess={() => {
+                    setIsOrderDialogOpen(false);
+                    queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+                  }}
                 />
               </div>
             ))}
