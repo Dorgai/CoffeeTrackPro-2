@@ -113,11 +113,11 @@ export function BillingEventGrid() {
     queryKey: ["/api/billing/details", selectedEventId],
     queryFn: async () => {
       if (!selectedEventId) return null;
-      const response = await fetch(`/api/billing/details/${selectedEventId}`);
-      if (!response.ok) {
+      const res = await apiRequest("GET", `/api/billing/details/${selectedEventId}`);
+      if (!res.ok) {
         throw new Error("Failed to fetch billing details");
       }
-      return response.json();
+      return res.json();
     },
     enabled: selectedEventId !== null,
     onError: (error: Error) => {
@@ -126,7 +126,7 @@ export function BillingEventGrid() {
         description: error.message,
         variant: "destructive",
       });
-      setSelectedEventId(null); // Reset selection on error
+      setSelectedEventId(null);
     },
   });
 
@@ -138,9 +138,9 @@ export function BillingEventGrid() {
     );
   }
 
-  const calculateSplitQuantities = (quantity: number, split: number) => {
-    return Math.round((quantity * split) / 100);
-  };
+  const hasNonZeroQuantities = billingData?.quantities?.some(
+    q => q.smallBagsQuantity > 0 || q.largeBagsQuantity > 0
+  );
 
   return (
     <div className="space-y-8">
@@ -148,9 +148,7 @@ export function BillingEventGrid() {
       <Card>
         <CardHeader>
           <CardTitle>Billing History</CardTitle>
-          <CardDescription>
-            Past billing events and their details
-          </CardDescription>
+          <CardDescription>Past billing events and their details</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -181,42 +179,17 @@ export function BillingEventGrid() {
                   </TableCell>
                 </TableRow>
               ))}
+              {(!billingHistory || billingHistory.length === 0) && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                    No billing events found
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
-
-      {/* Billing Details for Selected Event */}
-      {selectedEventId && selectedEventDetails && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Billing Event Details</CardTitle>
-            <CardDescription>
-              Detailed quantities for billing event
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Grade</TableHead>
-                  <TableHead>Small Bags</TableHead>
-                  <TableHead>Large Bags</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {selectedEventDetails.map((detail) => (
-                  <TableRow key={detail.id}>
-                    <TableCell className="font-medium">{detail.grade}</TableCell>
-                    <TableCell>{detail.smallBagsQuantity}</TableCell>
-                    <TableCell>{detail.largeBagsQuantity}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Current Billing Cycle Information */}
       <Card>
@@ -257,6 +230,13 @@ export function BillingEventGrid() {
                   </TableRow>
                 );
               })}
+              {(!billingData?.quantities || billingData.quantities.length === 0) && (
+                <TableRow>
+                  <TableCell colSpan={3} className="text-center text-muted-foreground">
+                    No quantities found for current billing cycle
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -303,38 +283,14 @@ export function BillingEventGrid() {
               </div>
             </div>
 
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Grade</TableHead>
-                  <TableHead>Primary Split Bags</TableHead>
-                  <TableHead>Secondary Split Bags</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {coffeeGrades.map((grade) => {
-                  const gradeData = billingData?.quantities?.find(q => q.grade === grade) ||
-                    { smallBagsQuantity: 0, largeBagsQuantity: 0 };
-                  const totalBags = gradeData.smallBagsQuantity + gradeData.largeBagsQuantity;
-                  return (
-                    <TableRow key={grade}>
-                      <TableCell className="font-medium">{grade}</TableCell>
-                      <TableCell>
-                        {calculateSplitQuantities(totalBags, primarySplit)}
-                      </TableCell>
-                      <TableCell>
-                        {calculateSplitQuantities(totalBags, secondarySplit)}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-
             <div className="mt-6">
               <Button
                 onClick={() => createBillingEventMutation.mutate()}
-                disabled={createBillingEventMutation.isPending || !billingData?.quantities?.length}
+                disabled={
+                  createBillingEventMutation.isPending || 
+                  !hasNonZeroQuantities ||
+                  primarySplit + secondarySplit !== 100
+                }
               >
                 {createBillingEventMutation.isPending ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -342,6 +298,38 @@ export function BillingEventGrid() {
                 Generate Billing Event
               </Button>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Selected Event Details */}
+      {selectedEventId && selectedEventDetails && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Billing Event Details</CardTitle>
+            <CardDescription>
+              Detailed quantities for selected billing event
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Grade</TableHead>
+                  <TableHead>Small Bags</TableHead>
+                  <TableHead>Large Bags</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {selectedEventDetails.map((detail) => (
+                  <TableRow key={detail.id}>
+                    <TableCell className="font-medium">{detail.grade}</TableCell>
+                    <TableCell>{detail.smallBagsQuantity}</TableCell>
+                    <TableCell>{detail.largeBagsQuantity}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
       )}
