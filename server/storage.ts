@@ -868,7 +868,7 @@ export class DatabaseStorage {
       console.log("Getting billing history with details");
       const query = sql`
         WITH events AS (
-          SELECT 
+          SELECT DISTINCT ON (be.id, be.cycle_start_date, be.cycle_end_date)
             be.*,
             u.username as "createdByUsername"
           FROM billing_events be
@@ -889,12 +889,12 @@ export class DatabaseStorage {
           FROM billing_event_details
           GROUP BY billing_event_id
         )
-        SELECT DISTINCT ON (e.id)
+        SELECT 
           e.*,
           COALESCE(d.details, '[]'::json) as details
         FROM events e
         LEFT JOIN event_details d ON e.id = d.billing_event_id
-        ORDER BY e.id, e.cycle_end_date DESC`;
+        ORDER BY e.cycle_end_date DESC`;
 
       const result = await db.execute(query);
       console.log("Retrieved billing history:", result.rows?.length, "events");
@@ -918,6 +918,7 @@ export class DatabaseStorage {
         LIMIT 1`;
 
       const result = await db.execute(query);
+      console.log("Last billing event found:", result.rows[0]);
       return result.rows[0] as BillingEvent | undefined;
     } catch (error) {
       console.error("Error getting last billing event:", error);
@@ -933,24 +934,24 @@ export class DatabaseStorage {
     try {
       // Get the last billing event to determine the start date
       const lastEvent = await this.getLastBillingEvent();
-      console.log("Last billing event:", lastEvent);
+      console.log("Last billing event for quantities:", lastEvent);
 
+      // Use the exact timestamp of the last event's end date
       const startDate = lastEvent 
-        ? new Date(lastEvent.cycleEndDate)
-        : new Date(0);
+        ? lastEvent.cycleEndDate
+        : new Date(0).toISOString();
 
-      console.log("Using start date for billing quantities:", startDate);
+      console.log("Using exact start timestamp for billing quantities:", startDate);
 
       const query = sql`
         SELECT 
           gc.grade,
           COALESCE(SUM(o.small_bags), 0)::integer as "smallBagsQuantity",
           COALESCE(SUM(o.large_bags), 0)::integer as "largeBagsQuantity"
-        FROM orders o
-        JOIN green_coffee gc ON o.green_coffee_id = gc.id
-        WHERE 
-          o.status = 'delivered' 
-          AND o.created_at > ${startDate}
+        FROM green_coffee gc
+        LEFT JOIN orders o ON o.green_coffee_id = gc.id 
+          AND o.status = 'delivered' 
+          AND o.created_at > ${startDate}::timestamptz
         GROUP BY gc.grade
         ORDER BY gc.grade`;
 
@@ -974,9 +975,7 @@ export class DatabaseStorage {
     createdById: number;
     primarySplitPercentage: number;
     secondarySplitPercentage: number;
-    quantities: Array<{
-      grade: string;
-      smallBagsQuantity: number;
+    quantities: Array<{      grade: string;      smallBagsQuantity: number;
       largeBagsQuantity: number;
     }>;
   }): Promise<BillingEvent> {

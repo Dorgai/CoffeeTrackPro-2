@@ -40,7 +40,6 @@ export default function RetailOrders() {
   const { activeShop } = useActiveShop();
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
 
-  // Add update order mutation
   const updateOrderMutation = useMutation({
     mutationFn: async (orderId: number) => {
       console.log("Updating order status for order:", orderId);
@@ -55,6 +54,7 @@ export default function RetailOrders() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/billing/quantities"] });
       toast({
         title: "Success",
         description: "Order marked as delivered",
