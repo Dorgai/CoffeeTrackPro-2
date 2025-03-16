@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, isValid } from "date-fns";
 import { useAuth } from "@/hooks/use-auth";
 
 type BillingQuantityResponse = {
@@ -140,7 +140,10 @@ export function BillingEventGrid() {
 
   const formatDateSafely = (dateString: string) => {
     try {
-      return format(parseISO(dateString), 'PPP');
+      if (!dateString) return 'N/A';
+      const date = parseISO(dateString);
+      if (!isValid(date)) throw new Error('Invalid date');
+      return format(date, 'PPP');
     } catch (error) {
       console.error("Error formatting date:", dateString, error);
       return dateString;

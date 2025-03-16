@@ -874,25 +874,26 @@ export class DatabaseStorage {
           FROM billing_events be
           LEFT JOIN users u ON be.created_by_id = u.id
           ORDER BY be.created_at DESC
+        ),
+        details AS (
+          SELECT 
+            billing_event_id,
+            json_agg(
+              json_build_object(
+                'id', id,
+                'grade', grade,
+                'smallBagsQuantity', small_bags_quantity,
+                'largeBagsQuantity', large_bags_quantity
+              )
+            ) as details
+          FROM billing_event_details
+          GROUP BY billing_event_id
         )
         SELECT 
           e.*,
-          json_agg(
-            json_build_object(
-              'id', bed.id,
-              'grade', bed.grade,
-              'smallBagsQuantity', bed.small_bags_quantity,
-              'largeBagsQuantity', bed.large_bags_quantity
-            )
-          ) as details
+          COALESCE(d.details, '[]'::json) as details
         FROM events e
-        LEFT JOIN billing_event_details bed ON e.id = bed.billing_event_id
-        GROUP BY 
-          e.id, e.shop_id, e.amount, e.status, e.type,
-          e.cycle_start_date, e.cycle_end_date,
-          e.primary_split_percentage, e.secondary_split_percentage,
-          e.description, e.processed_at, e.created_at,
-          e.created_by_id, e."createdByUsername"
+        LEFT JOIN details d ON e.id = d.billing_event_id
         ORDER BY e.created_at DESC`;
 
       const result = await db.execute(query);
@@ -900,7 +901,7 @@ export class DatabaseStorage {
 
       return result.rows.map(row => ({
         ...row,
-        details: row.details === '[null]' ? [] : row.details
+        details: Array.isArray(row.details) ? row.details : []
       }));
     } catch (error) {
       console.error("Error getting billing history:", error);
@@ -934,9 +935,11 @@ export class DatabaseStorage {
 
       // Get the last billing event to determine the start date
       const lastEvent = await this.getLastBillingEvent();
-      const startDate = lastEvent ? new Date(lastEvent.cycleEndDate) : new Date(0); // If no previous event, use epoch
+      const startDate = lastEvent?.cycleEndDate 
+        ? new Date(lastEvent.cycleEndDate) 
+        : new Date(0);
 
-      console.log("Using fromDate:", startDate.toISOString());
+      console.log("Using start date for billing quantities:", startDate);
 
       const query = sql`
         SELECT 
@@ -947,7 +950,7 @@ export class DatabaseStorage {
         JOIN green_coffee gc ON o.green_coffee_id = gc.id
         WHERE 
           o.status = 'delivered' 
-          AND o.created_at > ${startDate}
+          AND o.created_at >= ${startDate}
         GROUP BY gc.grade
         ORDER BY gc.grade`;
 
