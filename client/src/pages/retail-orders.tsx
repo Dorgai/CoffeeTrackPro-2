@@ -13,6 +13,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ShopSelector } from "@/components/layout/shop-selector";
 import { useToast } from "@/hooks/use-toast";
 import { formatDate } from "@/lib/utils";
+import { OrderForm } from "@/components/coffee/order-form";
 
 type OrderWithDetails = {
   id: number;
@@ -197,7 +198,15 @@ export default function RetailOrders() {
             <DialogDescription>Order coffee from the roastery</DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            {/* Order form content here */}
+            {coffees?.map((coffee) => (
+              <div key={coffee.id} className="mb-4">
+                <OrderForm
+                  coffee={coffee}
+                  availableBags={{ smallBags: 0, largeBags: 0 }}
+                  onSuccess={() => setIsOrderDialogOpen(false)}
+                />
+              </div>
+            ))}
           </div>
         </DialogContent>
       </Dialog>
