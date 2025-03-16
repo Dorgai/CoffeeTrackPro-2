@@ -146,12 +146,59 @@ export function BillingEventGrid() {
       return format(date, 'PPP');
     } catch (error) {
       console.error("Error formatting date:", dateString, error);
-      return dateString;
+      return 'N/A';
     }
+  };
+
+  const getCyclePeriodDisplay = (fromDate: string) => {
+    const date = parseISO(fromDate);
+    if (!isValid(date)) return 'N/A';
+    if (date.getTime() === 0) return 'First billing cycle';
+    return `Data gathered since: ${formatDateSafely(fromDate)}`;
   };
 
   return (
     <div className="space-y-8">
+      <Card>
+        <CardHeader>
+          <CardTitle>Current Billing Cycle</CardTitle>
+          <CardDescription>
+            {billingData?.fromDate ? getCyclePeriodDisplay(billingData.fromDate) : 'N/A'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Grade</TableHead>
+                <TableHead>Small Bags</TableHead>
+                <TableHead>Large Bags</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {coffeeGrades.map((grade) => {
+                const gradeData = billingData?.quantities?.find(q => q.grade === grade) ||
+                  { smallBagsQuantity: 0, largeBagsQuantity: 0 };
+                return (
+                  <TableRow key={grade}>
+                    <TableCell className="font-medium">{grade}</TableCell>
+                    <TableCell>{gradeData.smallBagsQuantity}</TableCell>
+                    <TableCell>{gradeData.largeBagsQuantity}</TableCell>
+                  </TableRow>
+                );
+              })}
+              {(!billingData?.quantities || billingData.quantities.length === 0) && (
+                <TableRow>
+                  <TableCell colSpan={3} className="text-center text-muted-foreground">
+                    No quantities found for current billing cycle
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Billing History</CardTitle>
@@ -194,46 +241,6 @@ export function BillingEventGrid() {
                 <TableRow>
                   <TableCell colSpan={coffeeGrades.length + 1} className="text-center text-muted-foreground">
                     No billing events found
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Current Billing Cycle</CardTitle>
-          <CardDescription>
-            Data gathered since: {billingData?.fromDate ? formatDateSafely(billingData.fromDate) : 'N/A'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Grade</TableHead>
-                <TableHead>Small Bags</TableHead>
-                <TableHead>Large Bags</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {coffeeGrades.map((grade) => {
-                const gradeData = billingData?.quantities?.find(q => q.grade === grade) ||
-                  { smallBagsQuantity: 0, largeBagsQuantity: 0 };
-                return (
-                  <TableRow key={grade}>
-                    <TableCell className="font-medium">{grade}</TableCell>
-                    <TableCell>{gradeData.smallBagsQuantity}</TableCell>
-                    <TableCell>{gradeData.largeBagsQuantity}</TableCell>
-                  </TableRow>
-                );
-              })}
-              {(!billingData?.quantities || billingData.quantities.length === 0) && (
-                <TableRow>
-                  <TableCell colSpan={3} className="text-center text-muted-foreground">
-                    No quantities found for current billing cycle
                   </TableCell>
                 </TableRow>
               )}

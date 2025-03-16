@@ -868,7 +868,7 @@ export class DatabaseStorage {
       console.log("Getting billing history with details");
       const query = sql`
         WITH events AS (
-          SELECT 
+          SELECT DISTINCT ON (be.id)
             be.*,
             u.username as "createdByUsername"
           FROM billing_events be
@@ -950,7 +950,7 @@ export class DatabaseStorage {
         JOIN green_coffee gc ON o.green_coffee_id = gc.id
         WHERE 
           o.status = 'delivered' 
-          AND o.created_at >= ${startDate}
+          AND o.created_at > ${startDate}
         GROUP BY gc.grade
         ORDER BY gc.grade`;
 
