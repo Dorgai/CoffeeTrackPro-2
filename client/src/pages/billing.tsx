@@ -7,13 +7,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
-import { BillingEvent } from "@shared/schema";
+import { parseISO, format } from "date-fns";
+import { BillingEvent, coffeeGrades } from "@shared/schema";
 
 type DeliveredQuantities = {
   grade: string;
   smallBagsQuantity: number;
   largeBagsQuantity: number;
+};
+
+type BillingEventWithDetails = BillingEvent & {
+  details: Array<{
+    grade: string;
+    smallBagsQuantity: number;
+    largeBagsQuantity: number;
+  }>;
 };
 
 export default function BillingPage() {
@@ -27,7 +35,7 @@ export default function BillingPage() {
   });
 
   // Fetch billing history
-  const { data: billingHistory, isLoading: loadingHistory } = useQuery<BillingEvent[]>({
+  const { data: billingHistory, isLoading: loadingHistory } = useQuery<BillingEventWithDetails[]>({
     queryKey: ["/api/billing/history"],
   });
 
@@ -58,7 +66,7 @@ export default function BillingPage() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || loadingQuantities || loadingHistory) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -74,11 +82,13 @@ export default function BillingPage() {
     q => q.smallBagsQuantity > 0 || q.largeBagsQuantity > 0
   );
 
-  const formatDateTime = (date: string) => {
+  const formatDateTime = (dateStr: string) => {
     try {
-      return format(new Date(date), "PPP p");
+      const date = parseISO(dateStr);
+      return format(date, "MMM d, yyyy HH:mm:ss");
     } catch (error) {
-      return "Invalid date";
+      console.error("Error formatting date:", dateStr, error);
+      return dateStr;
     }
   };
 
@@ -106,8 +116,8 @@ export default function BillingPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Delivered Orders</CardTitle>
-          <CardDescription>Current quantities for delivered orders</CardDescription>
+          <CardTitle>Current Billing Cycle</CardTitle>
+          <CardDescription>Orders in delivered status pending billing</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -129,7 +139,7 @@ export default function BillingPage() {
               {(!deliveredQuantities || deliveredQuantities.length === 0) && (
                 <TableRow>
                   <TableCell colSpan={3} className="text-center text-muted-foreground">
-                    No delivered orders found
+                    No orders in delivered status
                   </TableCell>
                 </TableRow>
               )}
@@ -142,7 +152,7 @@ export default function BillingPage() {
         <Card>
           <CardHeader>
             <CardTitle>Billing History</CardTitle>
-            <CardDescription>Previous billing events</CardDescription>
+            <CardDescription>Previous billing events with quantities</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
@@ -150,7 +160,9 @@ export default function BillingPage() {
                 <TableRow>
                   <TableHead>Period Start</TableHead>
                   <TableHead>Period End</TableHead>
-                  <TableHead>Status</TableHead>
+                  {coffeeGrades.map(grade => (
+                    <TableHead key={grade}>{grade}</TableHead>
+                  ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -158,7 +170,21 @@ export default function BillingPage() {
                   <TableRow key={event.id}>
                     <TableCell>{formatDateTime(event.cycleStartDate)}</TableCell>
                     <TableCell>{formatDateTime(event.cycleEndDate)}</TableCell>
-                    <TableCell className="capitalize">{event.status}</TableCell>
+                    {coffeeGrades.map(grade => {
+                      const details = event.details?.find(d => d.grade === grade);
+                      return (
+                        <TableCell key={grade}>
+                          {details ? (
+                            <>
+                              {details.smallBagsQuantity} small,{' '}
+                              {details.largeBagsQuantity} large
+                            </>
+                          ) : (
+                            '0 small, 0 large'
+                          )}
+                        </TableCell>
+                      );
+                    })}
                   </TableRow>
                 ))}
               </TableBody>
