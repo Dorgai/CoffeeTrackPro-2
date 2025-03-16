@@ -28,6 +28,21 @@ export function BillingEventGrid() {
   const isManager = user?.role === "shopManager";
   const isReadOnly = user?.role === "retailOwner";
 
+  const { data: billingData, isLoading: quantitiesLoading, refetch: refetchQuantities } = useQuery<BillingQuantityResponse>({
+    queryKey: ["/api/billing/quantities"],
+  });
+
+  const { data: billingHistory, isLoading: historyLoading, refetch: refetchHistory } = useQuery<Array<BillingEvent & { details: BillingEventDetail[] }>>({
+    queryKey: ["/api/billing/history"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/billing/history");
+      if (!res.ok) {
+        throw new Error("Failed to fetch billing history");
+      }
+      return res.json();
+    }
+  });
+
   const createBillingEventMutation = useMutation({
     mutationFn: async () => {
       if (!billingData?.quantities || !Array.isArray(billingData.quantities)) {
@@ -78,13 +93,15 @@ export function BillingEventGrid() {
         throw new Error(errorData.message || "Failed to create billing event");
       }
 
-      const data = await res.json();
-      console.log("Billing event created successfully:", data);
-      return data;
+      return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/billing/quantities"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/billing/history"] });
+    onSuccess: async () => {
+      // Refetch both quantities and history data
+      await Promise.all([
+        refetchQuantities(),
+        refetchHistory()
+      ]);
+
       toast({
         title: "Success",
         description: "Billing event created successfully",
@@ -98,32 +115,6 @@ export function BillingEventGrid() {
         variant: "destructive",
       });
     },
-  });
-
-  const { data: billingData, isLoading: quantitiesLoading } = useQuery<BillingQuantityResponse>({
-    queryKey: ["/api/billing/quantities"],
-  });
-
-  const { data: billingHistory, isLoading: historyLoading } = useQuery<Array<BillingEvent & { details: BillingEventDetail[] }>>({
-    queryKey: ["/api/billing/history"],
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/billing/history");
-      if (!res.ok) {
-        throw new Error("Failed to fetch billing history");
-      }
-      const events = await res.json();
-
-      // Fetch details for all events
-      const eventsWithDetails = await Promise.all(
-        events.map(async (event: BillingEvent) => {
-          const detailsRes = await apiRequest("GET", `/api/billing/details/${event.id}`);
-          const details = detailsRes.ok ? await detailsRes.json() : [];
-          return { ...event, details };
-        })
-      );
-
-      return eventsWithDetails;
-    }
   });
 
   if (quantitiesLoading || historyLoading) {

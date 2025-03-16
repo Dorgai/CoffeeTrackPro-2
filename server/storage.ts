@@ -868,14 +868,14 @@ export class DatabaseStorage {
       console.log("Getting billing history with details");
       const query = sql`
         WITH events AS (
-          SELECT DISTINCT ON (be.id)
+          SELECT 
             be.*,
             u.username as "createdByUsername"
           FROM billing_events be
           LEFT JOIN users u ON be.created_by_id = u.id
-          ORDER BY be.created_at DESC
+          ORDER BY be.cycle_end_date DESC
         ),
-        details AS (
+        event_details AS (
           SELECT 
             billing_event_id,
             json_agg(
@@ -889,12 +889,12 @@ export class DatabaseStorage {
           FROM billing_event_details
           GROUP BY billing_event_id
         )
-        SELECT 
+        SELECT DISTINCT ON (e.id)
           e.*,
           COALESCE(d.details, '[]'::json) as details
         FROM events e
-        LEFT JOIN details d ON e.id = d.billing_event_id
-        ORDER BY e.created_at DESC`;
+        LEFT JOIN event_details d ON e.id = d.billing_event_id
+        ORDER BY e.id, e.cycle_end_date DESC`;
 
       const result = await db.execute(query);
       console.log("Retrieved billing history:", result.rows?.length, "events");
@@ -931,12 +931,12 @@ export class DatabaseStorage {
     largeBagsQuantity: number;
   }>> {
     try {
-      console.log("Calculating billing quantities");
-
       // Get the last billing event to determine the start date
       const lastEvent = await this.getLastBillingEvent();
-      const startDate = lastEvent?.cycleEndDate 
-        ? new Date(lastEvent.cycleEndDate) 
+      console.log("Last billing event:", lastEvent);
+
+      const startDate = lastEvent 
+        ? new Date(lastEvent.cycleEndDate)
         : new Date(0);
 
       console.log("Using start date for billing quantities:", startDate);
@@ -957,7 +957,6 @@ export class DatabaseStorage {
       const result = await db.execute(query);
       console.log("Retrieved billing quantities:", result.rows);
 
-      // Map the results to the expected format
       return result.rows.map(row => ({
         grade: row.grade as string,
         smallBagsQuantity: Number(row.smallBagsQuantity),
