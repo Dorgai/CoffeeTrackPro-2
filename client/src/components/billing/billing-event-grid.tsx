@@ -136,14 +136,14 @@ export function BillingEventGrid() {
 
   const getCyclePeriodDisplay = (fromDate: string) => {
     try {
-      if (!fromDate) return 'N/A';
+      if (!fromDate) return 'No data available';
       const date = parseISO(fromDate);
-      if (!isValid(date)) return 'N/A';
+      if (!isValid(date)) return 'Invalid date';
       if (date.getTime() === 0) return 'First billing cycle';
-      return `Data gathered since: ${formatDateSafely(fromDate)}`;
+      return `Billing data collected since: ${formatDateSafely(fromDate)}`;
     } catch (error) {
       console.error("Error formatting cycle period:", error);
-      return 'N/A';
+      return 'Date formatting error';
     }
   };
 

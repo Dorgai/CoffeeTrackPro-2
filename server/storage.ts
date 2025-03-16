@@ -873,11 +873,12 @@ export class DatabaseStorage {
       console.log("Getting billing history with details");
       const query = sql`
         WITH events AS (
-          SELECT 
+          SELECT DISTINCT ON (be.shop_id, be.cycle_end_date)
             be.*,
             u.username as "createdByUsername"
           FROM billing_events be
           LEFT JOIN users u ON be.created_by_id = u.id
+          ORDER BY be.shop_id, be.cycle_end_date DESC
         ),
         details AS (
           SELECT 
@@ -893,12 +894,12 @@ export class DatabaseStorage {
           FROM billing_event_details
           GROUP BY billing_event_id
         )
-        SELECT DISTINCT ON (e.id)
+        SELECT 
           e.*,
           COALESCE(d.details, '[]'::json) as details
         FROM events e
         LEFT JOIN details d ON e.id = d.billing_event_id
-        ORDER BY e.id, e.cycle_end_date DESC`;
+        ORDER BY e.cycle_end_date DESC`;
 
       const result = await db.execute(query);
       console.log("Retrieved billing history:", result.rows?.length, "events");
@@ -973,12 +974,12 @@ export class DatabaseStorage {
 
   async createBillingEvent(data: {
     cycleStartDate: Date | string;
-    cycleEndDate: Date | string;
-    createdById: number;
+    cycleEndDate: Date | string;    createdById: number;
     primarySplitPercentage: number;
     secondarySplitPercentage: number;
     quantities: Array<{
-      grade: string;      smallBagsQuantity: number;
+      grade: string;
+      smallBagsQuantity: number;
       largeBagsQuantity: number;
     }>;
   }): Promise<BillingEvent> {
@@ -1000,7 +1001,7 @@ export class DatabaseStorage {
       }
 
       return await db.transaction(async (tx) => {
-        // Get active shops to create billing events for each
+        // Get active shops
         const activeShops = await tx
           .select()
           .from(shops)
@@ -1008,14 +1009,19 @@ export class DatabaseStorage {
 
         // Get the last billing event to determine the cycle start date
         const lastEvent = await this.getLastBillingEvent();
+
+        // Ensure we have valid dates
+        const now = new Date();
         const cycleStartDate = lastEvent
           ? new Date(lastEvent.cycleEndDate)
           : new Date(0);
-        const cycleEndDate = new Date(); // Current timestamp
+        const cycleEndDate = now;
 
         console.log("Creating billing event with dates:", {
-          cycleStartDate: formatTimestamp(cycleStartDate),
-          cycleEndDate: formatTimestamp(cycleEndDate),
+          cycleStartDate,
+          cycleEndDate,
+          cycleStartIso: cycleStartDate.toISOString(),
+          cycleEndIso: cycleEndDate.toISOString()
         });
 
         // Create a billing event for each active shop
@@ -1028,29 +1034,29 @@ export class DatabaseStorage {
                 amount: "0.00",
                 status: "pending",
                 type: "order",
-                cycleStartDate: formatTimestamp(cycleStartDate),
-                cycleEndDate: formatTimestamp(cycleEndDate),
-                createdById: data.createdById,
+                cycleStartDate: cycleStartDate.toISOString(),
+                cycleEndDate: cycleEndDate.toISOString(),
                 primarySplitPercentage: data.primarySplitPercentage,
                 secondarySplitPercentage: data.secondarySplitPercentage,
                 description: `Billing cycle from ${cycleStartDate.toLocaleString()} to ${cycleEndDate.toLocaleString()}`,
+                createdById: data.createdById,
               })
               .returning();
 
-            // Create details for each grade's quantities
+            // Create billing event details for each grade with non-zero quantities
             await Promise.all(
               data.quantities
                 .filter(q => q.smallBagsQuantity > 0 || q.largeBagsQuantity > 0)
-                .map(async (q) => {
-                  await tx
+                .map(q =>
+                  tx
                     .insert(billingEventDetails)
                     .values({
                       billingEventId: event.id,
                       grade: q.grade,
                       smallBagsQuantity: q.smallBagsQuantity,
-                      largeBagsQuantity: q.largeBagsQuantity,
-                    });
-                })
+                      largeBagsQuantity: q.largeBagsQuantity
+                    })
+                )
             );
 
             return event;
@@ -1058,7 +1064,7 @@ export class DatabaseStorage {
         );
 
         console.log("Created billing events:", events.length);
-        return events[0]; // Return first event
+        return events[0];
       });
     } catch (error) {
       console.error("Error creating billing event:", error);
