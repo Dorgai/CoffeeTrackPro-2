@@ -24,6 +24,17 @@ type BillingEventWithDetails = BillingEvent & {
   }>;
 };
 
+const formatDateTime = (dateStr: string) => {
+  try {
+    if (!dateStr) return 'N/A';
+    const date = parseISO(dateStr);
+    return format(date, "MMM d, yyyy HH:mm:ss");
+  } catch (error) {
+    console.error("Error formatting date:", dateStr, error);
+    return dateStr;
+  }
+};
+
 export default function BillingPage() {
   const { user, isLoading } = useAuth();
   const { toast } = useToast();
@@ -32,18 +43,31 @@ export default function BillingPage() {
   // Fetch delivered orders quantities
   const { data: deliveredQuantities, isLoading: loadingQuantities } = useQuery<DeliveredQuantities[]>({
     queryKey: ["/api/billing/delivered-quantities"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/billing/delivered-quantities");
+      console.log("Delivered quantities response:", await res.clone().json());
+      if (!res.ok) throw new Error("Failed to fetch delivered quantities");
+      return res.json();
+    },
     enabled: !!user,
   });
 
   // Fetch billing history
   const { data: billingHistory, isLoading: loadingHistory } = useQuery<BillingEventWithDetails[]>({
     queryKey: ["/api/billing/history"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/billing/history");
+      console.log("Billing history response:", await res.clone().json());
+      if (!res.ok) throw new Error("Failed to fetch billing history");
+      return res.json();
+    },
     enabled: !!user,
   });
 
   // Handle generate billing event
   const handleGenerateBillingEvent = async () => {
     try {
+      console.log("Generating billing event...");
       const payload = {
         primarySplitPercentage: 70,
         secondarySplitPercentage: 30,
@@ -90,16 +114,6 @@ export default function BillingPage() {
   const hasDeliveredOrders = deliveredQuantities?.some(
     q => q.smallBagsQuantity > 0 || q.largeBagsQuantity > 0
   );
-
-  const formatDateTime = (dateStr: string) => {
-    try {
-      const date = parseISO(dateStr);
-      return format(date, "MMM d, yyyy HH:mm:ss");
-    } catch (error) {
-      console.error("Error formatting date:", dateStr, error);
-      return dateStr;
-    }
-  };
 
   return (
     <div className="container mx-auto py-8 space-y-8">

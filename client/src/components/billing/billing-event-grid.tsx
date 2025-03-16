@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { BillingEvent, BillingEventDetail, coffeeGrades } from "@shared/schema";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { format, parseISO, isValid } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { useAuth } from "@/hooks/use-auth";
 
 type BillingQuantityResponse = {
@@ -117,8 +117,7 @@ export function BillingEventGrid() {
     try {
       if (!dateString) return 'N/A';
       const date = parseISO(dateString);
-      if (!isValid(date)) throw new Error('Invalid date');
-      return format(date, 'PPP p'); 
+      return format(date, 'PPP p');
     } catch (error) {
       console.error("Error formatting date:", dateString, error);
       return 'N/A';
@@ -196,7 +195,9 @@ export function BillingEventGrid() {
                 {billingHistory.map((event) => (
                   <TableRow key={event.id}>
                     <TableCell>
-                      {formatDateSafely(event.cycleStartDate)} to {formatDateSafely(event.cycleEndDate)}
+                      <span>{formatDateSafely(event.cycleStartDate)}</span>
+                      {' to '}
+                      <span>{formatDateSafely(event.cycleEndDate)}</span>
                     </TableCell>
                     {coffeeGrades.map(grade => {
                       const details = event.details?.find(d => d.grade === grade);
