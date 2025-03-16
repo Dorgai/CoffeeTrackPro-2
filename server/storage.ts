@@ -868,14 +868,13 @@ export class DatabaseStorage {
       console.log("Getting billing history with details");
       const query = sql`
         WITH events AS (
-          SELECT DISTINCT ON (be.id, be.cycle_start_date, be.cycle_end_date)
+          SELECT 
             be.*,
             u.username as "createdByUsername"
           FROM billing_events be
           LEFT JOIN users u ON be.created_by_id = u.id
-          ORDER BY be.cycle_end_date DESC
         ),
-        event_details AS (
+        details AS (
           SELECT 
             billing_event_id,
             json_agg(
@@ -889,12 +888,12 @@ export class DatabaseStorage {
           FROM billing_event_details
           GROUP BY billing_event_id
         )
-        SELECT 
+        SELECT DISTINCT ON (e.id)
           e.*,
           COALESCE(d.details, '[]'::json) as details
         FROM events e
-        LEFT JOIN event_details d ON e.id = d.billing_event_id
-        ORDER BY e.cycle_end_date DESC`;
+        LEFT JOIN details d ON e.id = d.billing_event_id
+        ORDER BY e.id, e.cycle_end_date DESC`;
 
       const result = await db.execute(query);
       console.log("Retrieved billing history:", result.rows?.length, "events");
@@ -937,9 +936,7 @@ export class DatabaseStorage {
       console.log("Last billing event for quantities:", lastEvent);
 
       // Use the exact timestamp of the last event's end date
-      const startDate = lastEvent 
-        ? lastEvent.cycleEndDate
-        : new Date(0).toISOString();
+      const startDate = lastEvent?.cycleEndDate || new Date(0).toISOString();
 
       console.log("Using exact start timestamp for billing quantities:", startDate);
 

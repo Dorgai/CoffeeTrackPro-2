@@ -127,7 +127,7 @@ export function BillingEventGrid() {
       if (!dateString) return 'N/A';
       const date = parseISO(dateString);
       if (!isValid(date)) throw new Error('Invalid date');
-      return format(date, 'PPP');
+      return format(date, 'PPP p'); // Added time to the date format
     } catch (error) {
       console.error("Error formatting date:", dateString, error);
       return 'N/A';
@@ -135,10 +135,16 @@ export function BillingEventGrid() {
   };
 
   const getCyclePeriodDisplay = (fromDate: string) => {
-    const date = parseISO(fromDate);
-    if (!isValid(date)) return 'N/A';
-    if (date.getTime() === 0) return 'First billing cycle';
-    return `Data gathered since: ${formatDateSafely(fromDate)}`;
+    try {
+      if (!fromDate) return 'N/A';
+      const date = parseISO(fromDate);
+      if (!isValid(date)) return 'N/A';
+      if (date.getTime() === 0) return 'First billing cycle';
+      return `Data gathered since: ${formatDateSafely(fromDate)}`;
+    } catch (error) {
+      console.error("Error formatting cycle period:", error);
+      return 'N/A';
+    }
   };
 
   return (
