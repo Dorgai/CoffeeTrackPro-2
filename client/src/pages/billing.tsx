@@ -32,17 +32,18 @@ export default function BillingPage() {
   // Fetch delivered orders quantities
   const { data: deliveredQuantities, isLoading: loadingQuantities } = useQuery<DeliveredQuantities[]>({
     queryKey: ["/api/billing/delivered-quantities"],
+    enabled: !!user,
   });
 
   // Fetch billing history
   const { data: billingHistory, isLoading: loadingHistory } = useQuery<BillingEventWithDetails[]>({
     queryKey: ["/api/billing/history"],
+    enabled: !!user,
   });
 
   // Handle generate billing event
   const handleGenerateBillingEvent = async () => {
     try {
-      // Default split percentages - adjust as needed
       const payload = {
         primarySplitPercentage: 70,
         secondarySplitPercentage: 30,
@@ -93,10 +94,10 @@ export default function BillingPage() {
   const formatDateTime = (dateStr: string) => {
     try {
       const date = parseISO(dateStr);
-      return format(date, "PPP p"); // Mar 15, 2025 at 2:30 PM
+      return format(date, "MMM d, yyyy HH:mm:ss");
     } catch (error) {
       console.error("Error formatting date:", dateStr, error);
-      return "Date error";
+      return dateStr;
     }
   };
 
@@ -139,11 +140,14 @@ export default function BillingPage() {
             <TableBody>
               {coffeeGrades.map((grade) => {
                 const gradeQuantity = deliveredQuantities?.find(q => q.grade === grade);
+                const smallBags = gradeQuantity?.smallBagsQuantity || 0;
+                const largeBags = gradeQuantity?.largeBagsQuantity || 0;
+
                 return (
                   <TableRow key={grade}>
                     <TableCell className="font-medium">{grade}</TableCell>
-                    <TableCell>{gradeQuantity?.smallBagsQuantity || 0}</TableCell>
-                    <TableCell>{gradeQuantity?.largeBagsQuantity || 0}</TableCell>
+                    <TableCell>{smallBags}</TableCell>
+                    <TableCell>{largeBags}</TableCell>
                   </TableRow>
                 );
               })}
