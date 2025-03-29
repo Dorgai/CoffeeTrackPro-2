@@ -1,10 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { GreenCoffee } from "@shared/schema";
-import { Loader2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { greenCoffee } from "@shared/schema";
+import { Loader2, PackagePlus } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { useActiveShop } from "@/hooks/use-active-shop";
 import { ShopSelector } from "@/components/layout/shop-selector";
-
 import {
   Card,
   CardContent,
@@ -12,17 +14,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { OrderForm } from "@/components/coffee/order-form";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+
+type GreenCoffee = typeof greenCoffee.$inferSelect;
 
 export default function Order() {
   const { user } = useAuth();

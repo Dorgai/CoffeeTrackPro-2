@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { GreenCoffee } from "@shared/schema";
+import { greenCoffee } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw, PackagePlus } from "lucide-react";
 import { InventoryGrid } from "@/components/coffee/inventory-grid";
 import { GreenCoffeeForm } from "@/components/coffee/green-coffee-form";
 import { InventoryDiscrepancyView } from "@/components/coffee/inventory-discrepancy-view";
@@ -13,6 +13,18 @@ import { ShopSelector } from "@/components/layout/shop-selector";
 import { RestockDialog } from "@/components/coffee/restock-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useActiveShop } from "@/hooks/use-active-shop";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+
+type GreenCoffee = typeof greenCoffee.$inferSelect;
 
 export default function Inventory() {
   const { user } = useAuth();

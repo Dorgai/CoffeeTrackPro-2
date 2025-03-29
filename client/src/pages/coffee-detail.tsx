@@ -1,10 +1,15 @@
+import { useState } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { GreenCoffee, RoastingBatch } from "@shared/schema";
+import { greenCoffee, type RoastingBatch } from "@shared/schema";
 import { formatDate } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Edit, Trash2, CoffeeIcon, Package } from "lucide-react";
+import { Loader2, PackagePlus, RefreshCw } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
+import { useActiveShop } from "@/hooks/use-active-shop";
+import { ShopSelector } from "@/components/layout/shop-selector";
 
 import {
   Card,
@@ -26,6 +31,10 @@ import {
 } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { RoastingForm } from "@/components/coffee/roasting-form";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+
+type GreenCoffee = typeof greenCoffee.$inferSelect;
 
 export default function CoffeeDetail() {
   const params = useParams();

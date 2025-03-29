@@ -7,6 +7,7 @@ import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { registerRoutes } from "./routes";
 import { initializeDatabase, cleanupDatabase } from "./db";
+import rateLimit from 'express-rate-limit';
 
 async function createServer() {
   try {
@@ -17,6 +18,13 @@ async function createServer() {
 
     const app = express();
     const port = process.env.PORT || 5000;
+
+    // Rate limiting
+    const limiter = rateLimit({
+      windowMs: 15 * 60 * 1000, // 15 minutes
+      max: 100 // limit each IP to 100 requests per windowMs
+    });
+    app.use(limiter);
 
     console.log("Setting up CORS...");
     app.use(cors({

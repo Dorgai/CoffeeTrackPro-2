@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
-import { GreenCoffee } from "@shared/schema";
+import { greenCoffee } from "@shared/schema";
 import { Loader2, PackagePlus } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useActiveShop } from "@/hooks/use-active-shop";
@@ -22,6 +22,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
+type GreenCoffee = typeof greenCoffee.$inferSelect;
 
 type OrderWithDetails = {
   id: number;

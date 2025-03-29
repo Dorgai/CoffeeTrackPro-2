@@ -3,8 +3,8 @@ import { useState } from "react";
 import { RoastingForm } from "@/components/coffee/roasting-form";
 import { InventoryGrid } from "@/components/coffee/inventory-grid";
 import { GreenCoffeeForm } from "@/components/coffee/green-coffee-form";
-import type { GreenCoffee, RoastingBatch } from "@shared/schema";
-import { Loader2 } from "lucide-react";
+import { greenCoffee, type RoastingBatch } from "@shared/schema";
+import { Loader2, PackagePlus } from "lucide-react";
 import StockProgress from "@/components/stock-progress";
 import {
   Table,
@@ -19,6 +19,12 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
+import { useActiveShop } from "@/hooks/use-active-shop";
+import { ShopSelector } from "@/components/layout/shop-selector";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+
+type GreenCoffee = typeof greenCoffee.$inferSelect;
 
 export default function Roasting() {
   const { user } = useAuth();

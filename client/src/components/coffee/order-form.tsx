@@ -4,7 +4,7 @@ import { z } from "zod";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { GreenCoffee } from "@shared/schema";
+import { greenCoffee } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { useActiveShop } from "@/hooks/use-active-shop";
 
@@ -20,6 +20,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Loader2 } from "lucide-react";
+
+type GreenCoffee = typeof greenCoffee.$inferSelect;
 
 // Define schema for order form
 const orderFormSchema = z.object({

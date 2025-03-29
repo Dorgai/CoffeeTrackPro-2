@@ -193,6 +193,7 @@ export default function Dashboard() {
                     <TableHead>Small Bags</TableHead>
                     <TableHead>Large Bags</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Created By</TableHead>
                     <TableHead>Created</TableHead>
                   </TableRow>
                 </TableHead>
@@ -204,6 +205,7 @@ export default function Dashboard() {
                       <TableCell>{order.smallBags}</TableCell>
                       <TableCell>{order.largeBags}</TableCell>
                       <TableCell>{order.status}</TableCell>
+                      <TableCell>{order.created_by || 'Unknown'}</TableCell>
                       <TableCell>{formatDate(order.createdAt)}</TableCell>
                     </TableRow>
                   ))}
@@ -351,6 +353,7 @@ export default function Dashboard() {
                         <TableHead>Small Bags</TableHead>
                         <TableHead>Large Bags</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>Created By</TableHead>
                         <TableHead>Created</TableHead>
                       </TableRow>
                     </TableHead>
@@ -362,6 +365,7 @@ export default function Dashboard() {
                           <TableCell>{order.smallBags}</TableCell>
                           <TableCell>{order.largeBags}</TableCell>
                           <TableCell>{order.status}</TableCell>
+                          <TableCell>{order.created_by || 'Unknown'}</TableCell>
                           <TableCell>{formatDate(order.createdAt)}</TableCell>
                         </TableRow>
                       ))}

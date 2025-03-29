@@ -1,23 +1,37 @@
-import { useLocation } from "wouter";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { greenCoffee } from "@shared/schema";
+import { Loader2, PackagePlus } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
+import { useActiveShop } from "@/hooks/use-active-shop";
+import { ShopSelector } from "@/components/layout/shop-selector";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { OrderForm } from "@/components/coffee/order-form";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { useLocation } from "wouter";
 import { AlertTriangle } from "lucide-react";
-import type { GreenCoffee } from "@shared/schema";
+
+type GreenCoffee = typeof greenCoffee.$inferSelect;
+
+interface InventoryGridProps {
+  coffees: GreenCoffee[];
+}
 
 export function InventoryGrid({
   coffees,
-}: {
-  coffees: GreenCoffee[];
-}) {
+}: InventoryGridProps) {
   const [, navigate] = useLocation();
 
   return (

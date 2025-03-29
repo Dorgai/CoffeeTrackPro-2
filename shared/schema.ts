@@ -116,6 +116,25 @@ export const retailInventories = pgTable("retail_inventories", {
   notes: text("notes"),
 });
 
+export const billingEvents = pgTable("billing_events", {
+  id: serial("id").primaryKey(),
+  cycleStartDate: timestamp("cycle_start_date").notNull(),
+  cycleEndDate: timestamp("cycle_end_date").notNull(),
+  createdById: integer("created_by_id").notNull().references(() => users.id),
+  primarySplitPercentage: integer("primary_split_percentage").notNull(),
+  secondarySplitPercentage: integer("secondary_split_percentage").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const billingEventDetails = pgTable("billing_event_details", {
+  id: serial("id").primaryKey(),
+  billingEventId: integer("billing_event_id").notNull().references(() => billingEvents.id),
+  shopName: text("shop_name").notNull(),
+  grade: text("grade", { enum: coffeeGrades }).notNull(),
+  smallBagsQuantity: integer("small_bags_quantity").notNull(),
+  largeBagsQuantity: integer("large_bags_quantity").notNull(),
+});
+
 export const insertRoastingBatchSchema = z.object({
   greenCoffeeId: z.number(),
   plannedAmount: z.coerce.number().min(0, "Planned amount must be 0 or greater"),
@@ -155,6 +174,8 @@ export type RetailInventory = typeof retailInventories.$inferSelect;
 export type RetailInventoryHistory = typeof retailInventoryHistory.$inferSelect;
 export type Order = typeof orders.$inferSelect;
 export type RoastingBatch = typeof roastingBatches.$inferSelect;
+export type BillingEvent = typeof billingEvents.$inferSelect;
+export type BillingEventDetail = typeof billingEventDetails.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertShop = z.infer<typeof insertShopSchema>;

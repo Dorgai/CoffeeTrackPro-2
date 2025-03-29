@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { GreenCoffee } from "@shared/schema";
-import { Loader2, PackagePlus, RefreshCw, Search } from "lucide-react";
+import { greenCoffee } from "@shared/schema";
+import { Loader2, PackagePlus, Search } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -19,19 +19,18 @@ import { OrderForm } from "@/components/coffee/order-form";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Link } from "wouter";
 import { RetailInventoryTable } from "@/components/coffee/retail-inventory-table";
-import { RestockDialog } from "@/components/coffee/restock-dialog";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Alert, AlertDescription } from "@/components/ui/alert"; // Added import for Alert component
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
+type GreenCoffee = typeof greenCoffee.$inferSelect;
 
 export default function Retail() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { activeShop } = useActiveShop();
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
-  const [isRestockDialogOpen, setIsRestockDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
@@ -66,18 +65,6 @@ export default function Retail() {
     return acc;
   }, {} as Record<string, GreenCoffee[]>);
 
-  const handleRestock = () => {
-    if (!activeShop?.id) {
-      toast({
-        title: "Error",
-        description: "Please select a shop first",
-        variant: "destructive",
-      });
-      return;
-    }
-    setIsRestockDialogOpen(true);
-  };
-
   return (
     <div className="container mx-auto py-8 space-y-8">
       <div className="flex flex-col space-y-4">
@@ -92,10 +79,6 @@ export default function Retail() {
             <div className="flex gap-4">
               <Button variant="outline" asChild>
                 <Link href="/retail/orders">View Orders</Link>
-              </Button>
-              <Button variant="outline" onClick={handleRestock}>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Restock
               </Button>
               <Button onClick={() => setIsOrderDialogOpen(true)}>
                 <PackagePlus className="h-4 w-4 mr-2" />
@@ -154,7 +137,7 @@ export default function Retail() {
                   {Object.entries(groupedCoffees).map(([grade, gradeCoffees]) => (
                     <TabsContent key={grade} value={grade}>
                       <div className="space-y-4">
-                        {gradeCoffees.map((coffee) => (
+                        {gradeCoffees.map((coffee: GreenCoffee) => (
                           <Card key={coffee.id}>
                             <CardContent className="pt-6">
                               <OrderForm
@@ -178,12 +161,6 @@ export default function Retail() {
           </CardContent>
         </DialogContent>
       </Dialog>
-
-      <RestockDialog
-        open={isRestockDialogOpen}
-        onOpenChange={setIsRestockDialogOpen}
-        shopId={activeShop?.id || null}
-      />
     </div>
   );
 }

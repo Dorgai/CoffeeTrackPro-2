@@ -75,6 +75,12 @@ export function setupAuth(app: Express) {
           return done(null, false, { message: "Invalid username or password" });
         }
 
+        // Check if user is pending approval
+        if (user.isPendingApproval) {
+          console.log("[Auth] Login blocked - user pending approval:", username);
+          return done(null, false, { message: "Your account is pending approval. Please wait for an administrator to approve your account." });
+        }
+
         console.log("[Auth] Login successful:", { username });
         return done(null, user);
       } catch (error) {

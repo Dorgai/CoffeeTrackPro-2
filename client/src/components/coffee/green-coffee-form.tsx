@@ -1,10 +1,13 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertGreenCoffeeSchema, GreenCoffee, coffeeGrades } from "@shared/schema";
+import { z } from "zod";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-
+import { greenCoffee, coffeeGrades } from "@shared/schema";
+import { useAuth } from "@/hooks/use-auth";
+import { useActiveShop } from "@/hooks/use-active-shop";
+import { ShopSelector } from "@/components/layout/shop-selector";
 import {
   Form,
   FormControl,
@@ -15,69 +18,74 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Loader2 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
-type FormValues = {
-  name: string;
-  producer: string;
-  country: string;
-  currentStock: string;
-  minThreshold: string;
-  grade: typeof coffeeGrades[number];
-};
+type GreenCoffee = typeof greenCoffee.$inferSelect;
+
+const insertGreenCoffeeSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  producer: z.string().min(1, "Producer is required"),
+  country: z.string().min(1, "Country is required"),
+  currentStock: z.coerce.number().min(0, "Current stock must be 0 or greater"),
+  minThreshold: z.coerce.number().min(0, "Minimum threshold must be 0 or greater"),
+  grade: z.enum(coffeeGrades),
+  isActive: z.boolean().default(true)
+});
+
+type FormValues = z.infer<typeof insertGreenCoffeeSchema>;
 
 export function GreenCoffeeForm({
+  onSuccess,
   coffee,
-  onSuccess
 }: {
-  coffee?: GreenCoffee;
   onSuccess?: () => void;
+  coffee?: GreenCoffee;
 }) {
   const { toast } = useToast();
-  const isEditing = !!coffee;
 
   const form = useForm<FormValues>({
     resolver: zodResolver(insertGreenCoffeeSchema),
-    defaultValues: coffee ? {
-      ...coffee,
-      currentStock: String(coffee.currentStock),
-      minThreshold: String(coffee.minThreshold)
-    } : {
+    defaultValues: coffee || {
       name: "",
       producer: "",
       country: "",
-      currentStock: "0",
-      minThreshold: "0",
-      grade: "Premium"
-    }
+      currentStock: 0,
+      minThreshold: 0,
+      grade: "Premium",
+      isActive: true,
+    },
   });
 
-  const mutation = useMutation({
+  const createGreenCoffeeMutation = useMutation({
     mutationFn: async (data: FormValues) => {
-      if (isEditing) {
-        const response = await apiRequest("PATCH", `/api/green-coffee/${coffee.id}`, data);
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || "Failed to update coffee");
-        }
-        return response.json();
-      } else {
-        const response = await apiRequest("POST", "/api/green-coffee", data);
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || "Failed to create coffee");
-        }
-        return response.json();
+      const res = await apiRequest("POST", "/api/green-coffee", data);
+      if (!res.ok) {
+        throw new Error(await res.text() || "Failed to create green coffee");
       }
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/green-coffee"] });
-      toast({
-        title: isEditing ? "Coffee Updated" : "Coffee Created",
-        description: isEditing ? "Green coffee has been updated" : "New green coffee has been added",
-      });
       if (onSuccess) onSuccess();
+      toast({
+        title: "Success",
+        description: "Green coffee has been created",
+      });
+      form.reset();
     },
     onError: (error: Error) => {
       toast({
@@ -88,51 +96,49 @@ export function GreenCoffeeForm({
     },
   });
 
-  const onSubmit = async (data: FormValues) => {
+  const onSubmit = form.handleSubmit(async (data) => {
     try {
-      await mutation.mutateAsync(data);
+      await createGreenCoffeeMutation.mutateAsync(data);
     } catch (error) {
-      console.error("Submit error:", error);
+      console.error("Failed to create green coffee:", error);
     }
-  };
+  });
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{isEditing ? "Edit Green Coffee" : "Add New Green Coffee"}</CardTitle>
+        <CardTitle>{coffee ? "Edit Green Coffee" : "Add New Green Coffee"}</CardTitle>
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Coffee Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Ethiopia Yirgacheffe" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+          <form onSubmit={onSubmit} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Name</FormLabel>
+                  <FormControl>
+                    <Input {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-              <FormField
-                control={form.control}
-                name="producer"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Producer</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Konga Cooperative" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="producer"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Producer</FormLabel>
+                  <FormControl>
+                    <Input {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}
@@ -141,83 +147,76 @@ export function GreenCoffeeForm({
                 <FormItem>
                   <FormLabel>Country</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Ethiopia" {...field} />
+                    <Input {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            <div className="grid grid-cols-3 gap-4">
-              <FormField
-                control={form.control}
-                name="grade"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Grade</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select grade" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {coffeeGrades.map((grade) => (
-                          <SelectItem key={grade} value={grade}>
-                            {grade}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <FormField
+              control={form.control}
+              name="currentStock"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Current Stock (kg)</FormLabel>
+                  <FormControl>
+                    <Input type="number" min="0" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-              <FormField
-                control={form.control}
-                name="currentStock"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Current Stock (kg)</FormLabel>
+            <FormField
+              control={form.control}
+              name="minThreshold"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Minimum Threshold (kg)</FormLabel>
+                  <FormControl>
+                    <Input type="number" min="0" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="grade"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Grade</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        {...field}
-                      />
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a grade" />
+                      </SelectTrigger>
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                    <SelectContent>
+                      {coffeeGrades.map((grade) => (
+                        <SelectItem key={grade} value={grade}>
+                          {grade}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-              <FormField
-                control={form.control}
-                name="minThreshold"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Min Threshold (kg)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="flex justify-end">
-              <Button type="submit" disabled={mutation.isPending}>
-                {mutation.isPending ? (isEditing ? "Updating..." : "Adding...") : (isEditing ? "Update Coffee" : "Add Coffee")}
-              </Button>
-            </div>
+            <Button type="submit" className="w-full" disabled={createGreenCoffeeMutation.isPending}>
+              {createGreenCoffeeMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Creating...
+                </>
+              ) : (
+                "Create Green Coffee"
+              )}
+            </Button>
           </form>
         </Form>
       </CardContent>

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { GreenCoffee } from "@shared/schema";
+import { greenCoffee } from "@shared/schema";
 import {
   HoverCard,
   HoverCardContent,
@@ -8,6 +8,22 @@ import {
 import { Coffee, Loader2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
+import { useActiveShop } from "@/hooks/use-active-shop";
+import { ShopSelector } from "@/components/layout/shop-selector";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+
+type GreenCoffee = typeof greenCoffee.$inferSelect;
 
 export function GreenBeansStockIndicator() {
   const { toast } = useToast();

@@ -234,6 +234,36 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  // Add route for updating user's shop assignments
+  app.post("/api/users/:id/shops", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const { shopIds } = req.body;
+
+      if (!Array.isArray(shopIds)) {
+        return res.status(400).json({ message: "shopIds must be an array" });
+      }
+
+      // Verify all shop IDs exist
+      const allShops = await storage.getShops();
+      const validShopIds = allShops.map(shop => shop.id);
+      const invalidShopIds = shopIds.filter(id => !validShopIds.includes(id));
+
+      if (invalidShopIds.length > 0) {
+        return res.status(400).json({ 
+          message: "Invalid shop IDs provided",
+          invalidShopIds
+        });
+      }
+
+      await storage.assignUserToShops(userId, shopIds);
+      res.json({ message: "Shop assignments updated successfully" });
+    } catch (error) {
+      console.error("Error updating user shop assignments:", error);
+      res.status(500).json({ message: "Failed to update shop assignments" });
+    }
+  });
+
   app.get("/api/users/:id", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
     try {
       const userId = parseInt(req.params.id);
@@ -262,6 +292,47 @@ export async function registerRoutes(app: Express): Promise<void> {
     } catch (error) {
       console.error("Error deleting user:", error);
       res.status(500).json({ message: "Failed to delete user" });
+    }
+  });
+
+  // Add permanent deletion endpoint for roastery owners
+  app.delete("/api/users/:id/permanent", requireRole(["roasteryOwner"]), async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        res.status(404).json({ message: "User not found" });
+        return;
+      }
+
+      // Prevent deleting roastery owners
+      if (user.role === "roasteryOwner") {
+        res.status(403).json({ message: "Cannot delete roastery owners" });
+        return;
+      }
+
+      await storage.deleteUser(userId);
+      res.json({ message: "User permanently deleted" });
+    } catch (error) {
+      console.error("Error permanently deleting user:", error);
+      res.status(500).json({ message: "Failed to permanently delete user" });
+    }
+  });
+
+  // Add user approval endpoint
+  app.post("/api/users/:id/approve", requireRole(["roasteryOwner"]), async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        res.status(404).json({ message: "User not found" });
+        return;
+      }
+      await storage.approveUser(userId);
+      res.json({ message: "User approved successfully" });
+    } catch (error) {
+      console.error("Error approving user:", error);
+      res.status(500).json({ message: "Failed to approve user" });
     }
   });
 
@@ -1158,16 +1229,19 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-  // Billing routes
+  // Add billing quantities route
   app.get("/api/billing/quantities", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
     try {
       const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
       const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+
+      console.log("Fetching billing quantities:", { startDate, endDate });
+
       const quantities = await storage.getBillingQuantities(startDate, endDate);
       res.json(quantities);
     } catch (error) {
       console.error("Error fetching billing quantities:", error);
-      res.status(500).json({ error: "Failed to fetch billing quantities" });
+      res.status(500).json({ message: "Failed to fetch billing quantities" });
     }
   });
 
