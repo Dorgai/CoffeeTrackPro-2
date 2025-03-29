@@ -10,8 +10,6 @@ import { nanoid } from "nanoid";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const viteLogger = createLogger();
-
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -25,12 +23,13 @@ export function log(message: string, source = "express") {
 
 export async function setupVite(app: Express, httpServer: Server) {
   const vite = await createServer({
+    ...viteConfig,
     server: {
       middlewareMode: true,
       hmr: {
         server: httpServer,
       },
-      allowedHosts: true
+      host: true
     },
   });
 

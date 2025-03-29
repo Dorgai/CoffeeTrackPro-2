@@ -23,7 +23,7 @@ router.post("/inventory", async (req, res) => {
     }
     const inventoryData = insertRetailInventorySchema.parse({
       ...req.body,
-      updatedById: req.session.userId
+      updatedById: req.session.userId as number
     });
     const inventory = await storage.updateRetailInventory(inventoryData);
     res.json(inventory);
