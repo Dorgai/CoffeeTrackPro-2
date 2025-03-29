@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { greenCoffee } from "@shared/schema";
+import { greenCoffee, type RetailInventory } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2, RefreshCw, PackagePlus } from "lucide-react";
 import { InventoryGrid } from "@/components/coffee/inventory-grid";
@@ -26,12 +26,40 @@ import { Badge } from "@/components/ui/badge";
 
 type GreenCoffee = typeof greenCoffee.$inferSelect;
 
+interface MonthSelectorProps {
+  value: number | null;
+  onChange: (value: number | null) => void;
+}
+
+function MonthSelector({ value, onChange }: MonthSelectorProps) {
+  const months = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  return (
+    <select
+      value={value || ""}
+      onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
+      className="rounded-md border border-gray-300 px-3 py-2"
+    >
+      <option value="">All Months</option>
+      {months.map((month, index) => (
+        <option key={month} value={index + 1}>
+          {month}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 export default function Inventory() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isRestockOpen, setIsRestockOpen] = useState(false);
   const [selectedShopId, setSelectedShopId] = useState<number | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
 
   const { data: coffees, isLoading, error } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
@@ -43,6 +71,10 @@ export default function Inventory() {
       }
       return res.json();
     },
+  });
+
+  const { data: inventory = [] } = useQuery<RetailInventory[]>({
+    queryKey: ["/api/retail/inventory", selectedMonth],
   });
 
   const handleRestock = () => {

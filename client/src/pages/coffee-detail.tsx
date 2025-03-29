@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { greenCoffee, type RoastingBatch } from "@shared/schema";
+import { greenCoffee, type RoastingBatch, type GreenCoffee } from "@shared/schema";
 import { formatDate } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Edit, Trash2, CoffeeIcon, Package } from "lucide-react";
@@ -36,7 +36,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 type GreenCoffee = typeof greenCoffee.$inferSelect;
 
-export default function CoffeeDetail() {
+interface CoffeeDetailProps {
+  coffee: GreenCoffee & {
+    notes?: string;
+  };
+}
+
+export function CoffeeDetailPage({ coffee }: CoffeeDetailProps) {
   const params = useParams();
   const { toast } = useToast();
 
@@ -66,7 +72,7 @@ export default function CoffeeDetail() {
   }
 
   // Fetch coffee details
-  const { data: coffee, isLoading: loadingCoffee, error: coffeeError } = useQuery<GreenCoffee>({
+  const { data: coffeeDetails, isLoading: loadingCoffee, error: coffeeError } = useQuery<GreenCoffee>({
     queryKey: ["/api/green-coffee", coffeeId],
     queryFn: async () => {
       console.log("Fetching coffee details for ID:", coffeeId);
@@ -134,7 +140,7 @@ export default function CoffeeDetail() {
     );
   }
 
-  if (!coffee) {
+  if (!coffeeDetails) {
     console.log("No coffee data available");
     return (
       <div className="container mx-auto py-8">
@@ -158,7 +164,7 @@ export default function CoffeeDetail() {
     );
   }
 
-  console.log("Rendering coffee details:", coffee);
+  console.log("Rendering coffee details:", coffeeDetails);
 
   // Calculate total roasted and total packaged amounts
   const totalRoasted = batches?.reduce((sum, batch) =>
@@ -180,7 +186,7 @@ export default function CoffeeDetail() {
             </Button>
           </Link>
           <h2 className="text-sm text-muted-foreground">
-            Home / Coffee / {coffee.name}
+            Home / Coffee / {coffeeDetails.name}
           </h2>
         </div>
 
@@ -194,7 +200,7 @@ export default function CoffeeDetail() {
             </DialogTrigger>
             <DialogContent className="sm:max-w-[600px]">
               <GreenCoffeeForm
-                coffee={coffee}
+                coffee={coffeeDetails}
                 onSuccess={() => {
                   toast({
                     title: "Coffee Updated",
@@ -222,9 +228,9 @@ export default function CoffeeDetail() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">{coffee.name}</CardTitle>
+          <CardTitle className="text-2xl">{coffeeDetails.name}</CardTitle>
           <CardDescription>
-            {coffee.producer} • {coffee.country}
+            {coffeeDetails.producer} • {coffeeDetails.country}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-8">
@@ -237,19 +243,19 @@ export default function CoffeeDetail() {
                 <dl className="space-y-2">
                   <div className="flex justify-between">
                     <dt className="font-medium text-muted-foreground">Current Stock:</dt>
-                    <dd>{coffee.currentStock} kg</dd>
+                    <dd>{coffeeDetails.currentStock} kg</dd>
                   </div>
                   <div className="flex justify-between">
                     <dt className="font-medium text-muted-foreground">Minimum Threshold:</dt>
-                    <dd>{coffee.minThreshold} kg</dd>
+                    <dd>{coffeeDetails.minThreshold} kg</dd>
                   </div>
                   <div className="flex justify-between">
                     <dt className="font-medium text-muted-foreground">Grade:</dt>
-                    <dd>{coffee.grade}</dd>
+                    <dd>{coffeeDetails.grade}</dd>
                   </div>
                   <div className="flex justify-between">
                     <dt className="font-medium text-muted-foreground">Added on:</dt>
-                    <dd>{formatDate(coffee.createdAt)}</dd>
+                    <dd>{formatDate(coffeeDetails.createdAt)}</dd>
                   </div>
                 </dl>
               </div>
@@ -258,7 +264,7 @@ export default function CoffeeDetail() {
                 <h3 className="text-lg font-semibold">Additional Information</h3>
                 <Separator className="my-2" />
                 <p className="text-muted-foreground whitespace-pre-wrap">
-                  {coffee.notes || "No additional information available"}
+                  {coffeeDetails.notes || "No additional information available"}
                 </p>
               </div>
             </div>
