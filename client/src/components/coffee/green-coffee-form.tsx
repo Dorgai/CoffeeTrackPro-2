@@ -65,7 +65,7 @@ export function GreenCoffeeForm({
       country: "",
       currentStock: 0,
       minThreshold: 0,
-      grade: "Premium",
+      grade: "Specialty",
       isActive: true,
     },
   });
@@ -98,9 +98,15 @@ export function GreenCoffeeForm({
 
   const onSubmit = form.handleSubmit(async (data) => {
     try {
-      await createGreenCoffeeMutation.mutateAsync(data);
+      const formData = {
+        ...data,
+        currentStock: Number(data.currentStock),
+        minThreshold: Number(data.minThreshold),
+      };
+      await createGreenCoffeeMutation.mutateAsync(formData);
+      onSuccess?.();
     } catch (error) {
-      console.error("Failed to create green coffee:", error);
+      console.error("Error submitting form:", error);
     }
   });
 

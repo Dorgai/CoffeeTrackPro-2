@@ -1,7 +1,7 @@
 import { Route, Switch } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import { AuthProvider } from "@/hooks/use-auth";
+import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { PageLayout } from "@/components/layout/page-layout";
 import Dashboard from "@/pages/dashboard";
 import ManagerDashboard from "@/pages/manager-dashboard";
@@ -29,6 +29,26 @@ import RoastingDiscrepancies from "@/pages/roasting-discrepancies";
 import Retail from "@/pages/retail";
 import UserShopManagement from "@/pages/user-shop-management";
 import Billing from "@/pages/billing";
+import { Navigate, useLocation } from "react-router-dom";
+
+const ProtectedRoute = ({ path, component: Component, roles }: { path: string; component: () => JSX.Element; roles?: string[] }) => {
+  const { user, isLoading } = useAuth();
+  const location = useLocation();
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (roles && !roles.includes(user.role)) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  return <Component />;
+};
 
 export default function App() {
   return (
@@ -39,6 +59,8 @@ export default function App() {
             {/* Public routes */}
             <Route path="/auth" component={AuthPage} />
             <Route path="/login" component={AuthPage} />
+            <Route path="/register" component={AuthPage} />
+            <Route path="/unauthorized" component={AuthPage} />
 
             {/* Roastery Dashboard - for roastery staff */}
             <Route path="/">

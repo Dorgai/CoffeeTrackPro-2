@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -17,6 +17,10 @@ import { Loader2, AlertTriangle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { StockStatus } from "./stock-status";
 import { Badge } from "@/components/ui/badge";
+import { useMutation } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { toast } from "sonner";
+import { type GreenCoffee } from "@shared/schema";
 
 type RestockDialogProps = {
   open: boolean;
@@ -30,6 +34,7 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
   const { toast } = useToast();
   const [quantities, setQuantities] = useState<Quantities>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const queryClient = useQueryClient();
 
   // Reset quantities when dialog opens/closes or shop changes
   useEffect(() => {
@@ -65,69 +70,31 @@ export function RestockDialog({ open, onOpenChange, shopId }: RestockDialogProps
     }));
   };
 
-  const handleSubmit = async () => {
-    if (!shopId) {
-      toast({
-        title: "Error",
-        description: "Please select a shop first",
-        variant: "destructive",
+  const restockMutation = useMutation({
+    mutationFn: async (amount: number) => {
+      const response = await api.post("/api/coffee/restock", {
+        coffeeId: coffees?.find(c => c.id === coffeeId)?.id,
+        amount,
       });
-      return;
-    }
-
-    const ordersToCreate = Object.entries(quantities)
-      .filter(([_, { small, large }]) => small > 0 || large > 0);
-
-    if (ordersToCreate.length === 0) {
-      toast({
-        title: "Error",
-        description: "Please specify quantities for at least one coffee type",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const results = await Promise.all(
-        ordersToCreate.map(async ([coffeeId, { small, large }]) => {
-          const response = await apiRequest("POST", "/api/orders", {
-            shopId,
-            greenCoffeeId: parseInt(coffeeId),
-            smallBags: small,
-            largeBags: large,
-            status: "pending"
-          });
-
-          if (!response.ok) {
-            throw new Error(await response.text());
-          }
-
-          return response.json();
-        })
-      );
-
-      // Invalidate relevant queries
-      await queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-      await queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory"] });
-
-      toast({
-        title: "Success",
-        description: `Created ${results.length} restock order${results.length > 1 ? 's' : ''}`,
-      });
-
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/retail-inventory"] });
+      toast.success("Coffee restocked successfully");
       onOpenChange(false);
       setQuantities({});
-    } catch (error) {
+    },
+    onError: (error) => {
+      toast.error("Failed to restock coffee");
       console.error("Restock error:", error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create restock orders",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (Object.values(quantities).some(({ small, large }) => small > 0 || large > 0)) {
+      restockMutation.mutate(Object.values(quantities).reduce((total, { small, large }) => total + small + large, 0));
     }
   };
 
