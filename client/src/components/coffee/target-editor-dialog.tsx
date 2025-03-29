@@ -13,28 +13,21 @@ import { useState, useEffect as ReactuseEffect } from "react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { CoffeeLargeBagTarget } from "@shared/schema";
+import { CoffeeLargeBagTarget, type GreenCoffee } from "@shared/schema";
 
 interface TargetEditorDialogProps {
-  shopId: number;
-  coffeeId: number;
-  coffeeName: string;
-  trigger?: React.ReactNode;
+  coffee: GreenCoffee;
+  onClose: () => void;
 }
 
-export function TargetEditorDialog({
-  shopId,
-  coffeeId,
-  coffeeName,
-  trigger
-}: TargetEditorDialogProps) {
-  const [open, setOpen] = useState(false);
+export function TargetEditorDialog({ coffee, onClose }: TargetEditorDialogProps) {
+  const [open, setOpen] = useState(true);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   // Fetch current target
   const { data: currentTarget, isLoading } = useQuery<CoffeeLargeBagTarget>({
-    queryKey: [`/api/shops/${shopId}/coffee/${coffeeId}/target`],
+    queryKey: [`/api/shops/${coffee.shopId}/coffee/${coffee.id}/target`],
     enabled: open, // Only fetch when dialog is open
   });
 
@@ -53,17 +46,17 @@ export function TargetEditorDialog({
     mutationFn: async () => {
       const res = await apiRequest(
         "PATCH",
-        `/api/shops/${shopId}/coffee/${coffeeId}/target`,
+        `/api/shops/${coffee.shopId}/coffee/${coffee.id}/target`,
         { desiredLargeBags: parseInt(desiredLargeBags) }
       );
       if (!res.ok) throw new Error("Failed to update target");
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/shops/${shopId}/coffee-targets`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/shops/${coffee.shopId}/coffee-targets`] });
       toast({
         title: "Target updated",
-        description: `Updated target for ${coffeeName}`,
+        description: `Updated target for ${coffee.name}`,
       });
       setOpen(false);
     },
@@ -76,14 +69,28 @@ export function TargetEditorDialog({
     },
   });
 
+  const handleSave = async () => {
+    try {
+      await updateTargetMutation.mutateAsync({
+        coffeeId: coffee.id,
+        target: parseInt(desiredLargeBags),
+      });
+      onClose();
+      toast.success("Target updated successfully");
+    } catch (error) {
+      toast.error("Failed to update target");
+      console.error("Update error:", error);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        {trigger || <Button variant="outline">Set Target</Button>}
+        <Button variant="outline">Set Target</Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Set Target for {coffeeName}</DialogTitle>
+          <DialogTitle>Set Target for {coffee.name}</DialogTitle>
           <DialogDescription>
             Set the desired number of large bags (1kg) for this coffee.
           </DialogDescription>
@@ -104,7 +111,7 @@ export function TargetEditorDialog({
             </div>
           )}
           <Button
-            onClick={() => updateTargetMutation.mutate()}
+            onClick={handleSave}
             disabled={updateTargetMutation.isPending || isLoading}
           >
             {updateTargetMutation.isPending ? "Saving..." : "Save Target"}
