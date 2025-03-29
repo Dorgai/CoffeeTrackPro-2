@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
-import type { GreenCoffee, RetailInventory, Shop, Order } from "@shared/schema"; 
+import type { GreenCoffee, RetailInventory, Shop, Order, RoastingBatch, UserRole } from "@shared/schema"; 
 import { useQuery } from "@tanstack/react-query";
 import {
   Card,
@@ -21,11 +21,19 @@ import { Link } from "wouter";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { MonthSelector } from "@/components/layout/month-selector";
 
-export default function Dashboard() {
-  const { user, logoutMutation } = useAuth();
+interface DashboardProps {
+  user: {
+    id: number;
+    role: UserRole;
+  };
+}
+
+export function DashboardPage({ user }: DashboardProps) {
   const { toast } = useToast();
   const [selectedShopId, setSelectedShopId] = useState<number | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [, navigate] = useLocation();
 
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
@@ -48,18 +56,14 @@ export default function Dashboard() {
     enabled: ["roasteryOwner", "owner", "retailOwner"].includes(user?.role || ""),
   });
 
-  // Update orders query to depend on selectedShopId
-  const { data: orders, isLoading: loadingOrders } = useQuery({
+  const { data: orders = [] } = useQuery<Order[]>({
     queryKey: ["/api/orders", selectedShopId],
-    queryFn: async () => {
-      const url = selectedShopId
-        ? `/api/orders?shopId=${selectedShopId}`
-        : "/api/orders";
-      const res = await apiRequest("GET", url);
-      if (!res.ok) throw new Error("Failed to fetch orders");
-      return res.json();
-    },
-    enabled: !!user && (!!selectedShopId || user.role === "roasteryOwner"),
+    enabled: !!selectedShopId,
+  });
+
+  const { data: batches = [] } = useQuery<RoastingBatch[]>({
+    queryKey: ["/api/roasting/batches", selectedMonth],
+    enabled: !!selectedMonth,
   });
 
   const { data: recentBatches, isLoading: loadingBatches } = useQuery({
@@ -67,7 +71,7 @@ export default function Dashboard() {
     enabled: user?.role === "roasteryOwner",
   });
 
-  const isLoading = loadingCoffees || loadingAllShops || loadingInventory || loadingAllInventory || loadingOrders || loadingBatches;
+  const isLoading = loadingCoffees || loadingAllShops || loadingInventory || loadingAllInventory || loadingBatches;
 
   if (isLoading) {
     return (
@@ -76,6 +80,8 @@ export default function Dashboard() {
       </div>
     );
   }
+
+  const isOwner = user.role === "retailOwner" || user.role === "roasteryOwner";
 
   if (user?.role === "roasteryOwner") {
     return (
@@ -89,6 +95,10 @@ export default function Dashboard() {
             <ShopSelector
               value={selectedShopId}
               onChange={setSelectedShopId}
+            />
+            <MonthSelector
+              value={selectedMonth}
+              onChange={setSelectedMonth}
             />
             <Button
               variant="outline"
@@ -278,6 +288,10 @@ export default function Dashboard() {
             <ShopSelector
               value={selectedShopId}
               onChange={setSelectedShopId}
+            />
+            <MonthSelector
+              value={selectedMonth}
+              onChange={setSelectedMonth}
             />
             <Button
               variant="outline"

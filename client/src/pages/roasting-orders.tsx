@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { GreenCoffee } from "@shared/schema";
+import { GreenCoffee, type Order, type OrderStatus } from "@shared/schema";
 import { Loader2, Package } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -130,6 +130,12 @@ const updateOrderSchema = z.object({
 
 type UpdateOrderValues = z.infer<typeof updateOrderSchema>;
 
+interface UpdateOrderData {
+  smallBags: number;
+  largeBags: number;
+  status: OrderStatus;
+}
+
 export default function RoastingOrders() {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -150,18 +156,9 @@ export default function RoastingOrders() {
   });
 
   const updateOrderMutation = useMutation({
-    mutationFn: async (data: UpdateOrderValues & { orderId: number }) => {
-      const res = await apiRequest("PATCH", `/api/orders/${data.orderId}/status`, {
-        status: data.status,
-        smallBags: data.smallBags,
-        largeBags: data.largeBags,
-        updatedById: user?.id,
-      });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Failed to update order");
-      }
-      return res.json();
+    mutationFn: async ({ orderId, data }: { orderId: number; data: UpdateOrderData }) => {
+      const response = await apiRequest("PATCH", `/api/orders/${orderId}/status`, data);
+      return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
@@ -180,6 +177,17 @@ export default function RoastingOrders() {
       });
     },
   });
+
+  const handleStatusUpdate = (orderId: number, status: OrderStatus) => {
+    updateOrderMutation.mutate({
+      orderId,
+      data: {
+        smallBags: 0, // These will be updated by the backend
+        largeBags: 0,
+        status,
+      },
+    });
+  };
 
   if (isLoading) {
     return (
@@ -335,7 +343,11 @@ export default function RoastingOrders() {
                     try {
                       await updateOrderMutation.mutateAsync({
                         orderId: selectedOrder.id,
-                        ...data,
+                        data: {
+                          smallBags: data.smallBags,
+                          largeBags: data.largeBags,
+                          status: data.status,
+                        },
                       });
                     } catch (error) {
                       console.error("Failed to update order:", error);
