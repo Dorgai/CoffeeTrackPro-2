@@ -1,4 +1,4 @@
-import { type RoastingBatch, type InsertRoastingBatch, roastingBatches, users, type User, type InsertUser, type Shop, type InsertShop, shops, userShops, type GreenCoffee, greenCoffee, type Order, type InsertOrder, orders, type RetailInventory, retailInventory, type RetailInventoryHistory, retailInventoryHistory } from "@shared/schema";
+import { type RoastingBatch, type InsertRoastingBatch, roastingBatches, users, type User, type InsertUser, type Shop, type InsertShop, shops, userShops, type RetailInventory, retailInventory, type RetailInventoryHistory, retailInventoryHistory, type Order, type InsertOrder, orders, type BillingEvent, type BillingEventDetail, billingEvents, billingEventDetails, type GreenCoffee, greenCoffee } from "@shared/schema";
 // Commenting out billing-related imports
 // import { type BillingEvent, billingEvents, type BillingEventDetail, billingEventDetails } from "@shared/schema";
 import { db } from "./db";
@@ -6,13 +6,12 @@ import { eq, and, inArray, sql, gt, desc, asc, or, gte, lte, isNull } from "driz
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
-import { formatTimestamp } from "@/shared/utils";
+import { formatTimestamp } from "../shared/utils";
 import { PostgresSessionStore } from "./session-store";
-
-const PostgresSessionStore = connectPg(session);
 
 export class DatabaseStorage {
   sessionStore: session.Store;
+  private db: typeof db;
 
   constructor() {
     if (!pool) {
@@ -24,13 +23,14 @@ export class DatabaseStorage {
       createTableIfMissing: true,
       tableName: 'sessions'
     });
+    this.db = db;
   }
 
   // User operations
   async getUser(id: number): Promise<User | undefined> {
     try {
       console.log("Getting user by ID:", id);
-      const [user] = await db
+      const [user] = await this.db
         .select()
         .from(users)
         .where(eq(users.id, id));
@@ -45,7 +45,7 @@ export class DatabaseStorage {
   async getUserByUsername(username: string): Promise<User | undefined> {
     try {
       console.log("Looking up user by username:", username);
-      const [user] = await db
+      const [user] = await this.db
         .select()
         .from(users)
         .where(eq(users.username, username));
@@ -60,7 +60,7 @@ export class DatabaseStorage {
   async createUser(user: InsertUser): Promise<User> {
     try {
       console.log("Creating new user:", { ...user, password: "[REDACTED]" });
-      const [newUser] = await db
+      const [newUser] = await this.db
         .insert(users)
         .values(user)
         .returning();
@@ -76,7 +76,7 @@ export class DatabaseStorage {
   async getShops(): Promise<Shop[]> {
     try {
       console.log("Getting all active shops");
-      const allShops = await db
+      const allShops = await this.db
         .select()
         .from(shops)
         .where(eq(shops.isActive, true))
@@ -92,7 +92,7 @@ export class DatabaseStorage {
   async createShop(data: InsertShop): Promise<Shop> {
     try {
       console.log("Creating shop:", data);
-      const [shop] = await db
+      const [shop] = await this.db
         .insert(shops)
         .values({
           ...data,
@@ -124,7 +124,7 @@ export class DatabaseStorage {
   async updateShop(id: number, data: Partial<Shop>): Promise<Shop> {
     try {
       console.log("Updating shop:", id, "with data:", data);
-      const [updatedShop] = await db
+      const [updatedShop] = await this.db
         .update(shops)
         .set(data)
         .where(eq(shops.id, id))
@@ -186,7 +186,7 @@ export class DatabaseStorage {
         LEFT JOIN users u ON li.updated_by_id = u.id
         ORDER BY ib.shop_name, ib.coffee_name`;
 
-      const result = await db.execute(query);
+      const result = await this.db.execute(query);
       return result.rows as RetailInventory[];
     } catch (error) {
       console.error("Error in getAllRetailInventories:", error);
@@ -245,7 +245,7 @@ export class DatabaseStorage {
         ) oi ON ci.shop_id = oi.shop_id AND ci.green_coffee_id = oi.green_coffee_id
         ORDER BY ci.shop_name, ci.coffee_name`;
 
-      const result = await db.execute(baseQuery);
+      const result = await this.db.execute(baseQuery);
       console.log("Found retail inventories:", {
         total: result.rows?.length,
         shopId,
@@ -264,7 +264,7 @@ export class DatabaseStorage {
   async getGreenCoffees(): Promise<GreenCoffee[]> {
     try {
       console.log("Storage: Fetching all green coffee entries");
-      const coffees = await db
+      const coffees = await this.db
         .select()
         .from(greenCoffee)
         .orderBy(greenCoffee.name);
@@ -279,7 +279,7 @@ export class DatabaseStorage {
 
   async getGreenCoffee(id: number): Promise<GreenCoffee | undefined> {
     try {
-      const [coffee] = await db
+      const [coffee] = await this.db
         .select()
         .from(greenCoffee)
         .where(eq(greenCoffee.id, id));
@@ -293,7 +293,7 @@ export class DatabaseStorage {
     try {
       console.log("Fetching all users from database");
       // First get all users
-      const allUsers = await db
+      const allUsers = await this.db
         .select()
         .from(users)
         .orderBy(users.username);
@@ -316,7 +316,7 @@ export class DatabaseStorage {
         throw new Error("Invalid role specified");
       }
 
-      const [user] = await db
+      const [user] = await this.db
         .update(users)
         .set(data)
         .where(eq(users.id, id))
@@ -335,12 +335,12 @@ export class DatabaseStorage {
       console.log("Permanently deleting user:", id);
       
       // First delete all user-shop assignments
-      await db
+      await this.db
         .delete(userShops)
         .where(eq(userShops.userId, id));
 
       // Then delete the user
-      await db
+      await this.db
         .delete(users)
         .where(eq(users.id, id));
 
@@ -356,7 +356,7 @@ export class DatabaseStorage {
       console.log("Approving user:", id);
 
       // First check if user exists and their current status
-      const [existingUser] = await db
+      const [existingUser] = await this.db
         .select()
         .from(users)
         .where(eq(users.id, id));
@@ -371,7 +371,7 @@ export class DatabaseStorage {
         return existingUser;
       }
 
-      const [user] = await db
+      const [user] = await this.db
         .update(users)
         .set({ isPendingApproval: false })
         .where(eq(users.id, id))
@@ -389,7 +389,7 @@ export class DatabaseStorage {
     try {
       console.log("Assigning shops to user:", userId, "shops:", shopIds);
 
-      return await db.transaction(async (tx) => {
+      return await this.db.transaction(async (tx) => {
         // Get the user
         const [user] = await tx
           .select()
@@ -430,7 +430,7 @@ export class DatabaseStorage {
     try {
       console.log("Getting all user-shop assignments");
 
-      const assignments = await db
+      const assignments = await this.db
         .select({
           userId: userShops.userId,
           shopId: userShops.shopId,
@@ -449,7 +449,7 @@ export class DatabaseStorage {
     try {
       console.log("Starting bulk user-shop assignment update with:", assignments);
 
-      await db.transaction(async (tx) => {
+      await this.db.transaction(async (tx) => {
         // Get all roastery owners and retail owners
         const [owners, retailOwners] = await Promise.all([
           tx
@@ -521,7 +521,7 @@ export class DatabaseStorage {
   async fetchUserShopAssignments(userId: number): Promise<Array<{ userId: number; shopId: number }>> {
     try {
       console.log("Fetching shop assignments for user:", userId);
-      const assignments = await db
+      const assignments = await this.db
         .select({
           userId: userShops.userId,
           shopId: userShops.shopId,
@@ -547,7 +547,7 @@ export class DatabaseStorage {
   }): Promise<RetailInventory> {
     try {
       console.log("Updating retail inventory:", data);
-      const [inventory] = await db
+      const [inventory] = await this.db
             .insert(retailInventory)
             .values({
           ...data,
@@ -565,7 +565,7 @@ export class DatabaseStorage {
   async getRetailInventoryItem(shopId: number, greenCoffeeId: number): Promise<RetailInventory | undefined> {
     try {
       console.log("Getting retail inventory item:", { shopId, greenCoffeeId });
-      const [inventory] = await db
+      const [inventory] = await this.db
         .select()
         .from(retailInventory)
         .where(
@@ -587,7 +587,7 @@ export class DatabaseStorage {
   async createGreenCoffee(data: any): Promise<GreenCoffee> {
     try {
       console.log("Creating green coffee:", data);
-      const [coffee] = await db
+      const [coffee] = await this.db
         .insert(greenCoffee)
         .values({
           ...data,
@@ -641,7 +641,7 @@ export class DatabaseStorage {
   async createOrder(data: InsertOrder): Promise<Order> {
     try {
       console.log("Creating new order:", data);
-      const [order] = await db
+      const [order] = await this.db
         .insert(orders)
         .values({
           shopId: data.shopId,
@@ -665,7 +665,7 @@ export class DatabaseStorage {
   async getOrder(id: number): Promise<Order | undefined> {
     try {
       console.log("Getting order by ID:", id);
-      const [order] = await db
+      const [order] = await this.db
         .select()
         .from(orders)
         .where(eq(orders.id, id));
@@ -683,7 +683,7 @@ export class DatabaseStorage {
   ): Promise<Order> {
     try {
       console.log("Updating order status:", id, data);
-      const [order] = await db
+      const [order] = await this.db
           .update(orders)
           .set({
             status: data.status,
@@ -705,7 +705,7 @@ export class DatabaseStorage {
   async addRoastingBatch(batch: InsertRoastingBatch): Promise<RoastingBatch> {
     try {
       console.log("Creating roasting batch:", batch);
-      const [newBatch] = await db
+      const [newBatch] = await this.db
         .insert(roastingBatches)
         .values({
           greenCoffeeId: batch.greenCoffeeId,
@@ -739,7 +739,7 @@ export class DatabaseStorage {
         ORDER BY rb.created_at DESC
       `;
 
-      const result = await db.execute(query);
+      const result = await this.db.execute(query);
       console.log("Found roasting batches:", result.rows?.length);
 
       return result.rows as RoastingBatch[];
@@ -752,7 +752,7 @@ export class DatabaseStorage {
   async getRoastingBatch(id: number): Promise<RoastingBatch | undefined> {
     try {
       console.log("Getting roasting batch by ID:", id);
-      const [batch] = await db
+      const [batch] = await this.db
         .select()
         .from(roastingBatches)
         .where(eq(roastingBatches.id, id));
@@ -767,7 +767,7 @@ export class DatabaseStorage {
   async updateRoastingBatch(id: number, data: Partial<RoastingBatch>): Promise<RoastingBatch> {
     try {
       console.log("Updating roasting batch:", id, "with data:", data);
-      const [batch] = await db
+      const [batch] = await this.db
         .update(roastingBatches)
         .set(data)
         .where(eq(roastingBatches.id, id))
@@ -783,7 +783,7 @@ export class DatabaseStorage {
   async updateGreenCoffeeStock(id: number, data: Partial<GreenCoffee>): Promise<GreenCoffee> {
     try {
       console.log("Updating green coffee stock:", id, "with data:", data);
-      const [coffee] = await db
+      const [coffee] = await this.db
         .update(greenCoffee)
         .set(data)
         .where(eq(greenCoffee.id, id))
@@ -799,7 +799,7 @@ export class DatabaseStorage {
   async createRoastingBatch(batch: InsertRoastingBatch): Promise<RoastingBatch> {
     try {
       console.log("Creating roasting batch:", batch);
-      const [newBatch] = await db
+      const [newBatch] = await this.db
         .insert(roastingBatches)
         .values({
           status: batch.status || "planned",
@@ -892,7 +892,7 @@ export class DatabaseStorage {
         FROM grade_totals
         ORDER BY grade`;
 
-      const result = await db.execute(query);
+      const result = await this.db.execute(query);
       console.log("Found billing quantities:", result.rows);
       return result.rows;
     } catch (error) {
@@ -922,7 +922,7 @@ export class DatabaseStorage {
         GROUP BY be.id, u.username
         ORDER BY be.created_at DESC`;
 
-      const result = await db.execute(query);
+      const result = await this.db.execute(query);
       return result.rows;
     } catch (error) {
       console.error("Error fetching billing history:", error);
@@ -938,7 +938,7 @@ export class DatabaseStorage {
         ORDER BY created_at DESC
         LIMIT 1`;
 
-      const result = await db.execute(query);
+      const result = await this.db.execute(query);
       return result.rows[0];
     } catch (error) {
       console.error("Error fetching last billing event:", error);
@@ -960,7 +960,7 @@ export class DatabaseStorage {
     }>;
   }): Promise<BillingEvent> {
     try {
-      const [event] = await db.transaction(async (tx) => {
+      const [event] = await this.db.transaction(async (tx) => {
         // Create billing event
         const [billingEvent] = await tx
           .insert(billingEvents)

@@ -176,6 +176,7 @@ export type Order = typeof orders.$inferSelect;
 export type RoastingBatch = typeof roastingBatches.$inferSelect;
 export type BillingEvent = typeof billingEvents.$inferSelect;
 export type BillingEventDetail = typeof billingEventDetails.$inferSelect;
+export type GreenCoffee = typeof greenCoffee.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertShop = z.infer<typeof insertShopSchema>;
