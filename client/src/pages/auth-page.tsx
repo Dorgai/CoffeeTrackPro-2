@@ -1,8 +1,9 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertUserSchema } from "@shared/schema";
+import { insertUserSchema, type UserRole } from "@shared/schema";
 import { Redirect } from "wouter";
+import { useState } from "react";
 
 import {
   Form,
@@ -30,17 +31,25 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+interface AuthFormData {
+  username: string;
+  password: string;
+  role: UserRole;
+}
+
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
+  const [isLogin, setIsLogin] = useState(true);
 
-  const loginForm = useForm({
+  const loginForm = useForm<AuthFormData>({
     defaultValues: {
       username: "",
       password: "",
+      role: "retailOwner",
     },
   });
 
-  const registerForm = useForm({
+  const registerForm = useForm<AuthFormData>({
     resolver: zodResolver(
       insertUserSchema.extend({
         role: insertUserSchema.shape.role,
@@ -49,9 +58,21 @@ export default function AuthPage() {
     defaultValues: {
       username: "",
       password: "",
-      role: "barista",
+      role: "retailOwner",
     },
   });
+
+  const onSubmit = async (data: AuthFormData) => {
+    try {
+      if (isLogin) {
+        await loginMutation.mutateAsync(data);
+      } else {
+        await registerMutation.mutateAsync(data);
+      }
+    } catch (error) {
+      console.error("Auth error:", error);
+    }
+  };
 
   if (user) {
     return <Redirect to="/" />;
@@ -93,9 +114,7 @@ export default function AuthPage() {
               <TabsContent value="login">
                 <Form {...loginForm}>
                   <form
-                    onSubmit={loginForm.handleSubmit((data) =>
-                      loginMutation.mutate(data)
-                    )}
+                    onSubmit={loginForm.handleSubmit(onSubmit)}
                     className="space-y-4"
                   >
                     <FormField
@@ -138,9 +157,7 @@ export default function AuthPage() {
               <TabsContent value="register">
                 <Form {...registerForm}>
                   <form
-                    onSubmit={registerForm.handleSubmit((data) =>
-                      registerMutation.mutate(data)
-                    )}
+                    onSubmit={registerForm.handleSubmit(onSubmit)}
                     className="space-y-4"
                   >
                     <FormField

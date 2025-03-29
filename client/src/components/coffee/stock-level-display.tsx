@@ -1,4 +1,4 @@
-import { RetailInventory } from "@shared/schema";
+import { type RetailInventory } from "@shared/schema";
 import {
   Card,
   CardContent,
@@ -9,7 +9,10 @@ import {
 import { Progress } from "@/components/ui/progress";
 
 interface StockLevelDisplayProps {
-  inventory: RetailInventory[];
+  inventory: RetailInventory & {
+    coffeeId: number;
+    coffeeName: string;
+  };
   desiredSmallBags?: number;
   desiredLargeBags?: number;
 }
@@ -20,16 +23,15 @@ export function StockLevelDisplay({
   desiredLargeBags = 50 
 }: StockLevelDisplayProps) {
   const getTotalBags = () => {
-    return inventory.reduce(
-      (acc, item) => ({
-        smallBags: acc.smallBags + (item.smallBags || 0),
-        largeBags: acc.largeBags + (item.largeBags || 0),
-      }),
-      { smallBags: 0, largeBags: 0 }
-    );
+    return {
+      smallBags: inventory.smallBags || 0,
+      largeBags: inventory.largeBags || 0,
+    };
   };
 
   const { smallBags, largeBags } = getTotalBags();
+  const totalBags = smallBags + largeBags;
+  const isLowStock = totalBags <= inventory.minThreshold;
   const smallBagsPercentage = Math.min((smallBags / desiredSmallBags) * 100, 100);
   const largeBagsPercentage = Math.min((largeBags / desiredLargeBags) * 100, 100);
 
@@ -43,7 +45,7 @@ export function StockLevelDisplay({
         <div className="space-y-2">
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium">Small Bags (200g)</span>
-            <span className="text-sm text-muted-foreground">
+            <span className={isLowStock ? "text-red-500" : ""}>
               {smallBags} / {desiredSmallBags}
             </span>
           </div>
@@ -57,7 +59,7 @@ export function StockLevelDisplay({
         <div className="space-y-2">
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium">Large Bags (1kg)</span>
-            <span className="text-sm text-muted-foreground">
+            <span className={isLowStock ? "text-red-500" : ""}>
               {largeBags} / {desiredLargeBags}
             </span>
           </div>
