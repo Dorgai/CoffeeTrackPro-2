@@ -11,9 +11,6 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
 }
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
 @layer base {
   :root {

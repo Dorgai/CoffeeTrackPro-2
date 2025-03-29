@@ -3,6 +3,8 @@ import type {
   ToastActionElement,
   ToastProps,
 } from "@/components/ui/toast"
+import { toast } from '../components/ui/toast';
+import { UseToastReturn } from '../types/hooks';
 
 const TOAST_LIMIT = 1
 const TOAST_REMOVE_DELAY = 5000
@@ -167,7 +169,7 @@ function toast({ ...props }: Toast) {
   }
 }
 
-function useToast() {
+export function useToast(): UseToastReturn {
   const [state, setState] = React.useState<State>(memoryState)
 
   React.useEffect(() => {
@@ -182,7 +184,14 @@ function useToast() {
 
   return {
     ...state,
-    toast,
+    toast: ({ type = 'info', title, description, duration = 3000 }) => {
+      toast({
+        variant: type === 'error' ? 'destructive' : type === 'info' ? 'default' : type,
+        title,
+        description,
+        duration,
+      });
+    },
     dismiss: (toastId?: string) => dispatch({ type: "DISMISS_TOAST", toastId }),
   }
 }

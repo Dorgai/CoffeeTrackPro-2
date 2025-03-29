@@ -1,60 +1,71 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { User } from "@shared/schema";
+import { api } from '../lib/api';
+
+interface User {
+  id: number;
+  email: string;
+  name: string;
+}
 
 interface AuthContextType {
   user: User | null;
-  isLoading: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  isAuthenticated: boolean;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | null>(null);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    // Check if user is logged in
-    fetch("/api/auth/me")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.user) {
-          setUser(data.user);
-        }
-      })
-      .catch((error) => {
-        console.error("Error checking auth status:", error);
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
+    const token = localStorage.getItem('token');
+    if (token) {
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      fetchUser();
+    }
   }, []);
 
-  const login = async (username: string, password: string) => {
-    const response = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ username, password }),
-    });
-
-    if (!response.ok) {
-      throw new Error("Login failed");
+  async function fetchUser() {
+    try {
+      const response = await api.get('/auth/me');
+      setUser(response.data);
+      setIsAuthenticated(true);
+    } catch (error) {
+      console.error('Error fetching user:', error);
+      logout();
     }
+  }
 
-    const data = await response.json();
-    setUser(data.user);
-  };
+  async function login(email: string, password: string) {
+    try {
+      const response = await api.post('/auth/login', { email, password });
+      const { token, user } = response.data;
+      localStorage.setItem('token', token);
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      setUser(user);
+      setIsAuthenticated(true);
+    } catch (error) {
+      console.error('Error logging in:', error);
+      throw error;
+    }
+  }
 
-  const logout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
+  async function logout() {
+    localStorage.removeItem('token');
+    delete api.defaults.headers.common['Authorization'];
     setUser(null);
-  };
+    setIsAuthenticated(false);
+  }
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, isAuthenticated, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
