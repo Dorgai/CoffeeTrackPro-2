@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
-import { greenCoffee } from "@shared/schema";
+import { greenCoffee, type Order, type OrderStatus } from "@shared/schema";
 import { Loader2, PackagePlus } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useActiveShop } from "@/hooks/use-active-shop";
@@ -43,10 +43,14 @@ type OrderWithDetails = {
   updatedBy: string | null;
 };
 
-const ORDER_STATUS_SEQUENCE = {
-  pending: ["roasted"],
-  roasted: ["dispatched"],
-  dispatched: ["delivered"],
+type OrderStatusMap = {
+  [K in OrderStatus]: string[];
+};
+
+const orderStatusMap: OrderStatusMap = {
+  pending: [],
+  roasted: [],
+  dispatched: [],
   delivered: [],
 };
 
@@ -87,18 +91,18 @@ export default function RetailOrders() {
     queryKey: ["/api/green-coffee"],
   });
 
-  const { data: orders, isLoading: loadingOrders } = useQuery<OrderWithDetails[]>({
-    queryKey: ["/api/orders", activeShop?.id],
-    queryFn: async () => {
-      if (!activeShop?.id) return [];
-      const res = await apiRequest("GET", `/api/orders?shopId=${activeShop.id}`);
-      if (!res.ok) {
-        throw new Error("Failed to fetch orders");
-      }
-      return res.json();
-    },
-    enabled: !!activeShop?.id,
+  const { data: orders, isLoading: loadingOrders } = useQuery<Order[]>({
+    queryKey: ["/api/orders"],
   });
+
+  const ordersByStatus = orders.reduce((acc, order) => {
+    const status = order.status as OrderStatus;
+    if (!acc[status]) {
+      acc[status] = [];
+    }
+    acc[status].push(order.id.toString());
+    return acc;
+  }, orderStatusMap);
 
   // Helper function to get allowed next statuses
   const getNextStatuses = (currentStatus: string): string[] => {
@@ -109,7 +113,7 @@ export default function RetailOrders() {
       return allStatuses.slice(currentIndex + 1);
     }
     // For retail owners and others, use the sequence map
-    return ORDER_STATUS_SEQUENCE[currentStatus] || [];
+    return orderStatusMap[currentStatus as OrderStatus] || [];
   };
 
   if (loadingCoffees || loadingOrders) {

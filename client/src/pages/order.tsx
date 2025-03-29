@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { greenCoffee } from "@shared/schema";
+import { greenCoffee, type Order, type OrderItem } from "@shared/schema";
 import { Loader2, PackagePlus } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -23,7 +23,11 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 type GreenCoffee = typeof greenCoffee.$inferSelect;
 
-export default function Order() {
+interface OrderPageProps {
+  orderId: number;
+}
+
+export function OrderPage({ orderId }: OrderPageProps) {
   const { user } = useAuth();
   const [selectedCoffee, setSelectedCoffee] = useState<GreenCoffee | null>(null);
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
@@ -36,6 +40,14 @@ export default function Order() {
   const { data: retailInventory, isLoading: loadingInventory } = useQuery({
     queryKey: ["/api/retail-inventory", selectedShopId],
     enabled: !!selectedShopId,
+  });
+
+  const { data: order } = useQuery<Order>({
+    queryKey: ["/api/orders", orderId],
+  });
+
+  const { data: items = [] } = useQuery<OrderItem[]>({
+    queryKey: ["/api/orders", orderId, "items"],
   });
 
   if (loadingCoffees || loadingInventory) {
@@ -59,6 +71,10 @@ export default function Order() {
   const hasInventory = (coffeeId: number) => {
     const bags = getAvailableBags(coffeeId);
     return bags.smallBags > 0 || bags.largeBags > 0;
+  };
+
+  const findItem = (coffeeId: number) => {
+    return items.find((item) => item.greenCoffeeId === coffeeId);
   };
 
   return (
