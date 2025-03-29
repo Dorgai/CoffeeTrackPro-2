@@ -23,18 +23,30 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { MonthSelector } from "@/components/layout/month-selector";
 
-interface DashboardProps {
-  user: {
-    id: number;
-    role: UserRole;
-  };
+interface DashboardStats {
+  totalGreenCoffee: number;
+  totalRoastingBatches: number;
+  totalOrders: number;
+  totalRetailInventory: number;
 }
 
-export function DashboardPage({ user }: DashboardProps) {
+export function DashboardPage() {
+  const { user } = useAuth();
   const { toast } = useToast();
   const [selectedShopId, setSelectedShopId] = useState<number | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [, navigate] = useLocation();
+
+  const { data: stats, isLoading } = useQuery<DashboardStats>({
+    queryKey: ["dashboard-stats"],
+    queryFn: async () => {
+      const response = await fetch("/api/dashboard/stats");
+      if (!response.ok) {
+        throw new Error("Failed to fetch dashboard stats");
+      }
+      return response.json();
+    },
+  });
 
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],

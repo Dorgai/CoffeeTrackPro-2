@@ -23,6 +23,9 @@ import { useActiveShop } from "@/hooks/use-active-shop";
 import { ShopSelector } from "@/components/layout/shop-selector";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 
 type GreenCoffee = typeof greenCoffee.$inferSelect;
 
@@ -30,6 +33,7 @@ export default function Roasting() {
   const { user } = useAuth();
   const [selectedCoffee, setSelectedCoffee] = useState<GreenCoffee | null>(null);
   const [showAddCoffeeDialog, setShowAddCoffeeDialog] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { data: coffees, isLoading: loadingCoffees } = useQuery<GreenCoffee[]>({
     queryKey: ["/api/green-coffee"],
@@ -52,6 +56,10 @@ export default function Roasting() {
       return res.json();
     },
   });
+
+  const filteredBatches = batches?.filter((batch) =>
+    batch.status.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   if (loadingCoffees || loadingBatches) {
     return (
@@ -135,6 +143,17 @@ export default function Roasting() {
           <CardDescription>History of roasting operations</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold">All Batches</h2>
+            <Button>New Batch</Button>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Input
+              placeholder="Search batches..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -175,6 +194,42 @@ export default function Roasting() {
               )}
             </TableBody>
           </Table>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Filtered Batches</CardTitle>
+          <CardDescription>Filtered batches based on search query</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {filteredBatches?.map((batch) => (
+              <div
+                key={batch.id}
+                className="rounded-lg border bg-card text-card-foreground shadow-sm"
+              >
+                <div className="p-6">
+                  <h3 className="text-lg font-semibold">Batch #{batch.id}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Status: {batch.status}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Planned Amount: {batch.plannedAmount} kg
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Small Bags Produced: {batch.smallBagsProduced || 0}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Large Bags Produced: {batch.largeBagsProduced || 0}
+                  </p>
+                </div>
+                <div className="p-6 pt-0">
+                  <Button variant="outline">View Details</Button>
+                </div>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
     </div>
