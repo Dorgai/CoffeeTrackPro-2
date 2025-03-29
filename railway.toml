@@ -15,7 +15,6 @@ PORT = "8080"
 CORS_ORIGIN = "https://coffeetrackpro.railway.app"
 DB_TYPE = "postgres"
 SESSION_SECRET = "your_secure_session_secret_here"
-DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/coffeetrackpro"
 
 [[services]]
 name = "web"

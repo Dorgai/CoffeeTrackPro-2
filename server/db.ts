@@ -28,12 +28,23 @@ export async function initializeDatabase() {
     console.log("Database URL:", process.env.DATABASE_URL?.substring(0, 20) + '...');
     console.log("Node environment:", process.env.NODE_ENV);
     
+    // Parse the DATABASE_URL to ensure it's valid
+    const databaseUrl = process.env.DATABASE_URL;
+    if (!databaseUrl) throw new Error('DATABASE_URL is required');
+    
+    const url = new URL(databaseUrl);
+    console.log("Database host:", url.hostname);
+    console.log("Database port:", url.port);
+    console.log("Database name:", url.pathname.slice(1));
+
     pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-      max: 20, // Maximum number of clients in the pool
-      idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
-      connectionTimeoutMillis: 2000, // Return an error after 2 seconds if connection could not be established
+      connectionString: databaseUrl,
+      ssl: {
+        rejectUnauthorized: false // Required for Railway's PostgreSQL
+      },
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 2000,
     });
 
     db = drizzle(pool, { schema });
@@ -49,7 +60,8 @@ export async function initializeDatabase() {
         retries--;
         if (retries === 0) throw error;
         console.log(`Connection attempt failed, retrying... (${retries} attempts left)`);
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retrying
+        console.log("Error details:", error.message);
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
     }
 
@@ -75,7 +87,8 @@ export async function initializeDatabase() {
     console.error("Error details:", {
       message: error.message,
       stack: error.stack,
-      code: error.code
+      code: error.code,
+      hint: error.hint
     });
     throw error;
   }
