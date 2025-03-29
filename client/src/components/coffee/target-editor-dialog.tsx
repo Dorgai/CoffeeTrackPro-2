@@ -9,11 +9,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useState, useEffect as ReactuseEffect } from "react";
-import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { CoffeeLargeBagTarget, type GreenCoffee } from "@shared/schema";
+import { useState, useEffect } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { GreenCoffee, CoffeeLargeBagTarget } from "@shared/schema";
+import { toast } from "sonner";
 
 interface TargetEditorDialogProps {
   coffee: GreenCoffee;
@@ -21,102 +20,77 @@ interface TargetEditorDialogProps {
 }
 
 export function TargetEditorDialog({ coffee, onClose }: TargetEditorDialogProps) {
-  const [open, setOpen] = useState(true);
-  const { toast } = useToast();
+  const [target, setTarget] = useState<number>(0);
   const queryClient = useQueryClient();
 
-  // Fetch current target
-  const { data: currentTarget, isLoading } = useQuery<CoffeeLargeBagTarget>({
-    queryKey: [`/api/shops/${coffee.shopId}/coffee/${coffee.id}/target`],
-    enabled: open, // Only fetch when dialog is open
-  });
+  useEffect(() => {
+    // Fetch current target
+    fetch(`/api/coffee/${coffee.id}/target`)
+      .then((res) => res.json())
+      .then((data: CoffeeLargeBagTarget) => {
+        if (data) {
+          setTarget(data.target);
+        }
+      })
+      .catch((error) => {
+        console.error("Error fetching target:", error);
+      });
+  }, [coffee.id]);
 
-  const [desiredLargeBags, setDesiredLargeBags] = useState(
-    currentTarget?.desiredLargeBags.toString() || "0"
-  );
-
-  // Update target when currentTarget changes
-  ReactuseEffect(() => {
-    if (currentTarget) {
-      setDesiredLargeBags(currentTarget.desiredLargeBags.toString());
-    }
-  }, [currentTarget]);
-
-  const updateTargetMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest(
-        "PATCH",
-        `/api/shops/${coffee.shopId}/coffee/${coffee.id}/target`,
-        { desiredLargeBags: parseInt(desiredLargeBags) }
-      );
-      if (!res.ok) throw new Error("Failed to update target");
-      return res.json();
+  const { mutateAsync: updateTarget } = useMutation({
+    mutationFn: async (newTarget: number) => {
+      const response = await fetch(`/api/coffee/${coffee.id}/target`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ target: newTarget }),
+      });
+      if (!response.ok) {
+        throw new Error("Failed to update target");
+      }
+      return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/shops/${coffee.shopId}/coffee-targets`] });
-      toast({
-        title: "Target updated",
-        description: `Updated target for ${coffee.name}`,
-      });
-      setOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["coffee", coffee.id] });
+      toast.success("Target updated successfully");
+      onClose();
     },
     onError: (error) => {
-      toast({
-        title: "Failed to update target",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error("Failed to update target");
+      console.error("Error updating target:", error);
     },
   });
 
-  const handleSave = async () => {
-    try {
-      await updateTargetMutation.mutateAsync({
-        coffeeId: coffee.id,
-        target: parseInt(desiredLargeBags),
-      });
-      onClose();
-      toast.success("Target updated successfully");
-    } catch (error) {
-      toast.error("Failed to update target");
-      console.error("Update error:", error);
-    }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await updateTarget(target);
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline">Set Target</Button>
-      </DialogTrigger>
+    <Dialog open onOpenChange={onClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Set Target for {coffee.name}</DialogTitle>
-          <DialogDescription>
-            Set the desired number of large bags (1kg) for this coffee.
-          </DialogDescription>
+          <DialogTitle>Set Large Bag Target</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 py-4">
-          {isLoading ? (
-            <div className="text-center text-muted-foreground">Loading current target...</div>
-          ) : (
-            <div className="space-y-2">
-              <Label htmlFor="largeBags">Desired Large Bags</Label>
-              <Input
-                id="largeBags"
-                type="number"
-                min="0"
-                value={desiredLargeBags}
-                onChange={(e) => setDesiredLargeBags(e.target.value)}
-              />
-            </div>
-          )}
-          <Button
-            onClick={handleSave}
-            disabled={updateTargetMutation.isPending || isLoading}
-          >
-            {updateTargetMutation.isPending ? "Saving..." : "Save Target"}
-          </Button>
-        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="target">Target (Large Bags)</Label>
+            <Input
+              id="target"
+              type="number"
+              min="0"
+              value={target}
+              onChange={(e) => setTarget(Number(e.target.value))}
+            />
+          </div>
+          <div className="flex justify-end space-x-2">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit">Save</Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );
