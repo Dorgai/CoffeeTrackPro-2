@@ -8,12 +8,13 @@ import connectPg from "connect-pg-simple";
 import { pool } from "./db";
 import { formatTimestamp } from "../shared/utils";
 import { PostgresSessionStore } from "./session-store";
+import { type Pool, type PoolClient } from "pg";
 
 export class DatabaseStorage {
   sessionStore: session.Store;
   private db: typeof db;
 
-  constructor() {
+  constructor(private pool: Pool) {
     if (!pool) {
       throw new Error('Database pool not initialized');
     }
@@ -24,6 +25,21 @@ export class DatabaseStorage {
       tableName: 'sessions'
     });
     this.db = db;
+  }
+
+  async withTransaction<T>(callback: (client: PoolClient) => Promise<T>): Promise<T> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await callback(client);
+      await client.query("COMMIT");
+      return result;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   // User operations
@@ -195,86 +211,29 @@ export class DatabaseStorage {
   }
 
   async getRetailInventories(shopId?: number): Promise<RetailInventory[]> {
-    try {
-      console.log("Storage: Fetching retail inventories for shop:", shopId);
-
-      const baseQuery = sql`
-        WITH latest_inventory AS (
-          SELECT DISTINCT ON (shop_id, green_coffee_id)
-            shop_id,
-            green_coffee_id,
-            small_bags,
-            large_bags,
-            updated_at,
-            updated_by_id,
-            update_type,
-            notes
-          FROM retail_inventory
-          ${shopId ? sql`WHERE shop_id = ${shopId}` : sql``}
-          ORDER BY shop_id, green_coffee_id, updated_at DESC
-        ),
-        coffee_inventory AS (
-          SELECT 
-            li.*,
-            s.name as shop_name,
-            s.location as shop_location,
-            gc.name as coffee_name,
-            gc.producer,
-            gc.grade,
-            gc.country,
-            u.username as updated_by_username
-          FROM latest_inventory li
-          JOIN shops s ON li.shop_id = s.id
-          JOIN green_coffee gc ON li.green_coffee_id = gc.id
-          LEFT JOIN users u ON li.updated_by_id = u.id
-        )
-        SELECT 
-          ci.*,
-          COALESCE(oi.total_small_bags, 0) as pending_small_bags,
-          COALESCE(oi.total_large_bags, 0) as pending_large_bags
-        FROM coffee_inventory ci
-        LEFT JOIN (
-          SELECT 
-            shop_id,
-            green_coffee_id,
-            SUM(small_bags) as total_small_bags,
-            SUM(large_bags) as total_large_bags
-          FROM orders
-          WHERE status = 'pending'
-          GROUP BY shop_id, green_coffee_id
-        ) oi ON ci.shop_id = oi.shop_id AND ci.green_coffee_id = oi.green_coffee_id
-        ORDER BY ci.shop_name, ci.coffee_name`;
-
-      const result = await this.db.execute(baseQuery);
-      console.log("Found retail inventories:", {
-        total: result.rows?.length,
-        shopId,
-        sampleRow: result.rows?.[0]
-      });
-
-      return result.rows as RetailInventory[];
-    } catch (error) {
-      console.error("Error getting retail inventories:", error);
-      return [];
-    }
+    const query = shopId
+      ? "SELECT * FROM retail_inventory WHERE shop_id = $1"
+      : "SELECT * FROM retail_inventory";
+    const values = shopId ? [shopId] : [];
+    const result = await this.pool.query<RetailInventory>(query, values);
+    return result.rows;
   }
 
+  async getOrders(shopId?: number): Promise<Order[]> {
+    const query = shopId
+      ? "SELECT * FROM orders WHERE shop_id = $1 ORDER BY created_at DESC"
+      : "SELECT * FROM orders ORDER BY created_at DESC";
+    const values = shopId ? [shopId] : [];
+    const result = await this.pool.query<Order>(query, values);
+    return result.rows;
+  }
 
   // Green coffee methods
   async getGreenCoffees(): Promise<GreenCoffee[]> {
-    try {
-      console.log("Storage: Fetching all green coffee entries");
-      const coffees = await this.db
-        .select()
-        .from(greenCoffee)
-        .orderBy(greenCoffee.name);
-
-      console.log("Found green coffees:", coffees.length);
-      return coffees;
-    } catch (error) {
-      console.error("Error getting green coffees:", error);
-      return [];
-    }
+    const result = await this.pool.query<GreenCoffee>(
+      "SELECT * FROM green_coffee ORDER BY name"
+    );
+    return result.rows;
   }
 
   async getGreenCoffee(id: number): Promise<GreenCoffee | undefined> {
@@ -289,6 +248,7 @@ export class DatabaseStorage {
       return undefined;
     }
   }
+
   async getAllUsers(): Promise<User[]> {
     try {
       console.log("Fetching all users from database");
@@ -424,7 +384,6 @@ export class DatabaseStorage {
       throw error;
     }
   }
-
 
   async getAllUserShopAssignments(): Promise<Array<{ userId: number; shopId: number }>> {
     try {
