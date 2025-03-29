@@ -22,40 +22,35 @@ let db: any;
 let pool: any;
 
 export async function initializeDatabase() {
-  if (dbType === 'postgres') {
+  try {
+    console.log("Initializing database connection...");
+    
     pool = new Pool({
       connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
     });
+
     db = drizzle(pool, { schema });
-  } else {
-    // MySQL connection
-    pool = await mysql.createPool(process.env.DATABASE_URL);
-    db = drizzleMySQL(pool, { schema, mode: 'default' });
-  }
 
-  try {
-    console.log("Testing database connection...");
-
-    // Test a simple query
+    // Test the connection
     await db.execute(sql`SELECT 1`);
+    console.log("Database connection test successful");
 
-    if (dbType === 'postgres') {
-      // Add error handler for idle clients
-      pool.on('error', (err: Error, client: any) => {
-        console.error('Unexpected error on idle client', err);
-        if (client) {
-          client.release(true);
-        }
-      });
+    // Add error handler for idle clients
+    pool.on('error', (err: Error, client: any) => {
+      console.error('Unexpected error on idle client', err);
+      if (client) {
+        client.release(true);
+      }
+    });
 
-      // Add connect handler
-      pool.on('connect', (client: any) => {
-        console.log("New client connected to database");
-        client.on('error', (err: Error) => {
-          console.error('Database client error:', err);
-        });
+    // Add connect handler
+    pool.on('connect', (client: any) => {
+      console.log("New client connected to database");
+      client.on('error', (err: Error) => {
+        console.error('Database client error:', err);
       });
-    }
+    });
 
     console.log("Database connection initialized successfully");
   } catch (error) {
