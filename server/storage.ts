@@ -15,9 +15,14 @@ export class DatabaseStorage {
   sessionStore: session.Store;
 
   constructor() {
+    if (!pool) {
+      throw new Error('Database pool not initialized');
+    }
+    
     this.sessionStore = new PostgresSessionStore({
       pool,
       createTableIfMissing: true,
+      tableName: 'sessions'
     });
   }
 

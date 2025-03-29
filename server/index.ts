@@ -8,6 +8,17 @@ import { setupAuth } from "./auth";
 import { registerRoutes } from "./routes";
 import { initializeDatabase, cleanupDatabase } from "./db";
 import rateLimit from 'express-rate-limit';
+import { DatabaseStorage } from "./storage";
+import { authRouter } from "./routes/auth";
+import { shopRouter } from "./routes/shop";
+import { roastingRouter } from "./routes/roasting";
+import { retailRouter } from "./routes/retail";
+import { orderRouter } from "./routes/order";
+import { greenCoffeeRouter } from "./routes/green-coffee";
+import { userRouter } from "./routes/user";
+import { errorHandler } from "./middleware/error-handler";
+import { authMiddleware } from "./middleware/auth";
+import { logger } from "./utils/logger";
 
 async function createServer() {
   try {
@@ -28,10 +39,8 @@ async function createServer() {
 
     console.log("Setting up CORS...");
     app.use(cors({
-      origin: true,
-      credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization']
+      origin: process.env.CLIENT_URL || 'http://localhost:3000',
+      credentials: true
     }));
 
     console.log("Setting up middleware...");
@@ -43,18 +52,16 @@ async function createServer() {
       res.json({ status: 'ok' });
     });
 
-
     console.log("Setting up session...");
     app.use(session({
-      secret: process.env.SESSION_SECRET || 'development_secret',
+      store: storage.sessionStore,
+      secret: process.env.SESSION_SECRET || 'your-secret-key',
       resave: false,
       saveUninitialized: false,
-      store: storage.sessionStore,
       cookie: {
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 24 * 60 * 60 * 1000, // 24 hours
-        httpOnly: true
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
       }
     }));
 
@@ -64,20 +71,17 @@ async function createServer() {
     console.log("Registering routes...");
     await registerRoutes(app);
 
-    // Global error handler
-    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-      console.error("Error:", err);
-      const status = err.status || err.statusCode || 500;
-      const message = err.message || "Internal Server Error";
+    // Routes
+    app.use('/api/auth', authRouter);
+    app.use('/api/shops', authMiddleware, shopRouter);
+    app.use('/api/roasting', authMiddleware, roastingRouter);
+    app.use('/api/retail', authMiddleware, retailRouter);
+    app.use('/api/orders', authMiddleware, orderRouter);
+    app.use('/api/green-coffee', authMiddleware, greenCoffeeRouter);
+    app.use('/api/users', authMiddleware, userRouter);
 
-      res.status(status).json({
-        error: {
-          message,
-          status,
-          timestamp: new Date().toISOString(),
-        }
-      });
-    });
+    // Global error handler
+    app.use(errorHandler);
 
     console.log("Starting HTTP server...");
     const httpServer = app.listen(Number(port), "0.0.0.0", () => {
