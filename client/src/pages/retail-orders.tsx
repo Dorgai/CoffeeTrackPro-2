@@ -66,7 +66,6 @@ export default function RetailOrders() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/billing/quantities"] });
       toast({
         title: "Success",
         description: "Order status updated successfully",

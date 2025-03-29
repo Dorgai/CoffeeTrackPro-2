@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, decimal } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, decimal, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -95,37 +95,25 @@ export const roastingBatches = pgTable("roasting_batches", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const billingEvents = pgTable("billing_events", {
+export const orderItems = pgTable("order_items", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id").notNull().references(() => orders.id),
+  greenCoffeeId: integer("green_coffee_id").notNull().references(() => greenCoffee.id),
+  quantity: integer("quantity").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const retailInventories = pgTable("retail_inventories", {
   id: serial("id").primaryKey(),
   shopId: integer("shop_id").notNull().references(() => shops.id),
-  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
-  status: text("status", { enum: ["pending", "processed", "failed"] }).notNull(),
-  type: text("type", { enum: ["order", "subscription", "adjustment"] }).notNull(),
-  cycleStartDate: timestamp("cycle_start_date").notNull(),
-  cycleEndDate: timestamp("cycle_end_date").notNull(),
-  primarySplitPercentage: decimal("primary_split_percentage", { precision: 5, scale: 2 }).notNull(),
-  secondarySplitPercentage: decimal("secondary_split_percentage", { precision: 5, scale: 2 }).notNull(),
-  description: text("description"),
-  processedAt: timestamp("processed_at"),
-  createdAt: timestamp("created_at").defaultNow(),
-  createdById: integer("created_by_id").references(() => users.id),
-});
-
-export const billingEventDetails = pgTable("billing_event_details", {
-  id: serial("id").primaryKey(),
-  billingEventId: integer("billing_event_id").notNull().references(() => billingEvents.id),
-  grade: text("grade", { enum: coffeeGrades }).notNull(),
-  smallBagsQuantity: integer("small_bags_quantity").notNull(),
-  largeBagsQuantity: integer("large_bags_quantity").notNull(),
-});
-
-export const gradePricing = pgTable("grade_pricing", {
-  id: serial("id").primaryKey(),
-  grade: text("grade", { enum: coffeeGrades }).notNull(),
-  pricePerKg: decimal("price_per_kg", { precision: 10, scale: 2 }).notNull(),
-  splitPercentage: decimal("split_percentage", { precision: 5, scale: 2 }).notNull(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  greenCoffeeId: integer("green_coffee_id").notNull().references(() => greenCoffee.id),
+  smallBags: integer("small_bags").notNull().default(0),
+  largeBags: integer("large_bags").notNull().default(0),
   updatedById: integer("updated_by_id").references(() => users.id),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  updateType: text("update_type", { enum: ["manual", "dispatch"] }).notNull(),
+  notes: text("notes"),
 });
 
 export const insertRoastingBatchSchema = z.object({
@@ -160,29 +148,18 @@ export const insertRetailInventoryHistorySchema = createInsertSchema(retailInven
 export const insertOrderSchema = createInsertSchema(orders);
 export const insertUserShopSchema = createInsertSchema(userShops);
 
-export const insertBillingEventSchema = createInsertSchema(billingEvents);
-export const insertBillingEventDetailSchema = createInsertSchema(billingEventDetails);
-export const insertGradePricingSchema = createInsertSchema(gradePricing);
-
 export type User = typeof users.$inferSelect;
 export type Shop = typeof shops.$inferSelect;
-export type GreenCoffee = typeof greenCoffee.$inferSelect;
-export type RetailInventory = typeof retailInventory.$inferSelect;
+export type UserShop = typeof userShops.$inferSelect;
+export type RetailInventory = typeof retailInventories.$inferSelect;
 export type RetailInventoryHistory = typeof retailInventoryHistory.$inferSelect;
 export type Order = typeof orders.$inferSelect;
 export type RoastingBatch = typeof roastingBatches.$inferSelect;
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertShop = z.infer<typeof insertShopSchema>;
-export type InsertGreenCoffee = z.infer<typeof insertGreenCoffeeSchema>;
+export type InsertUserShop = z.infer<typeof insertUserShopSchema>;
 export type InsertRetailInventory = z.infer<typeof insertRetailInventorySchema>;
 export type InsertRetailInventoryHistory = z.infer<typeof insertRetailInventoryHistorySchema>;
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type InsertRoastingBatch = z.infer<typeof insertRoastingBatchSchema>;
-export type InsertUserShop = z.infer<typeof insertUserShopSchema>;
-
-export type BillingEvent = typeof billingEvents.$inferSelect;
-export type BillingEventDetail = typeof billingEventDetails.$inferSelect;
-export type GradePricing = typeof gradePricing.$inferSelect;
-export type InsertBillingEvent = z.infer<typeof insertBillingEventSchema>;
-export type InsertBillingEventDetail = z.infer<typeof insertBillingEventDetailSchema>;
-export type InsertGradePricing = z.infer<typeof insertGradePricingSchema>;

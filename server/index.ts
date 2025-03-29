@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { setupVite } from "./vite";
@@ -5,7 +6,7 @@ import session from "express-session";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { registerRoutes } from "./routes";
-import { initializeDatabase } from "./db";
+import { initializeDatabase, cleanupDatabase } from "./db";
 
 async function createServer() {
   try {

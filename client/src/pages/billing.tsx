@@ -1,226 +1,221 @@
+import React, { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/use-auth";
-import { Loader2, Receipt } from "lucide-react";
-import { Redirect } from "wouter";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { format, startOfDay, endOfDay } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { parseISO, format } from "date-fns";
-import { BillingEvent, coffeeGrades } from "@shared/schema";
+import { CalendarIcon } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
-type DeliveredQuantities = {
+interface OrderQuantity {
   grade: string;
-  smallBagsQuantity: number;
-  largeBagsQuantity: number;
+  totalSmallBags: number;
+  totalLargeBags: number;
+  orders: {
+    id: number;
+    shopName: string;
+    smallBags: number;
+    largeBags: number;
+    orderDate: string;
+    deliveryDate: string;
+  }[];
+}
+
+interface SplitQuantities {
+  [grade: string]: {
+    percentage: number;
+    smallBags: number;
+    largeBags: number;
+  };
+}
+
+type GradeType = 'Specialty' | 'Premium' | 'Rarity';
+
+const GRADE_ORDER: Record<GradeType, number> = {
+  'Specialty': 0,
+  'Premium': 1,
+  'Rarity': 2
 };
 
-type BillingEventWithDetails = BillingEvent & {
-  details: Array<{
-    grade: string;
-    smallBagsQuantity: number;
-    largeBagsQuantity: number;
-  }>;
-};
+export default function Billing() {
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+  const [splits, setSplits] = useState<SplitQuantities>({});
 
-const formatDateTime = (dateStr: string) => {
-  try {
-    if (!dateStr) return 'N/A';
-    const date = parseISO(dateStr);
-    return format(date, "MMM d, yyyy HH:mm:ss");
-  } catch (error) {
-    console.error("Error formatting date:", dateStr, error);
-    return dateStr;
-  }
-};
-
-export default function BillingPage() {
-  const { user, isLoading } = useAuth();
-  const { toast } = useToast();
-  const isRoasteryOwner = user?.role === "roasteryOwner";
-
-  // Fetch delivered orders quantities
-  const { data: deliveredQuantities, isLoading: loadingQuantities } = useQuery<DeliveredQuantities[]>({
-    queryKey: ["/api/billing/delivered-quantities"],
+  const { data: quantities, isLoading } = useQuery<OrderQuantity[]>({
+    queryKey: ["/api/billing/quantities", startDate, endDate],
     queryFn: async () => {
-      const res = await apiRequest("GET", "/api/billing/delivered-quantities");
-      console.log("Delivered quantities response:", await res.clone().json());
-      if (!res.ok) throw new Error("Failed to fetch delivered quantities");
-      return res.json();
-    },
-    enabled: !!user,
-  });
-
-  // Fetch billing history
-  const { data: billingHistory, isLoading: loadingHistory } = useQuery<BillingEventWithDetails[]>({
-    queryKey: ["/api/billing/history"],
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/billing/history");
-      console.log("Billing history response:", await res.clone().json());
-      if (!res.ok) throw new Error("Failed to fetch billing history");
-      return res.json();
-    },
-    enabled: !!user,
-  });
-
-  // Handle generate billing event
-  const handleGenerateBillingEvent = async () => {
-    try {
-      console.log("Generating billing event...");
-      const payload = {
-        primarySplitPercentage: 70,
-        secondarySplitPercentage: 30,
-      };
-
-      const res = await apiRequest("POST", "/api/billing/generate", payload);
-      if (!res.ok) {
-        throw new Error("Failed to generate billing event");
+      const params = new URLSearchParams();
+      if (startDate) {
+        const start = startOfDay(startDate);
+        params.append("startDate", start.toISOString());
       }
+      if (endDate) {
+        const end = endOfDay(endDate);
+        params.append("endDate", end.toISOString());
+      }
+      const response = await fetch(`/api/billing/quantities?${params.toString()}`);
+      if (!response.ok) throw new Error("Failed to fetch billing quantities");
+      return response.json();
+    },
+  });
 
-      // Refresh data
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["/api/billing/delivered-quantities"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/billing/history"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/orders"] })
-      ]);
-
-      toast({
-        title: "Success",
-        description: "Billing event generated successfully",
-      });
-    } catch (error) {
-      console.error("Error generating billing event:", error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to generate billing event",
-        variant: "destructive",
-      });
-    }
+  const handleSplitChange = (grade: string, value: string) => {
+    const percentage = Math.min(100, Math.max(1, parseInt(value) || 70));
+    const totalSmallBags = quantities?.find(q => q.grade === grade)?.totalSmallBags || 0;
+    const totalLargeBags = quantities?.find(q => q.grade === grade)?.totalLargeBags || 0;
+    
+    setSplits(prev => ({
+      ...prev,
+      [grade]: {
+        percentage,
+        smallBags: Math.round(totalSmallBags * percentage / 100),
+        largeBags: Math.round(totalLargeBags * percentage / 100)
+      }
+    }));
   };
 
-  if (isLoading || loadingQuantities || loadingHistory) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
+  const getSplitValues = (grade: string) => {
+    const split = splits[grade];
+    if (!split) {
+      const totalSmallBags = quantities?.find(q => q.grade === grade)?.totalSmallBags || 0;
+      const totalLargeBags = quantities?.find(q => q.grade === grade)?.totalLargeBags || 0;
+      return {
+        percentage: 70,
+        smallBags: Math.round(totalSmallBags * 0.7),
+        largeBags: Math.round(totalLargeBags * 0.7)
+      };
+    }
+    return split;
+  };
+
+  if (isLoading) {
+    return <div>Loading...</div>;
   }
 
-  if (!user || (user.role !== "roasteryOwner" && user.role !== "retailOwner")) {
-    return <Redirect to="/" />;
-  }
-
-  const hasDeliveredOrders = deliveredQuantities?.some(
-    q => q.smallBagsQuantity > 0 || q.largeBagsQuantity > 0
-  );
+  const sortedQuantities = quantities?.sort((a, b) => {
+    const orderA = GRADE_ORDER[a.grade as GradeType] ?? 999;
+    const orderB = GRADE_ORDER[b.grade as GradeType] ?? 999;
+    return orderA - orderB;
+  });
 
   return (
-    <div className="container mx-auto py-8 space-y-8">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Billing Management</h1>
-          <p className="text-muted-foreground">
-            {isRoasteryOwner
-              ? "Manage billing events and track delivered orders"
-              : "View billing events and delivered orders"}
-          </p>
+    <div className="container mx-auto py-6">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Billing</h1>
+        <div className="flex gap-4">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-[240px] justify-start text-left font-normal">
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {startDate ? format(startDate, "PPP") : "Start Date"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="single"
+                selected={startDate}
+                onSelect={setStartDate}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-[240px] justify-start text-left font-normal">
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {endDate ? format(endDate, "PPP") : "End Date"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="single"
+                selected={endDate}
+                onSelect={setEndDate}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
         </div>
-        {isRoasteryOwner && (
-          <Button
-            onClick={handleGenerateBillingEvent}
-            disabled={!hasDeliveredOrders}
-          >
-            <Receipt className="h-4 w-4 mr-2" />
-            Generate Billing Event
-          </Button>
-        )}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Current Billing Cycle</CardTitle>
-          <CardDescription>Orders in delivered status pending billing</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Grade</TableHead>
-                <TableHead>Small Bags (200g)</TableHead>
-                <TableHead>Large Bags (1kg)</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {coffeeGrades.map((grade) => {
-                const gradeQuantity = deliveredQuantities?.find(q => q.grade === grade);
-                const smallBags = gradeQuantity?.smallBagsQuantity || 0;
-                const largeBags = gradeQuantity?.largeBagsQuantity || 0;
+      <div className="grid gap-6">
+        {sortedQuantities?.map((gradeData) => {
+          const split = getSplitValues(gradeData.grade);
+          const totalSmallBags = gradeData.totalSmallBags;
+          const totalLargeBags = gradeData.totalLargeBags;
+          const remainingSmallBags = totalSmallBags - split.smallBags;
+          const remainingLargeBags = totalLargeBags - split.largeBags;
+          const remainingPercentage = 100 - split.percentage;
 
-                return (
-                  <TableRow key={grade}>
-                    <TableCell className="font-medium">{grade}</TableCell>
-                    <TableCell>{smallBags}</TableCell>
-                    <TableCell>{largeBags}</TableCell>
-                  </TableRow>
-                );
-              })}
-              {(!deliveredQuantities || deliveredQuantities.length === 0) && (
-                <TableRow>
-                  <TableCell colSpan={3} className="text-center text-muted-foreground">
-                    No orders in delivered status
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {billingHistory && billingHistory.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Billing History</CardTitle>
-            <CardDescription>Previous billing events with quantities</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Period Start</TableHead>
-                  <TableHead>Period End</TableHead>
-                  {coffeeGrades.map(grade => (
-                    <TableHead key={grade}>{grade}</TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {billingHistory.map((event) => (
-                  <TableRow key={event.id}>
-                    <TableCell>{formatDateTime(event.cycleStartDate)}</TableCell>
-                    <TableCell>{formatDateTime(event.cycleEndDate)}</TableCell>
-                    {coffeeGrades.map(grade => {
-                      const details = event.details?.find(d => d.grade === grade);
-                      return (
-                        <TableCell key={grade}>
-                          {details ? (
-                            <>
-                              {details.smallBagsQuantity} small,{' '}
-                              {details.largeBagsQuantity} large
-                            </>
-                          ) : (
-                            '0 small, 0 large'
-                          )}
-                        </TableCell>
-                      );
-                    })}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
+          return (
+            <Card key={gradeData.grade}>
+              <CardHeader>
+                <CardTitle className="flex justify-between items-center">
+                  <span>{gradeData.grade}</span>
+                  <div className="text-sm text-muted-foreground">
+                    Total: {totalSmallBags} small bags, {totalLargeBags} large bags
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Split Percentage</TableHead>
+                      <TableHead className="text-right">Small Bags</TableHead>
+                      <TableHead className="text-right">Large Bags</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            min="1"
+                            max="100"
+                            value={split.percentage}
+                            onChange={(e) => handleSplitChange(gradeData.grade, e.target.value)}
+                            className="w-20"
+                          />
+                          <span>%</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">{split.smallBags}</TableCell>
+                      <TableCell className="text-right">{split.largeBags}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            value={remainingPercentage}
+                            disabled
+                            className="w-20 bg-muted"
+                          />
+                          <span>%</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">{remainingSmallBags}</TableCell>
+                      <TableCell className="text-right">{remainingLargeBags}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
     </div>
   );
-}
+} 

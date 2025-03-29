@@ -200,162 +200,68 @@ export async function registerRoutes(app: Express): Promise<void> {
     });
   });
 
-  // User Management Routes
-  app.get("/api/users", requireRole(["owner", "roasteryOwner"]), async (req, res) => {
+  // Add user management routes
+  app.get("/api/users", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
     try {
       const users = await storage.getAllUsers();
       res.json(users);
     } catch (error) {
-      console.error("Error fetching users:", error);
-      res.status(500).json({ message: "Failed to fetch users" });
+      console.error("Error getting users:", error);
+      res.status(500).json({ message: "Failed to get users" });
     }
   });
 
-  // Update user role or status
-  app.patch("/api/users/:id", requireRole(["owner", "roasteryOwner"]), async (req, res) => {
+  app.get("/api/users/:id/shops", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
     try {
       const userId = parseInt(req.params.id);
-      const { role, isActive } = req.body;
-
-      // Don't allow owner/roasteryOwner to modify their own role or status
-      if (userId === req.user!.id) {
-        return res.status(403).json({ message: "Cannot modify own user account" });
-      }
-
-      const user = await storage.getUser(userId);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      // Update user
-      const updatedUser = await storage.updateUser(userId, {
-        ...(role && { role }),
-        ...(typeof isActive === 'boolean' && { isActive })
-      });
-
-      // Remove sensitive data before sending response
-      const { password, ...userWithoutPassword } = updatedUser;
-      res.json(userWithoutPassword);
+      const shops = await storage.getUserShops(userId);
+      res.json(shops);
     } catch (error) {
-      console.error("Error updating user:", error);
-      res.status(500).json({
-        message: error instanceof Error ? error.message : "Failed to update user"
-      });
+      console.error("Error getting user shops:", error);
+      res.status(500).json({ message: "Failed to get user shops" });
     }
   });
 
-  // Add after update user role/status route
-  app.post("/api/users/:id/approve", requireRole(["roasteryOwner"]), async (req, res) => {
-    try {
-      const userId = parseInt(req.params.id);
-
-      // Don't allow owner/roasteryOwner to modify their own role
-      if (userId === req.user!.id) {
-        return res.status(403).json({ message: "Cannot modify own user account" });
-      }
-
-      const user = await storage.getUser(userId);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      const updatedUser = await storage.approveUser(userId);
-      res.json(updatedUser);
-    } catch (error) {
-      console.error("Error approving user:", error);
-      res.status(500).json({
-        message: error instanceof Error ? error.message : "Failed to approve user"
-      });
-    }
-  });
-
-  // Update shop assignment endpoint to handle only active shops
-  app.post("/api/users/:id/shops", requireRole(["roasteryOwner"]), async (req, res) => {
-    try {
-      const userId = parseInt(req.params.id);
-      const { shopIds } = req.body;
-
-      console.log("Processing shop assignment request:", {
-        userId,
-        shopIds,
-        requestedBy: req.user?.username
-      });
-
-      if (!Array.isArray(shopIds)) {
-        return res.status(400).json({ message: "Shop IDs must be an array" });
-      }
-
-      const user = await storage.getUser(userId);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      // Get only active shops
-      const activeShops = await storage.getShops();
-      const validShopIds = activeShops
-        .filter(shop => shop.isActive)
-        .map(shop => shop.id);
-
-      // Filter out inactive shops
-      const shopIdsToAssign = shopIds.filter(id => validShopIds.includes(id));
-
-      console.log("Filtered shop IDs to assign:", {
-        original: shopIds,
-        valid: shopIdsToAssign
-      });
-
-      // Assign shops using transaction
-      await storage.assignUserToShops(userId, shopIdsToAssign);
-
-      const updatedShops = await storage.getUserShops(userId);
-      console.log("Successfully updated user shops:", {
-        userId,
-        assignedShops: updatedShops.length
-      });
-
-      res.json(updatedShops);
-    } catch (error) {
-      console.error("Error in shop assignment:", error);
-      res.status(500).json({
-        message: "Failed to update user's shop assignments",
-        details: error instanceof Error ? error.message : String(error)
-      });
-    }
-  });
-
-  // Update user's shops endpoint with better logging
-  app.get("/api/users/:id/shops", requireRole(["roasteryOwner"]), async (req, res) => {
-    try {
-      const userId = parseInt(req.params.id);
-      console.log("Fetching shops for user:", userId);
-
-      const userShops = await storage.getUserShopIds(userId);
-      console.log("Retrieved shop IDs:", userShops);
-
-      res.json(userShops);
-    } catch (error) {
-      console.error("Error fetching user's shops:", error);
-      res.status(500).json({ message: "Failed to fetch user's shops" });
-    }
-  });
-
-  // Remove user from shop
-  app.delete("/api/users/:id/shops/:shopId", requireRole(["roasteryOwner"]), async (req, res) => {
+  app.delete("/api/users/:id/shops/:shopId", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
     try {
       const userId = parseInt(req.params.id);
       const shopId = parseInt(req.params.shopId);
-
-      console.log("Removing shop assignment:", {
-        userId,
-        shopId,
-        requestedBy: req.user?.username
-      });
-
-      await storage.removeUserFromShop(userId, shopId);
-      res.json({ message: "User removed from shop successfully" });
+      await storage.assignUserToShops(userId, []);
+      res.json({ message: "User removed from shop" });
     } catch (error) {
       console.error("Error removing user from shop:", error);
       res.status(500).json({ message: "Failed to remove user from shop" });
+    }
+  });
+
+  app.get("/api/users/:id", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        res.status(404).json({ message: "User not found" });
+        return;
+      }
+      res.json(user);
+    } catch (error) {
+      console.error("Error getting user:", error);
+      res.status(500).json({ message: "Failed to get user" });
+    }
+  });
+
+  app.delete("/api/users/:id", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        res.status(404).json({ message: "User not found" });
+        return;
+      }
+      await storage.updateUser(userId, { isActive: false });
+      res.json({ message: "User deleted" });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ message: "Failed to delete user" });
     }
   });
 
@@ -435,94 +341,58 @@ export async function registerRoutes(app: Express): Promise<void> {
   });
 
   // Shops Routes - accessible by roastery owner and shop manager
-  app.get("/api/shops/:id", requireShopAccess(["shopManager", "barista"]), async (req, res) => {
+  app.get("/api/shops", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
     try {
-      const shopId = parseInt(req.params.id);
-
-      // For non-roasteryOwner users, verify shop access
-      if (req.user?.role !== "roasteryOwner" && req.user?.role !== "owner") {
-        const hasAccess = await checkShopAccess(req.user!.id, shopId);
-        if (!hasAccess) {
-          return res.status(403).json({ message: "User does not have access to this shop" });
-        }
-      }
-
-      const shop = await storage.getShop(shopId);
-      if (!shop || !shop.isActive) {
-        return res.status(404).json({ message: "Shop not found" });
-      }
-
-      res.json(shop);
+      const shops = await storage.getShops();
+      res.json(shops);
     } catch (error) {
-      console.error("Error fetching shop details:", error);
-      res.status(500).json({ message: "Failed to fetch shop details" });
+      console.error("Error getting shops:", error);
+      res.status(500).json({ message: "Failed to get shops" });
     }
   });
 
-  app.get("/api/shops", requireShopAccess(["shopManager", "barista"]), async (req, res) => {
+  app.post("/api/shops", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
     try {
-      let shops;
-      if (req.user?.role === "roasteryOwner" || req.user?.role === "owner") {
-        shops = await storage.getShops();
-      } else {
-        shops = await storage.getUserShops(req.user!.id);
-      }
-      res.json(shops.filter(shop => shop.isActive));
-    } catch (error) {
-      console.error("Error fetching shops:", error);
-      res.status(500).json({ message: "Failed to fetch shops" });
-    }
-  });
-
-  app.post("/api/shops", requireRole(["roasteryOwner"]), async (req, res) => {
-    try {
-      const data = insertShopSchema.parse(req.body);
-      const shop = await storage.createShop(data);
+      const shop = await storage.createShop(req.body);
       res.status(201).json(shop);
     } catch (error) {
       console.error("Error creating shop:", error);
-      res.status(400).json({
-        message: error instanceof Error ? error.message : "Failed to create shop"
-      });
+      res.status(400).json({ message: "Failed to create shop" });
     }
   });
 
-  // Update shop update route
-  app.patch("/api/shops/:id", requireShopAccess(["shopManager"]), async (req, res) => {
+  app.get("/api/shops/:id", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
     try {
       const shopId = parseInt(req.params.id);
-
-      // RoasteryOwner can update everything
-      console.log("Updating shop:", shopId, "with data:", req.body);
-      const updatedShop = await storage.updateShop(shopId, req.body);
-      res.json(updatedShop);
-    } catch (error) {
-      console.error("Error updating shop:", error);
-      res.status(500).json({ 
-        message: "Failed to update shop",
-        details: error instanceof Error ? error.message : "Unknown error" 
-      });
-    }
-  });
-
-  app.delete("/api/shops/:id", requireRole(["roasteryOwner"]), async (req, res) => {
-    try {
-      const shopId = parseInt(req.params.id);
-      const shop = await storage.getShop(shopId);
-
+      const shops = await storage.getShops();
+      const shop = shops.find(s => s.id === shopId);
       if (!shop) {
-        return res.status(404).json({ message: "Shop not found" });
+        res.status(404).json({ message: "Shop not found" });
+        return;
       }
+      res.json(shop);
+    } catch (error) {
+      console.error("Error getting shop:", error);
+      res.status(500).json({ message: "Failed to get shop" });
+    }
+  });
 
-      const deletedShop = await storage.deleteShop(shopId);
-      res.json(deletedShop);
+  app.delete("/api/shops/:id", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
+    try {
+      const shopId = parseInt(req.params.id);
+      const shops = await storage.getShops();
+      const shop = shops.find(s => s.id === shopId);
+      if (!shop) {
+        res.status(404).json({ message: "Shop not found" });
+        return;
+      }
+      await storage.updateShop(shopId, { isActive: false });
+      res.json({ message: "Shop deleted" });
     } catch (error) {
       console.error("Error deleting shop:", error);
       res.status(500).json({ message: "Failed to delete shop" });
     }
   });
-
-
 
   // Green Coffee Routes - accessible by roastery owner and roaster
   app.get("/api/green-coffee", requireRole(["owner", "roasteryOwner", "roaster", "retailOwner", "shopManager", "barista"]), async (req, res) => {
@@ -892,7 +762,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   // Orders Routes - accessible by retail owner
   app.get("/api/orders", requireRole(["retailOwner", "owner", "roasteryOwner", "roaster", "shopManager", "barista"]), async (req, res) => {
     try {
-      console.log("Fetching orders for user:", req.user?.username,"with role:", req.user?.role);
+      console.log("Fetching orders for user:", req.user?.username, "with role:", req.user?.role);
       const shopId = req.query.shopId ? Number(req.query.shopId) : undefined;
       console.log("Filtering orders by shopId:", shopId);
 
@@ -928,7 +798,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           updated_by: sql<string | null>`(SELECT username FROM users WHERE id = ${orders.updatedById})`
         })
         .from(orders)
-        .leftJoin(shops, eq(orders.shopId, shops.id))
+        .innerJoin(shops, eq(orders.shopId, shops.id))
         .leftJoin(greenCoffee, eq(orders.greenCoffeeId, greenCoffee.id))
         .leftJoin(users, eq(orders.createdById, users.id));
 
@@ -954,7 +824,11 @@ export async function registerRoutes(app: Express): Promise<void> {
       const filteredOrders = await query;
       console.log(`Found ${filteredOrders.length} orders for shopId:`, shopId);
 
-      return res.json(filteredOrders);
+      // Filter out any orders with undefined shopId
+      const validOrders = filteredOrders.filter(order => order.shopId !== undefined);
+      console.log(`Filtered out ${filteredOrders.length - validOrders.length} orders with undefined shopId`);
+
+      return res.json(validOrders);
     } catch (error) {
       console.error("Error fetching orders:", error);
       res.status(500).json({
@@ -1028,7 +902,7 @@ export async function registerRoutes(app: Express): Promise<void> {
             // Update inventory with new quantities
             await storage.updateRetailInventory({
               shopId: order.shopId,
-              coffeeId: order.greenCoffeeId,
+              greenCoffeeId: order.greenCoffeeId,
               smallBags: newSmallBags,
               largeBags: newLargeBags,
               updatedById: req.user!.id,
@@ -1166,152 +1040,6 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-  //  // Add new billing routes after the existing ones
-  app.get("/api/billing/lastevent", requireRole(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
-    try {
-      const lastEvent = await storage.getLastBillingEvent();
-      res.json(lastEvent);
-    } catch (error) {
-      console.error("Error fetching last billing event:", error);
-      res.status(500).json({ message: "Failed to fetch last billing event" });
-    }
-  });
-
-  // Add or update the billing quantities endpoint
-  app.get("/api/billing/quantities", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
-    try {
-      console.log("Fetching billing quantities...");
-
-      // First get the last billing event to determine start date
-      const [lastBillingEvent] = await db.execute(sql`
-        SELECT MAX(cycle_end_date) as last_date 
-        FROM billing_events
-      `);
-
-      const fromDate = lastBillingEvent?.last_date || new Date(0).toISOString();
-
-      // Get delivered orders quantities grouped by grade
-      const quantities = await db.execute(sql`
-        SELECT 
-          gc.grade,
-          COALESCE(SUM(o.small_bags), 0) as small_bags_quantity,
-          COALESCE(SUM(o.large_bags), 0) as large_bags_quantity
-        FROM orders o
-        JOIN green_coffee gc ON o.green_coffee_id = gc.id
-        WHERE o.status = 'delivered'
-        GROUP BY gc.grade
-      `);
-
-      console.log("SQL Query Result:", quantities);
-
-      // Format the response
-      const formattedQuantities = quantities.map(row => ({
-        grade: row.grade,
-        smallBagsQuantity: Number(row.small_bags_quantity),
-        largeBagsQuantity: Number(row.large_bags_quantity)
-      }));
-
-      console.log("Formatted quantities:", formattedQuantities);
-
-      res.json({
-        fromDate,
-        quantities: formattedQuantities
-      });
-
-    } catch (error) {
-      console.error("Error fetching billing quantities:", error);
-      res.status(500).json({
-        message: "Failed to fetch billing quantities",
-        details: error instanceof Error ? error.message : String(error)
-      });
-    }
-  });
-
-  // Update the billing history endpoint to include details
-  app.get("/api/billing/history", requireRole(["roasteryOwner"]), async (req, res) => {
-    try {
-      console.log("Fetching billing history for user:", req.user?.username, "role:", req.user?.role);
-      const history = await storage.getBillingHistory();
-      console.log("Retrieved billing history:", history?.length, "events");
-      res.json(history);
-    } catch (error) {
-      console.error("Error fetching billing history:", error);
-      res.status(500).json({ message: "Failed to fetch billing history" });
-    }
-  });
-
-  // Billing event creation endpoint
-  app.post("/api/billing/events", requireRole(["roasteryOwner"]), async (req, res) => {
-    try {
-      console.log("Creating billing event, requested by:", {
-        userId: req.user?.id,
-        username: req.user?.username,
-        role: req.user?.role
-      });
-
-      console.log("Request payload:", JSON.stringify(req.body, null, 2));
-
-      // Validate required fields
-      const { primarySplitPercentage, secondarySplitPercentage, quantities, cycleStartDate, cycleEndDate } = req.body;
-
-      if (!primarySplitPercentage || !secondarySplitPercentage) {
-        throw new Error("Split percentages are required");
-      }
-
-      if (!Array.isArray(quantities) || quantities.length === 0) {
-        throw new Error("Valid quantities array is required");
-      }
-
-      if (!cycleStartDate || !cycleEndDate) {
-        throw new Error("Cycle dates are required");
-      }
-
-      const event = await storage.createBillingEvent({
-        ...req.body,
-        createdById: req.user!.id,
-      });
-
-      console.log("Successfully created billing event:", event);
-      res.json(event);
-    } catch (error) {
-      console.error("Error in billing event creation:", error);
-      res.status(400).json({
-        message: error instanceof Error ? error.message : "Failed to create billing event",
-        details: error instanceof Error ? error.stack : undefined
-      });
-    }
-  });
-
-  // Add billing history route
-  app.get("/api/billing/history", requireRole(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
-    try {
-      console.log("Fetching billing history for user:", req.user?.username, "role:", req.user?.role);
-      const history = await storage.getBillingHistory();
-      console.log("Retrieved billing history:", history.length, "events");
-      res.json(history);
-    } catch (error) {
-      console.error("Error fetching billing history:", error);
-      res.status(500).json({ message: "Failed to fetch billing history" });
-    }
-  });
-
-  app.get("/api/billing/details/:eventId", requireRole(["roasteryOwner", "shopManager", "retailOwner"]), async (req, res) => {
-    try {
-      const eventId = parseInt(req.params.eventId);
-      if (isNaN(eventId)) {
-        return res.status(400).json({ message: "Invalid event ID" });
-      }
-
-      console.log("Fetching billing details for event:", eventId, "user:", req.user?.username);
-      const details = await storage.getBillingEventDetails(eventId);
-      console.log("Retrieved billing details:", details);
-      res.json(details);
-    } catch (error) {
-      console.error("Error fetching billing details:", error);
-      res.status(500).json({ message: "Failed to fetch billing details" });
-    }
-  });
-
   // Add analytics routes for roastery owner
   app.get("/api/analytics/inventory", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
     try {
@@ -1430,59 +1158,23 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  // Billing routes
+  app.get("/api/billing/quantities", requireRole(["roasteryOwner", "retailOwner"]), async (req, res) => {
+    try {
+      const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
+      const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+      const quantities = await storage.getBillingQuantities(startDate, endDate);
+      res.json(quantities);
+    } catch (error) {
+      console.error("Error fetching billing quantities:", error);
+      res.status(500).json({ error: "Failed to fetch billing quantities" });
+    }
+  });
+
   // Remove the httpServer creation from here as it's already handled in index.ts
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok" });
   });
 
   // Add after "/api/users/:id/shops" routes
-
-
-  // Add billing routes
-  app.get("/api/billing/quantities", requireRole(["owner", "roasteryOwner"]), async (req, res) => {
-    try {
-      console.log("Fetching billing quantities...");
-      const quantities = await storage.getBillingQuantities();
-      console.log("Retrieved quantities:", quantities);
-      res.json({
-        quantities,
-        lastEvent: await storage.getLastBillingEvent()
-      });
-    } catch (error) {
-      console.error("Error in /api/billing/quantities:", error);
-      res.status(500).json({ message: "Failed to fetch billing quantities" });
-    }
-  });
-
-  app.get("/api/billing/history", requireRole(["owner", "roasteryOwner"]), async (req, res) => {
-    try {
-      console.log("Fetching billing history for user:", req.user?.username, "role:", req.user?.role);
-      const history = await storage.getBillingHistory();
-      res.json(history);
-    } catch (error) {
-      console.error("Error fetching billing history:", error);
-      res.status(500).json({ message: "Failed to fetch billing history" });
-    }
-  });
-
-  app.post("/api/billing/events", requireRole(["owner", "roasteryOwner"]), async (req, res) => {
-    try {
-      console.log("Creating billing event, requested by:", req.user?.username);
-      console.log("Request data:", req.body);
-
-      const event = await storage.createBillingEvent({
-        ...req.body,
-        createdById: req.user!.id,
-      });
-
-      console.log("Created billing event:", event);
-      res.status(201).json(event);
-    } catch (error) {
-      console.error("Error creating billing event:", error);
-      res.status(400).json({
-        message: error instanceof Error ? error.message : "Failed to create billing event"
-      });
-    }
-  });
-
 }

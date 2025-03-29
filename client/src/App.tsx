@@ -20,11 +20,15 @@ import Profile from "@/pages/profile";
 import NotFound from "@/pages/not-found";
 import { ProtectedRoute } from "@/lib/protected-route";
 import RetailNewArrivals from "@/pages/retail-new-arrivals";
-import Billing from "@/pages/billing";
+import RoastingBatches from "@/pages/roasting-batches";
+import Settings from "@/pages/settings";
+import Orders from "@/pages/orders";
+import Users from "@/pages/users";
+import { Toaster } from "@/components/ui/toaster";
 import RoastingDiscrepancies from "@/pages/roasting-discrepancies";
 import Retail from "@/pages/retail";
 import UserShopManagement from "@/pages/user-shop-management";
-import { Toaster } from "@/components/ui/toaster";
+import Billing from "@/pages/billing";
 
 export default function App() {
   return (
@@ -101,13 +105,11 @@ export default function App() {
             </Route>
 
             <Route path="/roasting/discrepancies">
-              {() => (
-                <ProtectedRoute
-                  path="/roasting/discrepancies"
-                  component={RoastingDiscrepancies}
-                  roles={["roasteryOwner", "roaster"]}
-                />
-              )}
+              <ProtectedRoute
+                path="/roasting/discrepancies"
+                component={RoastingDiscrepancies}
+                roles={["roasteryOwner", "roaster"]}
+              />
             </Route>
 
             {/* Retail Operations */}
@@ -198,13 +200,44 @@ export default function App() {
               {() => <ProtectedRoute path="/profile" component={Profile} />}
             </Route>
 
-            {/* Billing - roastery management only */}
-            <Route path="/billing">
+            {/* Roasting batches - roastery management only */}
+            <Route path="/roasting">
+              <ProtectedRoute
+                path="/roasting"
+                component={RoastingBatches}
+                allowedRoles={["roasteryOwner", "roaster"]}
+              />
+            </Route>
+
+            {/* Settings - all roles */}
+            <Route path="/settings">
               {() => (
                 <ProtectedRoute
-                  path="/billing"
-                  component={Billing}
-                  roles={["roasteryOwner"]}
+                  path="/settings"
+                  component={Settings}
+                  roles={["roasteryOwner", "roaster", "retailOwner", "shopManager", "barista"]}
+                />
+              )}
+            </Route>
+
+            {/* Orders - all roles */}
+            <Route path="/orders">
+              {() => (
+                <ProtectedRoute
+                  path="/orders"
+                  component={Orders}
+                  roles={["roasteryOwner", "roaster", "retailOwner", "shopManager", "barista"]}
+                />
+              )}
+            </Route>
+
+            {/* Users - all roles */}
+            <Route path="/users">
+              {() => (
+                <ProtectedRoute
+                  path="/users"
+                  component={Users}
+                  roles={["roasteryOwner", "roaster", "retailOwner", "shopManager", "barista"]}
                 />
               )}
             </Route>
@@ -216,6 +249,17 @@ export default function App() {
                   path="/user-shop-management"
                   component={UserShopManagement}
                   roles={["roasteryOwner"]}
+                />
+              )}
+            </Route>
+
+            {/* Billing - roasteryOwner and retailOwner */}
+            <Route path="/billing">
+              {() => (
+                <ProtectedRoute
+                  path="/billing"
+                  component={Billing}
+                  roles={["roasteryOwner", "retailOwner"]}
                 />
               )}
             </Route>
