@@ -51,6 +51,8 @@ type InventoryItem = {
   updatedByUsername: string | null;
 };
 
+type OrderStatus = "pending" | "roasted" | "dispatched" | "delivered";
+
 type OrderItem = {
   id: number;
   shopId: number;
@@ -58,12 +60,12 @@ type OrderItem = {
   coffeeName: string;
   smallBags: number;
   largeBags: number;
-  status: string;
+  status: OrderStatus;
   createdAt: string;
-  createdBy: string;
+  created_by: string;
 };
 
-const ORDER_STATUS_SEQUENCE = {
+const ORDER_STATUS_SEQUENCE: Record<OrderStatus, OrderStatus[]> = {
   pending: ["roasted"],
   roasted: ["dispatched"],
   dispatched: ["delivered"],
@@ -110,7 +112,7 @@ export default function RetailOverview() {
   });
 
   const updateOrderStatusMutation = useMutation({
-    mutationFn: async ({ orderId, status }: { orderId: number; status: string }) => {
+    mutationFn: async ({ orderId, status }: { orderId: number; status: OrderStatus }) => {
       const res = await apiRequest("PATCH", `/api/orders/${orderId}/status`, { status });
       if (!res.ok) {
         throw new Error("Failed to update order status");
@@ -134,15 +136,15 @@ export default function RetailOverview() {
   });
 
   // Helper function to get allowed next statuses
-  const getNextStatuses = (currentStatus: string): string[] => {
+  const getNextStatuses = (currentStatus: OrderStatus): OrderStatus[] => {
     if (user?.role === "roasteryOwner") {
       // Roastery owners can set any status except going backwards
-      const allStatuses = ["pending", "roasted", "dispatched", "delivered"];
+      const allStatuses: OrderStatus[] = ["pending", "roasted", "dispatched", "delivered"];
       const currentIndex = allStatuses.indexOf(currentStatus);
       return allStatuses.slice(currentIndex + 1);
     }
     // For retail owners and others, use the sequence map
-    return ORDER_STATUS_SEQUENCE[currentStatus] || [];
+    return ORDER_STATUS_SEQUENCE[currentStatus];
   };
 
   if (loadingInventory || loadingOrders) {
@@ -309,7 +311,7 @@ export default function RetailOverview() {
                           <TableCell>{order.smallBags}</TableCell>
                           <TableCell>{order.largeBags}</TableCell>
                           <TableCell className="capitalize">{order.status}</TableCell>
-                          <TableCell>{order.createdBy}</TableCell>
+                          <TableCell>{order.created_by || 'Unknown'}</TableCell>
                           <TableCell>{formatDate(order.createdAt)}</TableCell>
                           {(user?.role === "retailOwner" || user?.role === "roasteryOwner") && (
                             <TableCell>
@@ -324,7 +326,7 @@ export default function RetailOverview() {
                                         status: "delivered",
                                       })
                                     }
-                                    disabled={updateOrderStatusMutation.isPending || order.status === "delivered"}
+                                    disabled={updateOrderStatusMutation.isPending}
                                   >
                                     {updateOrderStatusMutation.isPending ? (
                                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -340,7 +342,7 @@ export default function RetailOverview() {
                                     onValueChange={(value) =>
                                       updateOrderStatusMutation.mutate({
                                         orderId: order.id,
-                                        status: value,
+                                        status: value as OrderStatus,
                                       })
                                     }
                                     disabled={updateOrderStatusMutation.isPending}
