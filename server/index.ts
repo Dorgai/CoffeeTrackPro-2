@@ -22,13 +22,19 @@ import { logger } from "./utils/logger";
 
 async function createServer() {
   try {
-    console.log("Starting server initialization...");
+    logger.info("Starting server initialization...");
 
     // Initialize database connection first
     await initializeDatabase();
+    logger.info("Database initialized successfully");
 
     const app = express();
     const port = process.env.PORT || 5000;
+
+    // Basic health check endpoint
+    app.get('/api/health', (_req, res) => {
+      res.json({ status: 'ok' });
+    });
 
     // Rate limiting
     const limiter = rateLimit({
@@ -37,22 +43,17 @@ async function createServer() {
     });
     app.use(limiter);
 
-    console.log("Setting up CORS...");
+    // CORS setup
     app.use(cors({
       origin: process.env.CLIENT_URL || 'http://localhost:3000',
       credentials: true
     }));
 
-    console.log("Setting up middleware...");
+    // Middleware setup
     app.use(express.json());
     app.use(express.urlencoded({ extended: false }));
 
-    // Basic health check endpoint
-    app.get('/api/health', (_req, res) => {
-      res.json({ status: 'ok' });
-    });
-
-    console.log("Setting up session...");
+    // Session setup
     app.use(session({
       store: storage.sessionStore,
       secret: process.env.SESSION_SECRET || 'your-secret-key',
@@ -65,44 +66,45 @@ async function createServer() {
       }
     }));
 
-    console.log("Setting up authentication...");
+    // Authentication setup
     setupAuth(app);
 
-    console.log("Registering routes...");
+    // Register routes
     await registerRoutes(app);
-
-    // Routes
-    app.use('/api/auth', authRouter);
-    app.use('/api/shops', authMiddleware, shopRouter);
-    app.use('/api/roasting', authMiddleware, roastingRouter);
-    app.use('/api/retail', authMiddleware, retailRouter);
-    app.use('/api/orders', authMiddleware, orderRouter);
-    app.use('/api/green-coffee', authMiddleware, greenCoffeeRouter);
-    app.use('/api/users', authMiddleware, userRouter);
 
     // Global error handler
     app.use(errorHandler);
 
-    console.log("Starting HTTP server...");
+    // Start HTTP server
     const httpServer = app.listen(Number(port), "0.0.0.0", () => {
-      console.log(`Server is running on http://0.0.0.0:${port}`);
+      logger.info(`Server is running on http://0.0.0.0:${port}`);
     });
 
     // Set up Vite in development mode
     if (app.get("env") === "development") {
-      console.log("Setting up Vite for development...");
       await setupVite(app, httpServer);
     }
 
-    console.log("Server initialization completed successfully");
+    // Handle graceful shutdown
+    process.on('SIGTERM', async () => {
+      logger.info('SIGTERM received. Shutting down gracefully...');
+      await cleanupDatabase();
+      httpServer.close(() => {
+        logger.info('Server closed');
+        process.exit(0);
+      });
+    });
+
+    logger.info("Server initialization completed successfully");
     return httpServer;
   } catch (error) {
-    console.error("Server initialization failed:", error);
+    logger.error("Server initialization failed:", error);
     throw error;
   }
 }
 
+// Start the server
 createServer().catch(error => {
-  console.error(`Failed to start server: ${error instanceof Error ? error.message : String(error)}`);
+  logger.error(`Failed to start server: ${error instanceof Error ? error.message : String(error)}`);
   process.exit(1);
 });
