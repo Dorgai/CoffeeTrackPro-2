@@ -18,7 +18,13 @@ router.get("/inventory", async (req, res) => {
 
 router.post("/inventory", async (req, res) => {
   try {
-    const inventoryData = insertRetailInventorySchema.parse(req.body);
+    if (!req.session.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const inventoryData = insertRetailInventorySchema.parse({
+      ...req.body,
+      updatedById: req.session.userId
+    });
     const inventory = await storage.updateRetailInventory(inventoryData);
     res.json(inventory);
   } catch (error) {

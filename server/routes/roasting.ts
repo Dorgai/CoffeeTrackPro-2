@@ -30,7 +30,13 @@ router.put("/batches/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const batchData = insertRoastingBatchSchema.partial().parse(req.body);
-    const batch = await storage.updateRoastingBatch(id, batchData);
+    const updateData = {
+      ...batchData,
+      plannedAmount: batchData.plannedAmount?.toString(),
+      actualAmount: batchData.actualAmount?.toString(),
+      roastingLoss: batchData.roastingLoss?.toString()
+    };
+    const batch = await storage.updateRoastingBatch(id, updateData);
     res.json(batch);
   } catch (error) {
     logger.error("Error updating roasting batch:", error);
