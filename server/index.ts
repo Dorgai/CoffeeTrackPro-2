@@ -29,7 +29,7 @@ async function createServer() {
     logger.info("Database initialized successfully");
 
     const app = express();
-    const port = process.env.PORT || 5000;
+    const port = process.env.PORT || 10000;
 
     // Basic health check endpoint
     app.get('/api/health', (_req, res) => {
