@@ -1,6 +1,6 @@
 [build]
 builder = "nixpacks"
-buildCommand = "npm run build"
+buildCommand = "npm install && npm run build"
 
 [deploy]
 startCommand = "npm start"
@@ -10,4 +10,10 @@ restartPolicyType = "on-failure"
 restartPolicyMaxRetries = 3
 
 [deploy.envs]
-NODE_ENV = "production" 
+NODE_ENV = "production"
+PORT = "8080"
+CORS_ORIGIN = "https://coffeetrackpro.railway.app"
+
+[[services]]
+name = "web"
+port = 8080 
