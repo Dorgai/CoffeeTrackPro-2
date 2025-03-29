@@ -31,6 +31,19 @@ coverage/
 tmp/
 temp/
 
+# Documentation
+*.docx
+*.md
+!README.md
+
+# Generated files
+generated-icon.png
+cookies.txt
+
+# Replit files
+.replit
+replit.nix
+
 server/public
 vite.config.ts.*
 *.tar.gz
